@@ -23,6 +23,7 @@
 LEGACY_ADMIN_SHOP_ID = 1
 
 import os
+import re
 import asyncio
 import logging
 
@@ -61,9 +62,9 @@ CLIENT_MENU = ReplyKeyboardMarkup(
 # Состояния диалогов админа
 (
     ADMIN_PLATE, ADMIN_OWNER_NAME, ADMIN_OWNER_PHONE, ADMIN_CAR_BRAND_MODEL,
-    ADMIN_MILEAGE, ADMIN_SERVICE_TYPE, ADMIN_OIL_BRAND, ADMIN_FILTER, ADMIN_COST,
+    ADMIN_MILEAGE, ADMIN_NEXT_MILEAGE, ADMIN_SERVICE_TYPE, ADMIN_OIL_BRAND, ADMIN_FILTER, ADMIN_COST,
     ADMIN_INTERVAL, ADMIN_NOTES, SEARCH_PLATE, BROADCAST_TEXT,
-) = range(13)
+) = range(14)
 
 
 def is_admin(update: Update) -> bool:
@@ -156,9 +157,10 @@ async def client_history_button(update: Update, context: ContextTypes.DEFAULT_TY
             for h in item["history"]:
                 filt = " + фильтр" if h["filter_changed"] else ""
                 cost = f", {h['cost']:,} сум".replace(",", " ") if h.get("cost") else ""
+                next_mil = f", менять при {h['next_mileage']:,} км".replace(",", " ") if h.get("next_mileage") else ""
                 text += (
                     f"📅 {h['change_date']} — {h['service_type']}{filt}\n"
-                    f"   Масло: {h['oil_brand'] or '—'}, пробег: {h['mileage'] or '—'} км{cost}\n"
+                    f"   Масло: {h['oil_brand'] or '—'}, пробег: {h['mileage'] or '—'} км{cost}{next_mil}\n"
                     f"   Следующая замена: {h['next_change_date']}\n"
                 )
                 if h["notes"]:
@@ -280,6 +282,20 @@ async def add_mileage(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("Введите пробег числом, например: 45000 (или \"-\")")
             return ADMIN_MILEAGE
+    await update.message.reply_text("При каком пробеге менять масло в следующий раз? Можно \"-\", если не важно:")
+    return ADMIN_NEXT_MILEAGE
+
+
+async def add_next_mileage(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text == "-":
+        context.user_data["next_mileage"] = None
+    else:
+        try:
+            context.user_data["next_mileage"] = int(text.replace(" ", ""))
+        except ValueError:
+            await update.message.reply_text("Введите пробег числом, например: 55000 (или \"-\")")
+            return ADMIN_NEXT_MILEAGE
     types_list = "\n".join(f"{i+1}. {t}" for i, t in enumerate(SERVICE_TYPES))
     await update.message.reply_text(f"Тип услуги — напишите номер или текст:\n{types_list}")
     return ADMIN_SERVICE_TYPE
@@ -320,17 +336,33 @@ async def add_cost(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Введите сумму числом, например: 150000 (или \"-\")")
             return ADMIN_COST
     await update.message.reply_text(
-        f"Через сколько месяцев следующая замена? (например: {DEFAULT_INTERVAL_MONTHS})"
+        f"Через сколько напомнить о следующей замене? Введите число и, если нужно, слово "
+        f"«дней» (например: 10 дней). Без слова — по умолчанию считается в месяцах "
+        f"(например: {DEFAULT_INTERVAL_MONTHS} — это {DEFAULT_INTERVAL_MONTHS} месяца)."
     )
     return ADMIN_INTERVAL
 
 
+def parse_interval(text: str):
+    """Разбирает ответ вида '10 дней', '3 месяца' или просто '3' (тогда — месяцы).
+    Возвращает (значение, единица) или (None, None), если не удалось разобрать."""
+    text = text.strip().lower()
+    m = re.match(r"^(\d+)\s*(дн\w*|мес\w*)?$", text)
+    if not m:
+        return None, None
+    value = int(m.group(1))
+    unit_word = m.group(2) or ""
+    unit = "days" if unit_word.startswith("дн") else "months"
+    return value, unit
+
+
 async def add_interval(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        context.user_data["interval_months"] = int(update.message.text.strip())
-    except ValueError:
-        await update.message.reply_text("Введите число месяцев, например: 3")
+    value, unit = parse_interval(update.message.text)
+    if value is None:
+        await update.message.reply_text("Не понял. Введите, например: 3 (месяца) или 10 дней")
         return ADMIN_INTERVAL
+    context.user_data["interval_value"] = value
+    context.user_data["interval_unit"] = unit
     await update.message.reply_text("Заметки (или напишите \"-\", если нет):")
     return ADMIN_NOTES
 
@@ -349,7 +381,8 @@ async def add_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     _, next_date = db.add_oil_change(
         car_id, d.get("mileage"), d.get("service_type", "Замена масла"), d.get("oil_brand"),
-        d.get("filter_changed", False), d.get("cost"), d["interval_months"], notes
+        d.get("filter_changed", False), d.get("cost"), d["interval_value"], d.get("interval_unit", "months"), notes,
+        next_mileage=d.get("next_mileage")
     )
 
     car_after, _ = db.get_car_history(LEGACY_ADMIN_SHOP_ID, d["plate"])
@@ -407,8 +440,9 @@ async def find_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for h in history:
             filt = " + фильтр" if h["filter_changed"] else ""
             cost = f", {h['cost']:,} сум".replace(",", " ") if h.get("cost") else ""
+            next_mil = f", менять при {h['next_mileage']:,} км".replace(",", " ") if h.get("next_mileage") else ""
             text += (
-                f"• {h['change_date']} — {h['service_type']}{filt}, {h['mileage'] or '—'} км, "
+                f"• {h['change_date']} — {h['service_type']}{filt}, {h['mileage'] or '—'} км{next_mil}, "
                 f"масло: {h['oil_brand'] or '—'}{cost}, след.: {h['next_change_date']}"
             )
             if h["notes"]:
@@ -558,6 +592,7 @@ def main():
             ADMIN_OWNER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_owner_phone)],
             ADMIN_CAR_BRAND_MODEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_car_brand_model)],
             ADMIN_MILEAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_mileage)],
+            ADMIN_NEXT_MILEAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_next_mileage)],
             ADMIN_SERVICE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_service_type)],
             ADMIN_OIL_BRAND: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_oil_brand)],
             ADMIN_FILTER: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_filter)],

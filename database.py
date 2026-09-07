@@ -104,6 +104,8 @@ def init_db():
             filter_changed INTEGER DEFAULT 0,
             cost INTEGER,
             interval_months INTEGER,
+            interval_unit TEXT DEFAULT 'months',
+            next_mileage INTEGER,
             next_change_date TEXT,
             notes TEXT,
             reminder_count INTEGER DEFAULT 0,
@@ -157,6 +159,8 @@ def _migrate(conn):
         "cost": "INTEGER",
         "reminder_count": "INTEGER DEFAULT 0",
         "last_reminder_date": "TEXT",
+        "interval_unit": "TEXT DEFAULT 'months'",
+        "next_mileage": "INTEGER",
     }
     for col, ddl in to_add.items():
         if col not in cols:
@@ -449,7 +453,7 @@ def get_client_full_history(telegram_id: int):
         result = []
         for car in cars:
             history = conn.execute(
-                "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC",
+                "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC",
                 (car["id"],)
             ).fetchall()
             result.append({"car": dict(car), "history": [dict(h) for h in history]})
@@ -501,7 +505,7 @@ def get_car_history(shop_id: int, plate_number: str):
         if not row:
             return None, []
         history = conn.execute(
-            "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC",
+            "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC",
             (row["id"],)
         ).fetchall()
         return dict(row), [dict(h) for h in history]
@@ -510,7 +514,7 @@ def get_car_history(shop_id: int, plate_number: str):
 def get_last_service(car_id: int):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC LIMIT 1",
+            "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC LIMIT 1",
             (car_id,)
         ).fetchone()
         return dict(row) if row else None
@@ -523,11 +527,12 @@ def get_all_cars_overview(shop_id: int):
                 c.id as car_id, c.plate_number, c.car_brand, c.car_model,
                 cl.full_name as owner_name, cl.phone as owner_phone,
                 cl.link_token, cl.telegram_id, cl.id as client_id,
-                (SELECT change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC LIMIT 1) as change_date,
-                (SELECT mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC LIMIT 1) as mileage,
-                (SELECT service_type FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC LIMIT 1) as service_type,
-                (SELECT oil_brand FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC LIMIT 1) as oil_brand,
-                (SELECT next_change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC LIMIT 1) as next_change_date
+                (SELECT change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as change_date,
+                (SELECT mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as mileage,
+                (SELECT service_type FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as service_type,
+                (SELECT oil_brand FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as oil_brand,
+                (SELECT next_change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_change_date,
+                (SELECT next_mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_mileage
             FROM cars c JOIN clients cl ON cl.id = c.client_id
             WHERE c.shop_id=?
             ORDER BY c.created_at DESC
@@ -538,19 +543,26 @@ def get_all_cars_overview(shop_id: int):
 # ---------- Замены масла / обслуживание ----------
 
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
-                    cost, interval_months: int, notes: str = ""):
+                    cost, interval_value: int, interval_unit: str = "months", notes: str = "",
+                    next_mileage=None):
     change_date = datetime.now().strftime("%Y-%m-%d")
-    next_date = (datetime.now() + relativedelta(months=interval_months)).strftime("%Y-%m-%d") if interval_months else None
+    if interval_value:
+        if interval_unit == "days":
+            next_date = (datetime.now() + timedelta(days=interval_value)).strftime("%Y-%m-%d")
+        else:
+            next_date = (datetime.now() + relativedelta(months=interval_value)).strftime("%Y-%m-%d")
+    else:
+        next_date = None
 
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
-                 interval_months, next_change_date, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                 interval_months, interval_unit, next_change_date, next_mileage, notes, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
-              interval_months, next_date, notes))
+              interval_value, interval_unit, next_date, next_mileage, notes))
         conn.commit()
         return cur.lastrowid, next_date
 

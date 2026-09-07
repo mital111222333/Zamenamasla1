@@ -242,9 +242,15 @@ PAGE = """
         <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
       </div>
     </div>
-    <div class="field">
-      <label>Пробег (км)</label>
-      <input id="mileage" type="number" placeholder="45000">
+    <div class="row2">
+      <div class="field">
+        <label>Текущий пробег (км)</label>
+        <input id="mileage" type="number" placeholder="45000">
+      </div>
+      <div class="field">
+        <label>Менять при пробеге (км)</label>
+        <input id="next_mileage" type="number" placeholder="55000">
+      </div>
     </div>
     <div class="field">
       <label>Тип услуги</label>
@@ -266,8 +272,14 @@ PAGE = """
         <input id="cost" type="number" placeholder="150000">
       </div>
       <div class="field">
-        <label>Через сколько месяцев следующая замена?</label>
-        <input id="interval_months" type="number" placeholder="3" value="3">
+        <label>Через сколько напомнить?</label>
+        <div style="display:flex; gap:8px;">
+          <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;">
+          <select id="interval_unit" style="flex:1;">
+            <option value="months">месяцев</option>
+            <option value="days">дней</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="field">
@@ -284,7 +296,7 @@ PAGE = """
         <thead>
           <tr>
             <th>Госномер</th><th>Владелец</th><th>Телефон</th><th>Авто</th>
-            <th>Посл. замена</th><th>Пробег</th><th>Услуга</th><th>Масло</th><th>След. замена</th><th>Клиент</th><th>История</th>
+            <th>Посл. замена</th><th>Пробег</th><th>Менять при</th><th>Услуга</th><th>Масло</th><th>След. замена</th><th>Клиент</th><th>История</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -394,15 +406,17 @@ async function submitCar() {
     car_brand: document.getElementById('car_brand').value,
     car_model: document.getElementById('car_model').value.trim(),
     mileage: document.getElementById('mileage').value,
+    next_mileage: document.getElementById('next_mileage').value,
     service_type: document.getElementById('service_type').value,
     oil_brand: document.getElementById('oil_brand').value.trim(),
     filter_changed: document.getElementById('filter_changed').checked,
     cost: document.getElementById('cost').value,
-    interval_months: document.getElementById('interval_months').value,
+    interval_value: document.getElementById('interval_value').value,
+    interval_unit: document.getElementById('interval_unit').value,
     notes: document.getElementById('notes').value.trim(),
   };
-  if (!payload.plate || !payload.owner_name || !payload.interval_months) {
-    showMsg('Заполните хотя бы госномер, имя владельца и интервал в месяцах.', false);
+  if (!payload.plate || !payload.owner_name || !payload.interval_value) {
+    showMsg('Заполните хотя бы госномер, имя владельца и интервал напоминания.', false);
     return;
   }
   const res = await fetch('/api/add', {
@@ -411,9 +425,10 @@ async function submitCar() {
   const data = await res.json();
   if (data.ok) {
     showMsg(`✅ Сохранено. Следующая замена ориентировочно: ${data.next_date || '—'}.`, true);
-    ['plate','owner_name','owner_phone','car_model','mileage','oil_brand','cost','notes'].forEach(id => document.getElementById(id).value = '');
+    ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','oil_brand','cost','notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('filter_changed').checked = false;
-    document.getElementById('interval_months').value = 3;
+    document.getElementById('interval_value').value = 3;
+    document.getElementById('interval_unit').value = 'months';
     if (data.client_link) {
       openModal(payload.plate, data.client_link, payload.owner_phone);
     }
@@ -441,6 +456,7 @@ function renderTable() {
       <td>${(c.car_brand || '')} ${(c.car_model || '')}</td>
       <td>${c.change_date || '—'}</td>
       <td>${c.mileage || '—'}</td>
+      <td>${c.next_mileage || '—'}</td>
       <td>${c.service_type || '—'}</td>
       <td>${c.oil_brand || '—'}</td>
       <td>${c.next_change_date || '—'}</td>
@@ -449,7 +465,7 @@ function renderTable() {
           : `<button class="badge unlinked" onclick='openModal(${JSON.stringify(c.plate_number)}, ${JSON.stringify(c.client_link || "")}, ${JSON.stringify(c.owner_phone || "")})'>показать ссылку</button>`}</td>
       <td><button class="history-toggle" onclick="toggleHistory('${c.plate_number}')">подробнее</button></td>
     </tr>
-    <tr class="history-row" id="hist-${c.plate_number}" style="display:none;"><td colspan="11"><div id="hist-body-${c.plate_number}">Загрузка...</div></td></tr>
+    <tr class="history-row" id="hist-${c.plate_number}" style="display:none;"><td colspan="12"><div id="hist-body-${c.plate_number}">Загрузка...</div></td></tr>
   `).join('');
 }
 
@@ -476,7 +492,7 @@ async function toggleHistory(plate) {
   body.innerHTML = history.map(h => `
     <div class="history-entry">
       📅 ${h.change_date} — ${h.service_type || 'Замена масла'}${h.filter_changed ? ' + фильтр' : ''} |
-      пробег: ${h.mileage || '—'} км | масло: ${h.oil_brand || '—'}
+      пробег: ${h.mileage || '—'} км | менять при: ${h.next_mileage || '—'} км | масло: ${h.oil_brand || '—'}
       ${h.cost ? ' | ' + h.cost.toLocaleString('ru-RU') + ' сум' : ''}
       | след.: ${h.next_change_date || '—'}
       ${h.notes ? ' | заметка: ' + h.notes : ''}
@@ -554,11 +570,15 @@ def api_add():
         car_brand = data.get("car_brand") or None
         car_model = data.get("car_model") or None
         mileage = int(data["mileage"]) if data.get("mileage") else None
+        next_mileage = int(data["next_mileage"]) if data.get("next_mileage") else None
         service_type = data.get("service_type") or "Замена масла"
         oil_brand = data.get("oil_brand") or None
         filter_changed = bool(data.get("filter_changed"))
         cost = int(data["cost"]) if data.get("cost") else None
-        interval_months = int(data["interval_months"])
+        interval_value = int(data["interval_value"])
+        interval_unit = data.get("interval_unit") or "months"
+        if interval_unit not in ("days", "months"):
+            interval_unit = "months"
         notes = data.get("notes") or ""
 
         existing_car = db.find_car(g.shop_id, plate)
@@ -571,7 +591,8 @@ def api_add():
             car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
 
         _, next_date = db.add_oil_change(
-            car_id, mileage, service_type, oil_brand, filter_changed, cost, interval_months, notes
+            car_id, mileage, service_type, oil_brand, filter_changed, cost, interval_value, interval_unit, notes,
+            next_mileage=next_mileage
         )
 
         car_after, _ = db.get_car_history(g.shop_id, plate)
