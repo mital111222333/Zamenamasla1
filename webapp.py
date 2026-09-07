@@ -170,6 +170,10 @@ PAGE = """
   }
   .checkbox-row { display:flex; align-items:center; gap:8px; }
   .checkbox-row input { width:auto; }
+  .item-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .item-row .item-name { flex:1.3; font-size:13px; color:var(--hint); }
+  .item-row input { flex:1; padding:8px; font-size:13px; }
+  .item-row .item-total { flex:0.9; font-size:12px; color:var(--hint); text-align:right; }
   button.submit {
     width: 100%; padding: 12px; border: none; border-radius: 10px;
     background: var(--btn); color: var(--btn-text); font-size: 16px; font-weight: 600;
@@ -253,33 +257,42 @@ PAGE = """
       </div>
     </div>
     <div class="field">
-      <label>Тип услуги</label>
-      <select id="service_type">
-        {% for s in service_types %}<option value="{{s}}">{{s}}</option>{% endfor %}
-      </select>
+      <label style="font-size:15px; color:var(--text); font-weight:600;">🧴 Жидкости</label>
     </div>
-    <div class="field">
-      <label>Марка масла</label>
-      <input id="oil_brand" placeholder="MITANOL 5W-30">
+    <div id="fluidsList"></div>
+
+    <div class="field" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">🔧 Фильтры</label>
     </div>
-    <div class="field checkbox-row">
-      <input type="checkbox" id="filter_changed">
-      <label style="margin:0;">Меняли фильтр</label>
+    <div id="filtersList"></div>
+
+    <div class="field" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">➕ Другое</label>
     </div>
     <div class="row2">
       <div class="field">
-        <label>Стоимость (сум)</label>
-        <input id="cost" type="number" placeholder="150000">
+        <label>Название</label>
+        <input id="other_name" placeholder="Например: мойка двигателя">
       </div>
       <div class="field">
-        <label>Через сколько напомнить?</label>
-        <div style="display:flex; gap:8px;">
-          <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;">
-          <select id="interval_unit" style="flex:1;">
-            <option value="months">месяцев</option>
-            <option value="days">дней</option>
-          </select>
-        </div>
+        <label>Цена (сум)</label>
+        <input id="other_price" type="number" placeholder="0" oninput="updateTotal()">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:14px; padding:12px; background:#11141a; border-radius:10px;">
+      <label style="font-size:15px;">Итого</label>
+      <div id="totalCost" style="font-size:22px; font-weight:700; color:var(--btn);">0 сум</div>
+    </div>
+
+    <div class="field" style="margin-top:14px;">
+      <label>Через сколько напомнить?</label>
+      <div style="display:flex; gap:8px;">
+        <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;">
+        <select id="interval_unit" style="flex:1;">
+          <option value="months">месяцев</option>
+          <option value="days">дней</option>
+        </select>
       </div>
     </div>
     <div class="field">
@@ -296,7 +309,7 @@ PAGE = """
         <thead>
           <tr>
             <th>Госномер</th><th>Владелец</th><th>Телефон</th><th>Авто</th>
-            <th>Посл. замена</th><th>Пробег</th><th>Менять при</th><th>Услуга</th><th>Масло</th><th>След. замена</th><th>Клиент</th><th>История</th>
+            <th>Посл. замена</th><th>Пробег</th><th>Менять при</th><th>Услуга</th><th>Итого</th><th>След. замена</th><th>Клиент</th><th>История</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -398,7 +411,74 @@ function showMsg(text, ok) {
   setTimeout(() => { el.innerHTML = ''; }, 6000);
 }
 
+// ---- Жидкости и фильтры (детализация замены) ----
+const FLUIDS = ["Моторное масло", "АКПП/МКПП масло", "Антифриз", "Тормозная жидкость", "Масло редуктора"];
+const FILTERS = ["Масляный фильтр", "Воздушный фильтр", "Салонный фильтр", "Топливный фильтр"];
+
+function renderItemLists() {
+  document.getElementById('fluidsList').innerHTML = FLUIDS.map((name, i) => `
+    <div class="item-row">
+      <span class="item-name">${name}</span>
+      <input id="fluid_brand_${i}" placeholder="Марка">
+      <input id="fluid_price_${i}" type="number" placeholder="сум/л" oninput="updateTotal()">
+      <input id="fluid_liters_${i}" type="number" step="0.1" placeholder="л" oninput="updateTotal()">
+    </div>
+  `).join('');
+  document.getElementById('filtersList').innerHTML = FILTERS.map((name, i) => `
+    <div class="item-row">
+      <span class="item-name" style="flex:2.3;">${name}</span>
+      <input id="filter_price_${i}" type="number" placeholder="Цена, сум" oninput="updateTotal()">
+    </div>
+  `).join('');
+}
+
+function collectItems() {
+  const items = [];
+  FLUIDS.forEach((name, i) => {
+    const price = parseFloat(document.getElementById(`fluid_price_${i}`).value) || 0;
+    const liters = parseFloat(document.getElementById(`fluid_liters_${i}`).value) || 0;
+    if (price > 0 && liters > 0) {
+      items.push({
+        name, brand: document.getElementById(`fluid_brand_${i}`).value.trim() || null,
+        unit_price: price, qty: liters, total: Math.round(price * liters),
+      });
+    }
+  });
+  FILTERS.forEach((name, i) => {
+    const price = parseFloat(document.getElementById(`filter_price_${i}`).value) || 0;
+    if (price > 0) {
+      items.push({name, unit_price: price, qty: 1, total: Math.round(price)});
+    }
+  });
+  const otherName = document.getElementById('other_name').value.trim();
+  const otherPrice = parseFloat(document.getElementById('other_price').value) || 0;
+  if (otherPrice > 0) {
+    items.push({name: `Другое: ${otherName || 'без названия'}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
+  }
+  return items;
+}
+
+function updateTotal() {
+  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  document.getElementById('totalCost').textContent = total.toLocaleString('ru-RU') + ' сум';
+}
+
+function resetItemInputs() {
+  FLUIDS.forEach((_, i) => {
+    document.getElementById(`fluid_brand_${i}`).value = '';
+    document.getElementById(`fluid_price_${i}`).value = '';
+    document.getElementById(`fluid_liters_${i}`).value = '';
+  });
+  FILTERS.forEach((_, i) => document.getElementById(`filter_price_${i}`).value = '');
+  document.getElementById('other_name').value = '';
+  document.getElementById('other_price').value = '';
+  updateTotal();
+}
+
+renderItemLists();
+
 async function submitCar() {
+  const items = collectItems();
   const payload = {
     plate: document.getElementById('plate').value.trim(),
     owner_name: document.getElementById('owner_name').value.trim(),
@@ -407,10 +487,7 @@ async function submitCar() {
     car_model: document.getElementById('car_model').value.trim(),
     mileage: document.getElementById('mileage').value,
     next_mileage: document.getElementById('next_mileage').value,
-    service_type: document.getElementById('service_type').value,
-    oil_brand: document.getElementById('oil_brand').value.trim(),
-    filter_changed: document.getElementById('filter_changed').checked,
-    cost: document.getElementById('cost').value,
+    items: items,
     interval_value: document.getElementById('interval_value').value,
     interval_unit: document.getElementById('interval_unit').value,
     notes: document.getElementById('notes').value.trim(),
@@ -425,8 +502,8 @@ async function submitCar() {
   const data = await res.json();
   if (data.ok) {
     showMsg(`✅ Сохранено. Следующая замена ориентировочно: ${data.next_date || '—'}.`, true);
-    ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','oil_brand','cost','notes'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('filter_changed').checked = false;
+    ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
+    resetItemInputs();
     document.getElementById('interval_value').value = 3;
     document.getElementById('interval_unit').value = 'months';
     if (data.client_link) {
@@ -458,7 +535,7 @@ function renderTable() {
       <td>${c.mileage || '—'}</td>
       <td>${c.next_mileage || '—'}</td>
       <td>${c.service_type || '—'}</td>
-      <td>${c.oil_brand || '—'}</td>
+      <td>${c.cost ? c.cost.toLocaleString('ru-RU') + ' сум' : '—'}</td>
       <td>${c.next_change_date || '—'}</td>
       <td>${c.telegram_id
           ? '<span class="badge linked">привязан</span>'
@@ -489,15 +566,27 @@ async function toggleHistory(plate) {
     body.innerHTML = 'Пока нет записей.';
     return;
   }
-  body.innerHTML = history.map(h => `
+  body.innerHTML = history.map(h => {
+    let itemsHtml = '';
+    if (h.items_json) {
+      try {
+        const items = JSON.parse(h.items_json);
+        itemsHtml = '<div style="margin:4px 0 4px 12px;">' + items.map(it =>
+          `• ${it.name}${it.brand ? ' (' + it.brand + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' л' : ''}: ${it.total.toLocaleString('ru-RU')} сум`
+        ).join('<br>') + '</div>';
+      } catch (e) { /* старая запись без items_json */ }
+    }
+    return `
     <div class="history-entry">
-      📅 ${h.change_date} — ${h.service_type || 'Замена масла'}${h.filter_changed ? ' + фильтр' : ''} |
-      пробег: ${h.mileage || '—'} км | менять при: ${h.next_mileage || '—'} км | масло: ${h.oil_brand || '—'}
-      ${h.cost ? ' | ' + h.cost.toLocaleString('ru-RU') + ' сум' : ''}
+      📅 ${h.change_date} — ${h.service_type || 'Замена масла'} |
+      пробег: ${h.mileage || '—'} км | менять при: ${h.next_mileage || '—'} км
+      ${h.cost ? ' | Итого: ' + h.cost.toLocaleString('ru-RU') + ' сум' : ''}
       | след.: ${h.next_change_date || '—'}
-      ${h.notes ? ' | заметка: ' + h.notes : ''}
+      ${itemsHtml}
+      ${h.notes ? '<span style="color:var(--hint)">заметка: ' + h.notes + '</span>' : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function openModal(plate, link, phone) {
@@ -571,10 +660,7 @@ def api_add():
         car_model = data.get("car_model") or None
         mileage = int(data["mileage"]) if data.get("mileage") else None
         next_mileage = int(data["next_mileage"]) if data.get("next_mileage") else None
-        service_type = data.get("service_type") or "Замена масла"
-        oil_brand = data.get("oil_brand") or None
-        filter_changed = bool(data.get("filter_changed"))
-        cost = int(data["cost"]) if data.get("cost") else None
+        items = data.get("items") or []
         interval_value = int(data["interval_value"])
         interval_unit = data.get("interval_unit") or "months"
         if interval_unit not in ("days", "months"):
@@ -591,8 +677,8 @@ def api_add():
             car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
 
         _, next_date = db.add_oil_change(
-            car_id, mileage, service_type, oil_brand, filter_changed, cost, interval_value, interval_unit, notes,
-            next_mileage=next_mileage
+            car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
+            next_mileage=next_mileage, items=items
         )
 
         car_after, _ = db.get_car_history(g.shop_id, plate)

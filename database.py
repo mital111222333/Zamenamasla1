@@ -15,6 +15,7 @@
 """
 
 import os
+import json
 import sqlite3
 import secrets
 from datetime import datetime, timedelta
@@ -106,6 +107,7 @@ def init_db():
             interval_months INTEGER,
             interval_unit TEXT DEFAULT 'months',
             next_mileage INTEGER,
+            items_json TEXT,
             next_change_date TEXT,
             notes TEXT,
             reminder_count INTEGER DEFAULT 0,
@@ -161,6 +163,7 @@ def _migrate(conn):
         "last_reminder_date": "TEXT",
         "interval_unit": "TEXT DEFAULT 'months'",
         "next_mileage": "INTEGER",
+        "items_json": "TEXT",
     }
     for col, ddl in to_add.items():
         if col not in cols:
@@ -532,7 +535,8 @@ def get_all_cars_overview(shop_id: int):
                 (SELECT service_type FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as service_type,
                 (SELECT oil_brand FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as oil_brand,
                 (SELECT next_change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_change_date,
-                (SELECT next_mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_mileage
+                (SELECT next_mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_mileage,
+                (SELECT cost FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as cost
             FROM cars c JOIN clients cl ON cl.id = c.client_id
             WHERE c.shop_id=?
             ORDER BY c.created_at DESC
@@ -544,7 +548,12 @@ def get_all_cars_overview(shop_id: int):
 
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
-                    next_mileage=None):
+                    next_mileage=None, items=None):
+    """items (необязательно) — детализированный список позиций вида
+    [{"name": "Моторное масло", "brand": "MITANOL", "unit_price": 45000, "qty": 4, "total": 180000}, ...]
+    Если передан — стоимость и итоговое описание считаются по нему, а service_type/oil_brand/cost
+    выше игнорируются (оставлены для обратной совместимости со старым простым способом внесения,
+    которым по-прежнему пользуется бот в Telegram)."""
     change_date = datetime.now().strftime("%Y-%m-%d")
     if interval_value:
         if interval_unit == "days":
@@ -554,15 +563,25 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
     else:
         next_date = None
 
+    items_json = None
+    if items:
+        items_json = json.dumps(items, ensure_ascii=False)
+        cost = round(sum(i.get("total", 0) for i in items))
+        names = [i["name"] for i in items]
+        service_type = ", ".join(names) if names else "Обслуживание"
+        motor_oil = next((i for i in items if i["name"] == "Моторное масло"), None)
+        oil_brand = motor_oil["brand"] if motor_oil and motor_oil.get("brand") else None
+        filter_changed = any(i["name"].endswith("фильтр") for i in items)
+
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
-                 interval_months, interval_unit, next_change_date, next_mileage, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                 interval_months, interval_unit, next_change_date, next_mileage, items_json, notes, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
-              interval_value, interval_unit, next_date, next_mileage, notes))
+              interval_value, interval_unit, next_date, next_mileage, items_json, notes))
         conn.commit()
         return cur.lastrowid, next_date
 
