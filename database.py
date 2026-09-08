@@ -714,6 +714,35 @@ def get_recent_broadcasts(shop_id: int, limit: int = 10):
 
 # ---------- Экспорт/бэкап (для кнопки «скачать базу» у точки) ----------
 
+def get_revenue_stats(shop_id: int) -> dict:
+    """Выручка и число услуг за сегодня/вчера/эту неделю (с понедельника)/этот
+    месяц/этот год — для точки. Считается по дате самой услуги (change_date),
+    а не по дате следующей замены."""
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
+    month_start = now.strftime("%Y-%m-01")
+    year_start = now.strftime("%Y-01-01")
+
+    with get_conn() as conn:
+        def agg(date_filter, param):
+            row = conn.execute(f"""
+                SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt
+                FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+                WHERE c.shop_id=? AND oc.cost IS NOT NULL AND {date_filter}
+            """, (shop_id, param)).fetchone()
+            return {"total": row["total"], "count": row["cnt"]}
+
+        return {
+            "today": agg("oc.change_date = ?", today),
+            "yesterday": agg("oc.change_date = ?", yesterday),
+            "week": agg("oc.change_date >= ?", week_start),
+            "month": agg("oc.change_date >= ?", month_start),
+            "year": agg("oc.change_date >= ?", year_start),
+        }
+
+
 def export_shop_data(shop_id: int) -> dict:
     """Полный дамп ВСЕХ данных одной точки — клиенты, машины (с полной
     историей внутри) и рассылки. Используется для скачивания резервной копии

@@ -214,6 +214,11 @@ PAGE = """
   .history-toggle { background:transparent; border:none; color:var(--btn); font-size:12px; cursor:pointer; text-decoration:underline; padding:0; }
   .history-row td { background:#11141a; white-space:normal; }
   .history-entry { padding:6px 0; border-bottom:1px dashed var(--border); font-size:12px; }
+  .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
+  .stats-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .stats-card .label { font-size:13px; color:var(--hint); margin-bottom:8px; }
+  .stats-card .amount { font-size:20px; font-weight:700; color:var(--btn); }
+  .stats-card .count { font-size:12px; color:var(--hint); margin-top:4px; }
 </style>
 </head>
 <body>
@@ -231,6 +236,7 @@ PAGE = """
     <div class="tab" id="tab-table" onclick="showTab('table')">{{ T.tab_table }}</div>
     <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')">{{ T.tab_broadcast }}</div>
     <div class="tab" id="tab-export" onclick="showTab('export')">{{ T.tab_export }}</div>
+    <div class="tab" id="tab-stats" onclick="showTab('stats')">{{ T.tab_stats }}</div>
   </div>
 
   <div id="msg"></div>
@@ -350,6 +356,10 @@ PAGE = """
     <p class="hint-text">{{ T.export_p2 }}</p>
     <button class="submit" onclick="window.location.href='/api/export'">{{ T.export_btn }}</button>
   </div>
+
+  <div id="view-stats" style="display:none;">
+    <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+  </div>
 </div>
 """
 
@@ -381,12 +391,31 @@ function showTab(t) {
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
   document.getElementById('view-broadcast').style.display = t === 'broadcast' ? 'block' : 'none';
   document.getElementById('view-export').style.display = t === 'export' ? 'block' : 'none';
+  document.getElementById('view-stats').style.display = t === 'stats' ? 'block' : 'none';
   document.getElementById('tab-add').classList.toggle('active', t === 'add');
   document.getElementById('tab-table').classList.toggle('active', t === 'table');
   document.getElementById('tab-broadcast').classList.toggle('active', t === 'broadcast');
   document.getElementById('tab-export').classList.toggle('active', t === 'export');
+  document.getElementById('tab-stats').classList.toggle('active', t === 'stats');
   if (t === 'table') loadCars();
   if (t === 'broadcast') loadBroadcastInfo();
+  if (t === 'stats') loadStats();
+}
+
+async function loadStats() {
+  const res = await fetch('/api/stats');
+  const s = await res.json();
+  const periods = [
+    ['today', T.stats_today], ['yesterday', T.stats_yesterday], ['week', T.stats_week],
+    ['month', T.stats_month], ['year', T.stats_year],
+  ];
+  document.getElementById('statsGrid').innerHTML = periods.map(([key, label]) => `
+    <div class="stats-card">
+      <div class="label">${label}</div>
+      <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
+      <div class="count">${T.stats_services_count} ${s[key].count}</div>
+    </div>
+  `).join('');
 }
 
 async function switchLanguage() {
@@ -757,6 +786,12 @@ def api_broadcast_create():
 
 
 # ============ Экспорт / бэкап ============
+
+@app.route("/api/stats")
+@login_required
+def api_stats():
+    return jsonify(db.get_revenue_stats(g.shop_id))
+
 
 @app.route("/api/export")
 @login_required

@@ -22,6 +22,7 @@ RU = {
     "tab_table": "База",
     "tab_broadcast": "📢 Рассылка",
     "tab_export": "⬇️ Экспорт",
+    "tab_stats": "📊 Статистика",
 
     # --- Форма внесения замены ---
     "field_plate": "Госномер",
@@ -114,6 +115,14 @@ RU = {
     "export_p2": "Пригодится для переноса на другой сервер или как резервная копия на всякий случай.",
     "export_btn": "⬇️ Скачать резервную копию",
 
+    "stats_today": "Сегодня",
+    "stats_yesterday": "Вчера",
+    "stats_week": "Эта неделя",
+    "stats_month": "Этот месяц",
+    "stats_year": "Этот год",
+    "stats_services_count": "услуг:",
+    "stats_loading": "Загрузка статистики...",
+
     # --- Модальное окно (ссылка/QR) ---
     "modal_hint": "Отправьте ссылку клиенту или покажите QR — после перехода он автоматически привяжется к боту.",
     "modal_send_tg": "✈️ Отправить в Telegram",
@@ -203,6 +212,7 @@ UZ = {
     "tab_table": "Baza",
     "tab_broadcast": "📢 Xabarnoma",
     "tab_export": "⬇️ Eksport",
+    "tab_stats": "📊 Statistika",
 
     "field_plate": "Davlat raqami",
     "field_owner_name": "Egasining ismi",
@@ -290,6 +300,14 @@ UZ = {
     "export_p1": "Nuqtangizning to'liq bazasini yuklab oling — barcha mijozlar, mashinalar va xizmat tarixi bitta faylda (JSON formatida).",
     "export_p2": "Boshqa serverga ko'chirish yoki zaxira nusxa sifatida foydali bo'ladi.",
     "export_btn": "⬇️ Zaxira nusxani yuklab olish",
+
+    "stats_today": "Bugun",
+    "stats_yesterday": "Kecha",
+    "stats_week": "Bu hafta",
+    "stats_month": "Bu oy",
+    "stats_year": "Bu yil",
+    "stats_services_count": "xizmatlar:",
+    "stats_loading": "Statistika yuklanmoqda...",
 
     "modal_hint": "Havolani mijozga yuboring yoki QR-kodni ko'rsating — o'tgandan so'ng u avtomatik botga bog'lanadi.",
     "modal_send_tg": "✈️ Telegram orqali yuborish",
