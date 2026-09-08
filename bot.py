@@ -35,6 +35,7 @@ from telegram.ext import (
 
 import database as db
 import webapp
+import i18n
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -54,10 +55,22 @@ SHOP_LON = os.environ.get("SHOP_LON", "")
 DEFAULT_INTERVAL_MONTHS = 3
 SERVICE_TYPES = ["Замена масла", "Замена масла + фильтр", "Полное ТО", "Другое"]
 
-CLIENT_MENU = ReplyKeyboardMarkup(
-    [[KeyboardButton("🕒 Моя история"), KeyboardButton("ℹ️ О пункте")]],
-    resize_keyboard=True
-)
+def client_menu(lang: str) -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(i18n.t("menu_history", lang)), KeyboardButton(i18n.t("menu_shop_info", lang))]],
+        resize_keyboard=True
+    )
+
+
+def get_client_lang(telegram_id: int) -> str:
+    """Язык клиента = язык его точки (по последней привязке). Если клиент
+    ещё не найден — возвращает русский по умолчанию (используется только
+    до момента привязки, когда мы ещё не знаем его точку)."""
+    client = db.get_client_by_telegram_id(telegram_id)
+    if not client:
+        return "ru"
+    shop = db.get_shop(client["shop_id"])
+    return (shop.get("language") if shop else None) or "ru"
 
 # Состояния диалогов админа
 (
@@ -101,13 +114,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if is_admin(update):
-        panel_note = f"\n🌐 Веб-панель: {webapp.PUBLIC_URL}" if webapp.PUBLIC_URL else ""
-        await update.message.reply_text(
-            "Здравствуйте! Это админ-панель пункта замены масла.\n\n"
-            "/add — внести новую замену масла\n"
-            "/find — найти машину по госномеру и посмотреть историю"
-            f"{panel_note}"
-        )
+        panel_note = f"\n{i18n.t('bot_panel_note', 'ru')} {webapp.PUBLIC_URL}" if webapp.PUBLIC_URL else ""
+        await update.message.reply_text(i18n.t("bot_admin_greeting", "ru") + panel_note)
         return ConversationHandler.END
 
     token = context.args[0] if context.args else None
@@ -116,26 +124,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if client:
             shop = db.get_shop(client["shop_id"])
             shop_name = shop["shop_name"] if shop else SHOP_NAME
+            lang = (shop.get("language") if shop else None) or "ru"
             cars = db.get_client_cars(client["id"])
             plates = ", ".join(c["plate_number"] for c in cars) or "—"
             await update.message.reply_text(
-                f"Здравствуйте, {client['full_name'] or user.first_name}! 👋\n\n"
-                f"Вы привязаны к {shop_name}. Ваше авто: {plates}.\n"
-                "Когда подойдёт время замены масла — пришлю напоминание.",
-                reply_markup=CLIENT_MENU,
+                i18n.t("bot_client_linked", lang, name=client['full_name'] or user.first_name,
+                       shop=shop_name, plates=plates),
+                reply_markup=client_menu(lang),
             )
             return ConversationHandler.END
 
     existing = db.get_client_by_telegram_id(user.id)
     if existing:
-        await update.message.reply_text("С возвращением! 👋", reply_markup=CLIENT_MENU)
+        lang = get_client_lang(user.id)
+        await update.message.reply_text(i18n.t("bot_welcome_back", lang), reply_markup=client_menu(lang))
         return ConversationHandler.END
 
-    await update.message.reply_text(
-        "Здравствуйте! Чтобы получать напоминания о замене масла, попросите "
-        "на пункте замены персональную ссылку или QR-код — просто перейдите по ней, "
-        "и вы будете автоматически привязаны."
-    )
+    await update.message.reply_text(i18n.t("bot_need_link", "ru"))
     return ConversationHandler.END
 
 
@@ -143,28 +148,33 @@ async def client_history_button(update: Update, context: ContextTypes.DEFAULT_TY
     if is_admin(update):
         return
     user = update.effective_user
+    lang = get_client_lang(user.id)
     data = db.get_client_full_history(user.id)
     if not data:
-        await update.message.reply_text("Пока нет ни одной машины, привязанной к вам.")
+        await update.message.reply_text(i18n.t("bot_no_cars_yet", lang))
         return
 
     for item in data:
         car = item["car"]
         text = f"🚗 {car['plate_number']} — {(car['car_brand'] or '')} {(car['car_model'] or '')}\n\n"
         if not item["history"]:
-            text += "Пока нет записей об обслуживании."
+            text += i18n.t("bot_no_service_records", lang)
         else:
             for h in item["history"]:
-                filt = " + фильтр" if h["filter_changed"] else ""
-                cost = f", {h['cost']:,} сум".replace(",", " ") if h.get("cost") else ""
-                next_mil = f", менять при {h['next_mileage']:,} км".replace(",", " ") if h.get("next_mileage") else ""
+                filt = i18n.t("bot_filter_suffix", lang) if h["filter_changed"] else ""
+                currency = i18n.t("currency", lang)
+                km = i18n.t("km_unit", lang)
+                cost = f", {h['cost']:,} {currency}".replace(",", " ") if h.get("cost") else ""
+                next_mil = (f", {i18n.t('bot_next_mileage_label', lang)} {h['next_mileage']:,} {km}"
+                            .replace(",", " ")) if h.get("next_mileage") else ""
                 text += (
                     f"📅 {h['change_date']} — {h['service_type']}{filt}\n"
-                    f"   Масло: {h['oil_brand'] or '—'}, пробег: {h['mileage'] or '—'} км{cost}{next_mil}\n"
-                    f"   Следующая замена: {h['next_change_date']}\n"
+                    f"   {i18n.t('bot_oil_label', lang)} {h['oil_brand'] or '—'}, "
+                    f"{i18n.t('bot_mileage_label', lang)} {h['mileage'] or '—'} {km}{cost}{next_mil}\n"
+                    f"   {i18n.t('bot_next_change_label', lang)} {h['next_change_date']}\n"
                 )
                 if h["notes"]:
-                    text += f"   Заметка: {h['notes']}\n"
+                    text += f"   {i18n.t('bot_notes_label', lang)} {h['notes']}\n"
                 text += "\n"
         await update.message.reply_text(text)
 
@@ -174,17 +184,18 @@ async def shop_info_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     client = db.get_client_by_telegram_id(update.effective_user.id)
     shop = db.get_shop(client["shop_id"]) if client else None
+    lang = (shop.get("language") if shop else None) or "ru"
     if not shop:
-        await update.message.reply_text("Не нашёл вашу точку — попробуйте перейти по вашей персональной ссылке ещё раз.")
+        await update.message.reply_text(i18n.t("bot_shop_not_found", lang))
         return
 
     lines = [f"ℹ️ {shop['shop_name'] or SHOP_NAME}"]
     if shop.get("address"):
-        lines.append(f"📍 Адрес: {shop['address']}")
+        lines.append(f"{i18n.t('bot_shop_address_label', lang)} {shop['address']}")
     if shop.get("phone"):
-        lines.append(f"📞 Телефон: {shop['phone']}")
+        lines.append(f"{i18n.t('bot_shop_phone_label', lang)} {shop['phone']}")
     if shop.get("hours"):
-        lines.append(f"🕒 Часы работы: {shop['hours']}")
+        lines.append(f"{i18n.t('bot_shop_hours_label', lang)} {shop['hours']}")
     await update.message.reply_text("\n".join(lines))
     if shop.get("lat") and shop.get("lon"):
         try:
@@ -199,17 +210,16 @@ async def reminder_button_callback(update: Update, context: ContextTypes.DEFAULT
     action, oil_change_id = query.data.split(":")
     oil_change_id = int(oil_change_id)
 
+    ctx = db.get_oil_change_with_context(oil_change_id)
+    lang = (ctx.get("language") if ctx else None) or "ru"
+
     if action == "changed":
         db.mark_already_changed_elsewhere(oil_change_id)
-        await query.edit_message_text("Спасибо! Отметили, что замена уже произведена. Хорошей дороги! 🚗")
+        await query.edit_message_text(i18n.t("bot_thanks_changed", lang))
     elif action == "book":
         db.mark_booked(oil_change_id)
-        ctx = db.get_oil_change_with_context(oil_change_id)
         shop_name_for_msg = ctx["shop_name"] if ctx else SHOP_NAME
-        await query.edit_message_text(
-            f"Отлично! Ждём вас на {shop_name_for_msg}. "
-            "Если нужно уточнить время — свяжитесь с нами напрямую."
-        )
+        await query.edit_message_text(i18n.t("bot_booked_confirm", lang, shop=shop_name_for_msg))
         if ctx and ctx.get("notify_telegram_id"):
             try:
                 await context.bot.send_message(
@@ -552,25 +562,19 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     due = db.get_due_reminders()
     for item in due:
         is_followup = item["reminder_count"] > 0
+        lang = item.get("language") or "ru"
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("✅ Уже поменял", callback_data=f"changed:{item['id']}"),
-                InlineKeyboardButton("📅 Записаться", callback_data=f"book:{item['id']}"),
+                InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}"),
+                InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}"),
             ]
         ])
+        shop_name = item.get('shop_name') or SHOP_NAME
         if is_followup:
-            text = (
-                f"🔧 Напоминаем ещё раз про {item['plate_number']} 🚗\n\n"
-                f"Масло пора менять — не откладывайте, это бережёт двигатель. "
-                f"Заедете к нам на {item.get('shop_name') or SHOP_NAME}?"
-            )
+            text = i18n.t("bot_reminder_followup", lang, plate=item['plate_number'], shop=shop_name)
         else:
-            text = (
-                f"🔔 Время замены масла!\n\n"
-                f"Ваш автомобиль {item['plate_number']} — подошёл срок очередной замены масла "
-                f"({item.get('service_type') or 'Замена масла'}).\n\n"
-                f"Хотите записаться на {item.get('shop_name') or SHOP_NAME}?"
-            )
+            service = item.get('service_type') or i18n.t("history_service_fallback", lang)
+            text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
         try:
             await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
             db.mark_reminder_sent(item["id"])
@@ -623,8 +627,10 @@ def main():
     app.add_handler(add_conv)
     app.add_handler(find_conv)
     app.add_handler(broadcast_conv)
-    app.add_handler(MessageHandler(filters.Regex("^🕒 Моя история$"), client_history_button))
-    app.add_handler(MessageHandler(filters.Regex("^ℹ️ О пункте$"), shop_info_button))
+    history_pattern = "^(" + "|".join(re.escape(i18n.t("menu_history", l)) for l in ("ru", "uz")) + ")$"
+    shop_info_pattern = "^(" + "|".join(re.escape(i18n.t("menu_shop_info", l)) for l in ("ru", "uz")) + ")$"
+    app.add_handler(MessageHandler(filters.Regex(history_pattern), client_history_button))
+    app.add_handler(MessageHandler(filters.Regex(shop_info_pattern), shop_info_button))
     app.add_handler(CallbackQueryHandler(broadcast_confirm_callback, pattern="^bc_"))
     app.add_handler(CallbackQueryHandler(reminder_button_callback))
 

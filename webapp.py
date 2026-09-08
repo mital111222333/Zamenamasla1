@@ -20,6 +20,7 @@ from urllib.parse import quote
 from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g
 
 import database as db
+import i18n
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
@@ -52,8 +53,11 @@ def login_required(view):
             session.clear()
             return redirect(url_for("login_page"))
         g.shop_id = session["shop_id"]
+        g.lang = shop.get("language") or "ru"
+        g.T = i18n.get_texts(g.lang)
         return view(*args, **kwargs)
     return wrapped
+
 
 
 def admin_required(view):
@@ -77,7 +81,7 @@ LOGIN_PAGE = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Вход — Замена масла</title>
+<title>{{ T.app_title }}</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -90,17 +94,20 @@ LOGIN_PAGE = """
   input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:15px; margin-bottom:14px; }
   button { width:100%; padding:12px; border:none; border-radius:10px; background:#3a86ff; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
   .error { background:#3a1e1e; color:#dc6f6f; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
+  .lang-link { display:block; text-align:center; margin-top:14px; color:#9a9a9a; font-size:12px; text-decoration:none; }
 </style>
 </head>
 <body>
   <form class="box" method="POST">
-    <h1>🔧 Вход в панель</h1>
+    <h1>🔧 {{ T.login_title }}</h1>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <label>Логин</label>
+    <input type="hidden" name="_lang" value="{{ lang }}">
+    <label>{{ T.login_username }}</label>
     <input name="username" autofocus required>
-    <label>Пароль</label>
+    <label>{{ T.login_password }}</label>
     <input name="password" type="password" required>
-    <button type="submit">Войти</button>
+    <button type="submit">{{ T.login_button }}</button>
+    <a class="lang-link" href="/login?lang={{ other_lang }}">{{ T.lang_switch }}</a>
   </form>
 </body>
 </html>
@@ -110,6 +117,9 @@ LOGIN_PAGE = """
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     error = None
+    lang = request.form.get("_lang") or request.args.get("lang")
+    if lang not in ("ru", "uz"):
+        lang = "ru"
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -122,8 +132,9 @@ def login_page():
             session["shop_name"] = shop.get("shop_name") or shop["username"]
             session.permanent = True
             return redirect(url_for("admin_page") if shop["role"] == "admin" else url_for("index"))
-        error = "Неверный логин или пароль."
-    return render_template_string(LOGIN_PAGE, error=error)
+        error = i18n.t("login_error", lang)
+    T = i18n.get_texts(lang)
+    return render_template_string(LOGIN_PAGE, error=error, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru")
 
 
 @app.route("/logout")
@@ -156,6 +167,7 @@ PAGE = """
   .topbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; }
   h1 { font-size: 20px; margin: 0; }
   .logout { color: var(--hint); font-size: 13px; text-decoration:none; }
+  .lang-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
   .tabs { display:flex; gap:8px; margin-bottom: 14px; flex-wrap:wrap; }
   .tab { flex:1; min-width:100px; text-align:center; padding: 10px; border-radius: 10px; background: var(--card); border:1px solid var(--border); cursor:pointer; font-weight:600; }
   .tab.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
@@ -208,108 +220,111 @@ PAGE = """
 <div class="container">
   <div class="topbar">
     <h1>🔧 {{ shop_name }}</h1>
-    <a class="logout" href="/logout">Выйти</a>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
+      <a class="logout" href="/logout">{{ T.logout }}</a>
+    </div>
   </div>
 
   <div class="tabs">
-    <div class="tab active" id="tab-add" onclick="showTab('add')">Внести замену</div>
-    <div class="tab" id="tab-table" onclick="showTab('table')">База</div>
-    <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')">📢 Рассылка</div>
-    <div class="tab" id="tab-export" onclick="showTab('export')">⬇️ Экспорт</div>
+    <div class="tab active" id="tab-add" onclick="showTab('add')">{{ T.tab_add }}</div>
+    <div class="tab" id="tab-table" onclick="showTab('table')">{{ T.tab_table }}</div>
+    <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')">{{ T.tab_broadcast }}</div>
+    <div class="tab" id="tab-export" onclick="showTab('export')">{{ T.tab_export }}</div>
   </div>
 
   <div id="msg"></div>
 
   <div id="view-add" class="card">
     <div class="field">
-      <label>Госномер</label>
+      <label>{{ T.field_plate }}</label>
       <input id="plate" placeholder="01A123BC">
     </div>
     <div class="field">
-      <label>Имя владельца</label>
+      <label>{{ T.field_owner_name }}</label>
       <input id="owner_name" placeholder="Имя Фамилия">
     </div>
     <div class="field">
-      <label>Телефон владельца</label>
+      <label>{{ T.field_owner_phone }}</label>
       <input id="owner_phone" placeholder="+998 90 123 45 67">
-      <div class="hint-text">Нужен, чтобы можно было в один клик отправить клиенту ссылку в WhatsApp, и чтобы связать несколько его машин в один аккаунт.</div>
+      <div class="hint-text">{{ T.hint_owner_phone }}</div>
     </div>
     <div class="row2">
       <div class="field">
-        <label>Марка авто</label>
+        <label>{{ T.field_car_brand }}</label>
         <select id="car_brand">
           {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
         </select>
       </div>
       <div class="field">
-        <label>Модель</label>
+        <label>{{ T.field_car_model }}</label>
         <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
       </div>
     </div>
     <div class="row2">
       <div class="field">
-        <label>Текущий пробег (км)</label>
+        <label>{{ T.field_mileage }}</label>
         <input id="mileage" type="number" placeholder="45000">
       </div>
       <div class="field">
-        <label>Менять при пробеге (км)</label>
+        <label>{{ T.field_next_mileage }}</label>
         <input id="next_mileage" type="number" placeholder="55000">
       </div>
     </div>
     <div class="field">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">🧴 Жидкости</label>
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_fluids }}</label>
     </div>
     <div id="fluidsList"></div>
 
     <div class="field" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">🔧 Фильтры</label>
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_filters }}</label>
     </div>
     <div id="filtersList"></div>
 
     <div class="field" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">➕ Другое</label>
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_other }}</label>
     </div>
     <div class="row2">
       <div class="field">
-        <label>Название</label>
-        <input id="other_name" placeholder="Например: мойка двигателя">
+        <label>{{ T.field_other_name }}</label>
+        <input id="other_name" placeholder="{{ T.field_other_name_ph }}">
       </div>
       <div class="field">
-        <label>Цена (сум)</label>
+        <label>{{ T.field_price }}</label>
         <input id="other_price" type="number" placeholder="0" oninput="updateTotal()">
       </div>
     </div>
 
     <div class="field" style="margin-top:14px; padding:12px; background:#11141a; border-radius:10px;">
-      <label style="font-size:15px;">Итого</label>
-      <div id="totalCost" style="font-size:22px; font-weight:700; color:var(--btn);">0 сум</div>
+      <label style="font-size:15px;">{{ T.field_total }}</label>
+      <div id="totalCost" style="font-size:22px; font-weight:700; color:var(--btn);">0</div>
     </div>
 
     <div class="field" style="margin-top:14px;">
-      <label>Через сколько напомнить?</label>
+      <label>{{ T.field_interval }}</label>
       <div style="display:flex; gap:8px;">
         <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;">
         <select id="interval_unit" style="flex:1;">
-          <option value="months">месяцев</option>
-          <option value="days">дней</option>
+          <option value="months">{{ T.unit_months }}</option>
+          <option value="days">{{ T.unit_days }}</option>
         </select>
       </div>
     </div>
     <div class="field">
-      <label>Заметки</label>
-      <textarea id="notes" rows="2" placeholder="Необязательно"></textarea>
+      <label>{{ T.field_notes }}</label>
+      <textarea id="notes" rows="2" placeholder="{{ T.notes_ph }}"></textarea>
     </div>
-    <button class="submit" onclick="submitCar()">Сохранить</button>
+    <button class="submit" onclick="submitCar()">{{ T.btn_save }}</button>
   </div>
 
   <div id="view-table" style="display:none;">
-    <input class="search" id="search" placeholder="Поиск по госномеру или имени..." oninput="renderTable()">
+    <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable()">
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Госномер</th><th>Владелец</th><th>Телефон</th><th>Авто</th>
-            <th>Посл. замена</th><th>Пробег</th><th>Менять при</th><th>Услуга</th><th>Итого</th><th>След. замена</th><th>Клиент</th><th>История</th>
+            <th>{{ T.th_plate }}</th><th>{{ T.th_owner }}</th><th>{{ T.th_phone }}</th><th>{{ T.th_car }}</th>
+            <th>{{ T.th_last_change }}</th><th>{{ T.th_mileage }}</th><th>{{ T.th_next_mileage }}</th><th>{{ T.th_service }}</th><th>{{ T.th_total }}</th><th>{{ T.th_next_change }}</th><th>{{ T.th_client }}</th><th>{{ T.th_history }}</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -319,21 +334,21 @@ PAGE = """
 
   <div id="view-broadcast" class="card" style="display:none;">
     <div class="field">
-      <label>Текст объявления/акции</label>
-      <textarea id="broadcast_message" rows="5" placeholder="Например: 🎉 Скидка 15% на масла MITANOL до конца месяца! Успейте записаться."></textarea>
-      <div class="hint-text" id="broadcastRecipients">Загрузка получателей...</div>
+      <label>{{ T.broadcast_msg_label }}</label>
+      <textarea id="broadcast_message" rows="5" placeholder="{{ T.broadcast_msg_ph }}"></textarea>
+      <div class="hint-text" id="broadcastRecipients">{{ T.broadcast_loading_recipients }}</div>
     </div>
-    <button class="submit" onclick="sendBroadcast()">📢 Отправить всем привязанным клиентам</button>
+    <button class="submit" onclick="sendBroadcast()">{{ T.broadcast_send_btn }}</button>
     <div style="margin-top:18px;">
-      <div class="hint-text" style="margin-bottom:8px;">Последние рассылки:</div>
+      <div class="hint-text" style="margin-bottom:8px;">{{ T.broadcast_history_title }}</div>
       <div id="broadcastHistory"></div>
     </div>
   </div>
 
   <div id="view-export" class="card" style="display:none;">
-    <p style="margin-top:0;">Скачайте полную копию базы вашей точки — все клиенты, машины и история обслуживания одним файлом (формат JSON).</p>
-    <p class="hint-text">Пригодится для переноса на другой сервер или как резервная копия на всякий случай.</p>
-    <button class="submit" onclick="window.location.href='/api/export'">⬇️ Скачать резервную копию</button>
+    <p style="margin-top:0;">{{ T.export_p1 }}</p>
+    <p class="hint-text">{{ T.export_p2 }}</p>
+    <button class="submit" onclick="window.location.href='/api/export'">{{ T.export_btn }}</button>
   </div>
 </div>
 """
@@ -342,17 +357,19 @@ MODAL_AND_SCRIPT = """
 <div class="modal-overlay" id="linkModal">
   <div class="modal">
     <h3 id="modalPlate"></h3>
-    <div class="hint-text">Отправьте ссылку клиенту или покажите QR — после перехода он автоматически привяжется к боту.</div>
-    <img id="modalQr" alt="QR-код">
+    <div class="hint-text">{{ T.modal_hint }}</div>
+    <img id="modalQr" alt="QR">
     <div class="link-text" id="modalLink"></div>
-    <a class="wa-btn" id="modalTg" href="#" target="_blank"><button class="submit" type="button" style="background:#2AABEE;">✈️ Отправить в Telegram</button></a>
-    <a class="wa-btn" id="modalWa" href="#" target="_blank"><button class="submit" type="button">📲 Отправить в WhatsApp</button></a>
-    <button class="submit" onclick="copyLink()" style="background:#2a2e37;">Скопировать ссылку</button>
-    <button class="close-btn" onclick="closeModal()">Закрыть</button>
+    <a class="wa-btn" id="modalTg" href="#" target="_blank"><button class="submit" type="button" style="background:#2AABEE;">{{ T.modal_send_tg }}</button></a>
+    <a class="wa-btn" id="modalWa" href="#" target="_blank"><button class="submit" type="button">{{ T.modal_send_wa }}</button></a>
+    <button class="submit" onclick="copyLink()" style="background:#2a2e37;">{{ T.modal_copy }}</button>
+    <button class="close-btn" onclick="closeModal()">{{ T.modal_close }}</button>
   </div>
 </div>
 
 <script>
+const T = {{ t_json|safe }};
+const LANG = {{ lang|tojson }};
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -372,36 +389,44 @@ function showTab(t) {
   if (t === 'broadcast') loadBroadcastInfo();
 }
 
+async function switchLanguage() {
+  const newLang = LANG === 'ru' ? 'uz' : 'ru';
+  await fetch('/api/set_language', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({language: newLang})
+  });
+  window.location.reload();
+}
+
 async function loadBroadcastInfo() {
   const res = await fetch('/api/broadcast/recipients');
   const data = await res.json();
   document.getElementById('broadcastRecipients').textContent =
-    `Получат сообщение: ${data.count} клиент(ов), привязавших бот.`;
+    `${T.broadcast_recipients_text} ${data.count} ${T.broadcast_recipients_suffix}`;
 
   const res2 = await fetch('/api/broadcast/history');
   const items = await res2.json();
   document.getElementById('broadcastHistory').innerHTML = items.length ? items.map(b => `
     <div style="padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;">
       <div>${b.message.length > 80 ? b.message.slice(0,80) + '…' : b.message}</div>
-      <div class="hint-text">${b.created_at} — статус: ${b.status}${b.status === 'done' ? `, доставлено ${b.total_sent}, не удалось ${b.total_failed}` : ''}</div>
+      <div class="hint-text">${b.created_at} — ${T.broadcast_status_label} ${b.status}${b.status === 'done' ? `, ${T.broadcast_delivered} ${b.total_sent}, ${T.broadcast_failed} ${b.total_failed}` : ''}</div>
     </div>
-  `).join('') : '<div class="hint-text">Пока рассылок не было.</div>';
+  `).join('') : `<div class="hint-text">${T.broadcast_none_yet}</div>`;
 }
 
 async function sendBroadcast() {
   const message = document.getElementById('broadcast_message').value.trim();
-  if (!message) { showMsg('Введите текст объявления.', false); return; }
-  if (!confirm('Отправить это сообщение всем привязанным клиентам?')) return;
+  if (!message) { showMsg(T.broadcast_empty_msg, false); return; }
+  if (!confirm(T.broadcast_confirm)) return;
   const res = await fetch('/api/broadcast', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message})
   });
   const data = await res.json();
   if (data.ok) {
-    showMsg('✅ Рассылка поставлена в очередь, отправится в течение примерно 15 секунд.', true);
+    showMsg(T.broadcast_queued, true);
     document.getElementById('broadcast_message').value = '';
     setTimeout(loadBroadcastInfo, 4000);
   } else {
-    showMsg('Ошибка: ' + data.error, false);
+    showMsg(T.msg_error + ' ' + data.error, false);
   }
 }
 
@@ -412,64 +437,64 @@ function showMsg(text, ok) {
 }
 
 // ---- Жидкости и фильтры (детализация замены) ----
-const FLUIDS = ["Моторное масло", "АКПП/МКПП масло", "Антифриз", "Тормозная жидкость", "Масло редуктора"];
-const FILTERS = ["Масляный фильтр", "Воздушный фильтр", "Салонный фильтр", "Топливный фильтр"];
+const FLUID_KEYS = ["fluid_0", "fluid_1", "fluid_2", "fluid_3", "fluid_4"];
+const FILTER_KEYS = ["filter_0", "filter_1", "filter_2", "filter_3"];
 
 function renderItemLists() {
-  document.getElementById('fluidsList').innerHTML = FLUIDS.map((name, i) => `
+  document.getElementById('fluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
     <div class="item-row">
-      <span class="item-name">${name}</span>
-      <input id="fluid_brand_${i}" placeholder="Марка">
-      <input id="fluid_price_${i}" type="number" placeholder="сум/л" oninput="updateTotal()">
-      <input id="fluid_liters_${i}" type="number" step="0.1" placeholder="л" oninput="updateTotal()">
+      <span class="item-name">${T[key]}</span>
+      <input id="fluid_brand_${i}" placeholder="${T.brand_ph}">
+      <input id="fluid_price_${i}" type="number" placeholder="${T.price_per_liter_ph}" oninput="updateTotal()">
+      <input id="fluid_liters_${i}" type="number" step="0.1" placeholder="${T.liters_ph}" oninput="updateTotal()">
     </div>
   `).join('');
-  document.getElementById('filtersList').innerHTML = FILTERS.map((name, i) => `
+  document.getElementById('filtersList').innerHTML = FILTER_KEYS.map((key, i) => `
     <div class="item-row">
-      <span class="item-name" style="flex:2.3;">${name}</span>
-      <input id="filter_price_${i}" type="number" placeholder="Цена, сум" oninput="updateTotal()">
+      <span class="item-name" style="flex:2.3;">${T[key]}</span>
+      <input id="filter_price_${i}" type="number" placeholder="${T.price_ph}" oninput="updateTotal()">
     </div>
   `).join('');
 }
 
 function collectItems() {
   const items = [];
-  FLUIDS.forEach((name, i) => {
+  FLUID_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`fluid_price_${i}`).value) || 0;
     const liters = parseFloat(document.getElementById(`fluid_liters_${i}`).value) || 0;
     if (price > 0 && liters > 0) {
       items.push({
-        name, brand: document.getElementById(`fluid_brand_${i}`).value.trim() || null,
+        key, name: T[key], brand: document.getElementById(`fluid_brand_${i}`).value.trim() || null,
         unit_price: price, qty: liters, total: Math.round(price * liters),
       });
     }
   });
-  FILTERS.forEach((name, i) => {
+  FILTER_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`filter_price_${i}`).value) || 0;
     if (price > 0) {
-      items.push({name, unit_price: price, qty: 1, total: Math.round(price)});
+      items.push({key, name: T[key], unit_price: price, qty: 1, total: Math.round(price)});
     }
   });
   const otherName = document.getElementById('other_name').value.trim();
   const otherPrice = parseFloat(document.getElementById('other_price').value) || 0;
   if (otherPrice > 0) {
-    items.push({name: `Другое: ${otherName || 'без названия'}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
+    items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
   return items;
 }
 
 function updateTotal() {
   const total = collectItems().reduce((sum, i) => sum + i.total, 0);
-  document.getElementById('totalCost').textContent = total.toLocaleString('ru-RU') + ' сум';
+  document.getElementById('totalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
 }
 
 function resetItemInputs() {
-  FLUIDS.forEach((_, i) => {
+  FLUID_KEYS.forEach((_, i) => {
     document.getElementById(`fluid_brand_${i}`).value = '';
     document.getElementById(`fluid_price_${i}`).value = '';
     document.getElementById(`fluid_liters_${i}`).value = '';
   });
-  FILTERS.forEach((_, i) => document.getElementById(`filter_price_${i}`).value = '');
+  FILTER_KEYS.forEach((_, i) => document.getElementById(`filter_price_${i}`).value = '');
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
   updateTotal();
@@ -493,7 +518,7 @@ async function submitCar() {
     notes: document.getElementById('notes').value.trim(),
   };
   if (!payload.plate || !payload.owner_name || !payload.interval_value) {
-    showMsg('Заполните хотя бы госномер, имя владельца и интервал напоминания.', false);
+    showMsg(T.msg_fill_required, false);
     return;
   }
   const res = await fetch('/api/add', {
@@ -501,7 +526,7 @@ async function submitCar() {
   });
   const data = await res.json();
   if (data.ok) {
-    showMsg(`✅ Сохранено. Следующая замена ориентировочно: ${data.next_date || '—'}.`, true);
+    showMsg(`✅ ${T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     resetItemInputs();
     document.getElementById('interval_value').value = 3;
@@ -510,7 +535,7 @@ async function submitCar() {
       openModal(payload.plate, data.client_link, payload.owner_phone);
     }
   } else {
-    showMsg('Ошибка: ' + data.error, false);
+    showMsg(T.msg_error + ' ' + data.error, false);
   }
 }
 
@@ -535,14 +560,14 @@ function renderTable() {
       <td>${c.mileage || '—'}</td>
       <td>${c.next_mileage || '—'}</td>
       <td>${c.service_type || '—'}</td>
-      <td>${c.cost ? c.cost.toLocaleString('ru-RU') + ' сум' : '—'}</td>
+      <td>${c.cost ? c.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
       <td>${c.next_change_date || '—'}</td>
       <td>${c.telegram_id
-          ? '<span class="badge linked">привязан</span>'
-          : `<button class="badge unlinked" onclick='openModal(${JSON.stringify(c.plate_number)}, ${JSON.stringify(c.client_link || "")}, ${JSON.stringify(c.owner_phone || "")})'>показать ссылку</button>`}</td>
-      <td><button class="history-toggle" onclick="toggleHistory('${c.plate_number}')">подробнее</button></td>
+          ? `<span class="badge linked">${T.badge_linked}</span>`
+          : `<button class="badge unlinked" onclick='openModal(${JSON.stringify(c.plate_number)}, ${JSON.stringify(c.client_link || "")}, ${JSON.stringify(c.owner_phone || "")})'>${T.badge_unlinked_btn}</button>`}</td>
+      <td><button class="history-toggle" onclick="toggleHistory('${c.plate_number}')">${T.history_more}</button></td>
     </tr>
-    <tr class="history-row" id="hist-${c.plate_number}" style="display:none;"><td colspan="12"><div id="hist-body-${c.plate_number}">Загрузка...</div></td></tr>
+    <tr class="history-row" id="hist-${c.plate_number}" style="display:none;"><td colspan="12"><div id="hist-body-${c.plate_number}">${T.history_loading}</div></td></tr>
   `).join('');
 }
 
@@ -563,7 +588,7 @@ async function toggleHistory(plate) {
   const history = await res.json();
   const body = document.getElementById('hist-body-' + plate);
   if (!history.length) {
-    body.innerHTML = 'Пока нет записей.';
+    body.innerHTML = T.history_empty;
     return;
   }
   body.innerHTML = history.map(h => {
@@ -572,35 +597,35 @@ async function toggleHistory(plate) {
       try {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div style="margin:4px 0 4px 12px;">' + items.map(it =>
-          `• ${it.name}${it.brand ? ' (' + it.brand + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' л' : ''}: ${it.total.toLocaleString('ru-RU')} сум`
+          `• ${it.name}${it.brand ? ' (' + it.brand + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
         ).join('<br>') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
     return `
     <div class="history-entry">
-      📅 ${h.change_date} — ${h.service_type || 'Замена масла'} |
-      пробег: ${h.mileage || '—'} км | менять при: ${h.next_mileage || '—'} км
-      ${h.cost ? ' | Итого: ' + h.cost.toLocaleString('ru-RU') + ' сум' : ''}
-      | след.: ${h.next_change_date || '—'}
+      📅 ${h.change_date} — ${h.service_type || T.history_service_fallback} |
+      ${T.history_mileage_label} ${h.mileage || '—'} км | ${T.history_next_mileage_label} ${h.next_mileage || '—'} км
+      ${h.cost ? ' | ' + T.history_total_label + ' ' + h.cost.toLocaleString('ru-RU') + ' ' + T.currency : ''}
+      | ${T.history_next_label} ${h.next_change_date || '—'}
       ${itemsHtml}
-      ${h.notes ? '<span style="color:var(--hint)">заметка: ' + h.notes + '</span>' : ''}
+      ${h.notes ? '<span style="color:var(--hint)">' + T.history_notes_label + ' ' + h.notes + '</span>' : ''}
     </div>
   `;
   }).join('');
 }
 
 function openModal(plate, link, phone) {
-  if (!link) { showMsg('BOT_USERNAME не задан на сервере — ссылку сформировать нельзя.', false); return; }
+  if (!link) { showMsg(T.modal_no_bot_username, false); return; }
   document.getElementById('modalPlate').textContent = plate;
   document.getElementById('modalLink').textContent = link;
   document.getElementById('modalQr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(link);
   const tgBtn = document.getElementById('modalTg');
-  tgBtn.href = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Ваша персональная ссылка для напоминаний о замене масла:');
+  tgBtn.href = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(T.share_text_tg);
   const waBtn = document.getElementById('modalWa');
   if (phone) {
     let digits = phone.replace(/\\D/g, '');
     if (digits && !digits.startsWith('998') && digits.length <= 9) digits = '998' + digits;
-    const text = encodeURIComponent('Здравствуйте! Вот ваша персональная ссылка для напоминаний о замене масла: ' + link);
+    const text = encodeURIComponent(T.share_text_wa + ' ' + link);
     waBtn.href = 'https://wa.me/' + digits + '?text=' + text;
     waBtn.style.display = 'block';
   } else {
@@ -615,7 +640,7 @@ function closeModal() {
 
 function copyLink() {
   const text = document.getElementById('modalLink').textContent;
-  navigator.clipboard.writeText(text).then(() => showMsg('Ссылка скопирована', true));
+  navigator.clipboard.writeText(text).then(() => showMsg(T.link_copied, true));
 }
 </script>
 </body>
@@ -628,8 +653,23 @@ PAGE = PAGE + MODAL_AND_SCRIPT
 @app.route("/")
 @login_required
 def index():
-    return render_template_string(PAGE, brands=CAR_BRANDS, service_types=SERVICE_TYPES,
-                                   shop_name=session.get("shop_name") or "Замена масла")
+    import json as _json
+    return render_template_string(
+        PAGE, brands=CAR_BRANDS, service_types=SERVICE_TYPES,
+        shop_name=session.get("shop_name") or "Замена масла",
+        T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False),
+    )
+
+
+@app.route("/api/set_language", methods=["POST"])
+@login_required
+def api_set_language():
+    data = request.get_json(force=True)
+    lang = data.get("language")
+    if lang not in ("ru", "uz"):
+        return jsonify({"ok": False, "error": "invalid language"}), 400
+    db.set_shop_language(g.shop_id, lang)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/cars")
@@ -1017,7 +1057,7 @@ DISPLAY_PAGE = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Табло</title>
+<title>{{ T.app_title }}</title>
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
   body {
@@ -1041,16 +1081,17 @@ DISPLAY_PAGE = """
 <body>
 <div id="screen"></div>
 <script>
+const T = {{ t_json|safe }};
 const SHOP_NAME = {{ shop_name|tojson }};
 const ANPR_TOKEN = {{ anpr_token|tojson }};
 
 function pad(n) { return n.toString().padStart(2, '0'); }
 function renderIdle() {
   const now = new Date();
-  const days = ['Якшанба','Душанба','Сешанба','Чоршанба','Пайшанба','Жума','Шанба'];
+  const days = T.days_of_week;
   document.getElementById('screen').innerHTML = `
     <div class="idle">
-      <div class="shop">${SHOP_NAME || '🔧 Пункт замены масла'}</div>
+      <div class="shop">${SHOP_NAME || '🔧 ' + T.app_title}</div>
       <div class="clock">${pad(now.getHours())}:${pad(now.getMinutes())}</div>
       <div class="date">${days[now.getDay()]}, ${pad(now.getDate())}.${pad(now.getMonth()+1)}.${now.getFullYear()}</div>
     </div>`;
@@ -1060,18 +1101,18 @@ function renderActive(d) {
   if (!d.found) {
     document.getElementById('screen').innerHTML = `
       <div class="active">
-        <div class="greet">Хуш келибсиз! 👋</div>
+        <div class="greet">${T.display_welcome} 👋</div>
         <div class="plate">${d.plate}</div>
-        <div class="notfound">Сиз ҳали бизнинг мижозимиз эмассиз</div>
+        <div class="notfound">${T.display_not_client_yet}</div>
       </div>`;
     return;
   }
   const last = d.last_service_date
-    ? `Сўнгги хизмат: ${d.last_service_date}${d.service_type ? ' — ' + d.service_type : ''}${d.oil_brand ? ' (' + d.oil_brand + ')' : ''}`
-    : 'Хизмат тарихи топилмади';
+    ? `${T.display_last_service} ${d.last_service_date}${d.service_type ? ' — ' + d.service_type : ''}${d.oil_brand ? ' (' + d.oil_brand + ')' : ''}`
+    : T.display_no_history;
   document.getElementById('screen').innerHTML = `
     <div class="active">
-      <div class="greet">Ассалому алайкум, ҳурматли мижоз ${d.owner_name || ''}!</div>
+      <div class="greet">${T.display_greeting} ${d.owner_name || ''}!</div>
       <div class="plate">${d.plate}</div>
       <div class="info">${last}</div>
     </div>`;
@@ -1095,10 +1136,15 @@ setInterval(tick, 2000);
 
 @app.route("/display/<anpr_token>")
 def display_page(anpr_token):
+    import json as _json
     shop = db.get_shop_by_anpr_token(anpr_token)
     if not shop or not shop["is_active"]:
         return "Табло не найдено — проверьте ссылку.", 404
-    return render_template_string(DISPLAY_PAGE, shop_name=shop.get("shop_name") or "", anpr_token=anpr_token)
+    T = i18n.get_texts(shop.get("language") or "ru")
+    return render_template_string(
+        DISPLAY_PAGE, shop_name=shop.get("shop_name") or "", anpr_token=anpr_token,
+        T=T, t_json=_json.dumps(T, ensure_ascii=False),
+    )
 
 
 def run_webapp():

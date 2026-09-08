@@ -61,6 +61,7 @@ def init_db():
             lon REAL,
             anpr_token TEXT UNIQUE,
             notify_telegram_id TEXT,
+            language TEXT DEFAULT 'ru',
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -152,6 +153,11 @@ def _migrate(conn):
             conn.execute("ALTER TABLE cars_old RENAME TO cars")
         else:
             conn.execute("DROP TABLE cars_old")
+
+    # --- shops: добавляем language, если его ещё нет (старые точки получают 'ru') ---
+    shop_cols = {row["name"] for row in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    if "language" not in shop_cols:
+        conn.execute("ALTER TABLE shops ADD COLUMN language TEXT DEFAULT 'ru'")
 
     # --- oil_changes: добавляем недостающие колонки (из более ранних версий) ---
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
@@ -366,6 +372,14 @@ def set_shop_active(shop_id: int, active: bool):
         conn.commit()
 
 
+def set_shop_language(shop_id: int, language: str):
+    if language not in ("ru", "uz"):
+        language = "ru"
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET language=? WHERE id=?", (language, shop_id))
+        conn.commit()
+
+
 def username_taken(username: str) -> bool:
     with get_conn() as conn:
         return conn.execute("SELECT 1 FROM shops WHERE username=?", (username,)).fetchone() is not None
@@ -569,9 +583,9 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         cost = round(sum(i.get("total", 0) for i in items))
         names = [i["name"] for i in items]
         service_type = ", ".join(names) if names else "Обслуживание"
-        motor_oil = next((i for i in items if i["name"] == "Моторное масло"), None)
+        motor_oil = next((i for i in items if i.get("key") == "fluid_0"), None)
         oil_brand = motor_oil["brand"] if motor_oil and motor_oil.get("brand") else None
-        filter_changed = any(i["name"].endswith("фильтр") for i in items)
+        filter_changed = any((i.get("key") or "").startswith("filter_") for i in items)
 
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
@@ -595,7 +609,7 @@ def get_due_reminders():
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT oc.*, c.plate_number, c.shop_id, cl.full_name as owner_name, cl.telegram_id,
-                   s.shop_name, s.notify_telegram_id
+                   s.shop_name, s.notify_telegram_id, s.language
             FROM oil_changes oc
             JOIN cars c ON c.id = oc.car_id
             JOIN clients cl ON cl.id = c.client_id
@@ -637,7 +651,7 @@ def get_oil_change_with_context(oil_change_id: int):
     with get_conn() as conn:
         row = conn.execute("""
             SELECT oc.*, c.plate_number, c.shop_id, cl.full_name as owner_name, cl.phone as owner_phone,
-                   s.shop_name, s.notify_telegram_id
+                   s.shop_name, s.notify_telegram_id, s.language
             FROM oil_changes oc
             JOIN cars c ON c.id = oc.car_id
             JOIN clients cl ON cl.id = c.client_id
