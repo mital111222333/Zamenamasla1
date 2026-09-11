@@ -219,6 +219,10 @@ PAGE = """
   .stats-card .label { font-size:13px; color:var(--hint); margin-bottom:8px; }
   .stats-card .amount { font-size:20px; font-weight:700; color:var(--btn); }
   .stats-card .count { font-size:12px; color:var(--hint); margin-top:4px; }
+  .known-client { margin-top:8px; padding:10px; background:#11141a; border:1px solid var(--btn); border-radius:10px; font-size:12px; }
+  .known-client .kc-title { color:#6fdc9a; font-weight:600; margin-bottom:6px; }
+  .known-client .kc-entry { padding:4px 0; border-bottom:1px dashed var(--border); }
+  .known-client .kc-entry:last-child { border-bottom:none; }
 </style>
 </head>
 <body>
@@ -244,7 +248,8 @@ PAGE = """
   <div id="view-add" class="card">
     <div class="field">
       <label>{{ T.field_plate }}</label>
-      <input id="plate" placeholder="01A123BC">
+      <input id="plate" placeholder="01A123BC" onblur="lookupPlate()">
+      <div id="knownClientPanel"></div>
     </div>
     <div class="field">
       <label>{{ T.field_owner_name }}</label>
@@ -359,6 +364,23 @@ PAGE = """
 
   <div id="view-stats" style="display:none;">
     <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+
+    <div class="card" style="margin-top:16px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.stats_custom_title }}</label>
+      <div id="statsPresets" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
+      <div class="row2">
+        <div class="field">
+          <label>{{ T.stats_from }}</label>
+          <input id="stats_from" type="date">
+        </div>
+        <div class="field">
+          <label>{{ T.stats_to }}</label>
+          <input id="stats_to" type="date">
+        </div>
+      </div>
+      <button class="submit" onclick="applyStatsRange()">{{ T.stats_apply }}</button>
+      <div id="statsRangeResult" style="margin-top:14px;"></div>
+    </div>
   </div>
 </div>
 """
@@ -417,6 +439,66 @@ async function loadStats() {
     </div>
   `).join('');
 }
+
+function fmtDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function setStatsRange(from, to) {
+  document.getElementById('stats_from').value = fmtDate(from);
+  document.getElementById('stats_to').value = fmtDate(to);
+  applyStatsRange();
+}
+
+function renderStatsPresets() {
+  const today = new Date();
+  const presets = [
+    [T.stats_preset_today, () => setStatsRange(today, today)],
+    [T.stats_preset_yesterday, () => {
+      const y = new Date(today); y.setDate(y.getDate() - 1);
+      setStatsRange(y, y);
+    }],
+    [T.stats_preset_7days, () => {
+      const start = new Date(today); start.setDate(start.getDate() - 6);
+      setStatsRange(start, today);
+    }],
+    [T.stats_preset_this_month, () => {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStatsRange(start, today);
+    }],
+    [T.stats_preset_prev_month, () => {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      setStatsRange(start, end);
+    }],
+  ];
+  document.getElementById('statsPresets').innerHTML = presets.map(([label], i) =>
+    `<button class="lang-btn" onclick="STATS_PRESETS[${i}]()">${label}</button>`
+  ).join('');
+  window.STATS_PRESETS = presets.map(p => p[1]);
+  const from = document.getElementById('stats_from');
+  const to = document.getElementById('stats_to');
+  if (!from.value) from.value = fmtDate(today);
+  if (!to.value) to.value = fmtDate(today);
+}
+
+async function applyStatsRange() {
+  const from = document.getElementById('stats_from').value;
+  const to = document.getElementById('stats_to').value;
+  if (!from || !to) return;
+  const res = await fetch(`/api/stats/range?from=${from}&to=${to}`);
+  const data = await res.json();
+  if (!data.ok) { document.getElementById('statsRangeResult').innerHTML = ''; return; }
+  document.getElementById('statsRangeResult').innerHTML = `
+    <div class="stats-card">
+      <div class="label">${T.stats_range_result} ${from} — ${to}</div>
+      <div class="amount">${data.total.toLocaleString('ru-RU')} ${T.currency}</div>
+      <div class="count">${T.stats_services_count} ${data.count}</div>
+    </div>
+  `;
+}
+
+renderStatsPresets();
 
 async function switchLanguage() {
   const newLang = LANG === 'ru' ? 'uz' : 'ru';
@@ -526,7 +608,34 @@ function resetItemInputs() {
   FILTER_KEYS.forEach((_, i) => document.getElementById(`filter_price_${i}`).value = '');
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
+  document.getElementById('knownClientPanel').innerHTML = '';
   updateTotal();
+}
+
+async function lookupPlate() {
+  const plate = document.getElementById('plate').value.trim();
+  const panel = document.getElementById('knownClientPanel');
+  if (!plate) { panel.innerHTML = ''; return; }
+  try {
+    const res = await fetch('/api/history/' + encodeURIComponent(plate));
+    const data = await res.json();
+    if (!data.car) { panel.innerHTML = ''; return; }
+
+    document.getElementById('owner_name').value = data.car.owner_name || '';
+    document.getElementById('owner_phone').value = data.car.owner_phone || '';
+    if (data.car.car_brand) document.getElementById('car_brand').value = data.car.car_brand;
+    document.getElementById('car_model').value = data.car.car_model || '';
+
+    const shown = data.history.slice(0, 2);
+    const historyHtml = shown.length ? shown.map(h => `
+      <div class="kc-entry">📅 ${h.change_date} — ${h.service_type || T.history_service_fallback}${h.cost ? ', ' + h.cost.toLocaleString('ru-RU') + ' ' + T.currency : ''}</div>
+    `).join('') : `<div class="kc-entry">${T.kc_no_history}</div>`;
+    const moreHint = data.history.length > 2 ? `<div class="kc-entry" style="opacity:.7;">${T.kc_more_hint}</div>` : '';
+
+    panel.innerHTML = `<div class="known-client"><div class="kc-title">${T.kc_found_title}</div>${historyHtml}${moreHint}</div>`;
+  } catch (e) {
+    panel.innerHTML = '';
+  }
 }
 
 renderItemLists();
@@ -614,7 +723,8 @@ async function toggleHistory(plate) {
   row.style.display = '';
   openHistoryRow = plate;
   const res = await fetch('/api/history/' + encodeURIComponent(plate));
-  const history = await res.json();
+  const data = await res.json();
+  const history = data.history || [];
   const body = document.getElementById('hist-body-' + plate);
   if (!history.length) {
     body.innerHTML = T.history_empty;
@@ -713,8 +823,8 @@ def api_cars():
 @app.route("/api/history/<plate>")
 @login_required
 def api_history(plate):
-    _, history = db.get_car_history(g.shop_id, plate)
-    return jsonify(history)
+    car, history = db.get_car_history(g.shop_id, plate)
+    return jsonify({"car": car, "history": history})
 
 
 @app.route("/api/add", methods=["POST"])
@@ -791,6 +901,18 @@ def api_broadcast_create():
 @login_required
 def api_stats():
     return jsonify(db.get_revenue_stats(g.shop_id))
+
+
+@app.route("/api/stats/range")
+@login_required
+def api_stats_range():
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_from) or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_to):
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+    result = db.get_revenue_range(g.shop_id, date_from, date_to)
+    result["ok"] = True
+    return jsonify(result)
 
 
 @app.route("/api/export")

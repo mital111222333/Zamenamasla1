@@ -743,6 +743,19 @@ def get_revenue_stats(shop_id: int) -> dict:
         }
 
 
+def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
+    """Выручка и число услуг за произвольный период (включительно с обеих
+    сторон), например для выбора дат через календарь на сайте."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.cost IS NOT NULL
+              AND oc.change_date >= ? AND oc.change_date <= ?
+        """, (shop_id, date_from, date_to)).fetchone()
+        return {"total": row["total"], "count": row["cnt"]}
+
+
 def export_shop_data(shop_id: int) -> dict:
     """Полный дамп ВСЕХ данных одной точки — клиенты, машины (с полной
     историей внутри) и рассылки. Используется для скачивания резервной копии
