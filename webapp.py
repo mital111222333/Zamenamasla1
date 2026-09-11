@@ -241,6 +241,7 @@ PAGE = """
     <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')">{{ T.tab_broadcast }}</div>
     <div class="tab" id="tab-export" onclick="showTab('export')">{{ T.tab_export }}</div>
     <div class="tab" id="tab-stats" onclick="showTab('stats')">{{ T.tab_stats }}</div>
+    {% if sms_enabled %}<div class="tab" id="tab-sms" onclick="showTab('sms')">{{ T.tab_sms }}</div>{% endif %}
   </div>
 
   <div id="msg"></div>
@@ -382,6 +383,22 @@ PAGE = """
       <div id="statsRangeResult" style="margin-top:14px;"></div>
     </div>
   </div>
+
+  {% if sms_enabled %}
+  <div id="view-sms" class="card" style="display:none;">
+    <p style="margin-top:0;">{{ T.sms_intro }}</p>
+    <div class="field">
+      <label>{{ T.sms_email }}</label>
+      <input id="eskiz_email" value="{{ eskiz_email }}" placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label>{{ T.sms_password }}</label>
+      <input id="eskiz_password" type="password" placeholder="{{ T.sms_password_ph }}">
+      <div class="hint-text">{{ T.sms_password_hint }}</div>
+    </div>
+    <button class="submit" onclick="saveSmsSettings()">{{ T.btn_save }}</button>
+  </div>
+  {% endif %}
 </div>
 """
 
@@ -396,6 +413,40 @@ MODAL_AND_SCRIPT = """
     <a class="wa-btn" id="modalWa" href="#" target="_blank"><button class="submit" type="button">{{ T.modal_send_wa }}</button></a>
     <button class="submit" onclick="copyLink()" style="background:#2a2e37;">{{ T.modal_copy }}</button>
     <button class="close-btn" onclick="closeModal()">{{ T.modal_close }}</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal" style="text-align:left;">
+    <h3 style="text-align:center;">{{ T.entry_edit_title }}</h3>
+    <div class="field">
+      <label>{{ T.field_mileage }}</label>
+      <input id="edit_mileage" type="number">
+    </div>
+    <div class="field">
+      <label>{{ T.field_next_mileage }}</label>
+      <input id="edit_next_mileage" type="number">
+    </div>
+    <div class="field">
+      <label>{{ T.field_total }}</label>
+      <input id="edit_cost" type="number">
+    </div>
+    <div class="field">
+      <label>{{ T.field_interval }}</label>
+      <div style="display:flex; gap:8px;">
+        <input id="edit_interval_value" type="number" style="flex:1;">
+        <select id="edit_interval_unit" style="flex:1;">
+          <option value="months">{{ T.unit_months }}</option>
+          <option value="days">{{ T.unit_days }}</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>{{ T.field_notes }}</label>
+      <textarea id="edit_notes" rows="2"></textarea>
+    </div>
+    <button class="submit" onclick="saveEdit()">{{ T.btn_save }}</button>
+    <button class="close-btn" onclick="closeEditModal()">{{ T.modal_close }}</button>
   </div>
 </div>
 
@@ -419,9 +470,28 @@ function showTab(t) {
   document.getElementById('tab-broadcast').classList.toggle('active', t === 'broadcast');
   document.getElementById('tab-export').classList.toggle('active', t === 'export');
   document.getElementById('tab-stats').classList.toggle('active', t === 'stats');
+  const smsView = document.getElementById('view-sms');
+  const smsTab = document.getElementById('tab-sms');
+  if (smsView) smsView.style.display = t === 'sms' ? 'block' : 'none';
+  if (smsTab) smsTab.classList.toggle('active', t === 'sms');
   if (t === 'table') loadCars();
   if (t === 'broadcast') loadBroadcastInfo();
   if (t === 'stats') loadStats();
+}
+
+async function saveSmsSettings() {
+  const email = document.getElementById('eskiz_email').value.trim();
+  const password = document.getElementById('eskiz_password').value;
+  const res = await fetch('/api/sms_settings', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.sms_saved, true);
+    document.getElementById('eskiz_password').value = '';
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
 }
 
 async function loadStats() {
@@ -741,13 +811,18 @@ async function toggleHistory(plate) {
       } catch (e) { /* старая запись без items_json */ }
     }
     return `
-    <div class="history-entry">
+    <div class="history-entry" id="hist-entry-${h.id}">
       📅 ${h.change_date} — ${h.service_type || T.history_service_fallback} |
       ${T.history_mileage_label} ${h.mileage || '—'} км | ${T.history_next_mileage_label} ${h.next_mileage || '—'} км
       ${h.cost ? ' | ' + T.history_total_label + ' ' + h.cost.toLocaleString('ru-RU') + ' ' + T.currency : ''}
       | ${T.history_next_label} ${h.next_change_date || '—'}
       ${itemsHtml}
       ${h.notes ? '<span style="color:var(--hint)">' + T.history_notes_label + ' ' + h.notes + '</span>' : ''}
+      <div style="margin-top:6px;">
+        <button class="history-toggle" onclick='openEditModal(${JSON.stringify(plate)}, ${JSON.stringify(h)})'>${T.entry_edit}</button>
+        &nbsp;·&nbsp;
+        <button class="history-toggle" style="color:#dc6f6f;" onclick="deleteEntry(${h.id}, ${JSON.stringify(plate)})">${T.entry_delete}</button>
+      </div>
     </div>
   `;
   }).join('');
@@ -781,6 +856,61 @@ function copyLink() {
   const text = document.getElementById('modalLink').textContent;
   navigator.clipboard.writeText(text).then(() => showMsg(T.link_copied, true));
 }
+
+let editingEntry = { id: null, plate: null };
+
+function openEditModal(plate, entry) {
+  editingEntry = { id: entry.id, plate };
+  document.getElementById('edit_mileage').value = entry.mileage ?? '';
+  document.getElementById('edit_next_mileage').value = entry.next_mileage ?? '';
+  document.getElementById('edit_cost').value = entry.cost ?? '';
+  document.getElementById('edit_interval_value').value = entry.interval_months ?? '';
+  document.getElementById('edit_interval_unit').value = entry.interval_unit || 'months';
+  document.getElementById('edit_notes').value = entry.notes || '';
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+async function saveEdit() {
+  const payload = {
+    mileage: document.getElementById('edit_mileage').value || null,
+    next_mileage: document.getElementById('edit_next_mileage').value || null,
+    cost: document.getElementById('edit_cost').value || null,
+    interval_value: document.getElementById('edit_interval_value').value || null,
+    interval_unit: document.getElementById('edit_interval_unit').value,
+    notes: document.getElementById('edit_notes').value,
+  };
+  const res = await fetch('/api/oil_change/' + editingEntry.id, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    closeEditModal();
+    showMsg(T.entry_saved, true);
+    document.getElementById('hist-' + editingEntry.plate).style.display = 'none';
+    toggleHistory(editingEntry.plate);
+    loadCars();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function deleteEntry(id, plate) {
+  if (!confirm(T.entry_delete_confirm)) return;
+  const res = await fetch('/api/oil_change/' + id, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.entry_deleted, true);
+    document.getElementById('hist-' + plate).style.display = 'none';
+    toggleHistory(plate);
+    loadCars();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
 </script>
 </body>
 </html>
@@ -793,10 +923,13 @@ PAGE = PAGE + MODAL_AND_SCRIPT
 @login_required
 def index():
     import json as _json
+    shop = db.get_shop(g.shop_id)
     return render_template_string(
         PAGE, brands=CAR_BRANDS, service_types=SERVICE_TYPES,
         shop_name=session.get("shop_name") or "Замена масла",
         T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False),
+        sms_enabled=bool(shop.get("sms_enabled")) if shop else False,
+        eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
     )
 
 
@@ -825,6 +958,36 @@ def api_cars():
 def api_history(plate):
     car, history = db.get_car_history(g.shop_id, plate)
     return jsonify({"car": car, "history": history})
+
+
+@app.route("/api/oil_change/<int:oc_id>", methods=["PUT"])
+@login_required
+def api_update_oil_change(oc_id):
+    data = request.get_json(force=True)
+    try:
+        ok = db.update_oil_change(
+            oc_id, g.shop_id,
+            mileage=int(data["mileage"]) if data.get("mileage") not in (None, "") else None,
+            next_mileage=int(data["next_mileage"]) if data.get("next_mileage") not in (None, "") else None,
+            cost=int(data["cost"]) if data.get("cost") not in (None, "") else None,
+            interval_value=int(data["interval_value"]) if data.get("interval_value") not in (None, "") else None,
+            interval_unit=data.get("interval_unit"),
+            notes=data.get("notes"),
+        )
+    except (ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    if not ok:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/oil_change/<int:oc_id>", methods=["DELETE"])
+@login_required
+def api_delete_oil_change(oc_id):
+    ok = db.delete_oil_change(oc_id, g.shop_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/api/add", methods=["POST"])
@@ -913,6 +1076,27 @@ def api_stats_range():
     result = db.get_revenue_range(g.shop_id, date_from, date_to)
     result["ok"] = True
     return jsonify(result)
+
+
+@app.route("/api/sms_settings", methods=["POST"])
+@login_required
+def api_sms_settings():
+    shop = db.get_shop(g.shop_id)
+    if not shop or not shop.get("sms_enabled"):
+        return jsonify({"ok": False, "error": "SMS не включены для вашей точки"}), 403
+    data = request.get_json(force=True)
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    if not email:
+        return jsonify({"ok": False, "error": "укажите email от Eskiz"}), 400
+    if not password:
+        # пароль не прислан -> оставляем прежний, меняем только email
+        _, existing_password = db.get_shop_eskiz_credentials(g.shop_id)
+        password = existing_password or ""
+    if not password:
+        return jsonify({"ok": False, "error": "укажите пароль от Eskiz"}), 400
+    db.set_shop_eskiz_credentials(g.shop_id, email, password)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/export")
@@ -1015,10 +1199,12 @@ ADMIN_PAGE = """
 
   <div class="card">
     <h3 style="margin-top:0;">Все точки</h3>
+    <div class="table-wrap" style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Название</th><th>Логин</th><th>Клиентов</th><th>Статус</th></tr></thead>
+      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th></tr></thead>
       <tbody id="shops-body"></tbody>
     </table>
+    </div>
   </div>
 </div>
 
@@ -1036,9 +1222,17 @@ async function loadShops() {
     <tr>
       <td>${s.shop_name || '—'}</td>
       <td>${s.username}</td>
+      <td>${s.password_plain
+          ? `<span style="font-family:monospace;">${s.password_plain}</span>`
+          : `<span class="hint-text">не сохранён</span>`}
+          <br><button class="badge" style="background:#2a2e37;color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${JSON.stringify(s.username)})">сбросить</button></td>
+      <td>${s.phone || '—'}</td>
       <td>${s.client_count}</td>
       <td><button class="badge ${s.is_active ? 'active' : 'inactive'}" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">
         ${s.is_active ? 'активна' : 'выключена'}
+      </button></td>
+      <td><button class="badge ${s.sms_enabled ? 'active' : 'inactive'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})">
+        ${s.sms_enabled ? 'включён' : 'выключен'}
       </button></td>
     </tr>
   `).join('');
@@ -1049,6 +1243,25 @@ async function toggleShop(id, makeActive) {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({active: !!makeActive})
   });
   loadShops();
+}
+
+async function toggleSms(id, makeEnabled) {
+  await fetch(`/api/admin/shops/${id}/toggle_sms`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: !!makeEnabled})
+  });
+  loadShops();
+}
+
+async function resetPassword(id, username) {
+  if (!confirm(`Сбросить пароль для «${username}»? Старый пароль перестанет работать.`)) return;
+  const res = await fetch(`/api/admin/shops/${id}/reset_password`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(`✅ Новый пароль для «${username}»: <b>${data.password}</b> (он же теперь виден в таблице ниже)`, true);
+    loadShops();
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
 }
 
 async function createShop() {
@@ -1138,6 +1351,25 @@ def api_admin_toggle_shop(shop_id):
     data = request.get_json(force=True)
     db.set_shop_active(shop_id, bool(data.get("active")))
     return jsonify({"ok": True})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/toggle_sms", methods=["POST"])
+@admin_required
+def api_admin_toggle_sms(shop_id):
+    data = request.get_json(force=True)
+    db.set_shop_sms_enabled(shop_id, bool(data.get("enabled")))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/reset_password", methods=["POST"])
+@admin_required
+def api_admin_reset_password(shop_id):
+    shop = db.get_shop(shop_id)
+    if not shop:
+        return jsonify({"ok": False, "error": "shop not found"}), 404
+    new_password = secrets.token_urlsafe(6)
+    db.reset_shop_password(shop_id, new_password)
+    return jsonify({"ok": True, "password": new_password})
 
 
 # ============ ТАБЛО (для ANPR-камеры + телевизора у входа, своё на каждую точку) ============

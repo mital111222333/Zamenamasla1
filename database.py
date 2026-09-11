@@ -18,12 +18,39 @@ import os
 import json
 import sqlite3
 import secrets
+import hashlib
+import base64
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 from dateutil.relativedelta import relativedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from cryptography.fernet import Fernet, InvalidToken
 
 DB_PATH = os.environ.get("DB_PATH", "oil_bot.db")
+
+# Пароли точек хранятся ДВАЖДЫ: как необратимый хэш (для проверки входа —
+# это правильный, безопасный способ) и отдельно в обратимо зашифрованном виде
+# (чтобы ты, как платформенный админ, мог посмотреть пароль в /admin, если
+# точка его забудет). Ключ шифрования выводится из SECRET_KEY — той же
+# переменной окружения, что уже используется для входа на сайт, отдельно
+# задавать ничего не нужно.
+_fernet_key = base64.urlsafe_b64encode(
+    hashlib.sha256((os.environ.get("SECRET_KEY") or "insecure-dev-key").encode()).digest()
+)
+_cipher = Fernet(_fernet_key)
+
+
+def _encrypt_password(password: str) -> str:
+    return _cipher.encrypt(password.encode()).decode()
+
+
+def _decrypt_password(token: str):
+    if not token:
+        return None
+    try:
+        return _cipher.decrypt(token.encode()).decode()
+    except (InvalidToken, ValueError, TypeError):
+        return None
 
 MAX_FOLLOWUP_REMINDERS = 6
 FOLLOWUP_INTERVAL_DAYS = 14
@@ -62,6 +89,10 @@ def init_db():
             anpr_token TEXT UNIQUE,
             notify_telegram_id TEXT,
             language TEXT DEFAULT 'ru',
+            password_plain TEXT,
+            sms_enabled INTEGER DEFAULT 0,
+            eskiz_email TEXT,
+            eskiz_password TEXT,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -158,6 +189,17 @@ def _migrate(conn):
     shop_cols = {row["name"] for row in conn.execute("PRAGMA table_info(shops)").fetchall()}
     if "language" not in shop_cols:
         conn.execute("ALTER TABLE shops ADD COLUMN language TEXT DEFAULT 'ru'")
+    shop_cols.add("language")
+
+    new_shop_cols = {
+        "password_plain": "TEXT",
+        "sms_enabled": "INTEGER DEFAULT 0",
+        "eskiz_email": "TEXT",
+        "eskiz_password": "TEXT",
+    }
+    for col, ddl in new_shop_cols.items():
+        if col not in shop_cols:
+            conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
 
     # --- oil_changes: добавляем недостающие колонки (из более ранних версий) ---
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
@@ -264,12 +306,12 @@ def _bootstrap_accounts(conn):
 
     try:
         conn.execute("""
-            INSERT INTO shops (username, password_hash, role, shop_name, phone, address, hours, lat, lon,
+            INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
                                 anpr_token, notify_telegram_id, is_active)
-            VALUES (?, ?, 'shop', ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            VALUES (?, ?, ?, 'shop', ?, ?, ?, ?, ?, ?, ?, ?, 1)
         """, (
-            BOOTSTRAP_SHOP_USERNAME, generate_password_hash(shop_password), BOOTSTRAP_SHOP_NAME,
-            BOOTSTRAP_SHOP_PHONE or None, BOOTSTRAP_SHOP_ADDRESS or None, BOOTSTRAP_SHOP_HOURS or None,
+            BOOTSTRAP_SHOP_USERNAME, generate_password_hash(shop_password), _encrypt_password(shop_password),
+            BOOTSTRAP_SHOP_NAME, BOOTSTRAP_SHOP_PHONE or None, BOOTSTRAP_SHOP_ADDRESS or None, BOOTSTRAP_SHOP_HOURS or None,
             float(BOOTSTRAP_SHOP_LAT) if BOOTSTRAP_SHOP_LAT else None,
             float(BOOTSTRAP_SHOP_LON) if BOOTSTRAP_SHOP_LON else None,
             secrets.token_urlsafe(8), BOOTSTRAP_NOTIFY_TELEGRAM_ID or None,
@@ -280,8 +322,9 @@ def _bootstrap_accounts(conn):
 
     try:
         conn.execute(
-            "INSERT INTO shops (username, password_hash, role, shop_name, is_active) VALUES (?, ?, 'admin', 'Платформа', 1)",
-            (BOOTSTRAP_ADMIN_USERNAME, generate_password_hash(admin_password))
+            "INSERT INTO shops (username, password_hash, password_plain, role, shop_name, is_active) "
+            "VALUES (?, ?, ?, 'admin', 'Платформа', 1)",
+            (BOOTSTRAP_ADMIN_USERNAME, generate_password_hash(admin_password), _encrypt_password(admin_password))
         )
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -325,13 +368,24 @@ def create_shop(username: str, password: str, shop_name: str = None, phone: str 
                  notify_telegram_id: str = None, role: str = "shop") -> dict:
     with get_conn() as conn:
         cur = conn.execute("""
-            INSERT INTO shops (username, password_hash, role, shop_name, phone, address, hours, lat, lon,
+            INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
                                 anpr_token, notify_telegram_id, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        """, (username, generate_password_hash(password), role, shop_name, phone, address, hours,
-              lat, lon, secrets.token_urlsafe(8), notify_telegram_id))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (username, generate_password_hash(password), _encrypt_password(password), role, shop_name,
+              phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id))
         conn.commit()
         return get_shop(cur.lastrowid)
+
+
+def reset_shop_password(shop_id: int, new_password: str):
+    """Сбрасывает пароль точки — обновляет и хэш (для входа), и зашифрованную
+    копию (чтобы платформенный админ мог посмотреть новый пароль в /admin)."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE shops SET password_hash=?, password_plain=? WHERE id=?",
+            (generate_password_hash(new_password), _encrypt_password(new_password), shop_id)
+        )
+        conn.commit()
 
 
 def authenticate_shop(username: str, password: str):
@@ -357,13 +411,22 @@ def get_shop_by_anpr_token(token: str):
 
 
 def list_shops():
-    """Все точки (без платформенных админов) + число их клиентов — для админ-панели."""
+    """Все точки (без платформенных админов) + число их клиентов — для админ-панели.
+    password_plain — расшифрованный пароль (чтобы платформенный админ мог его
+    посмотреть, если точка забудет); может быть None для очень старых точек,
+    заведённых до этой функции, или если SECRET_KEY менялся после создания."""
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT s.*, (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) as client_count
             FROM shops s WHERE s.role='shop' ORDER BY s.created_at DESC
         """).fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["password_plain"] = _decrypt_password(d.get("password_plain"))
+            del d["password_hash"]  # хэш не нужен на клиенте, чтобы не путать с настоящим паролем
+            result.append(d)
+        return result
 
 
 def set_shop_active(shop_id: int, active: bool):
@@ -378,6 +441,35 @@ def set_shop_language(shop_id: int, language: str):
     with get_conn() as conn:
         conn.execute("UPDATE shops SET language=? WHERE id=?", (language, shop_id))
         conn.commit()
+
+
+def set_shop_sms_enabled(shop_id: int, enabled: bool):
+    """Платформенный админ включает/выключает саму ВОЗМОЖНОСТЬ SMS для точки.
+    Даже при включении SMS не заработают, пока точка сама не впишет свои
+    данные Eskiz в своих настройках — это её собственный договор/аккаунт."""
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET sms_enabled=? WHERE id=?", (1 if enabled else 0, shop_id))
+        conn.commit()
+
+
+def set_shop_eskiz_credentials(shop_id: int, email: str, password: str):
+    """Точка сама вписывает свои логин/пароль от своего аккаунта Eskiz.uz.
+    Пароль от Eskiz хранится так же, обратимо зашифрованным — он нужен боту,
+    чтобы самому логиниться в Eskiz и получать токен для отправки SMS."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE shops SET eskiz_email=?, eskiz_password=? WHERE id=?",
+            (email or None, _encrypt_password(password) if password else None, shop_id)
+        )
+        conn.commit()
+
+
+def get_shop_eskiz_credentials(shop_id: int):
+    """Возвращает (email, пароль_в_открытом_виде) для отправки SMS, или (None, None)."""
+    shop = get_shop(shop_id)
+    if not shop or not shop.get("eskiz_email") or not shop.get("eskiz_password"):
+        return None, None
+    return shop["eskiz_email"], _decrypt_password(shop["eskiz_password"])
 
 
 def username_taken(username: str) -> bool:
@@ -600,21 +692,105 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         return cur.lastrowid, next_date
 
 
+def get_oil_change_for_shop(oc_id: int, shop_id: int):
+    """Запись обслуживания, только если она принадлежит указанной точке —
+    проверка прав перед редактированием/удалением."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT oc.* FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            WHERE oc.id=? AND c.shop_id=?
+        """, (oc_id, shop_id)).fetchone()
+        return dict(row) if row else None
+
+
+def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, next_mileage=None,
+                       cost=None, interval_value=None, interval_unit=None, notes=None):
+    """Редактирует базовые поля уже сохранённой записи (для исправления
+    опечаток). Возвращает True, если запись найдена и принадлежит точке —
+    иначе False (ничего не меняет), в том числе если это запись чужой точки."""
+    existing = get_oil_change_for_shop(oc_id, shop_id)
+    if not existing:
+        return False
+
+    fields = {}
+    if change_date is not None:
+        fields["change_date"] = change_date
+    if mileage is not None:
+        fields["mileage"] = mileage
+    if next_mileage is not None:
+        fields["next_mileage"] = next_mileage
+    if cost is not None:
+        fields["cost"] = cost
+    if notes is not None:
+        fields["notes"] = notes
+
+    if interval_value is not None or interval_unit is not None:
+        final_value = interval_value if interval_value is not None else existing["interval_months"]
+        final_unit = interval_unit if interval_unit is not None else existing["interval_unit"]
+        base_date_str = fields.get("change_date", existing["change_date"])
+        base_date = datetime.strptime(base_date_str, "%Y-%m-%d")
+        if final_value:
+            if final_unit == "days":
+                next_date = (base_date + timedelta(days=final_value)).strftime("%Y-%m-%d")
+            else:
+                next_date = (base_date + relativedelta(months=final_value)).strftime("%Y-%m-%d")
+        else:
+            next_date = None
+        fields["interval_months"] = final_value
+        fields["interval_unit"] = final_unit
+        fields["next_change_date"] = next_date
+
+    if not fields:
+        return True
+
+    set_clause = ", ".join(f"{k}=?" for k in fields)
+    with get_conn() as conn:
+        conn.execute(f"UPDATE oil_changes SET {set_clause} WHERE id=?", (*fields.values(), oc_id))
+        conn.commit()
+    return True
+
+
+def delete_oil_change(oc_id: int, shop_id: int):
+    """Удаляет запись (только если она принадлежит указанной точке). Если
+    удалённая запись была 'active' (текущей) — делает активной следующую по
+    свежести оставшуюся запись той же машины, чтобы напоминания продолжали
+    работать корректно. Возвращает True, если запись была найдена и удалена."""
+    existing = get_oil_change_for_shop(oc_id, shop_id)
+    if not existing:
+        return False
+
+    with get_conn() as conn:
+        conn.execute("DELETE FROM oil_changes WHERE id=?", (oc_id,))
+        if existing["status"] == "active":
+            next_row = conn.execute(
+                "SELECT id FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC LIMIT 1",
+                (existing["car_id"],)
+            ).fetchone()
+            if next_row:
+                conn.execute("UPDATE oil_changes SET status='active' WHERE id=?", (next_row["id"],))
+        conn.commit()
+    return True
+
+
 def get_due_reminders():
     """Напоминания по ВСЕМ точкам разом (каждая запись несёт свой shop_id и
     название точки — фоновая задача одна на весь бот, но данные каждой
-    записи принадлежат только её собственной точке)."""
+    записи принадлежат только её собственной точке). Возвращает клиентов и
+    с Telegram, и без — какой канал использовать (Telegram/SMS/ничего),
+    решает вызывающий код в боте."""
     today = datetime.now().strftime("%Y-%m-%d")
     followup_cutoff = (datetime.now() - timedelta(days=FOLLOWUP_INTERVAL_DAYS)).strftime("%Y-%m-%d")
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT oc.*, c.plate_number, c.shop_id, cl.full_name as owner_name, cl.telegram_id,
-                   s.shop_name, s.notify_telegram_id, s.language
+                   cl.phone as owner_phone, s.shop_name, s.notify_telegram_id, s.language,
+                   s.sms_enabled, s.eskiz_email, s.eskiz_password
             FROM oil_changes oc
             JOIN cars c ON c.id = oc.car_id
             JOIN clients cl ON cl.id = c.client_id
             JOIN shops s ON s.id = c.shop_id
-            WHERE oc.status='active' AND oc.next_change_date IS NOT NULL AND cl.telegram_id IS NOT NULL AND (
+            WHERE oc.status='active' AND oc.next_change_date IS NOT NULL AND (
                 (oc.reminder_count = 0 AND oc.next_change_date <= ?)
                 OR
                 (oc.reminder_count > 0 AND oc.reminder_count < ? AND oc.last_reminder_date <= ?)
@@ -776,7 +952,8 @@ def export_shop_data(shop_id: int) -> dict:
 
         return {
             "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "shop": {k: v for k, v in dict(shop).items() if k != "password_hash"} if shop else None,
+            "shop": {k: v for k, v in dict(shop).items()
+                      if k not in ("password_hash", "password_plain", "eskiz_password")} if shop else None,
             "clients": [dict(c) for c in clients],
             "cars": cars_out,
             "broadcasts": [dict(b) for b in broadcasts],

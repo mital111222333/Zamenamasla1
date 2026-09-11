@@ -36,6 +36,7 @@ from telegram.ext import (
 import database as db
 import webapp
 import i18n
+import sms
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -563,23 +564,39 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     for item in due:
         is_followup = item["reminder_count"] > 0
         lang = item.get("language") or "ru"
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}"),
-                InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}"),
-            ]
-        ])
         shop_name = item.get('shop_name') or SHOP_NAME
-        if is_followup:
-            text = i18n.t("bot_reminder_followup", lang, plate=item['plate_number'], shop=shop_name)
-        else:
-            service = item.get('service_type') or i18n.t("history_service_fallback", lang)
-            text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
-        try:
-            await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
-            db.mark_reminder_sent(item["id"])
-        except Exception as e:
-            logger.error(f"Не удалось отправить напоминание {item['id']}: {e}")
+
+        if item.get("telegram_id"):
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}"),
+                    InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}"),
+                ]
+            ])
+            if is_followup:
+                text = i18n.t("bot_reminder_followup", lang, plate=item['plate_number'], shop=shop_name)
+            else:
+                service = item.get('service_type') or i18n.t("history_service_fallback", lang)
+                text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
+            try:
+                await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
+                db.mark_reminder_sent(item["id"])
+            except Exception as e:
+                logger.error(f"Не удалось отправить напоминание {item['id']}: {e}")
+
+        elif item.get("sms_enabled") and item.get("owner_phone"):
+            key = "sms_reminder_followup" if is_followup else "sms_reminder_first"
+            text = i18n.t(key, lang, plate=item['plate_number'], shop=shop_name)
+            ok, err = sms.send_sms(
+                item["shop_id"], item.get("eskiz_email"), item.get("eskiz_password"),
+                item["owner_phone"], text
+            )
+            if ok:
+                db.mark_reminder_sent(item["id"])
+            else:
+                logger.warning(f"Не удалось отправить SMS-напоминание {item['id']}: {err}")
+        # иначе — ни Telegram, ни SMS недоступны для этого клиента, пропускаем
+        # (не отмечаем как отправленное — вдруг клиент привяжет Telegram позже)
 
 
 def main():
