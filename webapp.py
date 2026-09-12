@@ -2167,7 +2167,7 @@ def display_page(anpr_token):
 def run_webapp():
     port = int(os.environ.get("PORT", 8000))
     db.init_db()
-    app.run(host="0.0.0.0", port=port, use_reloader=False)
+    app.run(host="0.0.0.0", port=port, use_reloader=False, threaded=True)
 
 
 def run_webapp_in_thread():

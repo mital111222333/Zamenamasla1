@@ -163,6 +163,17 @@ def init_db():
         )
         """)
 
+        # --- индексы на часто используемые поля — чтобы поиск оставался
+        # быстрым по мере роста числа точек, клиентов и записей. Безопасно
+        # выполнять при каждом запуске (IF NOT EXISTS) и на уже существующих
+        # базах — данные не трогаются, только ускоряется поиск. ---
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_clients_shop ON clients(shop_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_shop ON cars(shop_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_client ON cars(client_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_car ON oil_changes(car_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_status_next ON oil_changes(status, next_change_date)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_broadcasts_shop ON broadcasts(shop_id)")
+
         conn.commit()
         _migrate(conn)
         _bootstrap_accounts(conn)
@@ -229,6 +240,10 @@ def _migrate(conn):
         created_at TEXT DEFAULT (datetime('now'))
     )
     """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_products_shop_category ON products(shop_id, category)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_restocks_shop ON stock_restocks(shop_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_restocks_product ON stock_restocks(product_id)")
 
     # --- oil_changes: добавляем недостающие колонки (из более ранних версий) ---
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
