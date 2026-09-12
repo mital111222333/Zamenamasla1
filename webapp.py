@@ -620,6 +620,12 @@ async function loadWarehouse() {
   productsCache = await res.json();
   renderProductsTable();
   loadRestockHistory();
+  // склад мог поменяться (добавили/удалили/пополнили товар) — обновляем поля
+  // "марка" в форме "Внести замену" и в форме редактирования/добавления из
+  // истории, чтобы новый товар сразу стал доступен в списке, без
+  // перезагрузки всей страницы
+  renderItemLists();
+  renderSvcItemLists();
 }
 
 function renderProductsTable() {
