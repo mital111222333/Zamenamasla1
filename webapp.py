@@ -206,6 +206,7 @@ PAGE = """
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:50; }
   .modal-overlay.open { display:flex; }
   .modal { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; max-width:320px; width:90%; text-align:center; }
+  .modal-wide { max-width:480px; max-height:85vh; overflow-y:auto; }
   .modal img { width:180px; height:180px; margin: 10px auto; display:block; border-radius:8px; background:#fff; }
   .modal .link-text { font-size:12px; word-break:break-all; color:var(--hint); background:#11141a; padding:8px; border-radius:8px; margin-bottom:10px; }
   .modal button { margin-top:8px; }
@@ -242,6 +243,7 @@ PAGE = """
     <div class="tab" id="tab-export" onclick="showTab('export')">{{ T.tab_export }}</div>
     <div class="tab" id="tab-stats" onclick="showTab('stats')">{{ T.tab_stats }}</div>
     {% if sms_enabled %}<div class="tab" id="tab-sms" onclick="showTab('sms')">{{ T.tab_sms }}</div>{% endif %}
+    {% if warehouse_enabled %}<div class="tab" id="tab-warehouse" onclick="showTab('warehouse')">{{ T.tab_warehouse }}</div>{% endif %}
   </div>
 
   <div id="msg"></div>
@@ -399,10 +401,81 @@ PAGE = """
     <button class="submit" onclick="saveSmsSettings()">{{ T.btn_save }}</button>
   </div>
   {% endif %}
+
+  {% if warehouse_enabled %}
+  <div id="view-warehouse" style="display:none;">
+    <div class="card">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_add_product }}</label>
+      <div class="row2">
+        <div class="field">
+          <label>{{ T.wh_category }}</label>
+          <select id="wh_new_category"></select>
+        </div>
+        <div class="field">
+          <label>{{ T.wh_product_name }}</label>
+          <input id="wh_new_name" placeholder="MITANOL 5W-30">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>{{ T.wh_sell_price }}</label>
+          <input id="wh_new_sell_price" type="number" placeholder="45000">
+        </div>
+        <div class="field">
+          <label>{{ T.wh_purchase_price }}</label>
+          <input id="wh_new_purchase_price" type="number" placeholder="30000">
+        </div>
+      </div>
+      <div class="field">
+        <label>{{ T.wh_initial_stock }}</label>
+        <input id="wh_new_stock" type="number" placeholder="0">
+      </div>
+      <button class="submit" onclick="createProduct()">{{ T.wh_add_btn }}</button>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_products_title }}</label>
+      <div class="table-wrap" style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>{{ T.wh_category }}</th><th>{{ T.wh_product_name }}</th><th>{{ T.wh_stock }}</th>
+            <th>{{ T.wh_sell_price }}</th><th>{{ T.wh_purchase_price }}</th><th></th>
+          </tr></thead>
+          <tbody id="products-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_restock_history }}</label>
+      <div id="restockHistory"></div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 """
 
 MODAL_AND_SCRIPT = """
+<div class="modal-overlay" id="restockModal">
+  <div class="modal" style="text-align:left;">
+    <h3 style="text-align:center;" id="restockModalTitle">{{ T.wh_restock_title }}</h3>
+    <div class="field">
+      <label>{{ T.wh_restock_qty }}</label>
+      <input id="restock_qty" type="number">
+    </div>
+    <div class="field">
+      <label>{{ T.wh_purchase_price }}</label>
+      <input id="restock_price" type="number">
+    </div>
+    <div class="field">
+      <label>{{ T.wh_restock_date }}</label>
+      <input id="restock_date" type="date">
+    </div>
+    <button class="submit" onclick="submitRestock()">{{ T.wh_restock_btn }}</button>
+    <button class="close-btn" onclick="closeRestockModal()">{{ T.modal_close }}</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="linkModal">
   <div class="modal">
     <h3 id="modalPlate"></h3>
@@ -417,8 +490,8 @@ MODAL_AND_SCRIPT = """
 </div>
 
 <div class="modal-overlay" id="editModal">
-  <div class="modal" style="text-align:left;">
-    <h3 style="text-align:center;">{{ T.entry_edit_title }}</h3>
+  <div class="modal modal-wide" style="text-align:left;">
+    <h3 style="text-align:center;" id="svcModalTitle">{{ T.entry_edit_title }}</h3>
     <div class="field">
       <label>{{ T.field_mileage }}</label>
       <input id="edit_mileage" type="number">
@@ -427,11 +500,37 @@ MODAL_AND_SCRIPT = """
       <label>{{ T.field_next_mileage }}</label>
       <input id="edit_next_mileage" type="number">
     </div>
+
     <div class="field">
-      <label>{{ T.field_total }}</label>
-      <input id="edit_cost" type="number">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_fluids }}</label>
     </div>
-    <div class="field">
+    <div id="svcFluidsList"></div>
+
+    <div class="field" style="margin-top:10px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_filters }}</label>
+    </div>
+    <div id="svcFiltersList"></div>
+
+    <div class="field" style="margin-top:10px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_other }}</label>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>{{ T.field_other_name }}</label>
+        <input id="svc_other_name" placeholder="{{ T.field_other_name_ph }}">
+      </div>
+      <div class="field">
+        <label>{{ T.field_price }}</label>
+        <input id="svc_other_price" type="number" placeholder="0" oninput="updateSvcTotal()">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:10px; padding:12px; background:#11141a; border-radius:10px;">
+      <label style="font-size:15px;">{{ T.field_total }}</label>
+      <div id="svcTotalCost" style="font-size:20px; font-weight:700; color:var(--btn);">0</div>
+    </div>
+
+    <div class="field" style="margin-top:10px;">
       <label>{{ T.field_interval }}</label>
       <div style="display:flex; gap:8px;">
         <input id="edit_interval_value" type="number" style="flex:1;">
@@ -453,11 +552,13 @@ MODAL_AND_SCRIPT = """
 <script>
 const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
+const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
 let carsCache = [];
 let openHistoryRow = null;
+let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы кнопки не тащили сырые данные записи (с заметками, апострофами и т.п.) прямо в HTML-атрибут onclick, а брали их отсюда по id
 
 function showTab(t) {
   document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
@@ -474,14 +575,22 @@ function showTab(t) {
   const smsTab = document.getElementById('tab-sms');
   if (smsView) smsView.style.display = t === 'sms' ? 'block' : 'none';
   if (smsTab) smsTab.classList.toggle('active', t === 'sms');
+  const whView = document.getElementById('view-warehouse');
+  const whTab = document.getElementById('tab-warehouse');
+  if (whView) whView.style.display = t === 'warehouse' ? 'block' : 'none';
+  if (whTab) whTab.classList.toggle('active', t === 'warehouse');
   if (t === 'table') loadCars();
   if (t === 'broadcast') loadBroadcastInfo();
   if (t === 'stats') loadStats();
+  if (t === 'warehouse') loadWarehouse();
 }
 
 async function saveSmsSettings() {
-  const email = document.getElementById('eskiz_email').value.trim();
-  const password = document.getElementById('eskiz_password').value;
+  const emailEl = document.getElementById('eskiz_email');
+  const passwordEl = document.getElementById('eskiz_password');
+  if (!emailEl || !passwordEl) return;  // вкладка SMS не отрисована (выключена для этой точки)
+  const email = emailEl.value.trim();
+  const password = passwordEl.value;
   const res = await fetch('/api/sms_settings', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password})
   });
@@ -494,9 +603,144 @@ async function saveSmsSettings() {
   }
 }
 
+// ---- Склад ----
+let productsCache = [];
+let restockingProductId = null;
+
+function renderWarehouseCategoryOptions() {
+  const sel = document.getElementById('wh_new_category');
+  if (!sel) return;
+  const allKeys = FLUID_KEYS.concat(FILTER_KEYS);
+  sel.innerHTML = allKeys.map(key => `<option value="${key}">${T[key]}</option>`).join('');
+}
+
+async function loadWarehouse() {
+  renderWarehouseCategoryOptions();
+  const res = await fetch('/api/products');
+  productsCache = await res.json();
+  renderProductsTable();
+  loadRestockHistory();
+}
+
+function renderProductsTable() {
+  const body = document.getElementById('products-body');
+  if (!body) return;
+  if (!productsCache.length) {
+    body.innerHTML = `<tr><td colspan="6">${T.wh_no_products}</td></tr>`;
+    return;
+  }
+  body.innerHTML = productsCache.map(p => {
+    const isLow = p.stock_qty < 0;
+    const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
+    return `
+    <tr>
+      <td>${T[p.category] || p.category}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td style="${isLow ? 'color:#dc6f6f; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
+      <td>${p.sell_price ? p.sell_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
+      <td>${p.purchase_price ? p.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
+      <td>
+        <button class="history-toggle" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_restock_action}</button>
+        &nbsp;·&nbsp;
+        <button class="history-toggle" style="color:#dc6f6f;" onclick="deleteProduct(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_delete_action}</button>
+      </td>
+    </tr>
+  `;
+  }).join('');
+}
+
+async function createProduct() {
+  const catEl = document.getElementById('wh_new_category');
+  const nameEl = document.getElementById('wh_new_name');
+  if (!catEl || !nameEl) return;  // вкладка "Склад" не отрисована (выключена для этой точки)
+  const category = catEl.value;
+  const name = nameEl.value.trim();
+  if (!category || !name) { showMsg(T.wh_fill_required, false); return; }
+  const payload = {
+    category, name,
+    sell_price: document.getElementById('wh_new_sell_price').value || null,
+    purchase_price: document.getElementById('wh_new_purchase_price').value || null,
+    initial_stock: document.getElementById('wh_new_stock').value || 0,
+  };
+  const res = await fetch('/api/products', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.wh_product_added, true);
+    ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm(T.wh_delete_confirm)) return;
+  const res = await fetch('/api/products/' + id, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.wh_product_deleted, true);
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+function openRestockModal(id, name) {
+  restockingProductId = id;
+  document.getElementById('restockModalTitle').textContent = T.wh_restock_title + ': ' + name;
+  document.getElementById('restock_qty').value = '';
+  document.getElementById('restock_price').value = '';
+  document.getElementById('restock_date').value = fmtDate(new Date());
+  document.getElementById('restockModal').classList.add('open');
+}
+
+function closeRestockModal() {
+  document.getElementById('restockModal').classList.remove('open');
+}
+
+async function submitRestock() {
+  const payload = {
+    quantity: document.getElementById('restock_qty').value,
+    purchase_price: document.getElementById('restock_price').value || null,
+    restock_date: document.getElementById('restock_date').value || null,
+  };
+  const res = await fetch(`/api/products/${restockingProductId}/restock`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    closeRestockModal();
+    showMsg(T.wh_restocked, true);
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function loadRestockHistory() {
+  const el = document.getElementById('restockHistory');
+  if (!el) return;
+  const res = await fetch('/api/restock_history');
+  const history = await res.json();
+  el.innerHTML = history.length ? history.map(r => `
+    <div style="padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;">
+      ${r.restock_date} — ${escapeHtml(r.product_name)}: +${r.quantity} ${r.unit === 'pc' ? T.unit_pc : T.unit_l}
+      ${r.purchase_price ? ' (' + r.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency + '/ед.)' : ''}
+    </div>
+  `).join('') : `<div class="hint-text">${T.wh_no_restocks}</div>`;
+}
+
+
 async function loadStats() {
   const res = await fetch('/api/stats');
   const s = await res.json();
+  let profit = null;
+  if (WAREHOUSE_ENABLED) {
+    const pRes = await fetch('/api/profit_stats');
+    profit = await pRes.json();
+  }
   const periods = [
     ['today', T.stats_today], ['yesterday', T.stats_yesterday], ['week', T.stats_week],
     ['month', T.stats_month], ['year', T.stats_year],
@@ -506,6 +750,7 @@ async function loadStats() {
       <div class="label">${label}</div>
       <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${s[key].count}</div>
+      ${profit ? `<div class="count" style="color:#6fdc9a;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
   `).join('');
 }
@@ -621,21 +866,103 @@ function showMsg(text, ok) {
 const FLUID_KEYS = ["fluid_0", "fluid_1", "fluid_2", "fluid_3", "fluid_4"];
 const FILTER_KEYS = ["filter_0", "filter_1", "filter_2", "filter_3"];
 
+// Общая логика для полей "марка" в форме внесения/редактирования замены —
+// используется и в обычной форме "Внести замену", и в форме
+// добавления/редактирования из истории (svcModal). Если для категории есть
+// товары на складе — поле становится выпадающим списком с остатком и ценой,
+// иначе (или если склад не включён точке) — обычное текстовое поле, как и
+// раньше.
+function productsForCategory(key) {
+  return WAREHOUSE_ENABLED ? productsCache.filter(p => p.category === key) : [];
+}
+
+function brandFieldHtml(key, fieldId, onPickHandler) {
+  const prods = productsForCategory(key);
+  if (!prods.length) {
+    return `<input id="${fieldId}" placeholder="${T.brand_ph}">`;
+  }
+  const options = ['<option value="">' + T.brand_ph + '</option>'].concat(
+    prods.map(p => {
+      const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
+      const stockWarn = p.stock_qty < 0 ? ' ⚠️' : '';
+      return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.stock_qty} ${unitLabel}${stockWarn})</option>`;
+    })
+  ).join('');
+  return `<select id="${fieldId}" data-is-product="1" onchange="${onPickHandler}">${options}</select>`;
+}
+
+function readBrandField(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return { brand: null, product_id: null };
+  if (el.tagName === 'SELECT') {
+    if (!el.value) return { brand: null, product_id: null };
+    const opt = el.options[el.selectedIndex];
+    return { brand: opt.dataset.name || null, product_id: parseInt(el.value) };
+  }
+  return { brand: el.value.trim() || null, product_id: null };
+}
+
+function selectOrPreserveBrand(brandEl, it) {
+  // Подставляет сохранённую позицию в поле "марка" при открытии редактирования.
+  // Если это обычное текстовое поле — просто вписываем текст, как раньше.
+  // Если это выпадающий список (склад включён и в категории есть товары) —
+  // пытаемся выбрать ТОТ ЖЕ товар. Но если товар с тех пор удалили со склада
+  // (его больше нет среди опций) — список НЕ должен молча показывать пустое
+  // поле: тогда добавляем в список одноразовую "историческую" опцию с
+  // сохранённым названием, чтобы при обычном пересохранении (без изменения
+  // этого поля) марка не терялась.
+  if (brandEl.tagName === 'INPUT') {
+    brandEl.value = it.brand || '';
+    return;
+  }
+  if (brandEl.tagName !== 'SELECT') return;
+  if (it.product_id && [...brandEl.options].some(o => o.value === String(it.product_id))) {
+    brandEl.value = String(it.product_id);
+  } else if (it.brand) {
+    const phantom = document.createElement('option');
+    phantom.value = it.product_id || ('legacy_' + Math.random().toString(36).slice(2));
+    phantom.textContent = it.brand + ' (' + T.wh_product_unavailable + ')';
+    phantom.dataset.name = it.brand;
+    if (!it.product_id) phantom.dataset.legacy = '1';
+    brandEl.appendChild(phantom);
+    brandEl.value = phantom.value;
+  }
+}
+
 function renderItemLists() {
   document.getElementById('fluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
     <div class="item-row">
       <span class="item-name">${T[key]}</span>
-      <input id="fluid_brand_${i}" placeholder="${T.brand_ph}">
+      ${brandFieldHtml(key, `fluid_brand_${i}`, `onFluidProductPicked(${i})`)}
       <input id="fluid_price_${i}" type="number" placeholder="${T.price_per_liter_ph}" oninput="updateTotal()">
       <input id="fluid_liters_${i}" type="number" step="0.1" placeholder="${T.liters_ph}" oninput="updateTotal()">
     </div>
   `).join('');
-  document.getElementById('filtersList').innerHTML = FILTER_KEYS.map((key, i) => `
+  document.getElementById('filtersList').innerHTML = FILTER_KEYS.map((key, i) => {
+    const prods = productsForCategory(key);
+    const brandField = prods.length ? brandFieldHtml(key, `filter_brand_${i}`, `onFilterProductPicked(${i})`) : '';
+    return `
     <div class="item-row">
-      <span class="item-name" style="flex:2.3;">${T[key]}</span>
+      <span class="item-name" style="flex:${prods.length ? '1.3' : '2.3'};">${T[key]}</span>
+      ${brandField}
       <input id="filter_price_${i}" type="number" placeholder="${T.price_ph}" oninput="updateTotal()">
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function onFluidProductPicked(i) {
+  const el = document.getElementById(`fluid_brand_${i}`);
+  const opt = el.options[el.selectedIndex];
+  if (opt && opt.dataset.price) document.getElementById(`fluid_price_${i}`).value = opt.dataset.price;
+  updateTotal();
+}
+
+function onFilterProductPicked(i) {
+  const el = document.getElementById(`filter_brand_${i}`);
+  const opt = el.options[el.selectedIndex];
+  if (opt && opt.dataset.price) document.getElementById(`filter_price_${i}`).value = opt.dataset.price;
+  updateTotal();
 }
 
 function collectItems() {
@@ -644,8 +971,9 @@ function collectItems() {
     const price = parseFloat(document.getElementById(`fluid_price_${i}`).value) || 0;
     const liters = parseFloat(document.getElementById(`fluid_liters_${i}`).value) || 0;
     if (price > 0 && liters > 0) {
+      const { brand, product_id } = readBrandField(`fluid_brand_${i}`);
       items.push({
-        key, name: T[key], brand: document.getElementById(`fluid_brand_${i}`).value.trim() || null,
+        key, name: T[key], brand, product_id,
         unit_price: price, qty: liters, total: Math.round(price * liters),
       });
     }
@@ -653,7 +981,9 @@ function collectItems() {
   FILTER_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`filter_price_${i}`).value) || 0;
     if (price > 0) {
-      items.push({key, name: T[key], unit_price: price, qty: 1, total: Math.round(price)});
+      const brandEl = document.getElementById(`filter_brand_${i}`);
+      const { brand, product_id } = brandEl ? readBrandField(`filter_brand_${i}`) : { brand: null, product_id: null };
+      items.push({key, name: T[key], brand, product_id, unit_price: price, qty: 1, total: Math.round(price)});
     }
   });
   const otherName = document.getElementById('other_name').value.trim();
@@ -708,7 +1038,17 @@ async function lookupPlate() {
   }
 }
 
-renderItemLists();
+async function initItemForms() {
+  if (WAREHOUSE_ENABLED) {
+    try {
+      const res = await fetch('/api/products');
+      productsCache = await res.json();
+    } catch (e) { /* остаёмся с пустым каталогом — поля просто будут текстовыми */ }
+  }
+  renderItemLists();
+  renderSvcItemLists();
+}
+initItemForms();
 
 async function submitCar() {
   const items = collectItems();
@@ -772,7 +1112,7 @@ function renderTable() {
       <td>${c.next_change_date || '—'}</td>
       <td>${c.telegram_id
           ? `<span class="badge linked">${T.badge_linked}</span>`
-          : `<button class="badge unlinked" onclick='openModal(${JSON.stringify(c.plate_number)}, ${JSON.stringify(c.client_link || "")}, ${JSON.stringify(c.owner_phone || "")})'>${T.badge_unlinked_btn}</button>`}</td>
+          : `<button class="badge unlinked" onclick="openModal(${escapeHtml(JSON.stringify(c.plate_number))}, ${escapeHtml(JSON.stringify(c.client_link || ''))}, ${escapeHtml(JSON.stringify(c.owner_phone || ''))})">${T.badge_unlinked_btn}</button>`}</td>
       <td><button class="history-toggle" onclick="toggleHistory('${c.plate_number}')">${T.history_more}</button></td>
     </tr>
     <tr class="history-row" id="hist-${c.plate_number}" style="display:none;"><td colspan="12"><div id="hist-body-${c.plate_number}">${T.history_loading}</div></td></tr>
@@ -781,9 +1121,11 @@ function renderTable() {
 
 async function toggleHistory(plate) {
   const row = document.getElementById('hist-' + plate);
+  if (!row) return;  // строки может не быть в DOM, если фильтр поиска её скрыл
   const isOpen = row.style.display !== 'none';
   if (openHistoryRow && openHistoryRow !== plate) {
-    document.getElementById('hist-' + openHistoryRow).style.display = 'none';
+    const prevRow = document.getElementById('hist-' + openHistoryRow);
+    if (prevRow) prevRow.style.display = 'none';  // прошлая открытая строка могла исчезнуть при поиске
   }
   if (isOpen) {
     row.style.display = 'none';
@@ -795,37 +1137,48 @@ async function toggleHistory(plate) {
   const res = await fetch('/api/history/' + encodeURIComponent(plate));
   const data = await res.json();
   const history = data.history || [];
+  historyDataCache[plate] = history;
   const body = document.getElementById('hist-body-' + plate);
+  const addBtnHtml = `<div style="margin-bottom:10px;"><button class="submit" style="padding:8px;" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})">${T.add_service_btn}</button></div>`;
   if (!history.length) {
-    body.innerHTML = T.history_empty;
+    body.innerHTML = addBtnHtml + T.history_empty;
     return;
   }
-  body.innerHTML = history.map(h => {
+  body.innerHTML = addBtnHtml + history.map(h => {
     let itemsHtml = '';
     if (h.items_json) {
       try {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div style="margin:4px 0 4px 12px;">' + items.map(it =>
-          `• ${it.name}${it.brand ? ' (' + it.brand + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
+          `• ${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
         ).join('<br>') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
     return `
     <div class="history-entry" id="hist-entry-${h.id}">
-      📅 ${h.change_date} — ${h.service_type || T.history_service_fallback} |
+      📅 ${h.change_date} — ${escapeHtml(h.service_type || T.history_service_fallback)} |
       ${T.history_mileage_label} ${h.mileage || '—'} км | ${T.history_next_mileage_label} ${h.next_mileage || '—'} км
       ${h.cost ? ' | ' + T.history_total_label + ' ' + h.cost.toLocaleString('ru-RU') + ' ' + T.currency : ''}
       | ${T.history_next_label} ${h.next_change_date || '—'}
       ${itemsHtml}
-      ${h.notes ? '<span style="color:var(--hint)">' + T.history_notes_label + ' ' + h.notes + '</span>' : ''}
+      ${h.notes ? '<span style="color:var(--hint)">' + T.history_notes_label + ' ' + escapeHtml(h.notes) + '</span>' : ''}
       <div style="margin-top:6px;">
-        <button class="history-toggle" onclick='openEditModal(${JSON.stringify(plate)}, ${JSON.stringify(h)})'>${T.entry_edit}</button>
+        <button class="history-toggle" onclick="openEditModalById(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_edit}</button>
         &nbsp;·&nbsp;
-        <button class="history-toggle" style="color:#dc6f6f;" onclick="deleteEntry(${h.id}, ${JSON.stringify(plate)})">${T.entry_delete}</button>
+        <button class="history-toggle" style="color:#dc6f6f;" onclick="deleteEntry(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_delete}</button>
       </div>
     </div>
   `;
   }).join('');
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function openModal(plate, link, phone) {
@@ -857,16 +1210,153 @@ function copyLink() {
   navigator.clipboard.writeText(text).then(() => showMsg(T.link_copied, true));
 }
 
-let editingEntry = { id: null, plate: null };
+// ---- Единое модальное окно: и "изменить запись", и "внести новую замену уже известному клиенту" ----
+let svcModal = { mode: null, id: null, plate: null };  // mode: 'edit' | 'add'
+
+function renderSvcItemLists() {
+  document.getElementById('svcFluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
+    <div class="item-row">
+      <span class="item-name">${T[key]}</span>
+      ${brandFieldHtml(key, `svc_fluid_brand_${i}`, `onSvcFluidProductPicked(${i})`)}
+      <input id="svc_fluid_price_${i}" type="number" placeholder="${T.price_per_liter_ph}" oninput="updateSvcTotal()">
+      <input id="svc_fluid_liters_${i}" type="number" step="0.1" placeholder="${T.liters_ph}" oninput="updateSvcTotal()">
+    </div>
+  `).join('');
+  document.getElementById('svcFiltersList').innerHTML = FILTER_KEYS.map((key, i) => {
+    const prods = productsForCategory(key);
+    const brandField = prods.length ? brandFieldHtml(key, `svc_filter_brand_${i}`, `onSvcFilterProductPicked(${i})`) : '';
+    return `
+    <div class="item-row">
+      <span class="item-name" style="flex:${prods.length ? '1.3' : '2.3'};">${T[key]}</span>
+      ${brandField}
+      <input id="svc_filter_price_${i}" type="number" placeholder="${T.price_ph}" oninput="updateSvcTotal()">
+    </div>
+  `;
+  }).join('');
+}
+
+function onSvcFluidProductPicked(i) {
+  const el = document.getElementById(`svc_fluid_brand_${i}`);
+  const opt = el.options[el.selectedIndex];
+  if (opt && opt.dataset.price) document.getElementById(`svc_fluid_price_${i}`).value = opt.dataset.price;
+  updateSvcTotal();
+}
+
+function onSvcFilterProductPicked(i) {
+  const el = document.getElementById(`svc_filter_brand_${i}`);
+  const opt = el.options[el.selectedIndex];
+  if (opt && opt.dataset.price) document.getElementById(`svc_filter_price_${i}`).value = opt.dataset.price;
+  updateSvcTotal();
+}
+
+function collectSvcItems() {
+  const items = [];
+  FLUID_KEYS.forEach((key, i) => {
+    const price = parseFloat(document.getElementById(`svc_fluid_price_${i}`).value) || 0;
+    const liters = parseFloat(document.getElementById(`svc_fluid_liters_${i}`).value) || 0;
+    if (price > 0 && liters > 0) {
+      const { brand, product_id } = readBrandField(`svc_fluid_brand_${i}`);
+      items.push({
+        key, name: T[key], brand, product_id,
+        unit_price: price, qty: liters, total: Math.round(price * liters),
+      });
+    }
+  });
+  FILTER_KEYS.forEach((key, i) => {
+    const price = parseFloat(document.getElementById(`svc_filter_price_${i}`).value) || 0;
+    if (price > 0) {
+      const brandEl = document.getElementById(`svc_filter_brand_${i}`);
+      const { brand, product_id } = brandEl ? readBrandField(`svc_filter_brand_${i}`) : { brand: null, product_id: null };
+      items.push({key, name: T[key], brand, product_id, unit_price: price, qty: 1, total: Math.round(price)});
+    }
+  });
+  const otherName = document.getElementById('svc_other_name').value.trim();
+  const otherPrice = parseFloat(document.getElementById('svc_other_price').value) || 0;
+  if (otherPrice > 0) {
+    items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
+  }
+  return items;
+}
+
+function updateSvcTotal() {
+  const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+  document.getElementById('svcTotalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
+}
+
+function resetSvcItemInputs() {
+  FLUID_KEYS.forEach((_, i) => {
+    document.getElementById(`svc_fluid_brand_${i}`).value = '';
+    document.getElementById(`svc_fluid_price_${i}`).value = '';
+    document.getElementById(`svc_fluid_liters_${i}`).value = '';
+  });
+  FILTER_KEYS.forEach((_, i) => {
+    document.getElementById(`svc_filter_price_${i}`).value = '';
+    const brandEl = document.getElementById(`svc_filter_brand_${i}`);
+    if (brandEl) brandEl.value = '';
+  });
+  document.getElementById('svc_other_name').value = '';
+  document.getElementById('svc_other_price').value = '';
+  updateSvcTotal();
+}
+
+function fillSvcItemsFrom(items) {
+  // подставляет уже сохранённые позиции в поля модалки (режим редактирования)
+  (items || []).forEach(it => {
+    if (!it.key) return;
+    if (it.key === 'other') {
+      const label = (it.name || '').replace(T.other_prefix + ': ', '');
+      document.getElementById('svc_other_name').value = label === T.other_unnamed ? '' : label;
+      document.getElementById('svc_other_price').value = it.total ?? '';
+      return;
+    }
+    const fi = FLUID_KEYS.indexOf(it.key);
+    if (fi !== -1) {
+      const brandEl = document.getElementById(`svc_fluid_brand_${fi}`);
+      selectOrPreserveBrand(brandEl, it);
+      document.getElementById(`svc_fluid_price_${fi}`).value = it.unit_price ?? '';
+      document.getElementById(`svc_fluid_liters_${fi}`).value = it.qty ?? '';
+      return;
+    }
+    const filI = FILTER_KEYS.indexOf(it.key);
+    if (filI !== -1) {
+      const brandEl = document.getElementById(`svc_filter_brand_${filI}`);
+      if (brandEl) selectOrPreserveBrand(brandEl, it);
+      document.getElementById(`svc_filter_price_${filI}`).value = it.total ?? '';
+    }
+  });
+}
+
+function openEditModalById(id, plate) {
+  const entry = (historyDataCache[plate] || []).find(h => h.id === id);
+  if (!entry) { showMsg(T.msg_error + ' запись не найдена в кэше, обновите список', false); return; }
+  openEditModal(plate, entry);
+}
 
 function openEditModal(plate, entry) {
-  editingEntry = { id: entry.id, plate };
+  svcModal = { mode: 'edit', id: entry.id, plate };
+  document.getElementById('svcModalTitle').textContent = T.entry_edit_title;
   document.getElementById('edit_mileage').value = entry.mileage ?? '';
   document.getElementById('edit_next_mileage').value = entry.next_mileage ?? '';
-  document.getElementById('edit_cost').value = entry.cost ?? '';
   document.getElementById('edit_interval_value').value = entry.interval_months ?? '';
   document.getElementById('edit_interval_unit').value = entry.interval_unit || 'months';
   document.getElementById('edit_notes').value = entry.notes || '';
+  resetSvcItemInputs();
+  if (entry.items_json) {
+    try { fillSvcItemsFrom(JSON.parse(entry.items_json)); } catch (e) {}
+  }
+  updateSvcTotal();
+  document.getElementById('editModal').classList.add('open');
+}
+
+function openAddServiceModal(plate) {
+  svcModal = { mode: 'add', id: null, plate };
+  document.getElementById('svcModalTitle').textContent = T.add_service_title;
+  document.getElementById('edit_mileage').value = '';
+  document.getElementById('edit_next_mileage').value = '';
+  document.getElementById('edit_interval_value').value = 3;
+  document.getElementById('edit_interval_unit').value = 'months';
+  document.getElementById('edit_notes').value = '';
+  resetSvcItemInputs();
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -875,23 +1365,35 @@ function closeEditModal() {
 }
 
 async function saveEdit() {
-  const payload = {
-    mileage: document.getElementById('edit_mileage').value || null,
-    next_mileage: document.getElementById('edit_next_mileage').value || null,
-    cost: document.getElementById('edit_cost').value || null,
-    interval_value: document.getElementById('edit_interval_value').value || null,
-    interval_unit: document.getElementById('edit_interval_unit').value,
-    notes: document.getElementById('edit_notes').value,
-  };
-  const res = await fetch('/api/oil_change/' + editingEntry.id, {
-    method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-  });
+  const items = collectSvcItems();
+  const mileage = document.getElementById('edit_mileage').value || null;
+  const next_mileage = document.getElementById('edit_next_mileage').value || null;
+  const interval_value = document.getElementById('edit_interval_value').value || null;
+  const interval_unit = document.getElementById('edit_interval_unit').value;
+  const notes = document.getElementById('edit_notes').value;
+
+  let res;
+  if (svcModal.mode === 'edit') {
+    res = await fetch('/api/oil_change/' + svcModal.id, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ mileage, next_mileage, interval_value, interval_unit, notes, items }),
+    });
+  } else {
+    const carRow = carsCache.find(c => c.plate_number === svcModal.plate);
+    res = await fetch('/api/add', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        plate: svcModal.plate, owner_name: carRow ? carRow.owner_name : '', mileage, next_mileage,
+        interval_value, interval_unit, notes, items,
+      }),
+    });
+  }
   const data = await res.json();
   if (data.ok) {
     closeEditModal();
-    showMsg(T.entry_saved, true);
-    document.getElementById('hist-' + editingEntry.plate).style.display = 'none';
-    toggleHistory(editingEntry.plate);
+    showMsg(svcModal.mode === 'edit' ? T.entry_saved : T.service_added, true);
+    document.getElementById('hist-' + svcModal.plate).style.display = 'none';
+    toggleHistory(svcModal.plate);
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -930,6 +1432,7 @@ def index():
         T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False),
         sms_enabled=bool(shop.get("sms_enabled")) if shop else False,
         eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
+        warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
     )
 
 
@@ -973,6 +1476,7 @@ def api_update_oil_change(oc_id):
             interval_value=int(data["interval_value"]) if data.get("interval_value") not in (None, "") else None,
             interval_unit=data.get("interval_unit"),
             notes=data.get("notes"),
+            items=data.get("items"),
         )
     except (ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -1099,6 +1603,96 @@ def api_sms_settings():
     return jsonify({"ok": True})
 
 
+def _warehouse_required():
+    shop = db.get_shop(g.shop_id)
+    if not shop or not shop.get("warehouse_enabled"):
+        return jsonify({"ok": False, "error": "Склад не включён для вашей точки"}), 403
+    return None
+
+
+@app.route("/api/products")
+@login_required
+def api_list_products():
+    return jsonify(db.list_products(g.shop_id))
+
+
+@app.route("/api/products", methods=["POST"])
+@login_required
+def api_create_product():
+    denied = _warehouse_required()
+    if denied:
+        return denied
+    data = request.get_json(force=True)
+    try:
+        category = data["category"]
+        name = data["name"].strip()
+        if not name:
+            return jsonify({"ok": False, "error": "укажите название товара"}), 400
+        unit = "pc" if category.startswith("filter_") else "l"
+        sell_price = int(data["sell_price"]) if data.get("sell_price") not in (None, "") else None
+        purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        initial_stock = float(data["initial_stock"]) if data.get("initial_stock") not in (None, "") else 0
+    except (KeyError, ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    product = db.create_product(g.shop_id, category, name, unit, sell_price, purchase_price, initial_stock)
+    return jsonify({"ok": True, "product": product})
+
+
+@app.route("/api/products/<int:product_id>", methods=["PUT"])
+@login_required
+def api_update_product(product_id):
+    data = request.get_json(force=True)
+    try:
+        ok = db.update_product(
+            product_id, g.shop_id,
+            name=data.get("name"),
+            sell_price=int(data["sell_price"]) if data.get("sell_price") not in (None, "") else None,
+            purchase_price=int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None,
+        )
+    except (ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    if not ok:
+        return jsonify({"ok": False, "error": "товар не найден"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/products/<int:product_id>", methods=["DELETE"])
+@login_required
+def api_delete_product(product_id):
+    ok = db.delete_product(product_id, g.shop_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "товар не найден"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/products/<int:product_id>/restock", methods=["POST"])
+@login_required
+def api_restock_product(product_id):
+    data = request.get_json(force=True)
+    try:
+        quantity = float(data["quantity"])
+        purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        restock_date = data.get("restock_date") or None
+    except (KeyError, ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    ok = db.restock_product(product_id, g.shop_id, quantity, purchase_price, restock_date)
+    if not ok:
+        return jsonify({"ok": False, "error": "товар не найден"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/restock_history")
+@login_required
+def api_restock_history():
+    return jsonify(db.get_restock_history(g.shop_id))
+
+
+@app.route("/api/profit_stats")
+@login_required
+def api_profit_stats():
+    return jsonify(db.get_profit_stats(g.shop_id))
+
+
 @app.route("/api/export")
 @login_required
 def api_export():
@@ -1201,7 +1795,7 @@ ADMIN_PAGE = """
     <h3 style="margin-top:0;">Все точки</h3>
     <div class="table-wrap" style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th></tr></thead>
+      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th></tr></thead>
       <tbody id="shops-body"></tbody>
     </table>
     </div>
@@ -1215,6 +1809,15 @@ function showMsg(text, ok) {
   setTimeout(() => { el.innerHTML = ''; }, 8000);
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function loadShops() {
   const res = await fetch('/api/admin/shops');
   const shops = await res.json();
@@ -1225,7 +1828,7 @@ async function loadShops() {
       <td>${s.password_plain
           ? `<span style="font-family:monospace;">${s.password_plain}</span>`
           : `<span class="hint-text">не сохранён</span>`}
-          <br><button class="badge" style="background:#2a2e37;color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${JSON.stringify(s.username)})">сбросить</button></td>
+          <br><button class="badge" style="background:#2a2e37;color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
       <td>${s.phone || '—'}</td>
       <td>${s.client_count}</td>
       <td><button class="badge ${s.is_active ? 'active' : 'inactive'}" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">
@@ -1234,8 +1837,18 @@ async function loadShops() {
       <td><button class="badge ${s.sms_enabled ? 'active' : 'inactive'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})">
         ${s.sms_enabled ? 'включён' : 'выключен'}
       </button></td>
+      <td><button class="badge ${s.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})">
+        ${s.warehouse_enabled ? 'включён' : 'выключен'}
+      </button></td>
     </tr>
   `).join('');
+}
+
+async function toggleWarehouse(id, makeEnabled) {
+  await fetch(`/api/admin/shops/${id}/toggle_warehouse`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: !!makeEnabled})
+  });
+  loadShops();
 }
 
 async function toggleShop(id, makeActive) {
@@ -1358,6 +1971,14 @@ def api_admin_toggle_shop(shop_id):
 def api_admin_toggle_sms(shop_id):
     data = request.get_json(force=True)
     db.set_shop_sms_enabled(shop_id, bool(data.get("enabled")))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/toggle_warehouse", methods=["POST"])
+@admin_required
+def api_admin_toggle_warehouse(shop_id):
+    data = request.get_json(force=True)
+    db.set_shop_warehouse_enabled(shop_id, bool(data.get("enabled")))
     return jsonify({"ok": True})
 
 

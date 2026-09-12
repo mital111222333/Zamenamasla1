@@ -93,6 +93,7 @@ def init_db():
             sms_enabled INTEGER DEFAULT 0,
             eskiz_email TEXT,
             eskiz_password TEXT,
+            warehouse_enabled INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -196,10 +197,38 @@ def _migrate(conn):
         "sms_enabled": "INTEGER DEFAULT 0",
         "eskiz_email": "TEXT",
         "eskiz_password": "TEXT",
+        "warehouse_enabled": "INTEGER DEFAULT 0",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
             conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
+
+    # --- склад: товары точки и история пополнений ---
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        name TEXT NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'l',
+        stock_qty REAL NOT NULL DEFAULT 0,
+        sell_price INTEGER,
+        purchase_price INTEGER,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS stock_restocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        shop_id INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        purchase_price INTEGER,
+        restock_date TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
 
     # --- oil_changes: добавляем недостающие колонки (из более ранних версий) ---
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
@@ -472,6 +501,128 @@ def get_shop_eskiz_credentials(shop_id: int):
     return shop["eskiz_email"], _decrypt_password(shop["eskiz_password"])
 
 
+def set_shop_warehouse_enabled(shop_id: int, enabled: bool):
+    """Платформенный админ включает/выключает вкладку «Склад» для точки."""
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET warehouse_enabled=? WHERE id=?", (1 if enabled else 0, shop_id))
+        conn.commit()
+
+
+# ============ СКЛАД: товары и остатки ============
+
+def create_product(shop_id: int, category: str, name: str, unit: str = "l",
+                    sell_price=None, purchase_price=None, initial_stock: float = 0) -> dict:
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """, (shop_id, category, name, unit, initial_stock, sell_price, purchase_price))
+        conn.commit()
+        return get_product(cur.lastrowid, shop_id)
+
+
+def get_product(product_id: int, shop_id: int, active_only: bool = True):
+    """Только если товар принадлежит указанной точке — проверка прав.
+    По умолчанию не находит «удалённые» (is_active=0) товары — на них больше
+    нельзя ссылаться в новых/редактируемых записях о замене, даже если их id
+    ещё где-то передаётся. Уже сохранённые старые записи это не затрагивает —
+    там название/марка уже сохранены как обычный текст в items_json."""
+    query = "SELECT * FROM products WHERE id=? AND shop_id=?"
+    params = [product_id, shop_id]
+    if active_only:
+        query += " AND is_active=1"
+    with get_conn() as conn:
+        row = conn.execute(query, params).fetchone()
+        return dict(row) if row else None
+
+
+def list_products(shop_id: int, category: str = None, active_only: bool = True):
+    query = "SELECT * FROM products WHERE shop_id=?"
+    params = [shop_id]
+    if category:
+        query += " AND category=?"
+        params.append(category)
+    if active_only:
+        query += " AND is_active=1"
+    query += " ORDER BY category, name"
+    with get_conn() as conn:
+        return [dict(r) for r in conn.execute(query, params).fetchall()]
+
+
+def update_product(product_id: int, shop_id: int, name=None, sell_price=None, purchase_price=None):
+    existing = get_product(product_id, shop_id)
+    if not existing:
+        return False
+    fields = {}
+    if name is not None:
+        fields["name"] = name
+    if sell_price is not None:
+        fields["sell_price"] = sell_price
+    if purchase_price is not None:
+        fields["purchase_price"] = purchase_price
+    if not fields:
+        return True
+    set_clause = ", ".join(f"{k}=?" for k in fields)
+    with get_conn() as conn:
+        conn.execute(f"UPDATE products SET {set_clause} WHERE id=?", (*fields.values(), product_id))
+        conn.commit()
+    return True
+
+
+def delete_product(product_id: int, shop_id: int):
+    """«Удаление» товара — мягкое (is_active=0), чтобы старые записи о заменах,
+    которые уже на него ссылались, не потеряли название/историю."""
+    existing = get_product(product_id, shop_id)
+    if not existing:
+        return False
+    with get_conn() as conn:
+        conn.execute("UPDATE products SET is_active=0 WHERE id=?", (product_id,))
+        conn.commit()
+    return True
+
+
+def restock_product(product_id: int, shop_id: int, quantity: float, purchase_price=None, restock_date: str = None):
+    """Пополнение склада — увеличивает остаток и пишет запись в историю
+    пополнений (дата, количество, цена закупки на тот момент). Если указана
+    цена закупки — обновляет её и в самой карточке товара (для будущих продаж)."""
+    existing = get_product(product_id, shop_id)
+    if not existing:
+        return False
+    if not restock_date:
+        restock_date = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (quantity, product_id))
+        if purchase_price is not None:
+            conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (purchase_price, product_id))
+        conn.execute("""
+            INSERT INTO stock_restocks (product_id, shop_id, quantity, purchase_price, restock_date)
+            VALUES (?, ?, ?, ?, ?)
+        """, (product_id, shop_id, quantity, purchase_price, restock_date))
+        conn.commit()
+    return True
+
+
+def get_restock_history(shop_id: int, limit: int = 50):
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT r.*, p.name as product_name, p.category, p.unit
+            FROM stock_restocks r JOIN products p ON p.id = r.product_id
+            WHERE r.shop_id=? ORDER BY r.restock_date DESC, r.id DESC LIMIT ?
+        """, (shop_id, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def adjust_stock(product_id: int, delta: float):
+    """Внутренняя функция — сдвигает остаток товара на delta (может быть
+    отрицательным при продаже или положительным при отмене/удалении записи,
+    которая его расходовала). Не проверяет принадлежность точке — вызывается
+    только изнутри add/update/delete_oil_change, где принадлежность уже
+    проверена на уровне самой записи о замене."""
+    with get_conn() as conn:
+        conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (delta, product_id))
+        conn.commit()
+
+
 def username_taken(username: str) -> bool:
     with get_conn() as conn:
         return conn.execute("SELECT 1 FROM shops WHERE username=?", (username,)).fetchone() is not None
@@ -671,6 +822,18 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
 
     items_json = None
     if items:
+        with get_conn() as _conn:
+            car_row = _conn.execute("SELECT shop_id FROM cars WHERE id=?", (car_id,)).fetchone()
+        item_shop_id = car_row["shop_id"] if car_row else None
+        for item in items:
+            pid = item.get("product_id")
+            if pid and item_shop_id:
+                product = get_product(pid, item_shop_id)
+                if product:
+                    item.setdefault("cost_price", product.get("purchase_price"))
+                    adjust_stock(pid, item.get("qty") or 0)
+                else:
+                    item["product_id"] = None  # товар не принадлежит этой точке — не связываем со складом
         items_json = json.dumps(items, ensure_ascii=False)
         cost = round(sum(i.get("total", 0) for i in items))
         names = [i["name"] for i in items]
@@ -705,10 +868,16 @@ def get_oil_change_for_shop(oc_id: int, shop_id: int):
 
 
 def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, next_mileage=None,
-                       cost=None, interval_value=None, interval_unit=None, notes=None):
-    """Редактирует базовые поля уже сохранённой записи (для исправления
-    опечаток). Возвращает True, если запись найдена и принадлежит точке —
-    иначе False (ничего не меняет), в том числе если это запись чужой точки."""
+                       cost=None, interval_value=None, interval_unit=None, notes=None, items=None):
+    """Редактирует уже сохранённую запись. Если передан НЕПУСТОЙ items — полностью
+    пересчитывает стоимость, детализацию (жидкости/фильтры) и итоговое
+    описание по нему (так же, как при создании новой записи); cost, которое
+    также могло быть передано отдельно, в этом случае игнорируется — сумма
+    считается по позициям. Пустой список ([]) или None в items трактуются
+    ОДИНАКОВО — «позиции не трогать» (чтобы безобидное редактирование, скажем,
+    только next_mileage у старой «простой» записи без позиций не стирало ей
+    случайно стоимость и марку масла). Возвращает True, если запись найдена и
+    принадлежит точке — иначе False (ничего не меняет)."""
     existing = get_oil_change_for_shop(oc_id, shop_id)
     if not existing:
         return False
@@ -720,10 +889,39 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
         fields["mileage"] = mileage
     if next_mileage is not None:
         fields["next_mileage"] = next_mileage
-    if cost is not None:
-        fields["cost"] = cost
     if notes is not None:
         fields["notes"] = notes
+
+    if items:
+        # Склад: сначала возвращаем то, что было списано старыми позициями
+        # (если товар всё ещё существует и принадлежит этой точке), потом
+        # списываем заново по новым позициям — так редактирование количества
+        # или замена бренда правильно отражается на остатках, а не задваивает
+        # списание.
+        old_items = json.loads(existing["items_json"]) if existing.get("items_json") else []
+        for old_item in old_items:
+            pid = old_item.get("product_id")
+            if pid and get_product(pid, shop_id, active_only=False):
+                adjust_stock(pid, -(old_item.get("qty") or 0))
+        for item in items:
+            pid = item.get("product_id")
+            if pid:
+                product = get_product(pid, shop_id)
+                if product:
+                    item["cost_price"] = product.get("purchase_price")
+                    adjust_stock(pid, item.get("qty") or 0)
+                else:
+                    item["product_id"] = None
+
+        fields["items_json"] = json.dumps(items, ensure_ascii=False)
+        fields["cost"] = round(sum(i.get("total", 0) for i in items))
+        names = [i["name"] for i in items]
+        fields["service_type"] = ", ".join(names) if names else "Обслуживание"
+        motor_oil = next((i for i in items if i.get("key") == "fluid_0"), None)
+        fields["oil_brand"] = motor_oil["brand"] if motor_oil and motor_oil.get("brand") else None
+        fields["filter_changed"] = int(any((i.get("key") or "").startswith("filter_") for i in items))
+    elif cost is not None:
+        fields["cost"] = cost
 
     if interval_value is not None or interval_unit is not None:
         final_value = interval_value if interval_value is not None else existing["interval_months"]
@@ -752,13 +950,20 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
 
 
 def delete_oil_change(oc_id: int, shop_id: int):
-    """Удаляет запись (только если она принадлежит указанной точке). Если
+    """Удаляет запись (только если она принадлежит указанной точке). Товары,
+    списанные со склада этой записью, возвращаются обратно на остаток. Если
     удалённая запись была 'active' (текущей) — делает активной следующую по
     свежести оставшуюся запись той же машины, чтобы напоминания продолжали
     работать корректно. Возвращает True, если запись была найдена и удалена."""
     existing = get_oil_change_for_shop(oc_id, shop_id)
     if not existing:
         return False
+
+    if existing.get("items_json"):
+        for item in json.loads(existing["items_json"]):
+            pid = item.get("product_id")
+            if pid and get_product(pid, shop_id, active_only=False):
+                adjust_stock(pid, -(item.get("qty") or 0))
 
     with get_conn() as conn:
         conn.execute("DELETE FROM oil_changes WHERE id=?", (oc_id,))
@@ -930,6 +1135,52 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
               AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchone()
         return {"total": row["total"], "count": row["cnt"]}
+
+
+def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
+    """Прибыль = сумма (цена продажи - цена закупки на момент продажи) по
+    каждой позиции, СВЯЗАННОЙ с товаром со склада (item['cost_price'] задан).
+    Позиции без привязки к складу (введены вручную текстом, без выбора из
+    каталога) в расчёт прибыли не входят — их себестоимость неизвестна."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.items_json IS NOT NULL
+              AND oc.change_date >= ? AND oc.change_date <= ?
+        """, (shop_id, date_from, date_to)).fetchall()
+    profit = 0
+    for row in rows:
+        try:
+            items = json.loads(row["items_json"])
+        except (ValueError, TypeError):
+            continue
+        for item in items:
+            if item.get("cost_price") is not None and item.get("qty") is not None:
+                profit += (item.get("total") or 0) - item["qty"] * item["cost_price"]
+    return round(profit)
+
+
+def get_profit_range(shop_id: int, date_from: str, date_to: str) -> int:
+    return _compute_profit_for_range(shop_id, date_from, date_to)
+
+
+def get_profit_stats(shop_id: int) -> dict:
+    """Прибыль за сегодня/вчера/эту неделю/этот месяц/этот год — по той же
+    логике периодов, что и get_revenue_stats."""
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
+    month_start = now.strftime("%Y-%m-01")
+    year_start = now.strftime("%Y-01-01")
+    far_past = "2000-01-01"
+    return {
+        "today": _compute_profit_for_range(shop_id, today, today),
+        "yesterday": _compute_profit_for_range(shop_id, yesterday, yesterday),
+        "week": _compute_profit_for_range(shop_id, week_start, today),
+        "month": _compute_profit_for_range(shop_id, month_start, today),
+        "year": _compute_profit_for_range(shop_id, year_start, today),
+    }
 
 
 def export_shop_data(shop_id: int) -> dict:
