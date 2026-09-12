@@ -1198,6 +1198,24 @@ def get_profit_stats(shop_id: int) -> dict:
     }
 
 
+def get_full_history_flat(shop_id: int):
+    """Полная история всех замен точки одним плоским списком (по строке на
+    каждую услугу, с данными машины/клиента в той же строке) — для выгрузки
+    в Excel. Отсортировано от новых к старым."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date, c.plate_number, cl.full_name as owner_name, cl.phone as owner_phone,
+                   c.car_brand, c.car_model, oc.mileage, oc.next_mileage, oc.service_type,
+                   oc.oil_brand, oc.cost, oc.next_change_date, oc.notes
+            FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            JOIN clients cl ON cl.id = c.client_id
+            WHERE c.shop_id = ?
+            ORDER BY oc.change_date DESC, oc.id DESC
+        """, (shop_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
 def export_shop_data(shop_id: int) -> dict:
     """Полный дамп ВСЕХ данных одной точки — клиенты, машины (с полной
     историей внутри) и рассылки. Используется для скачивания резервной копии

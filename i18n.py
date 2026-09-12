@@ -161,6 +161,8 @@ RU = {
     "export_p1": "Скачайте полную копию базы вашей точки — все клиенты, машины и история обслуживания одним файлом (формат JSON).",
     "export_p2": "Пригодится для переноса на другой сервер или как резервная копия на всякий случай.",
     "export_btn": "⬇️ Скачать резервную копию",
+    "export_excel_btn": "📊 Скачать в Excel",
+    "export_excel_hint": "Таблица со всей историей замен — открывается сразу в Excel, удобно для просмотра и печати.",
 
     "stats_today": "Сегодня",
     "stats_yesterday": "Вчера",
@@ -406,6 +408,8 @@ UZ = {
     "export_p1": "Nuqtangizning to'liq bazasini yuklab oling — barcha mijozlar, mashinalar va xizmat tarixi bitta faylda (JSON formatida).",
     "export_p2": "Boshqa serverga ko'chirish yoki zaxira nusxa sifatida foydali bo'ladi.",
     "export_btn": "⬇️ Zaxira nusxani yuklab olish",
+    "export_excel_btn": "📊 Excelga yuklab olish",
+    "export_excel_hint": "Barcha almashtirishlar tarixi jadval ko'rinishida — Excelda darhol ochiladi, ko'rish va chop etish uchun qulay.",
 
     "stats_today": "Bugun",
     "stats_yesterday": "Kecha",

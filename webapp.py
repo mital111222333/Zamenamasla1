@@ -14,6 +14,7 @@ import os
 import re
 import time
 import secrets
+import urllib.parse
 import threading
 from functools import wraps
 from urllib.parse import quote
@@ -364,6 +365,8 @@ PAGE = """
     <p style="margin-top:0;">{{ T.export_p1 }}</p>
     <p class="hint-text">{{ T.export_p2 }}</p>
     <button class="submit" onclick="window.location.href='/api/export'">{{ T.export_btn }}</button>
+    <button class="submit" style="background:#1a7a3d; margin-top:8px;" onclick="window.location.href='/api/export_excel'">{{ T.export_excel_btn }}</button>
+    <p class="hint-text">{{ T.export_excel_hint }}</p>
   </div>
 
   <div id="view-stats" style="display:none;">
@@ -1710,6 +1713,74 @@ def api_export():
     return Response(
         body, mimetype="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.route("/api/export_excel")
+@login_required
+def api_export_excel():
+    import io
+    from datetime import datetime as _dt
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    rows = db.get_full_history_flat(g.shop_id)
+    shop = db.get_shop(g.shop_id)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "История"
+
+    headers = [
+        "Дата", "Госномер", "Владелец", "Телефон", "Марка авто", "Модель",
+        "Пробег, км", "Менять при, км", "Услуга", "Марка масла",
+        "Итого, сум", "След. замена", "Заметки",
+    ]
+    header_font = Font(name="Arial", bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="3A5FCD", end_color="3A5FCD", fill_type="solid")
+    for col_idx, title in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=title)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.freeze_panes = "A2"
+
+    body_font = Font(name="Arial", size=11)
+    for row_idx, r in enumerate(rows, start=2):
+        values = [
+            r["change_date"], r["plate_number"], r["owner_name"] or "", r["owner_phone"] or "",
+            r["car_brand"] or "", r["car_model"] or "", r["mileage"], r["next_mileage"],
+            r["service_type"] or "", r["oil_brand"] or "", r["cost"], r["next_change_date"] or "",
+            r["notes"] or "",
+        ]
+        for col_idx, value in enumerate(values, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.font = body_font
+            if col_idx == 11 and value is not None:  # "Итого, сум"
+                cell.number_format = "#,##0"
+
+    widths = [12, 12, 20, 15, 14, 14, 12, 14, 22, 16, 13, 12, 24]
+    for col_idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64 + col_idx)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    shop_name_part = (shop.get("shop_name") or "shop").replace(" ", "_") if shop else "shop"
+    filename = f"{shop_name_part}_{_dt.now().strftime('%Y-%m-%d')}.xlsx"
+    # Content-Disposition допускает только ASCII в filename="..." — название
+    # точки почти всегда на кириллице, поэтому кодируем правильно (RFC 5987):
+    # ASCII-заглушка для старых клиентов + filename*= с настоящим именем
+    # в UTF-8 для всех современных браузеров.
+    ascii_fallback = "history_export.xlsx"
+    encoded_filename = urllib.parse.quote(filename)
+    return Response(
+        buf.read(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{encoded_filename}"
+        }
     )
 
 
