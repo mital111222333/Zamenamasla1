@@ -183,8 +183,9 @@ PAGE = """
   .checkbox-row { display:flex; align-items:center; gap:8px; }
   .checkbox-row input { width:auto; }
   .item-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-  .item-row .item-name { flex:1.3; font-size:13px; color:var(--hint); }
-  .item-row input { flex:1; padding:8px; font-size:13px; }
+  .item-row .item-name { flex:1.3; font-size:13px; color:var(--hint); min-width:0; }
+  .item-row input { flex:1; padding:8px; font-size:13px; min-width:0; }
+  .item-row select { flex:1.6; padding:8px; font-size:13px; min-width:0; }
   .item-row .item-total { flex:0.9; font-size:12px; color:var(--hint); text-align:right; }
   button.submit {
     width: 100%; padding: 12px; border: none; border-radius: 10px;
