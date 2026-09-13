@@ -89,6 +89,9 @@ RU = {
     "liters_ph": "л",
     "brand_ph": "Марка",
     "price_ph": "Цена, сум",
+    "qty_ph": "Кол-во",
+    "wh_other_stock_title": "📦 Прочие товары со склада",
+    "wh_add_row": "➕ Добавить строку",
 
     "fluid_0": "Моторное масло",
     "fluid_1": "АКПП/МКПП масло",
@@ -99,6 +102,9 @@ RU = {
     "filter_1": "Воздушный фильтр",
     "filter_2": "Салонный фильтр",
     "filter_3": "Топливный фильтр",
+    "other": "Прочее",
+    "wh_category_other": "➕ Прочее (своё название)",
+    "wh_unit": "Единица измерения",
     "other_prefix": "Другое",
     "other_unnamed": "без названия",
 
@@ -339,6 +345,9 @@ UZ = {
     "liters_ph": "litr",
     "brand_ph": "Markasi",
     "price_ph": "Narxi, so'm",
+    "qty_ph": "Miqdor",
+    "wh_other_stock_title": "📦 Ombordagi boshqa mahsulotlar",
+    "wh_add_row": "➕ Qator qo’shish",
 
     "fluid_0": "Motor moyi",
     "fluid_1": "AKPP/MKPP moyi",
@@ -349,6 +358,9 @@ UZ = {
     "filter_1": "Havo filtri",
     "filter_2": "Salon filtri",
     "filter_3": "Yoqilg'i filtri",
+    "other": "Boshqa",
+    "wh_category_other": "➕ Boshqa (o'z nomi bilan)",
+    "wh_unit": "O'lchov birligi",
     "other_prefix": "Boshqa",
     "other_unnamed": "nomsiz",
 
