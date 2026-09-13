@@ -83,44 +83,24 @@ LOGIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ T.app_title }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   body {
-    margin:0; background:#14110D; color:#EFE7DA; font-family:'IBM Plex Sans', -apple-system, sans-serif;
+    margin:0; background:#0f1115; color:#f2f2f2; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
     height:100vh; display:flex; align-items:center; justify-content:center;
-    background-image: radial-gradient(ellipse at 50% -10%, rgba(214,138,52,0.10), transparent 60%);
   }
-  .box {
-    background:#1E1A16; border:1px solid #332B22; border-radius:16px; padding:30px; width:90%; max-width:340px;
-    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 30px rgba(0,0,0,0.35);
-  }
-  h1 {
-    font-family:'Oswald', sans-serif; font-weight:600; font-size:22px; letter-spacing:0.3px;
-    margin:0 0 4px; text-align:center; color:#F4EEE3;
-  }
-  .tagline { text-align:center; font-size:12px; color:#A69A87; margin:0 0 22px; }
-  label { display:block; font-size:13px; color:#A69A87; margin-bottom:4px; }
-  input {
-    width:100%; padding:11px; border-radius:9px; border:1px solid #332B22; background:#161310; color:#F4EEE3;
-    font-size:15px; margin-bottom:14px; font-family:'IBM Plex Sans', sans-serif;
-  }
-  input:focus { outline:none; border-color:#D68A34; }
-  button {
-    width:100%; padding:12px; border:none; border-radius:10px; background:#D68A34; color:#1A1108;
-    font-family:'IBM Plex Sans', sans-serif; font-size:15px; font-weight:600; cursor:pointer;
-    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 12px rgba(214,138,52,0.25);
-  }
-  .error { background:#3A2018; color:#E5978A; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; border:1px solid #5A2E24; }
-  .lang-link { display:block; text-align:center; margin-top:16px; color:#A69A87; font-size:12px; text-decoration:none; }
+  .box { background:#1a1d24; border:1px solid #2a2e37; border-radius:14px; padding:28px; width:90%; max-width:340px; }
+  h1 { font-size:20px; margin:0 0 20px; text-align:center; }
+  label { display:block; font-size:13px; color:#9a9a9a; margin-bottom:4px; }
+  input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:15px; margin-bottom:14px; }
+  button { width:100%; padding:12px; border:none; border-radius:10px; background:#3a86ff; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
+  .error { background:#3a1e1e; color:#dc6f6f; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
+  .lang-link { display:block; text-align:center; margin-top:14px; color:#9a9a9a; font-size:12px; text-decoration:none; }
 </style>
 </head>
 <body>
   <form class="box" method="POST">
     <h1>🔧 {{ T.login_title }}</h1>
-    <p class="tagline">MITAL</p>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <input type="hidden" name="_lang" value="{{ lang }}">
     <label>{{ T.login_username }}</label>
@@ -174,52 +154,102 @@ PAGE = """
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
   :root {
-    --bg: var(--tg-theme-bg-color, #14110D);
-    --text: var(--tg-theme-text-color, #EFE7DA);
-    --hint: var(--tg-theme-hint-color, #A69A87);
-    --btn: var(--tg-theme-button-color, #D68A34);
-    --btn-text: var(--tg-theme-button-text-color, #1A1108);
-    --card: #1E1A16;
-    --border: #332B22;
-    --field-bg: #161310;
-    --ok: #5B9279;
-    --ok-bg: #1B2A21;
-    --danger: #C1554A;
-    --danger-bg: #2E1B17;
-    --font-display: 'Oswald', sans-serif;
-    --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+    --bg: var(--tg-theme-bg-color, #F1F5F9);
+    --text: var(--tg-theme-text-color, #1E293B);
+    --hint: var(--tg-theme-hint-color, #94A3B8);
+    --btn: var(--tg-theme-button-color, #E63946);
+    --btn-text: var(--tg-theme-button-text-color, #FFFFFF);
+    --blue: #0F52BA;
+    --darkblue: #0A2540;
+    --cyan: #00A8E8;
+    --darkred: #9B111E;
+    --carbon: #181E29;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+    --field-bg: #F4F7FA;
+    --ok: #059669;
+    --ok-bg: #ECFDF5;
+    --danger: #B3241C;
+    --danger-bg: #FDECEA;
+    --accent2: #0F52BA;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family: var(--font-body); }
-  .container { padding: 12px; max-width: 960px; margin: 0 auto; }
-  .topbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; }
-  h1 { font-family: var(--font-display); font-weight:600; letter-spacing:0.2px; font-size: 21px; margin: 0; color:#F4EEE3; }
-  .logout { color: var(--hint); font-size: 13px; text-decoration:none; }
-  .lang-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
-  .tabs { display:flex; gap:8px; margin-bottom: 14px; flex-wrap:wrap; }
-  .tab {
-    flex:1; min-width:100px; text-align:center; padding: 10px; border-radius: 10px; background: var(--card);
-    border:1px solid var(--border); cursor:pointer; font-weight:600; font-family: var(--font-display);
-    letter-spacing:0.2px; transition: box-shadow .15s ease;
+  .speedline {
+    height:6px; width:100%;
+    background: linear-gradient(90deg, var(--blue) 0%, var(--blue) 33%, #fff 33%, #fff 38%, var(--btn) 38%, var(--btn) 70%, #fff 70%, #fff 75%, var(--cyan) 75%, var(--cyan) 100%);
   }
-  .tab.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); box-shadow: 0 0 0 1px rgba(214,138,52,.35), 0 3px 14px rgba(214,138,52,.30); }
+  .container { padding: 12px; max-width: 960px; margin: 0 auto; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin: 14px 0 16px; }
+  .logo-badge {
+    display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
+    background:var(--darkblue); color:var(--cyan); border-radius:12px; transform:rotate(-8deg);
+    box-shadow:0 4px 10px rgba(10,37,64,.25); font-size:16px; flex:none;
+  }
+  h1 { font-family: var(--font-display); font-weight:800; font-style:italic; letter-spacing:-0.3px; font-size: 22px; margin: 0; line-height:1.1; color:var(--darkblue); }
+  h1 .accent { color:var(--btn); }
+  .logo-sub { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--hint); }
+  .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
+  .lang-btn { background: #EFF6FF; border: 1px solid #BFDBFE; color: var(--blue); font-size: 12px; font-weight:700; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
+  .tabs { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom: 10px; }
+  .tab {
+    text-align:center; padding: 10px 4px; border-radius: 14px; background: var(--card);
+    border:2px solid var(--border); cursor:pointer; font-weight:700; font-family: var(--font-display);
+    font-size:11px; text-transform:uppercase; letter-spacing:0.2px; transition: all .15s ease;
+    display:flex; flex-direction:column; align-items:center; gap:5px;
+    box-shadow: 0 1px 3px rgba(20,20,25,.04);
+  }
+  .tab .tab-icon {
+    width:30px; height:30px; border-radius:50%; background:var(--field-bg); color:var(--blue);
+    display:flex; align-items:center; justify-content:center; font-size:13px; flex:none; transition: all .15s ease;
+  }
+  .tab#tab-add { border-color:var(--btn); }
+  .tab#tab-add .tab-icon { background:var(--danger-bg); color:var(--btn); }
+  .tab#tab-add span:last-child { color:var(--btn); }
+  .tab.active { color: var(--btn); }
+  .tab.active .tab-icon { background:var(--btn); color:#fff; transform:scale(1.08); }
+  .wh-banner {
+    width:100%; background:var(--carbon); border:2px solid #0d1117; border-radius:16px; padding:12px 16px;
+    display:flex; align-items:center; justify-content:center; gap:12px; cursor:pointer; margin-bottom:12px;
+    box-shadow:0 8px 20px rgba(0,0,0,.25);
+  }
+  .wh-banner .stripe-pair { display:flex; gap:4px; }
+  .wh-banner .stripe-pair span { width:8px; height:26px; border-radius:2px; transform:skewX(-12deg); }
+  .wh-banner .wh-label { font-family:var(--font-display); font-weight:800; font-style:italic; font-size:18px; color:#fff; text-transform:uppercase; letter-spacing:0.5px; }
   .card {
-    background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px;
-    box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 10px rgba(0,0,0,.20);
+    background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 12px;
+    box-shadow: 0 10px 25px -5px rgba(15,82,186,.08); overflow:hidden;
   }
   .field { margin-bottom: 10px; }
   .row2 { display:flex; gap:10px; }
   .row2 .field { flex:1; }
-  label { display:block; font-size: 13px; color: var(--hint); margin-bottom: 4px; }
+  label { display:block; font-size: 12px; color: var(--hint); margin-bottom: 4px; text-transform:uppercase; letter-spacing:0.4px; }
+  label i { color:var(--btn); margin-right:4px; width:12px; text-align:center; }
   input, select, textarea {
-    width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+    width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border);
     background: var(--field-bg); color: var(--text); font-size: 15px; font-family: var(--font-body);
   }
-  input:focus, select:focus, textarea:focus { outline:none; border-color: var(--btn); }
+  input:focus, select:focus, textarea:focus { outline:none; border-color: var(--btn); box-shadow:0 0 0 3px rgba(225,6,0,.12); }
+  .card-header {
+    background:linear-gradient(90deg, var(--blue), #1a6fd4); color:#fff; padding:14px 16px; border-radius:20px 20px 0 0; margin:-16px -16px 14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .card-header .dot { width:9px; height:9px; border-radius:50%; background:var(--btn); flex:none; box-shadow:0 0 0 4px rgba(225,6,0,.25); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+  .card-header h3 { margin:0; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:17px; letter-spacing:0.3px; text-transform:uppercase; }
+  .plate-wrap { position:relative; }
+  .plate-chip {
+    position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    font-size:11px; font-weight:700; color:var(--hint); background:var(--border); padding:2px 6px; border-radius:5px;
+  }
+  #plate { padding-left:44px; font-family:var(--font-mono); font-weight:600; letter-spacing:1px; text-transform:uppercase; }
   .checkbox-row { display:flex; align-items:center; gap:8px; }
   .checkbox-row input { width:auto; }
   .item-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
@@ -229,98 +259,117 @@ PAGE = """
   .other-stock-row { display:flex; gap:6px; align-items:center; margin-bottom:8px; }
   .other-stock-row select { flex:2; padding:8px; font-size:13px; min-width:0; }
   .other-stock-row input { flex:1; padding:8px; font-size:13px; min-width:0; }
-  .other-stock-row button { flex:none; width:32px; height:32px; border-radius:8px; border:none; background:var(--danger-bg); color:#E5978A; font-size:14px; cursor:pointer; }
+  .other-stock-row button { flex:none; width:32px; height:32px; border-radius:8px; border:none; background:var(--danger-bg); color:var(--danger); font-size:14px; cursor:pointer; }
   .item-row .item-total { flex:0.9; font-size:12px; color:var(--hint); text-align:right; }
   button.submit {
-    width: 100%; padding: 12px; border: none; border-radius: 10px;
-    background: var(--btn); color: var(--btn-text); font-size: 15px; font-weight: 600; font-family: var(--font-body);
-    cursor: pointer; margin-top: 6px;
-    box-shadow: 0 1px 0 rgba(255,255,255,.20) inset, 0 3px 10px rgba(214,138,52,.20);
+    width: 100%; padding: 14px; border: none; border-radius: 14px;
+    background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 55%, #312E81 100%); color:#fff; font-size: 15px; font-weight: 700; font-family: var(--font-display);
+    letter-spacing:0.5px; text-transform:uppercase; cursor: pointer; margin-top: 6px;
+    box-shadow: 0 8px 18px rgba(29,78,216,.30);
   }
+  button.submit:active { transform:scale(.98); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  th { color: var(--hint); font-weight: 600; position: sticky; top: 0; background: var(--bg); }
+  th { color:#fff; font-weight: 700; position: sticky; top: 0; background: #1E293B; font-family: var(--font-body); letter-spacing:0.4px; font-size:10px; text-transform:uppercase; }
   .table-wrap { overflow-x: auto; border:1px solid var(--border); border-radius: 12px; }
-  .badge { display:inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight:600; cursor:pointer; border:none; }
-  .badge.linked { background: var(--ok-bg); color: #8FCBAE; }
-  .badge.unlinked { background: var(--danger-bg); color: #E5978A; }
+  .badge { display:inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight:600; cursor:pointer; border:none; text-transform:uppercase; letter-spacing:0.3px; }
+  .badge.linked { background: var(--ok-bg); color: var(--ok); }
+  .badge.unlinked { background: var(--danger-bg); color: var(--danger); }
   .search { margin-bottom: 10px; }
   .hint-text { color: var(--hint); font-size: 12px; margin-top: 6px; }
-  .msg { padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
-  .msg.ok { background:var(--ok-bg); color:#8FCBAE; }
-  .msg.err { background:var(--danger-bg); color:#E5978A; }
-  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:50; }
+  .msg { padding: 12px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; }
+  .msg.ok { background:var(--ok-bg); color:var(--ok); }
+  .msg.err { background:var(--danger-bg); color:var(--danger); }
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(20,20,25,.55); align-items:center; justify-content:center; z-index:50; }
   .modal-overlay.open { display:flex; }
-  .modal { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; max-width:320px; width:90%; text-align:center; box-shadow: 0 12px 34px rgba(0,0,0,.4); }
+  .modal { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; max-width:320px; width:90%; text-align:center; box-shadow: 0 12px 34px rgba(20,20,25,.25); }
   .modal-wide { max-width:480px; max-height:85vh; overflow-y:auto; }
-  .modal img { width:180px; height:180px; margin: 10px auto; display:block; border-radius:8px; background:#fff; }
-  .modal .link-text { font-size:12px; word-break:break-all; color:var(--hint); background:var(--field-bg); padding:8px; border-radius:8px; margin-bottom:10px; }
+  .modal img { width:180px; height:180px; margin: 10px auto; display:block; border-radius:10px; background:#fff; }
+  .modal .link-text { font-size:12px; word-break:break-all; color:var(--hint); background:var(--field-bg); padding:8px; border-radius:10px; margin-bottom:10px; }
   .modal button { margin-top:8px; }
   .modal a.wa-btn { display:block; text-decoration:none; }
   .close-btn { background:transparent; border:none; color:var(--hint); font-size:14px; cursor:pointer; margin-top:6px; width:100%; padding:8px; }
   .history-toggle { background:transparent; border:none; color:var(--btn); font-size:12px; cursor:pointer; text-decoration:underline; padding:0; }
   .history-row td { background:var(--field-bg); white-space:normal; }
   .history-entry { padding:6px 0; border-bottom:1px dashed var(--border); font-size:12px; }
-  .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
+  .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
   .stats-card {
-    background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px;
-    box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 10px rgba(0,0,0,.18);
+    background:linear-gradient(135deg, #EFF6FF, #EEF2FF); border:1px solid #DBEAFE; border-radius:16px; padding:14px;
+    text-align:center;
   }
-  .stats-card .label { font-size:12px; color:var(--hint); margin-bottom:8px; font-family: var(--font-display); letter-spacing:0.2px; }
-  .stats-card .amount { font-size:20px; font-weight:600; color:var(--btn); font-family: var(--font-mono); }
-  .stats-card .count { font-size:12px; color:var(--hint); margin-top:4px; }
-  .known-client { margin-top:8px; padding:10px; background:var(--field-bg); border:1px solid var(--btn); border-radius:10px; font-size:12px; }
-  .known-client .kc-title { color:#8FCBAE; font-weight:600; margin-bottom:6px; }
+  .stats-card .label { font-size:10px; color:#64748B; margin-bottom:4px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
+  .stats-card .amount { font-size:22px; font-weight:800; color:var(--blue); font-family: var(--font-display); }
+  .stats-card .count { font-size:11px; color:var(--hint); margin-top:4px; }
+  .known-client { margin-top:8px; padding:12px; background:var(--ok-bg); border:1px solid var(--ok); border-radius:10px; font-size:12px; }
+  .known-client .kc-title { color:var(--ok); font-weight:700; margin-bottom:6px; }
   .known-client .kc-entry { padding:4px 0; border-bottom:1px dashed var(--border); }
   .known-client .kc-entry:last-child { border-bottom:none; }
 </style>
 </head>
 <body>
+<div class="speedline"></div>
 <div class="container">
   <div class="topbar">
-    <h1>🔧 {{ shop_name }}</h1>
-    <div style="display:flex; align-items:center; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="logo-badge"><i class="fa-solid fa-wrench"></i></div>
+      <div>
+        <h1>{{ shop_name }}</h1>
+        <div class="logo-sub">MITAL AUTO SERVICE</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
       <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
       <a class="logout" href="/logout">{{ T.logout }}</a>
     </div>
   </div>
 
   <div class="tabs">
-    <div class="tab active" id="tab-add" onclick="showTab('add')">{{ T.tab_add }}</div>
-    <div class="tab" id="tab-table" onclick="showTab('table')">{{ T.tab_table }}</div>
-    <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')">{{ T.tab_broadcast }}</div>
-    <div class="tab" id="tab-export" onclick="showTab('export')">{{ T.tab_export }}</div>
-    <div class="tab" id="tab-stats" onclick="showTab('stats')">{{ T.tab_stats }}</div>
-    {% if sms_enabled %}<div class="tab" id="tab-sms" onclick="showTab('sms')">{{ T.tab_sms }}</div>{% endif %}
-    {% if warehouse_enabled %}<div class="tab" id="tab-warehouse" onclick="showTab('warehouse')">{{ T.tab_warehouse }}</div>{% endif %}
+    <div class="tab active" id="tab-add" onclick="showTab('add')"><span class="tab-icon"><i class="fa-solid fa-oil-can"></i></span><span>{{ T.tab_add }}</span></div>
+    <div class="tab" id="tab-table" onclick="showTab('table')"><span class="tab-icon"><i class="fa-solid fa-car"></i></span><span>{{ T.tab_table }}</span></div>
+    <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')"><span class="tab-icon"><i class="fa-solid fa-bullhorn"></i></span><span>{{ T.tab_broadcast }}</span></div>
+    <div class="tab" id="tab-export" onclick="showTab('export')"><span class="tab-icon"><i class="fa-solid fa-file-arrow-down"></i></span><span>{{ T.tab_export }}</span></div>
+    <div class="tab" id="tab-stats" onclick="showTab('stats')"><span class="tab-icon"><i class="fa-solid fa-chart-column"></i></span><span>{{ T.tab_stats }}</span></div>
+    {% if sms_enabled %}<div class="tab" id="tab-sms" onclick="showTab('sms')"><span class="tab-icon"><i class="fa-solid fa-comment-sms"></i></span><span>{{ T.tab_sms }}</span></div>{% endif %}
   </div>
+
+  {% if warehouse_enabled %}
+  <div class="wh-banner" id="tab-warehouse" onclick="showTab('warehouse')">
+    <div class="stripe-pair"><span style="background:var(--blue);"></span><span style="background:var(--btn);"></span></div>
+    <div class="wh-label"><i class="fa-solid fa-boxes-stacked"></i> {{ T.tab_warehouse }}</div>
+    <div class="stripe-pair"><span style="background:var(--btn);"></span><span style="background:var(--cyan);"></span></div>
+  </div>
+  {% endif %}
 
   <div id="msg"></div>
 
   <div id="view-add" class="card">
+    <div class="card-header"><span class="dot"></span><h3>{{ T.tab_add }}</h3></div>
     <div class="field">
-      <label>{{ T.field_plate }}</label>
-      <input id="plate" placeholder="01A123BC" onblur="lookupPlate()">
+      <label><i class="fa-solid fa-id-card"></i>{{ T.field_plate }}</label>
+      <div class="plate-wrap">
+        <span class="plate-chip">UZ</span>
+        <input id="plate" placeholder="01A123BC" onblur="lookupPlate()">
+      </div>
       <div id="knownClientPanel"></div>
     </div>
     <div class="field">
-      <label>{{ T.field_owner_name }}</label>
+      <label><i class="fa-solid fa-user"></i>{{ T.field_owner_name }}</label>
       <input id="owner_name" placeholder="Имя Фамилия">
     </div>
     <div class="field">
-      <label>{{ T.field_owner_phone }}</label>
+      <label><i class="fa-solid fa-phone"></i>{{ T.field_owner_phone }}</label>
       <input id="owner_phone" placeholder="+998 90 123 45 67">
       <div class="hint-text">{{ T.hint_owner_phone }}</div>
     </div>
     <div class="row2">
       <div class="field">
-        <label>{{ T.field_car_brand }}</label>
+        <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
         <select id="car_brand">
           {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
         </select>
       </div>
       <div class="field">
-        <label>{{ T.field_car_model }}</label>
+        <label><i class="fa-solid fa-car-side"></i>{{ T.field_car_model }}</label>
         <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
       </div>
     </div>
@@ -723,13 +772,13 @@ function renderProductsTable() {
     <tr>
       <td>${T[p.category] || p.category}</td>
       <td>${escapeHtml(p.name)}</td>
-      <td style="${isLow ? 'color:#E5978A; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
+      <td style="${isLow ? 'color:#B3241C; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
       <td>${p.sell_price ? p.sell_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
       <td>${p.purchase_price ? p.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
       <td>
         <button class="history-toggle" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_restock_action}</button>
         &nbsp;·&nbsp;
-        <button class="history-toggle" style="color:#E5978A;" onclick="deleteProduct(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_delete_action}</button>
+        <button class="history-toggle" style="color:#B3241C;" onclick="deleteProduct(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_delete_action}</button>
       </td>
     </tr>
   `;
@@ -839,7 +888,7 @@ async function loadStats() {
       <div class="label">${label}</div>
       <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${s[key].count}</div>
-      ${profit ? `<div class="count" style="color:#8FCBAE;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
+      ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
   `).join('');
 }
@@ -1367,7 +1416,7 @@ async function toggleHistory(plate) {
       <div style="margin-top:6px;">
         <button class="history-toggle" onclick="openEditModalById(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_edit}</button>
         &nbsp;·&nbsp;
-        <button class="history-toggle" style="color:#E5978A;" onclick="deleteEntry(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_delete}</button>
+        <button class="history-toggle" style="color:#B3241C;" onclick="deleteEntry(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_delete}</button>
       </div>
     </div>
   `;
@@ -1999,44 +2048,59 @@ ADMIN_PAGE = """
 <title>Админ-панель — точки</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
   :root {
-    --bg:#14110D; --text:#EFE7DA; --hint:#A69A87; --btn:#D68A34; --btn-text:#1A1108;
-    --card:#1E1A16; --border:#332B22; --field-bg:#161310; --ok-bg:#1B2A21; --danger-bg:#2E1B17;
-    --font-display:'Oswald', sans-serif; --font-body:'IBM Plex Sans', -apple-system, sans-serif; --font-mono:'IBM Plex Mono', monospace;
+    --bg:#F1F5F9; --text:#1E293B; --hint:#94A3B8; --btn:#E63946; --btn-text:#FFFFFF; --blue:#0F52BA; --darkblue:#0A2540; --cyan:#00A8E8;
+    --card:#FFFFFF; --border:#E2E8F0; --field-bg:#F4F7FA; --ok:#059669; --ok-bg:#ECFDF5; --danger:#B3241C; --danger-bg:#FDECEA;
+    --font-display:'Space Grotesk', sans-serif; --font-body:'Plus Jakarta Sans', -apple-system, sans-serif; --font-mono:'IBM Plex Mono', monospace;
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family: var(--font-body); }
+  .speedline { height:6px; width:100%; background: linear-gradient(90deg, var(--blue) 0%, var(--blue) 33%, #fff 33%, #fff 38%, var(--btn) 38%, var(--btn) 70%, #fff 70%, #fff 75%, var(--cyan) 75%, var(--cyan) 100%); }
   .container { padding: 12px; max-width: 900px; margin: 0 auto; }
-  .topbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; }
-  h1 { font-family: var(--font-display); font-weight:600; letter-spacing:0.2px; font-size: 21px; margin: 0; color:#F4EEE3; }
-  .logout { color: var(--hint); font-size: 13px; text-decoration:none; }
-  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 10px rgba(0,0,0,.20); }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin: 14px 0 16px; }
+  .logo-badge {
+    display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
+    background:var(--darkblue); color:var(--cyan); border-radius:12px; transform:rotate(-8deg);
+    box-shadow:0 4px 10px rgba(10,37,64,.25); font-size:16px; flex:none;
+  }
+  h1 { font-family: var(--font-display); font-weight:800; font-style:italic; letter-spacing:-0.3px; font-size: 20px; margin: 0; line-height:1.1; color:var(--darkblue); }
+  .logo-sub { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--hint); }
+  .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
+  .card { background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 16px; box-shadow: 0 10px 25px -5px rgba(15,82,186,.08); }
   .field { margin-bottom: 10px; }
   .row2 { display:flex; gap:10px; }
   .row2 .field { flex:1; }
-  label { display:block; font-size: 13px; color: var(--hint); margin-bottom: 4px; }
-  input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--field-bg); color: var(--text); font-size: 15px; font-family: var(--font-body); }
-  input:focus { outline:none; border-color: var(--btn); }
-  button.submit { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--btn); color: var(--btn-text); font-size: 15px; font-weight: 600; font-family: var(--font-body); cursor: pointer; margin-top: 6px; box-shadow: 0 1px 0 rgba(255,255,255,.20) inset, 0 3px 10px rgba(214,138,52,.20); }
+  label { display:block; font-size: 12px; color: var(--hint); margin-bottom: 4px; text-transform:uppercase; letter-spacing:0.4px; }
+  input { width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--field-bg); color: var(--text); font-size: 15px; font-family: var(--font-body); }
+  input:focus { outline:none; border-color: var(--blue); box-shadow:0 0 0 3px rgba(15,82,186,.12); }
+  button.submit { width: 100%; padding: 14px; border: none; border-radius: 14px; background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 55%, #312E81 100%); color:#fff; font-size: 15px; font-weight: 700; font-family: var(--font-display); letter-spacing:0.5px; text-transform:uppercase; cursor: pointer; margin-top: 6px; box-shadow: 0 8px 18px rgba(29,78,216,.30); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
-  th { color: var(--hint); font-weight: 600; font-family: var(--font-display); letter-spacing:0.2px; }
-  .badge { display:inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight:600; cursor:pointer; border:none; }
-  .badge.active { background: var(--ok-bg); color: #8FCBAE; }
-  .badge.inactive { background: var(--danger-bg); color: #E5978A; }
+  th { color:#fff; background:#1E293B; font-weight: 700; font-size:10px; text-transform:uppercase; letter-spacing:0.4px; }
+  .badge { display:inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight:600; cursor:pointer; border:none; text-transform:uppercase; letter-spacing:0.3px; }
+  .badge.active { background: var(--ok-bg); color: var(--ok); }
+  .badge.inactive { background: var(--danger-bg); color: var(--danger); }
   .hint-text { color: var(--hint); font-size: 12px; margin-top: 6px; }
-  .msg { padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
-  .msg.ok { background:var(--ok-bg); color:#8FCBAE; }
-  .msg.err { background:var(--danger-bg); color:#E5978A; }
-  .new-creds { background:var(--field-bg); border:1px dashed var(--btn); border-radius:8px; padding:10px; font-size:13px; margin-top:10px; font-family: var(--font-mono); }
+  .msg { padding: 12px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; }
+  .msg.ok { background:var(--ok-bg); color:var(--ok); }
+  .msg.err { background:var(--danger-bg); color:var(--danger); }
+  .new-creds { background:var(--field-bg); border:1px dashed var(--blue); border-radius:10px; padding:10px; font-size:13px; margin-top:10px; font-family: var(--font-mono); }
 </style>
 </head>
 <body>
+<div class="speedline"></div>
 <div class="container">
   <div class="topbar">
-    <h1>🗂️ Точки замены масла</h1>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="logo-badge"><i class="fa-solid fa-flag-checkered"></i></div>
+      <div>
+        <h1>Точки замены масла</h1>
+        <div class="logo-sub">MITAL PLATFORM</div>
+      </div>
+    </div>
     <a class="logout" href="/logout">Выйти</a>
   </div>
 
@@ -2360,22 +2424,22 @@ DISPLAY_PAGE = """
 <title>{{ T.app_title }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
   body {
-    background: radial-gradient(circle at center, #201808 0%, #14110D 100%);
-    color: #F4EEE3; font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    background: radial-gradient(circle at center, #1A0B0A 0%, #0A0A0B 100%);
+    color: #F5F5F2; font-family: 'Exo 2', -apple-system, sans-serif;
     height: 100vh; display:flex; align-items:center; justify-content:center;
     overflow: hidden; text-align:center;
   }
-  .idle .shop { font-family:'Oswald', sans-serif; font-weight:600; font-size: 4vw; letter-spacing:1px; opacity:.9; }
-  .idle .clock { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 10vw; margin-top: 2vh; font-variant-numeric: tabular-nums; color:#E8B979; }
+  .idle .shop { font-family:'Teko', sans-serif; font-weight:600; font-size: 4.5vw; letter-spacing:1px; opacity:.9; text-transform:uppercase; }
+  .idle .clock { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 10vw; margin-top: 2vh; font-variant-numeric: tabular-nums; color:#E8352E; }
   .idle .date { font-size: 2.2vw; opacity:.6; margin-top:1vh; }
   .active { animation: fadein .4s ease; }
-  .active .greet { font-family:'Oswald', sans-serif; font-weight:600; font-size: 4.2vw; color:#8FCBAE; }
+  .active .greet { font-family:'Teko', sans-serif; font-weight:600; font-size: 5vw; color:#3FBE7E; text-transform:uppercase; }
   .active .plate { font-family:'IBM Plex Mono', monospace; font-size: 6vw; font-weight:600; letter-spacing:4px; margin: 3vh 0; padding: 1vh 3vw;
-    border: 4px solid #F4EEE3; border-radius: 16px; display:inline-block; }
+    border: 4px solid #F5F5F2; border-radius: 6px; display:inline-block; }
   .active .info { font-size: 2.4vw; opacity:.85; line-height:1.7; margin-top:2vh; }
   .active .notfound { font-size: 3vw; opacity:.8; margin-top:3vh; }
   @keyframes fadein { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
