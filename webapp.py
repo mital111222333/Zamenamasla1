@@ -83,24 +83,44 @@ LOGIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ T.app_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   body {
-    margin:0; background:#0f1115; color:#f2f2f2; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    margin:0; background:#14110D; color:#EFE7DA; font-family:'IBM Plex Sans', -apple-system, sans-serif;
     height:100vh; display:flex; align-items:center; justify-content:center;
+    background-image: radial-gradient(ellipse at 50% -10%, rgba(214,138,52,0.10), transparent 60%);
   }
-  .box { background:#1a1d24; border:1px solid #2a2e37; border-radius:14px; padding:28px; width:90%; max-width:340px; }
-  h1 { font-size:20px; margin:0 0 20px; text-align:center; }
-  label { display:block; font-size:13px; color:#9a9a9a; margin-bottom:4px; }
-  input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:15px; margin-bottom:14px; }
-  button { width:100%; padding:12px; border:none; border-radius:10px; background:#3a86ff; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
-  .error { background:#3a1e1e; color:#dc6f6f; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
-  .lang-link { display:block; text-align:center; margin-top:14px; color:#9a9a9a; font-size:12px; text-decoration:none; }
+  .box {
+    background:#1E1A16; border:1px solid #332B22; border-radius:16px; padding:30px; width:90%; max-width:340px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 30px rgba(0,0,0,0.35);
+  }
+  h1 {
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:22px; letter-spacing:0.3px;
+    margin:0 0 4px; text-align:center; color:#F4EEE3;
+  }
+  .tagline { text-align:center; font-size:12px; color:#A69A87; margin:0 0 22px; }
+  label { display:block; font-size:13px; color:#A69A87; margin-bottom:4px; }
+  input {
+    width:100%; padding:11px; border-radius:9px; border:1px solid #332B22; background:#161310; color:#F4EEE3;
+    font-size:15px; margin-bottom:14px; font-family:'IBM Plex Sans', sans-serif;
+  }
+  input:focus { outline:none; border-color:#D68A34; }
+  button {
+    width:100%; padding:12px; border:none; border-radius:10px; background:#D68A34; color:#1A1108;
+    font-family:'IBM Plex Sans', sans-serif; font-size:15px; font-weight:600; cursor:pointer;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 12px rgba(214,138,52,0.25);
+  }
+  .error { background:#3A2018; color:#E5978A; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; border:1px solid #5A2E24; }
+  .lang-link { display:block; text-align:center; margin-top:16px; color:#A69A87; font-size:12px; text-decoration:none; }
 </style>
 </head>
 <body>
   <form class="box" method="POST">
     <h1>🔧 {{ T.login_title }}</h1>
+    <p class="tagline">MITAL</p>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <input type="hidden" name="_lang" value="{{ lang }}">
     <label>{{ T.login_username }}</label>
@@ -152,78 +172,105 @@ PAGE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ shop_name }} — панель</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: var(--tg-theme-bg-color, #0f1115);
-    --text: var(--tg-theme-text-color, #f2f2f2);
-    --hint: var(--tg-theme-hint-color, #9a9a9a);
-    --btn: var(--tg-theme-button-color, #3a86ff);
-    --btn-text: var(--tg-theme-button-text-color, #ffffff);
-    --card: #1a1d24;
-    --border: #2a2e37;
+    --bg: var(--tg-theme-bg-color, #14110D);
+    --text: var(--tg-theme-text-color, #EFE7DA);
+    --hint: var(--tg-theme-hint-color, #A69A87);
+    --btn: var(--tg-theme-button-color, #D68A34);
+    --btn-text: var(--tg-theme-button-text-color, #1A1108);
+    --card: #1E1A16;
+    --border: #332B22;
+    --field-bg: #161310;
+    --ok: #5B9279;
+    --ok-bg: #1B2A21;
+    --danger: #C1554A;
+    --danger-bg: #2E1B17;
+    --font-display: 'Oswald', sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
   }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: var(--font-body); }
   .container { padding: 12px; max-width: 960px; margin: 0 auto; }
   .topbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; }
-  h1 { font-size: 20px; margin: 0; }
+  h1 { font-family: var(--font-display); font-weight:600; letter-spacing:0.2px; font-size: 21px; margin: 0; color:#F4EEE3; }
   .logout { color: var(--hint); font-size: 13px; text-decoration:none; }
   .lang-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
   .tabs { display:flex; gap:8px; margin-bottom: 14px; flex-wrap:wrap; }
-  .tab { flex:1; min-width:100px; text-align:center; padding: 10px; border-radius: 10px; background: var(--card); border:1px solid var(--border); cursor:pointer; font-weight:600; }
-  .tab.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
-  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .tab {
+    flex:1; min-width:100px; text-align:center; padding: 10px; border-radius: 10px; background: var(--card);
+    border:1px solid var(--border); cursor:pointer; font-weight:600; font-family: var(--font-display);
+    letter-spacing:0.2px; transition: box-shadow .15s ease;
+  }
+  .tab.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); box-shadow: 0 0 0 1px rgba(214,138,52,.35), 0 3px 14px rgba(214,138,52,.30); }
+  .card {
+    background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 10px rgba(0,0,0,.20);
+  }
   .field { margin-bottom: 10px; }
   .row2 { display:flex; gap:10px; }
   .row2 .field { flex:1; }
   label { display:block; font-size: 13px; color: var(--hint); margin-bottom: 4px; }
   input, select, textarea {
     width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
-    background: #11141a; color: var(--text); font-size: 15px;
+    background: var(--field-bg); color: var(--text); font-size: 15px; font-family: var(--font-body);
   }
+  input:focus, select:focus, textarea:focus { outline:none; border-color: var(--btn); }
   .checkbox-row { display:flex; align-items:center; gap:8px; }
   .checkbox-row input { width:auto; }
   .item-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
   .item-row .item-name { flex:1.3; font-size:13px; color:var(--hint); min-width:0; }
   .item-row input { flex:1; padding:8px; font-size:13px; min-width:0; }
   .item-row select { flex:1.6; padding:8px; font-size:13px; min-width:0; }
+  .other-stock-row { display:flex; gap:6px; align-items:center; margin-bottom:8px; }
+  .other-stock-row select { flex:2; padding:8px; font-size:13px; min-width:0; }
+  .other-stock-row input { flex:1; padding:8px; font-size:13px; min-width:0; }
+  .other-stock-row button { flex:none; width:32px; height:32px; border-radius:8px; border:none; background:var(--danger-bg); color:#E5978A; font-size:14px; cursor:pointer; }
   .item-row .item-total { flex:0.9; font-size:12px; color:var(--hint); text-align:right; }
   button.submit {
     width: 100%; padding: 12px; border: none; border-radius: 10px;
-    background: var(--btn); color: var(--btn-text); font-size: 16px; font-weight: 600;
+    background: var(--btn); color: var(--btn-text); font-size: 15px; font-weight: 600; font-family: var(--font-body);
     cursor: pointer; margin-top: 6px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.20) inset, 0 3px 10px rgba(214,138,52,.20);
   }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { color: var(--hint); font-weight: 600; position: sticky; top: 0; background: var(--bg); }
   .table-wrap { overflow-x: auto; border:1px solid var(--border); border-radius: 12px; }
   .badge { display:inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight:600; cursor:pointer; border:none; }
-  .badge.linked { background: #1e3a2a; color: #6fdc9a; }
-  .badge.unlinked { background: #3a1e1e; color: #dc6f6f; }
+  .badge.linked { background: var(--ok-bg); color: #8FCBAE; }
+  .badge.unlinked { background: var(--danger-bg); color: #E5978A; }
   .search { margin-bottom: 10px; }
   .hint-text { color: var(--hint); font-size: 12px; margin-top: 6px; }
   .msg { padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
-  .msg.ok { background:#1e3a2a; color:#6fdc9a; }
-  .msg.err { background:#3a1e1e; color:#dc6f6f; }
+  .msg.ok { background:var(--ok-bg); color:#8FCBAE; }
+  .msg.err { background:var(--danger-bg); color:#E5978A; }
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:50; }
   .modal-overlay.open { display:flex; }
-  .modal { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; max-width:320px; width:90%; text-align:center; }
+  .modal { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; max-width:320px; width:90%; text-align:center; box-shadow: 0 12px 34px rgba(0,0,0,.4); }
   .modal-wide { max-width:480px; max-height:85vh; overflow-y:auto; }
   .modal img { width:180px; height:180px; margin: 10px auto; display:block; border-radius:8px; background:#fff; }
-  .modal .link-text { font-size:12px; word-break:break-all; color:var(--hint); background:#11141a; padding:8px; border-radius:8px; margin-bottom:10px; }
+  .modal .link-text { font-size:12px; word-break:break-all; color:var(--hint); background:var(--field-bg); padding:8px; border-radius:8px; margin-bottom:10px; }
   .modal button { margin-top:8px; }
   .modal a.wa-btn { display:block; text-decoration:none; }
   .close-btn { background:transparent; border:none; color:var(--hint); font-size:14px; cursor:pointer; margin-top:6px; width:100%; padding:8px; }
   .history-toggle { background:transparent; border:none; color:var(--btn); font-size:12px; cursor:pointer; text-decoration:underline; padding:0; }
-  .history-row td { background:#11141a; white-space:normal; }
+  .history-row td { background:var(--field-bg); white-space:normal; }
   .history-entry { padding:6px 0; border-bottom:1px dashed var(--border); font-size:12px; }
   .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
-  .stats-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
-  .stats-card .label { font-size:13px; color:var(--hint); margin-bottom:8px; }
-  .stats-card .amount { font-size:20px; font-weight:700; color:var(--btn); }
+  .stats-card {
+    background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 10px rgba(0,0,0,.18);
+  }
+  .stats-card .label { font-size:12px; color:var(--hint); margin-bottom:8px; font-family: var(--font-display); letter-spacing:0.2px; }
+  .stats-card .amount { font-size:20px; font-weight:600; color:var(--btn); font-family: var(--font-mono); }
   .stats-card .count { font-size:12px; color:var(--hint); margin-top:4px; }
-  .known-client { margin-top:8px; padding:10px; background:#11141a; border:1px solid var(--btn); border-radius:10px; font-size:12px; }
-  .known-client .kc-title { color:#6fdc9a; font-weight:600; margin-bottom:6px; }
+  .known-client { margin-top:8px; padding:10px; background:var(--field-bg); border:1px solid var(--btn); border-radius:10px; font-size:12px; }
+  .known-client .kc-title { color:#8FCBAE; font-weight:600; margin-bottom:6px; }
   .known-client .kc-entry { padding:4px 0; border-bottom:1px dashed var(--border); }
   .known-client .kc-entry:last-child { border-bottom:none; }
 </style>
@@ -311,9 +358,17 @@ PAGE = """
       </div>
     </div>
 
-    <div class="field" style="margin-top:14px; padding:12px; background:#11141a; border-radius:10px;">
+    {% if warehouse_enabled %}
+    <div class="field" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.wh_other_stock_title }}</label>
+    </div>
+    <div id="otherStockRows"></div>
+    <button type="button" class="submit" style="padding:8px; background:var(--border);" onclick="addOtherStockRow('other')">{{ T.wh_add_row }}</button>
+    {% endif %}
+
+    <div class="field" style="margin-top:14px; padding:12px; background:var(--field-bg); border-radius:10px;">
       <label style="font-size:15px;">{{ T.field_total }}</label>
-      <div id="totalCost" style="font-size:22px; font-weight:700; color:var(--btn);">0</div>
+      <div id="totalCost" style="font-size:24px; font-weight:600; color:var(--btn); font-family:var(--font-mono);">0</div>
     </div>
 
     <div class="field" style="margin-top:14px;">
@@ -413,12 +468,19 @@ PAGE = """
       <div class="row2">
         <div class="field">
           <label>{{ T.wh_category }}</label>
-          <select id="wh_new_category"></select>
+          <select id="wh_new_category" onchange="onWhCategoryChanged()"></select>
         </div>
         <div class="field">
           <label>{{ T.wh_product_name }}</label>
           <input id="wh_new_name" placeholder="MITANOL 5W-30">
         </div>
+      </div>
+      <div class="field" id="wh_new_unit_row" style="display:none;">
+        <label>{{ T.wh_unit }}</label>
+        <select id="wh_new_unit">
+          <option value="pc">{{ T.unit_pc }}</option>
+          <option value="l">{{ T.unit_l }}</option>
+        </select>
       </div>
       <div class="row2">
         <div class="field">
@@ -488,7 +550,7 @@ MODAL_AND_SCRIPT = """
     <div class="link-text" id="modalLink"></div>
     <a class="wa-btn" id="modalTg" href="#" target="_blank"><button class="submit" type="button" style="background:#2AABEE;">{{ T.modal_send_tg }}</button></a>
     <a class="wa-btn" id="modalWa" href="#" target="_blank"><button class="submit" type="button">{{ T.modal_send_wa }}</button></a>
-    <button class="submit" onclick="copyLink()" style="background:#2a2e37;">{{ T.modal_copy }}</button>
+    <button class="submit" onclick="copyLink()" style="background:var(--border);">{{ T.modal_copy }}</button>
     <button class="close-btn" onclick="closeModal()">{{ T.modal_close }}</button>
   </div>
 </div>
@@ -529,9 +591,17 @@ MODAL_AND_SCRIPT = """
       </div>
     </div>
 
-    <div class="field" style="margin-top:10px; padding:12px; background:#11141a; border-radius:10px;">
+    {% if warehouse_enabled %}
+    <div class="field" style="margin-top:10px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.wh_other_stock_title }}</label>
+    </div>
+    <div id="svcOtherStockRows"></div>
+    <button type="button" class="submit" style="padding:8px; background:var(--border);" onclick="addOtherStockRow('svcOther')">{{ T.wh_add_row }}</button>
+    {% endif %}
+
+    <div class="field" style="margin-top:10px; padding:12px; background:var(--field-bg); border-radius:10px;">
       <label style="font-size:15px;">{{ T.field_total }}</label>
-      <div id="svcTotalCost" style="font-size:20px; font-weight:700; color:var(--btn);">0</div>
+      <div id="svcTotalCost" style="font-size:22px; font-weight:600; color:var(--btn); font-family:var(--font-mono);">0</div>
     </div>
 
     <div class="field" style="margin-top:10px;">
@@ -615,7 +685,14 @@ function renderWarehouseCategoryOptions() {
   const sel = document.getElementById('wh_new_category');
   if (!sel) return;
   const allKeys = FLUID_KEYS.concat(FILTER_KEYS);
-  sel.innerHTML = allKeys.map(key => `<option value="${key}">${T[key]}</option>`).join('');
+  sel.innerHTML = allKeys.map(key => `<option value="${key}">${T[key]}</option>`).join('')
+    + `<option value="other">${T.wh_category_other}</option>`;
+}
+
+function onWhCategoryChanged() {
+  const sel = document.getElementById('wh_new_category');
+  const unitRow = document.getElementById('wh_new_unit_row');
+  if (unitRow) unitRow.style.display = sel.value === 'other' ? 'block' : 'none';
 }
 
 async function loadWarehouse() {
@@ -646,13 +723,13 @@ function renderProductsTable() {
     <tr>
       <td>${T[p.category] || p.category}</td>
       <td>${escapeHtml(p.name)}</td>
-      <td style="${isLow ? 'color:#dc6f6f; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
+      <td style="${isLow ? 'color:#E5978A; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
       <td>${p.sell_price ? p.sell_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
       <td>${p.purchase_price ? p.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
       <td>
         <button class="history-toggle" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_restock_action}</button>
         &nbsp;·&nbsp;
-        <button class="history-toggle" style="color:#dc6f6f;" onclick="deleteProduct(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_delete_action}</button>
+        <button class="history-toggle" style="color:#E5978A;" onclick="deleteProduct(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_delete_action}</button>
       </td>
     </tr>
   `;
@@ -668,6 +745,7 @@ async function createProduct() {
   if (!category || !name) { showMsg(T.wh_fill_required, false); return; }
   const payload = {
     category, name,
+    unit: document.getElementById('wh_new_unit').value,
     sell_price: document.getElementById('wh_new_sell_price').value || null,
     purchase_price: document.getElementById('wh_new_purchase_price').value || null,
     initial_stock: document.getElementById('wh_new_stock').value || 0,
@@ -679,6 +757,7 @@ async function createProduct() {
   if (data.ok) {
     showMsg(T.wh_product_added, true);
     ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('wh_new_unit_row').style.display = 'none';
     loadWarehouse();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -760,7 +839,7 @@ async function loadStats() {
       <div class="label">${label}</div>
       <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${s[key].count}</div>
-      ${profit ? `<div class="count" style="color:#6fdc9a;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
+      ${profit ? `<div class="count" style="color:#8FCBAE;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
   `).join('');
 }
@@ -939,6 +1018,116 @@ function selectOrPreserveBrand(brandEl, it) {
   }
 }
 
+// ---- "Прочие товары" — динамический список строк (как в чеке), для товаров
+// со склада, которые не подходят ни под одну из фиксированных категорий
+// (жидкости/фильтры). prefix: 'other' — основная форма "Внести замену",
+// 'svcOther' — форма редактирования/добавления из истории. ----
+let otherStockRows = [];
+let otherStockSeq = 0;
+let svcOtherStockRows = [];
+let svcOtherStockSeq = 0;
+
+function renderOneOtherStockRow(prefix, id) {
+  const prods = productsForCategory('other');
+  const updateFn = prefix === 'other' ? 'updateTotal' : 'updateSvcTotal';
+  const options = ['<option value="">' + T.brand_ph + '</option>'].concat(
+    prods.map(p => {
+      const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
+      const stockWarn = p.stock_qty < 0 ? ' ⚠️' : '';
+      return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.stock_qty} ${unitLabel}${stockWarn})</option>`;
+    })
+  ).join('');
+  return `
+    <div class="other-stock-row" id="${prefix}_stockrow_${id}">
+      <select id="${prefix}_stock_product_${id}" onchange="onOtherStockPicked('${prefix}', ${id})">${options}</select>
+      <input id="${prefix}_stock_price_${id}" type="number" placeholder="${T.price_ph}" oninput="${updateFn}()">
+      <input id="${prefix}_stock_qty_${id}" type="number" step="0.1" placeholder="${T.qty_ph}" oninput="${updateFn}()">
+      <button type="button" onclick="removeOtherStockRow('${prefix}', ${id})">✕</button>
+    </div>
+  `;
+}
+
+function addOtherStockRow(prefix) {
+  let id;
+  if (prefix === 'other') { otherStockSeq++; id = otherStockSeq; otherStockRows.push(id); }
+  else { svcOtherStockSeq++; id = svcOtherStockSeq; svcOtherStockRows.push(id); }
+  const container = document.getElementById(prefix + 'StockRows');
+  if (!container) return;
+  // добавляем ТОЛЬКО новую строку в конец — не трогаем уже существующие,
+  // чтобы не стереть то, что пользователь уже успел ввести в них
+  container.insertAdjacentHTML('beforeend', renderOneOtherStockRow(prefix, id));
+}
+
+function removeOtherStockRow(prefix, id) {
+  if (prefix === 'other') { otherStockRows = otherStockRows.filter(x => x !== id); }
+  else { svcOtherStockRows = svcOtherStockRows.filter(x => x !== id); }
+  // удаляем ТОЛЬКО конкретный элемент строки — соседние строки не трогаем
+  const rowEl = document.getElementById(`${prefix}_stockrow_${id}`);
+  if (rowEl) rowEl.remove();
+  if (prefix === 'other') updateTotal(); else updateSvcTotal();
+}
+
+function renderOtherStockRows(prefix) {
+  // Полная перерисовка С НУЛЯ — используется только при сбросе формы или
+  // загрузке сохранённых позиций (когда в DOM ещё нет строк, которые можно
+  // было бы случайно затереть). Для добавления/удаления ОДНОЙ строки к уже
+  // заполненному списку используются addOtherStockRow/removeOtherStockRow —
+  // они не перерисовывают соседние строки.
+  const container = document.getElementById(prefix + 'StockRows');
+  if (!container) return;
+  const ids = prefix === 'other' ? otherStockRows : svcOtherStockRows;
+  container.innerHTML = ids.map(id => renderOneOtherStockRow(prefix, id)).join('');
+}
+
+function onOtherStockPicked(prefix, id) {
+  const el = document.getElementById(`${prefix}_stock_product_${id}`);
+  const opt = el.options[el.selectedIndex];
+  if (opt && opt.dataset.price) document.getElementById(`${prefix}_stock_price_${id}`).value = opt.dataset.price;
+  if (prefix === 'other') updateTotal(); else updateSvcTotal();
+}
+
+function collectOtherStockItems(prefix) {
+  const ids = prefix === 'other' ? otherStockRows : svcOtherStockRows;
+  const items = [];
+  ids.forEach(id => {
+    const selectEl = document.getElementById(`${prefix}_stock_product_${id}`);
+    const priceEl = document.getElementById(`${prefix}_stock_price_${id}`);
+    const qtyEl = document.getElementById(`${prefix}_stock_qty_${id}`);
+    if (!selectEl || !priceEl || !qtyEl) return;
+    const price = parseFloat(priceEl.value) || 0;
+    const qty = parseFloat(qtyEl.value) || 0;
+    if (price > 0 && qty > 0 && selectEl.value) {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      items.push({
+        key: 'other_stock', name: opt.dataset.name || '', brand: null, product_id: parseInt(selectEl.value),
+        unit_price: price, qty, total: Math.round(price * qty),
+      });
+    }
+  });
+  return items;
+}
+
+function fillOtherStockRowsFrom(prefix, items) {
+  // Восстанавливает СРАЗУ ВСЕ позиции "Прочее" при открытии редактирования.
+  // Важно: сначала регистрируем id всех строк и рисуем их ОДНИМ вызовом
+  // renderOtherStockRows — если рисовать по одной (вызывая render на каждую),
+  // каждый следующий вызов полностью перерисовывает контейнер и стирает
+  // выбор, уже сделанный в предыдущих строках.
+  if (!items.length) return;
+  const ids = items.map(() => {
+    if (prefix === 'other') { otherStockSeq++; otherStockRows.push(otherStockSeq); return otherStockSeq; }
+    svcOtherStockSeq++; svcOtherStockRows.push(svcOtherStockSeq); return svcOtherStockSeq;
+  });
+  renderOtherStockRows(prefix);
+  items.forEach((it, i) => {
+    const id = ids[i];
+    const selectEl = document.getElementById(`${prefix}_stock_product_${id}`);
+    if (selectEl) selectOrPreserveBrand(selectEl, { product_id: it.product_id, brand: it.name });
+    document.getElementById(`${prefix}_stock_price_${id}`).value = it.unit_price ?? '';
+    document.getElementById(`${prefix}_stock_qty_${id}`).value = it.qty ?? '';
+  });
+}
+
 function renderItemLists() {
   document.getElementById('fluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
     <div class="item-row">
@@ -1001,6 +1190,7 @@ function collectItems() {
   if (otherPrice > 0) {
     items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
+  items.push(...collectOtherStockItems('other'));
   return items;
 }
 
@@ -1019,6 +1209,8 @@ function resetItemInputs() {
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
   document.getElementById('knownClientPanel').innerHTML = '';
+  otherStockRows = [];
+  renderOtherStockRows('other');
   updateTotal();
 }
 
@@ -1175,7 +1367,7 @@ async function toggleHistory(plate) {
       <div style="margin-top:6px;">
         <button class="history-toggle" onclick="openEditModalById(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_edit}</button>
         &nbsp;·&nbsp;
-        <button class="history-toggle" style="color:#dc6f6f;" onclick="deleteEntry(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_delete}</button>
+        <button class="history-toggle" style="color:#E5978A;" onclick="deleteEntry(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_delete}</button>
       </div>
     </div>
   `;
@@ -1285,6 +1477,7 @@ function collectSvcItems() {
   if (otherPrice > 0) {
     items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
+  items.push(...collectOtherStockItems('svcOther'));
   return items;
 }
 
@@ -1306,17 +1499,24 @@ function resetSvcItemInputs() {
   });
   document.getElementById('svc_other_name').value = '';
   document.getElementById('svc_other_price').value = '';
+  svcOtherStockRows = [];
+  renderOtherStockRows('svcOther');
   updateSvcTotal();
 }
 
 function fillSvcItemsFrom(items) {
   // подставляет уже сохранённые позиции в поля модалки (режим редактирования)
+  const otherStockItems = [];
   (items || []).forEach(it => {
     if (!it.key) return;
     if (it.key === 'other') {
       const label = (it.name || '').replace(T.other_prefix + ': ', '');
       document.getElementById('svc_other_name').value = label === T.other_unnamed ? '' : label;
       document.getElementById('svc_other_price').value = it.total ?? '';
+      return;
+    }
+    if (it.key === 'other_stock') {
+      otherStockItems.push(it);
       return;
     }
     const fi = FLUID_KEYS.indexOf(it.key);
@@ -1334,6 +1534,7 @@ function fillSvcItemsFrom(items) {
       document.getElementById(`svc_filter_price_${filI}`).value = it.total ?? '';
     }
   });
+  fillOtherStockRowsFrom('svcOther', otherStockItems);
 }
 
 function openEditModalById(id, plate) {
@@ -1638,7 +1839,10 @@ def api_create_product():
         name = data["name"].strip()
         if not name:
             return jsonify({"ok": False, "error": "укажите название товара"}), 400
-        unit = "pc" if category.startswith("filter_") else "l"
+        if category == "other":
+            unit = "pc" if data.get("unit") == "pc" else "l"
+        else:
+            unit = "pc" if category.startswith("filter_") else "l"
         sell_price = int(data["sell_price"]) if data.get("sell_price") not in (None, "") else None
         purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
         initial_stock = float(data["initial_stock"]) if data.get("initial_stock") not in (None, "") else 0
@@ -1793,32 +1997,40 @@ ADMIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Админ-панель — точки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0f1115; --text:#f2f2f2; --hint:#9a9a9a; --btn:#3a86ff; --card:#1a1d24; --border:#2a2e37; }
+  :root {
+    --bg:#14110D; --text:#EFE7DA; --hint:#A69A87; --btn:#D68A34; --btn-text:#1A1108;
+    --card:#1E1A16; --border:#332B22; --field-bg:#161310; --ok-bg:#1B2A21; --danger-bg:#2E1B17;
+    --font-display:'Oswald', sans-serif; --font-body:'IBM Plex Sans', -apple-system, sans-serif; --font-mono:'IBM Plex Mono', monospace;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: var(--font-body); }
   .container { padding: 12px; max-width: 900px; margin: 0 auto; }
   .topbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; }
-  h1 { font-size: 20px; margin: 0; }
+  h1 { font-family: var(--font-display); font-weight:600; letter-spacing:0.2px; font-size: 21px; margin: 0; color:#F4EEE3; }
   .logout { color: var(--hint); font-size: 13px; text-decoration:none; }
-  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 10px rgba(0,0,0,.20); }
   .field { margin-bottom: 10px; }
   .row2 { display:flex; gap:10px; }
   .row2 .field { flex:1; }
   label { display:block; font-size: 13px; color: var(--hint); margin-bottom: 4px; }
-  input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #11141a; color: var(--text); font-size: 15px; }
-  button.submit { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--btn); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+  input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--field-bg); color: var(--text); font-size: 15px; font-family: var(--font-body); }
+  input:focus { outline:none; border-color: var(--btn); }
+  button.submit { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--btn); color: var(--btn-text); font-size: 15px; font-weight: 600; font-family: var(--font-body); cursor: pointer; margin-top: 6px; box-shadow: 0 1px 0 rgba(255,255,255,.20) inset, 0 3px 10px rgba(214,138,52,.20); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
-  th { color: var(--hint); font-weight: 600; }
+  th { color: var(--hint); font-weight: 600; font-family: var(--font-display); letter-spacing:0.2px; }
   .badge { display:inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight:600; cursor:pointer; border:none; }
-  .badge.active { background: #1e3a2a; color: #6fdc9a; }
-  .badge.inactive { background: #3a1e1e; color: #dc6f6f; }
+  .badge.active { background: var(--ok-bg); color: #8FCBAE; }
+  .badge.inactive { background: var(--danger-bg); color: #E5978A; }
   .hint-text { color: var(--hint); font-size: 12px; margin-top: 6px; }
   .msg { padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
-  .msg.ok { background:#1e3a2a; color:#6fdc9a; }
-  .msg.err { background:#3a1e1e; color:#dc6f6f; }
-  .new-creds { background:#11141a; border:1px dashed var(--btn); border-radius:8px; padding:10px; font-size:13px; margin-top:10px; }
+  .msg.ok { background:var(--ok-bg); color:#8FCBAE; }
+  .msg.err { background:var(--danger-bg); color:#E5978A; }
+  .new-creds { background:var(--field-bg); border:1px dashed var(--btn); border-radius:8px; padding:10px; font-size:13px; margin-top:10px; font-family: var(--font-mono); }
 </style>
 </head>
 <body>
@@ -1906,7 +2118,7 @@ async function loadShops() {
       <td>${s.password_plain
           ? `<span style="font-family:monospace;">${s.password_plain}</span>`
           : `<span class="hint-text">не сохранён</span>`}
-          <br><button class="badge" style="background:#2a2e37;color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
+          <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
       <td>${s.phone || '—'}</td>
       <td>${s.client_count}</td>
       <td><button class="badge ${s.is_active ? 'active' : 'inactive'}" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">
@@ -2146,21 +2358,24 @@ DISPLAY_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>{{ T.app_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
   body {
-    background: radial-gradient(circle at center, #10131a 0%, #05070b 100%);
-    color: #fff; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(circle at center, #201808 0%, #14110D 100%);
+    color: #F4EEE3; font-family: 'IBM Plex Sans', -apple-system, sans-serif;
     height: 100vh; display:flex; align-items:center; justify-content:center;
     overflow: hidden; text-align:center;
   }
-  .idle .shop { font-size: 4vw; font-weight:700; letter-spacing:1px; opacity:.9; }
-  .idle .clock { font-size: 10vw; font-weight:800; margin-top: 2vh; font-variant-numeric: tabular-nums; }
+  .idle .shop { font-family:'Oswald', sans-serif; font-weight:600; font-size: 4vw; letter-spacing:1px; opacity:.9; }
+  .idle .clock { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 10vw; margin-top: 2vh; font-variant-numeric: tabular-nums; color:#E8B979; }
   .idle .date { font-size: 2.2vw; opacity:.6; margin-top:1vh; }
   .active { animation: fadein .4s ease; }
-  .active .greet { font-size: 4.2vw; font-weight:800; color:#6fdc9a; }
-  .active .plate { font-size: 6vw; font-weight:900; letter-spacing:4px; margin: 3vh 0; padding: 1vh 3vw;
-    border: 4px solid #fff; border-radius: 16px; display:inline-block; }
+  .active .greet { font-family:'Oswald', sans-serif; font-weight:600; font-size: 4.2vw; color:#8FCBAE; }
+  .active .plate { font-family:'IBM Plex Mono', monospace; font-size: 6vw; font-weight:600; letter-spacing:4px; margin: 3vh 0; padding: 1vh 3vw;
+    border: 4px solid #F4EEE3; border-radius: 16px; display:inline-block; }
   .active .info { font-size: 2.4vw; opacity:.85; line-height:1.7; margin-top:2vh; }
   .active .notfound { font-size: 3vw; opacity:.8; margin-top:3vh; }
   @keyframes fadein { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
