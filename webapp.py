@@ -56,6 +56,19 @@ def login_required(view):
         g.shop_id = session["shop_id"]
         g.lang = shop.get("language") or "ru"
         g.T = i18n.get_texts(g.lang)
+        g.is_employee = bool(session.get("is_employee"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def employee_blocked(view):
+    """Закрывает API-эндпоинт для логина сотрудника (прибыль, цены закупки,
+    экспорт, управление складом) — даже если кто-то обратится к нему напрямую,
+    в обход интерфейса. Ставить ПОСЛЕ @login_required."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if getattr(g, "is_employee", False):
+            return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
         return view(*args, **kwargs)
     return wrapped
 
@@ -131,8 +144,20 @@ def login_page():
             session["role"] = shop["role"]
             session["username"] = shop["username"]
             session["shop_name"] = shop.get("shop_name") or shop["username"]
+            session["is_employee"] = False
             session.permanent = True
             return redirect(url_for("admin_page") if shop["role"] == "admin" else url_for("index"))
+        employee = db.authenticate_shop_employee(username, password)
+        if employee:
+            parent_shop = db.get_shop(employee["shop_id"])
+            session.clear()
+            session["shop_id"] = employee["shop_id"]
+            session["role"] = "shop"
+            session["username"] = employee["username"]
+            session["shop_name"] = (parent_shop.get("shop_name") or "") if parent_shop else ""
+            session["is_employee"] = True
+            session.permanent = True
+            return redirect(url_for("index"))
         error = i18n.t("login_error", lang)
     T = i18n.get_texts(lang)
     return render_template_string(LOGIN_PAGE, error=error, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru")
@@ -327,12 +352,14 @@ PAGE = """
     <div class="tab active" id="tab-add" onclick="showTab('add')"><span class="tab-icon"><i class="fa-solid fa-oil-can"></i></span><span>{{ T.tab_add }}</span></div>
     <div class="tab" id="tab-table" onclick="showTab('table')"><span class="tab-icon"><i class="fa-solid fa-car"></i></span><span>{{ T.tab_table }}</span></div>
     <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')"><span class="tab-icon"><i class="fa-solid fa-bullhorn"></i></span><span>{{ T.tab_broadcast }}</span></div>
+    {% if not is_employee %}
     <div class="tab" id="tab-export" onclick="showTab('export')"><span class="tab-icon"><i class="fa-solid fa-file-arrow-down"></i></span><span>{{ T.tab_export }}</span></div>
     <div class="tab" id="tab-stats" onclick="showTab('stats')"><span class="tab-icon"><i class="fa-solid fa-chart-column"></i></span><span>{{ T.tab_stats }}</span></div>
+    {% endif %}
     {% if sms_enabled %}<div class="tab" id="tab-sms" onclick="showTab('sms')"><span class="tab-icon"><i class="fa-solid fa-comment-sms"></i></span><span>{{ T.tab_sms }}</span></div>{% endif %}
   </div>
 
-  {% if warehouse_enabled %}
+  {% if warehouse_enabled and not is_employee %}
   <div class="wh-banner" id="tab-warehouse" onclick="showTab('warehouse')">
     <div class="stripe-pair"><span style="background:var(--blue);"></span><span style="background:var(--btn);"></span></div>
     <div class="wh-label"><i class="fa-solid fa-boxes-stacked"></i> {{ T.tab_warehouse }}</div>
@@ -465,6 +492,7 @@ PAGE = """
     </div>
   </div>
 
+  {% if not is_employee %}
   <div id="view-export" class="card" style="display:none;">
     <p style="margin-top:0;">{{ T.export_p1 }}</p>
     <p class="hint-text">{{ T.export_p2 }}</p>
@@ -493,6 +521,7 @@ PAGE = """
       <div id="statsRangeResult" style="margin-top:14px;"></div>
     </div>
   </div>
+  {% endif %}
 
   {% if sms_enabled %}
   <div id="view-sms" class="card" style="display:none;">
@@ -510,7 +539,7 @@ PAGE = """
   </div>
   {% endif %}
 
-  {% if warehouse_enabled %}
+  {% if warehouse_enabled and not is_employee %}
   <div id="view-warehouse" style="display:none;">
     <div class="card">
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_add_product }}</label>
@@ -687,13 +716,17 @@ function showTab(t) {
   document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
   document.getElementById('view-broadcast').style.display = t === 'broadcast' ? 'block' : 'none';
-  document.getElementById('view-export').style.display = t === 'export' ? 'block' : 'none';
-  document.getElementById('view-stats').style.display = t === 'stats' ? 'block' : 'none';
   document.getElementById('tab-add').classList.toggle('active', t === 'add');
   document.getElementById('tab-table').classList.toggle('active', t === 'table');
   document.getElementById('tab-broadcast').classList.toggle('active', t === 'broadcast');
-  document.getElementById('tab-export').classList.toggle('active', t === 'export');
-  document.getElementById('tab-stats').classList.toggle('active', t === 'stats');
+  const exportView = document.getElementById('view-export');
+  const exportTab = document.getElementById('tab-export');
+  if (exportView) exportView.style.display = t === 'export' ? 'block' : 'none';
+  if (exportTab) exportTab.classList.toggle('active', t === 'export');
+  const statsView = document.getElementById('view-stats');
+  const statsTab = document.getElementById('tab-stats');
+  if (statsView) statsView.style.display = t === 'stats' ? 'block' : 'none';
+  if (statsTab) statsTab.classList.toggle('active', t === 'stats');
   const smsView = document.getElementById('view-sms');
   const smsTab = document.getElementById('tab-sms');
   if (smsView) smsView.style.display = t === 'sms' ? 'block' : 'none';
@@ -1693,6 +1726,7 @@ def index():
         sms_enabled=bool(shop.get("sms_enabled")) if shop else False,
         eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
+        is_employee=g.is_employee,
     )
 
 
@@ -1716,10 +1750,30 @@ def api_cars():
     return jsonify(cars)
 
 
+def _strip_cost_price(history):
+    """Убирает cost_price (цена закупки, снятая со склада на момент продажи) из
+    items_json перед отправкой сотруднику — иначе цена закупки была бы видна
+    через сырой ответ сервера, даже если интерфейс её не показывает."""
+    import json as _json
+    for row in history:
+        if not row.get("items_json"):
+            continue
+        try:
+            items = _json.loads(row["items_json"])
+        except (ValueError, TypeError):
+            continue
+        for item in items:
+            item.pop("cost_price", None)
+        row["items_json"] = _json.dumps(items, ensure_ascii=False)
+    return history
+
+
 @app.route("/api/history/<plate>")
 @login_required
 def api_history(plate):
     car, history = db.get_car_history(g.shop_id, plate)
+    if g.is_employee:
+        history = _strip_cost_price(history)
     return jsonify({"car": car, "history": history})
 
 
@@ -1826,12 +1880,14 @@ def api_broadcast_create():
 
 @app.route("/api/stats")
 @login_required
+@employee_blocked
 def api_stats():
     return jsonify(db.get_revenue_stats(g.shop_id))
 
 
 @app.route("/api/stats/range")
 @login_required
+@employee_blocked
 def api_stats_range():
     date_from = request.args.get("from", "")
     date_to = request.args.get("to", "")
@@ -1873,11 +1929,16 @@ def _warehouse_required():
 @app.route("/api/products")
 @login_required
 def api_list_products():
-    return jsonify(db.list_products(g.shop_id))
+    products = db.list_products(g.shop_id)
+    if g.is_employee:
+        for p in products:
+            p.pop("purchase_price", None)
+    return jsonify(products)
 
 
 @app.route("/api/products", methods=["POST"])
 @login_required
+@employee_blocked
 def api_create_product():
     denied = _warehouse_required()
     if denied:
@@ -1903,6 +1964,7 @@ def api_create_product():
 
 @app.route("/api/products/<int:product_id>", methods=["PUT"])
 @login_required
+@employee_blocked
 def api_update_product(product_id):
     data = request.get_json(force=True)
     try:
@@ -1921,6 +1983,7 @@ def api_update_product(product_id):
 
 @app.route("/api/products/<int:product_id>", methods=["DELETE"])
 @login_required
+@employee_blocked
 def api_delete_product(product_id):
     ok = db.delete_product(product_id, g.shop_id)
     if not ok:
@@ -1930,6 +1993,7 @@ def api_delete_product(product_id):
 
 @app.route("/api/products/<int:product_id>/restock", methods=["POST"])
 @login_required
+@employee_blocked
 def api_restock_product(product_id):
     data = request.get_json(force=True)
     try:
@@ -1946,18 +2010,21 @@ def api_restock_product(product_id):
 
 @app.route("/api/restock_history")
 @login_required
+@employee_blocked
 def api_restock_history():
     return jsonify(db.get_restock_history(g.shop_id))
 
 
 @app.route("/api/profit_stats")
 @login_required
+@employee_blocked
 def api_profit_stats():
     return jsonify(db.get_profit_stats(g.shop_id))
 
 
 @app.route("/api/export")
 @login_required
+@employee_blocked
 def api_export():
     import json
     data = db.export_shop_data(g.shop_id)
@@ -1971,6 +2038,7 @@ def api_export():
 
 @app.route("/api/export_excel")
 @login_required
+@employee_blocked
 def api_export_excel():
     import io
     from datetime import datetime as _dt
@@ -2149,7 +2217,7 @@ ADMIN_PAGE = """
     <h3 style="margin-top:0;">Все точки</h3>
     <div class="table-wrap" style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th></tr></thead>
+      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th></tr></thead>
       <tbody id="shops-body"></tbody>
     </table>
     </div>
@@ -2194,8 +2262,78 @@ async function loadShops() {
       <td><button class="badge ${s.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})">
         ${s.warehouse_enabled ? 'включён' : 'выключен'}
       </button></td>
+      <td><button class="badge" style="background:#EFF6FF;color:var(--blue);" onclick="toggleEmployees(${s.id})">👥 сотрудники</button></td>
     </tr>
+    <tr id="emp-row-${s.id}" style="display:none;"><td colspan="8"><div id="emp-panel-${s.id}" style="padding:10px; background:var(--field-bg); border-radius:10px;">…</div></td></tr>
   `).join('');
+}
+
+async function toggleEmployees(shopId) {
+  const row = document.getElementById(`emp-row-${shopId}`);
+  const opening = row.style.display === 'none';
+  row.style.display = opening ? '' : 'none';
+  if (opening) await loadEmployees(shopId);
+}
+
+async function loadEmployees(shopId) {
+  const panel = document.getElementById(`emp-panel-${shopId}`);
+  const res = await fetch(`/api/admin/shops/${shopId}/employees`);
+  const employees = await res.json();
+  const list = employees.length ? employees.map(e => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
+      <span>${escapeHtml(e.full_name || e.username)} <span class="hint-text">(${e.username})</span></span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span style="font-family:monospace;">${e.password_plain || '—'}</span>
+        <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetEmployeePassword(${e.id}, ${shopId}, ${escapeHtml(JSON.stringify(e.username))})">сбросить</button>
+        <button class="badge inactive" onclick="deleteEmployee(${e.id}, ${shopId}, ${escapeHtml(JSON.stringify(e.username))})">удалить</button>
+      </span>
+    </div>
+  `).join('') : `<div class="hint-text">Пока нет сотрудников у этой точки.</div>`;
+  panel.innerHTML = `
+    <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Сотрудники точки (ограниченный доступ — без статистики, прибыли, экспорта, склада)</div>
+    ${list}
+    <div style="display:flex; gap:6px; margin-top:10px;">
+      <input id="new-emp-username-${shopId}" placeholder="логин сотрудника" style="flex:1;">
+      <button class="badge active" style="padding:6px 14px;" onclick="createEmployee(${shopId})">+ добавить</button>
+    </div>
+  `;
+}
+
+async function createEmployee(shopId) {
+  const input = document.getElementById(`new-emp-username-${shopId}`);
+  const username = input.value.trim();
+  if (!username) return;
+  const res = await fetch(`/api/admin/shops/${shopId}/employees`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(`✅ Сотрудник «${username}» создан. Пароль: <b>${data.password}</b>`, true);
+    loadEmployees(shopId);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
+}
+
+async function resetEmployeePassword(employeeId, shopId, username) {
+  if (!confirm(`Сбросить пароль для сотрудника «${username}»?`)) return;
+  const res = await fetch(`/api/admin/employees/${employeeId}/reset_password`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({shop_id: shopId})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(`✅ Новый пароль для «${username}»: <b>${data.password}</b>`, true);
+    loadEmployees(shopId);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
+}
+
+async function deleteEmployee(employeeId, shopId, username) {
+  if (!confirm(`Удалить сотрудника «${username}»? Он больше не сможет войти.`)) return;
+  const res = await fetch(`/api/admin/employees/${employeeId}?shop_id=${shopId}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) { loadEmployees(shopId); } else { showMsg('Ошибка: ' + data.error, false); }
 }
 
 async function toggleWarehouse(id, makeEnabled) {
@@ -2345,6 +2483,51 @@ def api_admin_reset_password(shop_id):
     new_password = secrets.token_urlsafe(6)
     db.reset_shop_password(shop_id, new_password)
     return jsonify({"ok": True, "password": new_password})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/employees")
+@admin_required
+def api_admin_list_employees(shop_id):
+    return jsonify(db.list_shop_employees(shop_id))
+
+
+@app.route("/api/admin/shops/<int:shop_id>/employees", methods=["POST"])
+@admin_required
+def api_admin_create_employee(shop_id):
+    shop = db.get_shop(shop_id)
+    if not shop:
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    data = request.get_json(force=True)
+    username = (data.get("username") or "").strip()
+    full_name = (data.get("full_name") or "").strip() or None
+    if not username:
+        return jsonify({"ok": False, "error": "укажите логин"}), 400
+    result = db.create_shop_employee(shop_id, username, full_name=full_name)
+    if not result:
+        return jsonify({"ok": False, "error": "такой логин уже занят"}), 400
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/admin/employees/<int:employee_id>/reset_password", methods=["POST"])
+@admin_required
+def api_admin_reset_employee_password(employee_id):
+    shop_id = request.get_json(force=True).get("shop_id")
+    new_password = db.reset_shop_employee_password(employee_id, shop_id)
+    if not new_password:
+        return jsonify({"ok": False, "error": "сотрудник не найден"}), 404
+    return jsonify({"ok": True, "password": new_password})
+
+
+@app.route("/api/admin/employees/<int:employee_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_employee(employee_id):
+    shop_id = request.get_json(force=True).get("shop_id") if request.data else None
+    if not shop_id:
+        shop_id = request.args.get("shop_id", type=int)
+    ok = db.delete_shop_employee(employee_id, shop_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "сотрудник не найден"}), 404
+    return jsonify({"ok": True})
 
 
 # ============ ТАБЛО (для ANPR-камеры + телевизора у входа, своё на каждую точку) ============

@@ -163,6 +163,20 @@ def init_db():
         )
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS shop_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_plain TEXT,
+            full_name TEXT,
+            role TEXT NOT NULL DEFAULT 'employee',
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+        """)
+
         # --- индексы на часто используемые поля — чтобы поиск оставался
         # быстрым по мере роста числа точек, клиентов и записей. Безопасно
         # выполнять при каждом запуске (IF NOT EXISTS) и на уже существующих
@@ -173,6 +187,7 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_car ON oil_changes(car_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_status_next ON oil_changes(status, next_change_date)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_broadcasts_shop ON broadcasts(shop_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop ON shop_users(shop_id)")
 
         conn.commit()
         _migrate(conn)
@@ -440,6 +455,71 @@ def authenticate_shop(username: str, password: str):
         if not check_password_hash(row["password_hash"], password):
             return None
         return dict(row)
+
+
+def authenticate_shop_employee(username: str, password: str):
+    """Логин сотрудника (ограниченный доступ) — своя таблица shop_users,
+    не путать с владельцем точки в shops."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM shop_users WHERE username=?", (username,)).fetchone()
+        if not row or not row["is_active"]:
+            return None
+        if not check_password_hash(row["password_hash"], password):
+            return None
+        return dict(row)
+
+
+def create_shop_employee(shop_id: int, username: str, password: str = None, full_name: str = None):
+    """Платформенный админ создаёт логин сотрудника для точки — ограниченный
+    доступ (без прибыли, цен закупки, статистики, экспорта)."""
+    if not password:
+        password = secrets.token_urlsafe(9)
+    with get_conn() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO shop_users (shop_id, username, password_hash, password_plain, full_name, role) "
+                "VALUES (?, ?, ?, ?, ?, 'employee')",
+                (shop_id, username, generate_password_hash(password), _encrypt_password(password), full_name)
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            return None
+        return {"username": username, "password": password}
+
+
+def list_shop_employees(shop_id: int):
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, username, full_name, is_active, created_at, password_plain FROM shop_users "
+            "WHERE shop_id=? ORDER BY created_at DESC", (shop_id,)
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["password_plain"] = _decrypt_password(d["password_plain"]) if d.get("password_plain") else None
+            out.append(d)
+        return out
+
+
+def delete_shop_employee(employee_id: int, shop_id: int) -> bool:
+    """Удаляет логин сотрудника — только если он реально принадлежит этой точке."""
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM shop_users WHERE id=? AND shop_id=?", (employee_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def reset_shop_employee_password(employee_id: int, shop_id: int):
+    new_password = secrets.token_urlsafe(9)
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE shop_users SET password_hash=?, password_plain=? WHERE id=? AND shop_id=?",
+            (generate_password_hash(new_password), _encrypt_password(new_password), employee_id, shop_id)
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return None
+        return new_password
 
 
 def get_shop(shop_id: int):
