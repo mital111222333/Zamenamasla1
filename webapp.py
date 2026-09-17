@@ -937,11 +937,19 @@ async function loadStats() {
   ];
 
   let aggHtml = '';
+  let myBranches = [];
   if (!IS_BRANCH) {
     try {
       const aggRes = await fetch('/api/aggregated_stats');
       const agg = await aggRes.json();
       if (agg.has_branches) {
+        const breakdownRows = (agg.breakdown || []).map(r => `
+          <tr>
+            <td>${escapeHtml(r.shop_name)}${r.is_head ? ` <span class="hint-text">(${T.branch_head_label})</span>` : ''}</td>
+            <td>${r.revenue.today.total.toLocaleString('ru-RU')} ${T.currency}</td>
+            <td style="color:#1B8A5A;">${r.profit.today.toLocaleString('ru-RU')} ${T.currency}</td>
+          </tr>
+        `).join('');
         aggHtml = `
           <div class="card" style="margin-bottom:16px; border-color:#FDBA74;">
             <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">
@@ -958,7 +966,15 @@ async function loadStats() {
               `).join('')}
             </div>
             <div style="margin-top:14px; padding-top:14px; border-top:1px dashed #FDBA74;">
+              <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">${T.branch_breakdown_title}</label>
+              <div class="table-wrap"><table>
+                <thead><tr><th>${T.branch_col_label}</th><th>${T.stats_today}</th><th>${T.stats_profit_label}</th></tr></thead>
+                <tbody>${breakdownRows}</tbody>
+              </table></div>
+            </div>
+            <div style="margin-top:14px; padding-top:14px; border-top:1px dashed #FDBA74;">
               <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">${T.branch_prices_title}</label>
+              <div id="branchWarehouseSummary" style="margin-bottom:10px;"></div>
               <select id="branchPriceSelect" onchange="loadBranchProducts(this.value)">
                 <option value="">${T.branch_prices_pick}</option>
               </select>
@@ -972,10 +988,16 @@ async function loadStats() {
 
   document.getElementById('statsAggregated').innerHTML = aggHtml;
   if (!IS_BRANCH && document.getElementById('branchPriceSelect')) {
-    const br = await (await fetch('/api/my_branches')).json();
+    myBranches = await (await fetch('/api/my_branches')).json();
     document.getElementById('branchPriceSelect').innerHTML =
       `<option value="">${T.branch_prices_pick}</option>` +
-      br.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
+      myBranches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
+    document.getElementById('branchWarehouseSummary').innerHTML = myBranches.map(b => `
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px dashed var(--border);">
+        <span>${escapeHtml(b.shop_name || b.username)}</span>
+        <span>${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}</span>
+      </div>
+    `).join('');
   }
   document.getElementById('statsGrid').innerHTML = periods.map(([key, label]) => `
     <div class="stats-card">
@@ -1975,14 +1997,16 @@ def api_stats():
 @profit_blocked
 def api_aggregated_stats():
     """Для главного аккаунта — сложенные выручка и прибыль по нему самому и
-    всем его филиалам вместе. Для точки без филиалов просто вернёт её же
-    собственные числа (сумма по пустому списку филиалов — это она сама)."""
+    всем его филиалам вместе, плюс разбивка кто сколько продал по отдельности.
+    Для точки без филиалов просто вернёт её же собственные числа (сумма по
+    пустому списку филиалов — это она сама)."""
     branches = db.get_branches(g.shop_id)
     return jsonify({
         "has_branches": len(branches) > 0,
         "branch_count": len(branches),
         "revenue": db.get_aggregated_revenue_stats(g.shop_id),
         "profit": db.get_aggregated_profit_stats(g.shop_id),
+        "breakdown": db.get_branch_breakdown_stats(g.shop_id),
     })
 
 
@@ -1990,10 +2014,19 @@ def api_aggregated_stats():
 @login_required
 @profit_blocked
 def api_my_branches():
-    """Список филиалов главного аккаунта — для панели управления ценами
-    закупки. Филиалу самому это не нужно (заблокировано profit_blocked)."""
+    """Список филиалов главного аккаунта со сводкой по складу — для панели
+    управления ценами закупки. Филиалу самому это не нужно (заблокировано
+    profit_blocked)."""
     branches = db.get_branches(g.shop_id)
-    return jsonify([{"id": b["id"], "shop_name": b["shop_name"], "username": b["username"]} for b in branches])
+    summary = {s["id"]: s for s in db.get_branch_warehouse_summary(g.shop_id)}
+    result = []
+    for b in branches:
+        s = summary.get(b["id"], {"product_count": 0, "missing_price_count": 0})
+        result.append({
+            "id": b["id"], "shop_name": b["shop_name"], "username": b["username"],
+            "product_count": s["product_count"], "missing_price_count": s["missing_price_count"],
+        })
+    return jsonify(result)
 
 
 @app.route("/api/branches/<int:branch_id>/products")

@@ -1358,6 +1358,43 @@ def get_aggregated_profit_stats(parent_shop_id: int) -> dict:
     return combined
 
 
+def get_branch_breakdown_stats(parent_shop_id: int):
+    """Выручка и прибыль отдельно по каждому филиалу (и самому главному
+    аккаунту) — кто сколько продал, а не только общая сумма."""
+    parent = get_shop(parent_shop_id)
+    branches = get_branches(parent_shop_id)
+    rows = []
+    for shop in [parent] + branches:
+        if not shop:
+            continue
+        rows.append({
+            "shop_id": shop["id"],
+            "shop_name": shop.get("shop_name") or shop["username"],
+            "is_head": shop["id"] == parent_shop_id,
+            "revenue": get_revenue_stats(shop["id"]),
+            "profit": get_profit_stats(shop["id"]),
+        })
+    return rows
+
+
+def get_branch_warehouse_summary(parent_shop_id: int):
+    """По каждому филиалу — сколько товаров на складе и у скольких из них
+    ещё не проставлена цена закупки. Чтобы видеть это одним взглядом, не
+    заходя по очереди в склад каждого филиала."""
+    branches = get_branches(parent_shop_id)
+    result = []
+    for b in branches:
+        products = list_products(b["id"])
+        missing = sum(1 for p in products if p.get("purchase_price") is None)
+        result.append({
+            "id": b["id"],
+            "shop_name": b.get("shop_name") or b["username"],
+            "product_count": len(products),
+            "missing_price_count": missing,
+        })
+    return result
+
+
 def set_product_purchase_price(product_id: int, shop_id: int, purchase_price):
     """Главный аккаунт вписывает цену закупки товара своего филиала — сам
     филиал этого не делает (см. create_product/restock_product ниже, где
