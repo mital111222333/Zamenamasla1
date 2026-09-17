@@ -937,6 +937,8 @@ function setStatsRange(from, to) {
 }
 
 function renderStatsPresets() {
+  const presetsEl = document.getElementById('statsPresets');
+  if (!presetsEl) return;  // вкладка "Статистика" скрыта (например, для сотрудника)
   const today = new Date();
   const presets = [
     [T.stats_preset_today, () => setStatsRange(today, today)],
