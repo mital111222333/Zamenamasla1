@@ -94,6 +94,8 @@ def init_db():
             eskiz_email TEXT,
             eskiz_password TEXT,
             warehouse_enabled INTEGER DEFAULT 0,
+            client_group TEXT,
+            parent_shop_id INTEGER,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -224,6 +226,8 @@ def _migrate(conn):
         "eskiz_email": "TEXT",
         "eskiz_password": "TEXT",
         "warehouse_enabled": "INTEGER DEFAULT 0",
+        "client_group": "TEXT",
+        "parent_shop_id": "INTEGER",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
@@ -424,16 +428,25 @@ def generate_token() -> str:
 
 def create_shop(username: str, password: str, shop_name: str = None, phone: str = None,
                  address: str = None, hours: str = None, lat: float = None, lon: float = None,
-                 notify_telegram_id: str = None, role: str = "shop") -> dict:
+                 notify_telegram_id: str = None, role: str = "shop", client_group: str = None) -> dict:
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
-                                anpr_token, notify_telegram_id, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                                anpr_token, notify_telegram_id, is_active, client_group)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """, (username, generate_password_hash(password), _encrypt_password(password), role, shop_name,
-              phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id))
+              phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id, client_group or None))
         conn.commit()
         return get_shop(cur.lastrowid)
+
+
+def set_shop_client_group(shop_id: int, client_group: str):
+    """Платформенный админ объединяет точку с остальными филиалами того же
+    клиента — просто текстовая метка, по которой /admin группирует список.
+    Пустая строка снимает группировку (точка снова отдельная)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET client_group=? WHERE id=?", (client_group or None, shop_id))
+        conn.commit()
 
 
 def reset_shop_password(shop_id: int, new_password: str):
@@ -1276,6 +1289,86 @@ def get_profit_stats(shop_id: int) -> dict:
         "month": _compute_profit_for_range(shop_id, month_start, today),
         "year": _compute_profit_for_range(shop_id, year_start, today),
     }
+
+
+def create_branch_shop(parent_shop_id: int, username: str, password: str, shop_name: str = None,
+                        phone: str = None, address: str = None) -> dict:
+    """Создаёт филиал — обычная точка (свой склад, своя база клиентов), но
+    с role='branch' и привязкой к главному аккаунту (parent_shop_id).
+    Права филиала (без прибыли, без цены закупки) применяются в webapp.py
+    по этому role, а не отдельным полем — так же, как role='admin'."""
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
+                                anpr_token, is_active, parent_shop_id)
+            VALUES (?, ?, ?, 'branch', ?, ?, ?, ?, 1, ?)
+        """, (username, generate_password_hash(password), _encrypt_password(password), shop_name,
+              phone, address, secrets.token_urlsafe(8), parent_shop_id))
+        conn.commit()
+        return get_shop(cur.lastrowid)
+
+
+def get_branches(parent_shop_id: int):
+    """Все филиалы главного аккаунта + число их клиентов — для его собственной
+    панели и для админки."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT s.*, (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) as client_count
+            FROM shops s WHERE s.parent_shop_id = ? ORDER BY s.created_at
+        """, (parent_shop_id,)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["password_plain"] = _decrypt_password(d.get("password_plain"))
+            del d["password_hash"]
+            result.append(d)
+        return result
+
+
+def is_branch_of(shop_id: int, parent_shop_id: int) -> bool:
+    """Проверка владения: действительно ли эта точка — филиал именно этого
+    главного аккаунта (защита от того, чтобы один владелец лез в чужие
+    филиалы, подставив чужой shop_id)."""
+    shop = get_shop(shop_id)
+    return bool(shop and shop.get("parent_shop_id") == parent_shop_id)
+
+
+def get_aggregated_revenue_stats(parent_shop_id: int) -> dict:
+    """Выручка главного аккаунта, сложенная со всеми его филиалами — по тем
+    же периодам, что и обычная статистика."""
+    shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
+    combined = {"today": {"total": 0, "count": 0}, "yesterday": {"total": 0, "count": 0},
+                "week": {"total": 0, "count": 0}, "month": {"total": 0, "count": 0}, "year": {"total": 0, "count": 0}}
+    for sid in shop_ids:
+        stats = get_revenue_stats(sid)
+        for period in combined:
+            combined[period]["total"] += stats[period]["total"]
+            combined[period]["count"] += stats[period]["count"]
+    return combined
+
+
+def get_aggregated_profit_stats(parent_shop_id: int) -> dict:
+    """Прибыль главного аккаунта, сложенная со всеми его филиалами."""
+    shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
+    combined = {"today": 0, "yesterday": 0, "week": 0, "month": 0, "year": 0}
+    for sid in shop_ids:
+        stats = get_profit_stats(sid)
+        for period in combined:
+            combined[period] += stats[period]
+    return combined
+
+
+def set_product_purchase_price(product_id: int, shop_id: int, purchase_price):
+    """Главный аккаунт вписывает цену закупки товара своего филиала — сам
+    филиал этого не делает (см. create_product/restock_product ниже, где
+    покупная цена от филиала игнорируется)."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE products SET purchase_price=? WHERE id=? AND shop_id=?",
+            (purchase_price, product_id, shop_id)
+        )
+        conn.commit()
+        return cur.rowcount > 0
 
 
 def get_full_history_flat(shop_id: int):

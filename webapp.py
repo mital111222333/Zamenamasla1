@@ -47,7 +47,7 @@ SERVICE_TYPES = ["Замена масла", "Замена масла + филь�
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if session.get("role") != "shop" or not session.get("shop_id"):
+        if session.get("role") not in ("shop", "branch") or not session.get("shop_id"):
             return redirect(url_for("login_page"))
         shop = db.get_shop(session["shop_id"])
         if not shop or not shop["is_active"]:
@@ -57,6 +57,8 @@ def login_required(view):
         g.lang = shop.get("language") or "ru"
         g.T = i18n.get_texts(g.lang)
         g.is_employee = bool(session.get("is_employee"))
+        g.is_branch = shop.get("role") == "branch"
+        g.parent_shop_id = shop.get("parent_shop_id")
         return view(*args, **kwargs)
     return wrapped
 
@@ -68,6 +70,20 @@ def employee_blocked(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if getattr(g, "is_employee", False):
+            return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def profit_blocked(view):
+    """Закрывает прибыль и от сотрудника, и от филиала — прибыль по филиалам
+    видит только их главный аккаунт (в сложенном виде, см. агрегированную
+    статистику). Остальное (статистика по выручке, экспорт, рассылка, SMS)
+    филиалу по-прежнему доступно, поэтому это отдельный декоратор, а не
+    расширение employee_blocked."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if getattr(g, "is_employee", False) or getattr(g, "is_branch", False):
             return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
         return view(*args, **kwargs)
     return wrapped
@@ -502,6 +518,7 @@ PAGE = """
   </div>
 
   <div id="view-stats" style="display:none;">
+    <div id="statsAggregated"></div>
     <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
 
     <div class="card" style="margin-top:16px;">
@@ -565,7 +582,7 @@ PAGE = """
           <label>{{ T.wh_sell_price }}</label>
           <input id="wh_new_sell_price" type="number" placeholder="45000">
         </div>
-        <div class="field">
+        <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
           <label>{{ T.wh_purchase_price }}</label>
           <input id="wh_new_purchase_price" type="number" placeholder="30000">
         </div>
@@ -583,7 +600,7 @@ PAGE = """
         <table>
           <thead><tr>
             <th>{{ T.wh_category }}</th><th>{{ T.wh_product_name }}</th><th>{{ T.wh_stock }}</th>
-            <th>{{ T.wh_sell_price }}</th><th>{{ T.wh_purchase_price }}</th><th></th>
+            <th>{{ T.wh_sell_price }}</th>{% if not is_branch %}<th>{{ T.wh_purchase_price }}</th>{% endif %}<th></th>
           </tr></thead>
           <tbody id="products-body"></tbody>
         </table>
@@ -607,7 +624,7 @@ MODAL_AND_SCRIPT = """
       <label>{{ T.wh_restock_qty }}</label>
       <input id="restock_qty" type="number">
     </div>
-    <div class="field">
+    <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
       <label>{{ T.wh_purchase_price }}</label>
       <input id="restock_price" type="number">
     </div>
@@ -705,6 +722,7 @@ MODAL_AND_SCRIPT = """
 const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
+const IS_BRANCH = {{ is_branch|tojson }};
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -794,8 +812,9 @@ async function loadWarehouse() {
 function renderProductsTable() {
   const body = document.getElementById('products-body');
   if (!body) return;
+  const colCount = IS_BRANCH ? 5 : 6;
   if (!productsCache.length) {
-    body.innerHTML = `<tr><td colspan="6">${T.wh_no_products}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${colCount}">${T.wh_no_products}</td></tr>`;
     return;
   }
   body.innerHTML = productsCache.map(p => {
@@ -807,7 +826,7 @@ function renderProductsTable() {
       <td>${escapeHtml(p.name)}</td>
       <td style="${isLow ? 'color:#B3241C; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
       <td>${p.sell_price ? p.sell_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
-      <td>${p.purchase_price ? p.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
+      ${IS_BRANCH ? '' : `<td>${p.purchase_price ? p.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>`}
       <td>
         <button class="history-toggle" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_restock_action}</button>
         &nbsp;·&nbsp;
@@ -916,6 +935,48 @@ async function loadStats() {
     ['today', T.stats_today], ['yesterday', T.stats_yesterday], ['week', T.stats_week],
     ['month', T.stats_month], ['year', T.stats_year],
   ];
+
+  let aggHtml = '';
+  if (!IS_BRANCH) {
+    try {
+      const aggRes = await fetch('/api/aggregated_stats');
+      const agg = await aggRes.json();
+      if (agg.has_branches) {
+        aggHtml = `
+          <div class="card" style="margin-bottom:16px; border-color:#FDBA74;">
+            <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">
+              ${T.stats_all_branches_title} (${agg.branch_count})
+            </label>
+            <div class="stats-grid">
+              ${periods.map(([key, label]) => `
+                <div class="stats-card" style="background:linear-gradient(135deg, #FFF7ED, #FEF3C7); border-color:#FDBA74;">
+                  <div class="label">${label}</div>
+                  <div class="amount" style="color:#9A3412;">${agg.revenue[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
+                  <div class="count">${T.stats_services_count} ${agg.revenue[key].count}</div>
+                  <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${agg.profit[key].toLocaleString('ru-RU')} ${T.currency}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div style="margin-top:14px; padding-top:14px; border-top:1px dashed #FDBA74;">
+              <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">${T.branch_prices_title}</label>
+              <select id="branchPriceSelect" onchange="loadBranchProducts(this.value)">
+                <option value="">${T.branch_prices_pick}</option>
+              </select>
+              <div id="branchProductsPanel" style="margin-top:10px;"></div>
+            </div>
+          </div>
+        `;
+      }
+    } catch (e) { /* не главный аккаунт или ошибка - просто не показываем блок */ }
+  }
+
+  document.getElementById('statsAggregated').innerHTML = aggHtml;
+  if (!IS_BRANCH && document.getElementById('branchPriceSelect')) {
+    const br = await (await fetch('/api/my_branches')).json();
+    document.getElementById('branchPriceSelect').innerHTML =
+      `<option value="">${T.branch_prices_pick}</option>` +
+      br.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
+  }
   document.getElementById('statsGrid').innerHTML = periods.map(([key, label]) => `
     <div class="stats-card">
       <div class="label">${label}</div>
@@ -924,6 +985,27 @@ async function loadStats() {
       ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
   `).join('');
+}
+
+async function loadBranchProducts(branchId) {
+  const panel = document.getElementById('branchProductsPanel');
+  if (!branchId) { panel.innerHTML = ''; return; }
+  const products = await (await fetch(`/api/branches/${branchId}/products`)).json();
+  if (!products.length) { panel.innerHTML = `<div class="hint-text">${T.wh_no_products}</div>`; return; }
+  panel.innerHTML = products.map(p => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
+      <span>${escapeHtml(p.name)} <span class="hint-text">(${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l})</span></span>
+      <input type="number" value="${p.purchase_price ?? ''}" placeholder="${T.wh_purchase_price}"
+             style="width:110px; padding:5px 8px; font-size:12px;"
+             onchange="setBranchPurchasePrice(${branchId}, ${p.id}, this.value)">
+    </div>
+  `).join('');
+}
+
+async function setBranchPurchasePrice(branchId, productId, value) {
+  await fetch(`/api/branches/${branchId}/products/${productId}/purchase_price`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({purchase_price: value})
+  });
 }
 
 function fmtDate(d) {
@@ -1729,6 +1811,7 @@ def index():
         eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         is_employee=g.is_employee,
+        is_branch=g.is_branch,
     )
 
 
@@ -1774,7 +1857,7 @@ def _strip_cost_price(history):
 @login_required
 def api_history(plate):
     car, history = db.get_car_history(g.shop_id, plate)
-    if g.is_employee:
+    if g.is_employee or g.is_branch:
         history = _strip_cost_price(history)
     return jsonify({"car": car, "history": history})
 
@@ -1887,6 +1970,61 @@ def api_stats():
     return jsonify(db.get_revenue_stats(g.shop_id))
 
 
+@app.route("/api/aggregated_stats")
+@login_required
+@profit_blocked
+def api_aggregated_stats():
+    """Для главного аккаунта — сложенные выручка и прибыль по нему самому и
+    всем его филиалам вместе. Для точки без филиалов просто вернёт её же
+    собственные числа (сумма по пустому списку филиалов — это она сама)."""
+    branches = db.get_branches(g.shop_id)
+    return jsonify({
+        "has_branches": len(branches) > 0,
+        "branch_count": len(branches),
+        "revenue": db.get_aggregated_revenue_stats(g.shop_id),
+        "profit": db.get_aggregated_profit_stats(g.shop_id),
+    })
+
+
+@app.route("/api/my_branches")
+@login_required
+@profit_blocked
+def api_my_branches():
+    """Список филиалов главного аккаунта — для панели управления ценами
+    закупки. Филиалу самому это не нужно (заблокировано profit_blocked)."""
+    branches = db.get_branches(g.shop_id)
+    return jsonify([{"id": b["id"], "shop_name": b["shop_name"], "username": b["username"]} for b in branches])
+
+
+@app.route("/api/branches/<int:branch_id>/products")
+@login_required
+@profit_blocked
+def api_branch_products(branch_id):
+    """Главный аккаунт смотрит склад конкретного своего филиала — с ценой
+    закупки, которую сам филиал не видит. Проверяем, что это реально его
+    филиал, а не чужая точка."""
+    if not db.is_branch_of(branch_id, g.shop_id):
+        return jsonify({"ok": False, "error": "это не ваш филиал"}), 403
+    return jsonify(db.list_products(branch_id))
+
+
+@app.route("/api/branches/<int:branch_id>/products/<int:product_id>/purchase_price", methods=["POST"])
+@login_required
+@profit_blocked
+def api_set_branch_purchase_price(branch_id, product_id):
+    if not db.is_branch_of(branch_id, g.shop_id):
+        return jsonify({"ok": False, "error": "это не ваш филиал"}), 403
+    data = request.get_json(force=True)
+    try:
+        purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+    except (ValueError, TypeError):
+        return jsonify({"ok": False, "error": "неверная цена"}), 400
+    ok = db.set_product_purchase_price(product_id, branch_id, purchase_price)
+    if not ok:
+        return jsonify({"ok": False, "error": "товар не найден"}), 404
+    return jsonify({"ok": True})
+
+
 @app.route("/api/stats/range")
 @login_required
 @employee_blocked
@@ -1932,7 +2070,7 @@ def _warehouse_required():
 @login_required
 def api_list_products():
     products = db.list_products(g.shop_id)
-    if g.is_employee:
+    if g.is_employee or g.is_branch:
         for p in products:
             p.pop("purchase_price", None)
     return jsonify(products)
@@ -1957,6 +2095,8 @@ def api_create_product():
             unit = "pc" if category.startswith("filter_") else "l"
         sell_price = int(data["sell_price"]) if data.get("sell_price") not in (None, "") else None
         purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        if g.is_branch:
+            purchase_price = None  # филиал не вписывает цену закупки — это делает только главный аккаунт
         initial_stock = float(data["initial_stock"]) if data.get("initial_stock") not in (None, "") else 0
     except (KeyError, ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -1970,11 +2110,14 @@ def api_create_product():
 def api_update_product(product_id):
     data = request.get_json(force=True)
     try:
+        purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        if g.is_branch:
+            purchase_price = None  # филиал не может менять цену закупки — только главный аккаунт
         ok = db.update_product(
             product_id, g.shop_id,
             name=data.get("name"),
             sell_price=int(data["sell_price"]) if data.get("sell_price") not in (None, "") else None,
-            purchase_price=int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None,
+            purchase_price=purchase_price,
         )
     except (ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -2001,6 +2144,8 @@ def api_restock_product(product_id):
     try:
         quantity = float(data["quantity"])
         purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        if g.is_branch:
+            purchase_price = None  # филиал не вписывает цену закупки при пополнении — только главный аккаунт
         restock_date = data.get("restock_date") or None
     except (KeyError, ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -2014,12 +2159,16 @@ def api_restock_product(product_id):
 @login_required
 @employee_blocked
 def api_restock_history():
-    return jsonify(db.get_restock_history(g.shop_id))
+    history = db.get_restock_history(g.shop_id)
+    if g.is_branch:
+        for r in history:
+            r.pop("purchase_price", None)
+    return jsonify(history)
 
 
 @app.route("/api/profit_stats")
 @login_required
-@employee_blocked
+@profit_blocked
 def api_profit_stats():
     return jsonify(db.get_profit_stats(g.shop_id))
 
@@ -2182,6 +2331,11 @@ ADMIN_PAGE = """
       <label>Название точки</label>
       <input id="new_shop_name" placeholder="MITAL Namangan">
     </div>
+    <div class="field">
+      <label>Клиент / группа (необяз.) — для филиала укажи то же, что у других точек этого клиента</label>
+      <input id="new_client_group" list="clientGroupsList" placeholder="например: Sinov01">
+      <datalist id="clientGroupsList"></datalist>
+    </div>
     <div class="row2">
       <div class="field">
         <label>Логин</label>
@@ -2219,7 +2373,7 @@ ADMIN_PAGE = """
     <h3 style="margin-top:0;">Все точки</h3>
     <div class="table-wrap" style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th></tr></thead>
+      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th><th>Филиалы</th><th>Группа</th></tr></thead>
       <tbody id="shops-body"></tbody>
     </table>
     </div>
@@ -2245,7 +2399,24 @@ function escapeHtml(str) {
 async function loadShops() {
   const res = await fetch('/api/admin/shops');
   const shops = await res.json();
-  document.getElementById('shops-body').innerHTML = shops.map(s => `
+
+  // список известных групп — для автодополнения в форме создания новой точки
+  const groupNames = [...new Set(shops.map(s => s.client_group).filter(Boolean))].sort();
+  document.getElementById('clientGroupsList').innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}">`).join('');
+
+  // группируем: сначала точки с группой (по алфавиту группы), потом без группы
+  const grouped = {};
+  const standalone = [];
+  shops.forEach(s => {
+    if (s.client_group) {
+      (grouped[s.client_group] = grouped[s.client_group] || []).push(s);
+    } else {
+      standalone.push(s);
+    }
+  });
+
+  function renderShopRow(s) {
+    return `
     <tr>
       <td>${s.shop_name || '—'}</td>
       <td>${s.username}</td>
@@ -2265,9 +2436,33 @@ async function loadShops() {
         ${s.warehouse_enabled ? 'включён' : 'выключен'}
       </button></td>
       <td><button class="badge" style="background:#EFF6FF;color:var(--blue);" onclick="toggleEmployees(${s.id})">👥 сотрудники</button></td>
+      <td><button class="badge" style="background:#FFF7ED;color:#9A3412;" onclick="toggleBranches(${s.id})">🏢 филиалы</button></td>
+      <td>
+        <input value="${escapeHtml(s.client_group || '')}" list="clientGroupsList" placeholder="без группы"
+               style="width:120px; padding:4px 6px; font-size:12px;"
+               onchange="setClientGroup(${s.id}, this.value)">
+      </td>
     </tr>
-    <tr id="emp-row-${s.id}" style="display:none;"><td colspan="8"><div id="emp-panel-${s.id}" style="padding:10px; background:var(--field-bg); border-radius:10px;">…</div></td></tr>
-  `).join('');
+    <tr id="emp-row-${s.id}" style="display:none;"><td colspan="10"><div id="emp-panel-${s.id}" style="padding:10px; background:var(--field-bg); border-radius:10px;">…</div></td></tr>
+    <tr id="branch-row-${s.id}" style="display:none;"><td colspan="10"><div id="branch-panel-${s.id}" style="padding:10px; background:var(--field-bg); border-radius:10px;">…</div></td></tr>
+  `;
+  }
+
+  let html = '';
+  Object.keys(grouped).sort().forEach(group => {
+    html += `<tr><td colspan="10" style="background:#EFF6FF; font-weight:700; color:var(--blue); padding:8px 6px;">🏷️ ${escapeHtml(group)} (${grouped[group].length})</td></tr>`;
+    grouped[group].forEach(s => html += renderShopRow(s));
+  });
+  standalone.forEach(s => html += renderShopRow(s));
+
+  document.getElementById('shops-body').innerHTML = html;
+}
+
+async function setClientGroup(shopId, value) {
+  await fetch(`/api/admin/shops/${shopId}/client_group`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({client_group: value.trim()})
+  });
+  loadShops();
 }
 
 async function toggleEmployees(shopId) {
@@ -2338,6 +2533,53 @@ async function deleteEmployee(employeeId, shopId, username) {
   if (data.ok) { loadEmployees(shopId); } else { showMsg('Ошибка: ' + data.error, false); }
 }
 
+async function toggleBranches(shopId) {
+  const row = document.getElementById(`branch-row-${shopId}`);
+  const opening = row.style.display === 'none';
+  row.style.display = opening ? '' : 'none';
+  if (opening) await loadBranches(shopId);
+}
+
+async function loadBranches(shopId) {
+  const panel = document.getElementById(`branch-panel-${shopId}`);
+  const res = await fetch(`/api/admin/shops/${shopId}/branches`);
+  const branches = await res.json();
+  const list = branches.length ? branches.map(b => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
+      <span>${escapeHtml(b.shop_name || b.username)} <span class="hint-text">(${b.username}, клиентов: ${b.client_count})</span></span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span style="font-family:monospace;">${b.password_plain || '—'}</span>
+        <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetPassword(${b.id}, ${escapeHtml(JSON.stringify(b.username))})">сбросить</button>
+      </span>
+    </div>
+  `).join('') : `<div class="hint-text">У этой точки пока нет филиалов.</div>`;
+  panel.innerHTML = `
+    <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Филиалы (полноценные точки — свой склад, своя база, без цены закупки и без прибыли по отдельности)</div>
+    ${list}
+    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+      <input id="new-branch-name-${shopId}" placeholder="название филиала" style="flex:1; min-width:140px;">
+      <input id="new-branch-username-${shopId}" placeholder="логин" style="flex:1; min-width:120px;">
+      <button class="badge active" style="padding:6px 14px;" onclick="createBranch(${shopId})">+ добавить филиал</button>
+    </div>
+  `;
+}
+
+async function createBranch(shopId) {
+  const shopName = document.getElementById(`new-branch-name-${shopId}`).value.trim();
+  const username = document.getElementById(`new-branch-username-${shopId}`).value.trim();
+  if (!shopName || !username) { showMsg('Укажите название филиала и логин.', false); return; }
+  const res = await fetch(`/api/admin/shops/${shopId}/branches`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({shop_name: shopName, username})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(`✅ Филиал «${shopName}» создан. Логин: <b>${username}</b>, пароль: <b>${data.password}</b>`, true);
+    loadBranches(shopId);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
+}
+
 async function toggleWarehouse(id, makeEnabled) {
   await fetch(`/api/admin/shops/${id}/toggle_warehouse`, {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: !!makeEnabled})
@@ -2374,6 +2616,7 @@ async function resetPassword(id, username) {
 async function createShop() {
   const payload = {
     shop_name: document.getElementById('new_shop_name').value.trim(),
+    client_group: document.getElementById('new_client_group').value.trim(),
     username: document.getElementById('new_username').value.trim(),
     password: document.getElementById('new_password').value.trim(),
     phone: document.getElementById('new_phone').value.trim(),
@@ -2403,7 +2646,7 @@ async function createShop() {
     document.getElementById('newCreds').innerHTML =
       `<div class="new-creds">✅ Точка создана. Логин: <b>${data.username}</b>, пароль: <b>${data.password}</b><br>
        Сохраните пароль сейчас — второй раз он нигде не показывается.</div>`;
-    ['new_shop_name','new_username','new_password','new_phone','new_notify_id','new_address','new_location'].forEach(id => document.getElementById(id).value = '');
+    ['new_shop_name','new_client_group','new_username','new_password','new_phone','new_notify_id','new_address','new_location'].forEach(id => document.getElementById(id).value = '');
     loadShops();
   } else {
     showMsg('Ошибка: ' + data.error, false);
@@ -2448,8 +2691,17 @@ def api_admin_create_shop():
         lat=float(data["lat"]) if data.get("lat") else None,
         lon=float(data["lon"]) if data.get("lon") else None,
         notify_telegram_id=data.get("notify_telegram_id") or None,
+        client_group=(data.get("client_group") or "").strip() or None,
     )
     return jsonify({"ok": True, "id": shop["id"], "username": username, "password": password})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/client_group", methods=["POST"])
+@admin_required
+def api_admin_set_client_group(shop_id):
+    data = request.get_json(force=True)
+    db.set_shop_client_group(shop_id, (data.get("client_group") or "").strip())
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/shops/<int:shop_id>/toggle", methods=["POST"])
@@ -2508,6 +2760,34 @@ def api_admin_create_employee(shop_id):
     if not result:
         return jsonify({"ok": False, "error": "такой логин уже занят"}), 400
     return jsonify({"ok": True, **result})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/branches")
+@admin_required
+def api_admin_list_branches(shop_id):
+    return jsonify(db.get_branches(shop_id))
+
+
+@app.route("/api/admin/shops/<int:shop_id>/branches", methods=["POST"])
+@admin_required
+def api_admin_create_branch(shop_id):
+    parent = db.get_shop(shop_id)
+    if not parent:
+        return jsonify({"ok": False, "error": "главная точка не найдена"}), 404
+    data = request.get_json(force=True)
+    username = (data.get("username") or "").strip()
+    shop_name = (data.get("shop_name") or "").strip()
+    if not username or not shop_name:
+        return jsonify({"ok": False, "error": "укажите логин и название филиала"}), 400
+    if db.username_taken(username):
+        return jsonify({"ok": False, "error": "такой логин уже занят"}), 400
+    password = (data.get("password") or "").strip() or secrets.token_urlsafe(6)
+    branch = db.create_branch_shop(
+        shop_id, username, password, shop_name=shop_name,
+        phone=data.get("phone") or None, address=data.get("address") or None,
+    )
+    db.set_shop_warehouse_enabled(branch["id"], True)  # филиалу склад нужен сразу, это весь смысл филиала
+    return jsonify({"ok": True, "id": branch["id"], "username": username, "password": password})
 
 
 @app.route("/api/admin/employees/<int:employee_id>/reset_password", methods=["POST"])
