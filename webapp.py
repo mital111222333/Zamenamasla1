@@ -240,6 +240,12 @@ PAGE = """
   .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
   .lang-btn { background: #EFF6FF; border: 1px solid #BFDBFE; color: var(--blue); font-size: 12px; font-weight:700; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
   .tabs { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom: 10px; }
+  .subtabs { display:flex; gap:8px; margin-bottom:14px; }
+  .subtab {
+    flex:1; text-align:center; padding:10px; border-radius:10px; background:var(--field-bg);
+    border:1.5px solid var(--border); cursor:pointer; font-weight:700; font-size:13px; color:var(--hint);
+  }
+  .subtab.active { background:var(--btn); color:#fff; border-color:var(--btn); }
   .tab {
     text-align:center; padding: 10px 4px; border-radius: 14px; background: var(--card);
     border:2px solid var(--border); cursor:pointer; font-weight:700; font-family: var(--font-display);
@@ -518,24 +524,34 @@ PAGE = """
   </div>
 
   <div id="view-stats" style="display:none;">
-    <div id="statsAggregated"></div>
-    <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+    <div class="subtabs">
+      <div class="subtab active" id="substat-own" onclick="showStatsSubTab('own')">{{ T.stats_sub_own }}</div>
+      <div class="subtab" id="substat-branches" onclick="showStatsSubTab('branches')" style="display:none;">{{ T.stats_sub_branches }}</div>
+    </div>
 
-    <div class="card" style="margin-top:16px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.stats_custom_title }}</label>
-      <div id="statsPresets" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
-      <div class="row2">
-        <div class="field">
-          <label>{{ T.stats_from }}</label>
-          <input id="stats_from" type="date">
+    <div id="statsOwnView">
+      <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.stats_custom_title }}</label>
+        <div id="statsPresets" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
+        <div class="row2">
+          <div class="field">
+            <label>{{ T.stats_from }}</label>
+            <input id="stats_from" type="date">
+          </div>
+          <div class="field">
+            <label>{{ T.stats_to }}</label>
+            <input id="stats_to" type="date">
+          </div>
         </div>
-        <div class="field">
-          <label>{{ T.stats_to }}</label>
-          <input id="stats_to" type="date">
-        </div>
+        <button class="submit" onclick="applyStatsRange()">{{ T.stats_apply }}</button>
+        <div id="statsRangeResult" style="margin-top:14px;"></div>
       </div>
-      <button class="submit" onclick="applyStatsRange()">{{ T.stats_apply }}</button>
-      <div id="statsRangeResult" style="margin-top:14px;"></div>
+    </div>
+
+    <div id="statsBranchesView" style="display:none;">
+      <div id="statsAggregated"></div>
     </div>
   </div>
   {% endif %}
@@ -558,58 +574,76 @@ PAGE = """
 
   {% if warehouse_enabled and not is_employee %}
   <div id="view-warehouse" style="display:none;">
-    <div class="card">
-      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_add_product }}</label>
-      <div class="row2">
-        <div class="field">
-          <label>{{ T.wh_category }}</label>
-          <select id="wh_new_category" onchange="onWhCategoryChanged()"></select>
+    <div class="subtabs">
+      <div class="subtab active" id="subwh-own" onclick="showWhSubTab('own')">{{ T.wh_sub_own }}</div>
+      <div class="subtab" id="subwh-branches" onclick="showWhSubTab('branches')" style="display:none;">{{ T.wh_sub_branches }}</div>
+    </div>
+
+    <div id="whOwnView">
+      <div class="card">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_add_product }}</label>
+        <div class="row2">
+          <div class="field">
+            <label>{{ T.wh_category }}</label>
+            <select id="wh_new_category" onchange="onWhCategoryChanged()"></select>
+          </div>
+          <div class="field">
+            <label>{{ T.wh_product_name }}</label>
+            <input id="wh_new_name" placeholder="MITANOL 5W-30">
+          </div>
+        </div>
+        <div class="field" id="wh_new_unit_row" style="display:none;">
+          <label>{{ T.wh_unit }}</label>
+          <select id="wh_new_unit">
+            <option value="pc">{{ T.unit_pc }}</option>
+            <option value="l">{{ T.unit_l }}</option>
+          </select>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>{{ T.wh_sell_price }}</label>
+            <input id="wh_new_sell_price" type="number" placeholder="45000">
+          </div>
+          <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
+            <label>{{ T.wh_purchase_price }}</label>
+            <input id="wh_new_purchase_price" type="number" placeholder="30000">
+          </div>
         </div>
         <div class="field">
-          <label>{{ T.wh_product_name }}</label>
-          <input id="wh_new_name" placeholder="MITANOL 5W-30">
+          <label>{{ T.wh_initial_stock }}</label>
+          <input id="wh_new_stock" type="number" placeholder="0">
+        </div>
+        <button class="submit" onclick="createProduct()">{{ T.wh_add_btn }}</button>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_products_title }}</label>
+        <div class="table-wrap" style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>{{ T.wh_category }}</th><th>{{ T.wh_product_name }}</th><th>{{ T.wh_stock }}</th>
+              <th>{{ T.wh_sell_price }}</th>{% if not is_branch %}<th>{{ T.wh_purchase_price }}</th>{% endif %}<th></th>
+            </tr></thead>
+            <tbody id="products-body"></tbody>
+          </table>
         </div>
       </div>
-      <div class="field" id="wh_new_unit_row" style="display:none;">
-        <label>{{ T.wh_unit }}</label>
-        <select id="wh_new_unit">
-          <option value="pc">{{ T.unit_pc }}</option>
-          <option value="l">{{ T.unit_l }}</option>
+
+      <div class="card" style="margin-top:14px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_restock_history }}</label>
+        <div id="restockHistory"></div>
+      </div>
+    </div>
+
+    <div id="whBranchesView" style="display:none;">
+      <div class="card">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.branch_prices_title }}</label>
+        <div id="branchWarehouseSummary" style="margin-bottom:12px;"></div>
+        <select id="branchPriceSelect" onchange="loadBranchProducts(this.value)">
+          <option value="">{{ T.branch_prices_pick }}</option>
         </select>
+        <div id="branchProductsPanel" style="margin-top:10px;"></div>
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>{{ T.wh_sell_price }}</label>
-          <input id="wh_new_sell_price" type="number" placeholder="45000">
-        </div>
-        <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
-          <label>{{ T.wh_purchase_price }}</label>
-          <input id="wh_new_purchase_price" type="number" placeholder="30000">
-        </div>
-      </div>
-      <div class="field">
-        <label>{{ T.wh_initial_stock }}</label>
-        <input id="wh_new_stock" type="number" placeholder="0">
-      </div>
-      <button class="submit" onclick="createProduct()">{{ T.wh_add_btn }}</button>
-    </div>
-
-    <div class="card" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_products_title }}</label>
-      <div class="table-wrap" style="overflow-x:auto;">
-        <table>
-          <thead><tr>
-            <th>{{ T.wh_category }}</th><th>{{ T.wh_product_name }}</th><th>{{ T.wh_stock }}</th>
-            <th>{{ T.wh_sell_price }}</th>{% if not is_branch %}<th>{{ T.wh_purchase_price }}</th>{% endif %}<th></th>
-          </tr></thead>
-          <tbody id="products-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_restock_history }}</label>
-      <div id="restockHistory"></div>
     </div>
   </div>
   {% endif %}
@@ -807,7 +841,36 @@ async function loadWarehouse() {
   // перезагрузки всей страницы
   renderItemLists();
   renderSvcItemLists();
+
+  if (!IS_BRANCH) {
+    try {
+      const branches = await (await fetch('/api/my_branches')).json();
+      const branchBtn = document.getElementById('subwh-branches');
+      if (branches.length) {
+        branchBtn.style.display = '';
+        document.getElementById('branchPriceSelect').innerHTML =
+          `<option value="">${T.branch_prices_pick}</option>` +
+          branches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
+        document.getElementById('branchWarehouseSummary').innerHTML = branches.map(b => `
+          <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px dashed var(--border);">
+            <span>${escapeHtml(b.shop_name || b.username)}</span>
+            <span>${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}</span>
+          </div>
+        `).join('');
+      } else {
+        branchBtn.style.display = 'none';
+      }
+    } catch (e) { /* не главный аккаунт или ошибка - просто не показываем подвкладку */ }
+  }
 }
+
+function showWhSubTab(t) {
+  document.getElementById('whOwnView').style.display = t === 'own' ? 'block' : 'none';
+  document.getElementById('whBranchesView').style.display = t === 'branches' ? 'block' : 'none';
+  document.getElementById('subwh-own').classList.toggle('active', t === 'own');
+  document.getElementById('subwh-branches').classList.toggle('active', t === 'branches');
+}
+
 
 function renderProductsTable() {
   const body = document.getElementById('products-body');
@@ -927,7 +990,7 @@ async function loadStats() {
   const res = await fetch('/api/stats');
   const s = await res.json();
   let profit = null;
-  if (WAREHOUSE_ENABLED) {
+  if (WAREHOUSE_ENABLED && !IS_BRANCH) {
     const pRes = await fetch('/api/profit_stats');
     profit = await pRes.json();
   }
@@ -936,13 +999,21 @@ async function loadStats() {
     ['month', T.stats_month], ['year', T.stats_year],
   ];
 
-  let aggHtml = '';
-  let myBranches = [];
+  document.getElementById('statsGrid').innerHTML = periods.map(([key, label]) => `
+    <div class="stats-card">
+      <div class="label">${label}</div>
+      <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
+      <div class="count">${T.stats_services_count} ${s[key].count}</div>
+      ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
+    </div>
+  `).join('');
+
   if (!IS_BRANCH) {
     try {
-      const aggRes = await fetch('/api/aggregated_stats');
-      const agg = await aggRes.json();
+      const agg = await (await fetch('/api/aggregated_stats')).json();
+      const branchBtn = document.getElementById('substat-branches');
       if (agg.has_branches) {
+        branchBtn.style.display = '';
         const breakdownRows = (agg.breakdown || []).map(r => `
           <tr>
             <td>${escapeHtml(r.shop_name)}${r.is_head ? ` <span class="hint-text">(${T.branch_head_label})</span>` : ''}</td>
@@ -950,8 +1021,8 @@ async function loadStats() {
             <td style="color:#1B8A5A;">${r.profit.today.toLocaleString('ru-RU')} ${T.currency}</td>
           </tr>
         `).join('');
-        aggHtml = `
-          <div class="card" style="margin-bottom:16px; border-color:#FDBA74;">
+        document.getElementById('statsAggregated').innerHTML = `
+          <div class="card" style="border-color:#FDBA74;">
             <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">
               ${T.stats_all_branches_title} (${agg.branch_count})
             </label>
@@ -972,41 +1043,20 @@ async function loadStats() {
                 <tbody>${breakdownRows}</tbody>
               </table></div>
             </div>
-            <div style="margin-top:14px; padding-top:14px; border-top:1px dashed #FDBA74;">
-              <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">${T.branch_prices_title}</label>
-              <div id="branchWarehouseSummary" style="margin-bottom:10px;"></div>
-              <select id="branchPriceSelect" onchange="loadBranchProducts(this.value)">
-                <option value="">${T.branch_prices_pick}</option>
-              </select>
-              <div id="branchProductsPanel" style="margin-top:10px;"></div>
-            </div>
           </div>
         `;
+      } else {
+        branchBtn.style.display = 'none';
       }
-    } catch (e) { /* не главный аккаунт или ошибка - просто не показываем блок */ }
+    } catch (e) { /* не главный аккаунт или ошибка - просто не показываем подвкладку */ }
   }
+}
 
-  document.getElementById('statsAggregated').innerHTML = aggHtml;
-  if (!IS_BRANCH && document.getElementById('branchPriceSelect')) {
-    myBranches = await (await fetch('/api/my_branches')).json();
-    document.getElementById('branchPriceSelect').innerHTML =
-      `<option value="">${T.branch_prices_pick}</option>` +
-      myBranches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
-    document.getElementById('branchWarehouseSummary').innerHTML = myBranches.map(b => `
-      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px dashed var(--border);">
-        <span>${escapeHtml(b.shop_name || b.username)}</span>
-        <span>${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}</span>
-      </div>
-    `).join('');
-  }
-  document.getElementById('statsGrid').innerHTML = periods.map(([key, label]) => `
-    <div class="stats-card">
-      <div class="label">${label}</div>
-      <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
-      <div class="count">${T.stats_services_count} ${s[key].count}</div>
-      ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
-    </div>
-  `).join('');
+function showStatsSubTab(t) {
+  document.getElementById('statsOwnView').style.display = t === 'own' ? 'block' : 'none';
+  document.getElementById('statsBranchesView').style.display = t === 'branches' ? 'block' : 'none';
+  document.getElementById('substat-own').classList.toggle('active', t === 'own');
+  document.getElementById('substat-branches').classList.toggle('active', t === 'branches');
 }
 
 async function loadBranchProducts(branchId) {
