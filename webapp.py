@@ -348,10 +348,39 @@ PAGE = """
   .stats-card .label { font-size:10px; color:#64748B; margin-bottom:4px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
   .stats-card .amount { font-size:22px; font-weight:800; color:var(--blue); font-family: var(--font-display); }
   .stats-card .count { font-size:11px; color:var(--hint); margin-top:4px; }
-  .known-client { margin-top:8px; padding:12px; background:var(--ok-bg); border:1px solid var(--ok); border-radius:10px; font-size:12px; }
-  .known-client .kc-title { color:var(--ok); font-weight:700; margin-bottom:6px; }
-  .known-client .kc-entry { padding:4px 0; border-bottom:1px dashed var(--border); }
-  .known-client .kc-entry:last-child { border-bottom:none; }
+  .known-client {
+    margin-top:12px; background:var(--card); border:2px solid #BFDBFE; border-radius:18px;
+    overflow:hidden; box-shadow: 0 6px 16px rgba(15,82,186,.08);
+  }
+  .known-client .kc-header {
+    background:linear-gradient(90deg, var(--blue), #1a6fd4); color:#fff; padding:12px 14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .known-client .kc-header i { font-size:15px; }
+  .known-client .kc-header span { font-family:var(--font-display); font-weight:700; font-style:italic; font-size:14px; text-transform:uppercase; letter-spacing:0.3px; }
+  .known-client .kc-body { padding:16px; }
+  .known-client .kc-person { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+  .known-client .kc-avatar {
+    width:58px; height:58px; border-radius:50%; background:var(--field-bg); color:var(--blue);
+    display:flex; align-items:center; justify-content:center; font-family:var(--font-display);
+    font-weight:700; font-size:22px; flex:none; border:2px solid #DBEAFE;
+  }
+  .known-client .kc-name { font-size:18px; font-weight:700; color:var(--text); line-height:1.25; }
+  .known-client .kc-meta { font-size:13px; color:var(--hint); margin-top:3px; }
+  .known-client .kc-history-label { font-size:11px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px; }
+  .known-client .kc-last-visit {
+    background:var(--field-bg); border-radius:12px; padding:11px 13px; margin-bottom:14px;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+  }
+  .known-client .kc-last-visit .kc-lv-service { font-size:14px; font-weight:700; color:var(--text); }
+  .known-client .kc-last-visit .kc-lv-date { font-size:12px; color:var(--hint); margin-top:2px; }
+  .known-client .kc-last-visit .kc-lv-cost { font-size:16px; font-weight:700; color:var(--blue); flex:none; }
+  .known-client .kc-action-btn {
+    width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, #1D4ED8 0%, #1E40AF 55%, #312E81 100%);
+    color:#fff; font-size:15px; font-weight:700; font-family:var(--font-body); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 14px rgba(29,78,216,.28);
+  }
+  .known-client .kc-action-hint { font-size:11.5px; color:var(--hint); text-align:center; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -1669,16 +1698,50 @@ async function lookupPlate() {
     if (data.car.car_brand) document.getElementById('car_brand').value = data.car.car_brand;
     document.getElementById('car_model').value = data.car.car_model || '';
 
-    const shown = data.history.slice(0, 2);
-    const historyHtml = shown.length ? shown.map(h => `
-      <div class="kc-entry">📅 ${h.change_date} — ${h.service_type || T.history_service_fallback}${h.cost ? ', ' + h.cost.toLocaleString('ru-RU') + ' ' + T.currency : ''}</div>
-    `).join('') : `<div class="kc-entry">${T.kc_no_history}</div>`;
-    const moreHint = data.history.length > 2 ? `<div class="kc-entry" style="opacity:.7;">${T.kc_more_hint}</div>` : '';
+    const name = data.car.owner_name || T.kc_no_name;
+    const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+    const carLine = [data.car.car_brand, data.car.car_model].filter(Boolean).join(' ');
+    const metaParts = [data.car.owner_phone, carLine].filter(Boolean);
 
-    panel.innerHTML = `<div class="known-client"><div class="kc-title">${T.kc_found_title}</div>${historyHtml}${moreHint}</div>`;
+    const last = data.history[0];
+    const visitCount = data.history.length;
+    const lastVisitHtml = last ? `
+      <div class="kc-last-visit">
+        <div>
+          <div class="kc-lv-service">${escapeHtml(last.service_type || T.history_service_fallback)}</div>
+          <div class="kc-lv-date">${last.change_date}${visitCount > 1 ? ` · ${T.kc_visits_total} ${visitCount}` : ''}</div>
+        </div>
+        <div class="kc-lv-cost">${last.cost ? last.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
+      </div>
+    ` : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
+
+    panel.innerHTML = `
+      <div class="known-client">
+        <div class="kc-header"><i class="fa-solid fa-circle-check"></i><span>${T.kc_found_title}</span></div>
+        <div class="kc-body">
+          <div class="kc-person">
+            <div class="kc-avatar">${escapeHtml(initials)}</div>
+            <div>
+              <div class="kc-name">${escapeHtml(name)}</div>
+              <div class="kc-meta">${escapeHtml(metaParts.join(' · '))}</div>
+            </div>
+          </div>
+          <div class="kc-history-label">${T.kc_history_label}</div>
+          ${lastVisitHtml}
+          <button type="button" class="kc-action-btn" onclick="focusNextEntry()"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
+          <div class="kc-action-hint">${T.kc_add_service_hint}</div>
+        </div>
+      </div>
+    `;
   } catch (e) {
     panel.innerHTML = '';
   }
+}
+
+function focusNextEntry() {
+  const mileage = document.getElementById('mileage');
+  mileage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  mileage.focus();
 }
 
 async function initItemForms() {
