@@ -1377,6 +1377,45 @@ def get_branch_breakdown_stats(parent_shop_id: int):
     return rows
 
 
+def get_aggregated_revenue_range(parent_shop_id: int, date_from: str, date_to: str) -> dict:
+    """Выручка за произвольный период, сложенная по главному аккаунту и всем
+    его филиалам вместе."""
+    shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
+    total, count = 0, 0
+    for sid in shop_ids:
+        r = get_revenue_range(sid, date_from, date_to)
+        total += r["total"]
+        count += r["count"]
+    return {"total": total, "count": count}
+
+
+def get_aggregated_profit_range(parent_shop_id: int, date_from: str, date_to: str) -> int:
+    """Прибыль за произвольный период, сложенная по главному аккаунту и всем
+    его филиалам вместе."""
+    shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
+    return sum(get_profit_range(sid, date_from, date_to) for sid in shop_ids)
+
+
+def get_branch_breakdown_range(parent_shop_id: int, date_from: str, date_to: str):
+    """Разбивка по каждому филиалу (и самому главному) за произвольный
+    период — та же идея, что get_branch_breakdown_stats, но не только
+    "сегодня", а любой выбранный диапазон дат."""
+    parent = get_shop(parent_shop_id)
+    branches = get_branches(parent_shop_id)
+    rows = []
+    for shop in [parent] + branches:
+        if not shop:
+            continue
+        rows.append({
+            "shop_id": shop["id"],
+            "shop_name": shop.get("shop_name") or shop["username"],
+            "is_head": shop["id"] == parent_shop_id,
+            "revenue": get_revenue_range(shop["id"], date_from, date_to),
+            "profit": get_profit_range(shop["id"], date_from, date_to),
+        })
+    return rows
+
+
 def get_branch_warehouse_summary(parent_shop_id: int):
     """По каждому филиалу — сколько товаров на складе и у скольких из них
     ещё не проставлена цена закупки. Чтобы видеть это одним взглядом, не

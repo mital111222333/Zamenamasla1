@@ -197,6 +197,7 @@ PAGE = """
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root {
     --bg: var(--tg-theme-bg-color, #F1F5F9);
@@ -552,6 +553,26 @@ PAGE = """
 
     <div id="statsBranchesView" style="display:none;">
       <div id="statsAggregated"></div>
+
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.stats_custom_title }}</label>
+        <div id="branchStatsPresets" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
+        <div class="row2">
+          <div class="field">
+            <label>{{ T.stats_from }}</label>
+            <input id="branch_stats_from" type="date">
+          </div>
+          <div class="field">
+            <label>{{ T.stats_to }}</label>
+            <input id="branch_stats_to" type="date">
+          </div>
+        </div>
+        <button class="submit" onclick="applyBranchStatsRange()">{{ T.stats_apply }}</button>
+        <div id="branchStatsRangeResult" style="margin-top:14px;"></div>
+        <div id="branchChartWrap" style="margin-top:16px; display:none;">
+          <canvas id="branchChart" height="220"></canvas>
+        </div>
+      </div>
     </div>
   </div>
   {% endif %}
@@ -1065,19 +1086,26 @@ async function loadBranchProducts(branchId) {
   const products = await (await fetch(`/api/branches/${branchId}/products`)).json();
   if (!products.length) { panel.innerHTML = `<div class="hint-text">${T.wh_no_products}</div>`; return; }
   panel.innerHTML = products.map(p => `
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
-      <span>${escapeHtml(p.name)} <span class="hint-text">(${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l})</span></span>
-      <input type="number" value="${p.purchase_price ?? ''}" placeholder="${T.wh_purchase_price}"
-             style="width:110px; padding:5px 8px; font-size:12px;"
-             onchange="setBranchPurchasePrice(${branchId}, ${p.id}, this.value)">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
+      <span style="flex:1; min-width:0;">${escapeHtml(p.name)} <span class="hint-text">(${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l})</span></span>
+      <input id="branch_price_${branchId}_${p.id}" type="number" value="${p.purchase_price ?? ''}" placeholder="${T.wh_purchase_price}"
+             style="width:100px; padding:5px 8px; font-size:12px; flex:none;">
+      <button class="badge active" style="flex:none;" onclick="setBranchPurchasePrice(${branchId}, ${p.id})">${T.branch_save_price}</button>
+      <span id="branch_price_saved_${branchId}_${p.id}" style="display:none; color:#1B8A5A; font-size:15px; flex:none;">✓</span>
     </div>
   `).join('');
 }
 
-async function setBranchPurchasePrice(branchId, productId, value) {
+async function setBranchPurchasePrice(branchId, productId) {
+  const input = document.getElementById(`branch_price_${branchId}_${productId}`);
   await fetch(`/api/branches/${branchId}/products/${productId}/purchase_price`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({purchase_price: value})
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({purchase_price: input.value})
   });
+  const check = document.getElementById(`branch_price_saved_${branchId}_${productId}`);
+  if (check) {
+    check.style.display = 'inline';
+    setTimeout(() => { check.style.display = 'none'; }, 1500);
+  }
 }
 
 function fmtDate(d) {
@@ -1141,6 +1169,101 @@ async function applyStatsRange() {
 }
 
 renderStatsPresets();
+
+function renderBranchStatsPresets() {
+  const presetsEl = document.getElementById('branchStatsPresets');
+  if (!presetsEl) return;  // подвкладка "Все филиалы" скрыта (нет филиалов) или недоступна
+  const today = new Date();
+  const presets = [
+    [T.stats_preset_today, () => setBranchStatsRange(today, today)],
+    [T.stats_preset_yesterday, () => {
+      const y = new Date(today); y.setDate(y.getDate() - 1);
+      setBranchStatsRange(y, y);
+    }],
+    [T.stats_preset_7days, () => {
+      const start = new Date(today); start.setDate(start.getDate() - 6);
+      setBranchStatsRange(start, today);
+    }],
+    [T.stats_preset_this_month, () => {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      setBranchStatsRange(start, today);
+    }],
+    [T.stats_preset_prev_month, () => {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      setBranchStatsRange(start, end);
+    }],
+  ];
+  presetsEl.innerHTML = presets.map(([label], i) =>
+    `<button class="lang-btn" onclick="BRANCH_STATS_PRESETS[${i}]()">${label}</button>`
+  ).join('');
+  window.BRANCH_STATS_PRESETS = presets.map(p => p[1]);
+  const from = document.getElementById('branch_stats_from');
+  const to = document.getElementById('branch_stats_to');
+  if (from && !from.value) from.value = fmtDate(today);
+  if (to && !to.value) to.value = fmtDate(today);
+}
+
+function setBranchStatsRange(from, to) {
+  document.getElementById('branch_stats_from').value = fmtDate(from);
+  document.getElementById('branch_stats_to').value = fmtDate(to);
+  applyBranchStatsRange();
+}
+
+async function applyBranchStatsRange() {
+  const from = document.getElementById('branch_stats_from').value;
+  const to = document.getElementById('branch_stats_to').value;
+  if (!from || !to) return;
+  const res = await fetch(`/api/aggregated_stats/range?from=${from}&to=${to}`);
+  const data = await res.json();
+  if (!data.ok) { document.getElementById('branchStatsRangeResult').innerHTML = ''; return; }
+
+  const breakdown = data.breakdown || [];
+  const breakdownRows = breakdown.map(r => `
+    <tr>
+      <td>${escapeHtml(r.shop_name)}${r.is_head ? ` <span class="hint-text">(${T.branch_head_label})</span>` : ''}</td>
+      <td>${r.revenue.total.toLocaleString('ru-RU')} ${T.currency}</td>
+      <td style="color:#1B8A5A;">${r.profit.toLocaleString('ru-RU')} ${T.currency}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('branchStatsRangeResult').innerHTML = `
+    <div class="stats-card" style="background:linear-gradient(135deg, #FFF7ED, #FEF3C7); border-color:#FDBA74; margin-bottom:14px;">
+      <div class="label">${T.stats_range_result} ${from} — ${to}</div>
+      <div class="amount" style="color:#9A3412;">${data.revenue.total.toLocaleString('ru-RU')} ${T.currency}</div>
+      <div class="count">${T.stats_services_count} ${data.revenue.count}</div>
+      <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>${T.branch_col_label}</th><th>${T.stats_revenue_label}</th><th>${T.stats_profit_label}</th></tr></thead>
+      <tbody>${breakdownRows}</tbody>
+    </table></div>
+  `;
+
+  renderBranchChart(breakdown);
+}
+
+function renderBranchChart(breakdown) {
+  const wrap = document.getElementById('branchChartWrap');
+  if (!wrap) return;
+  if (typeof Chart === 'undefined' || !breakdown.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const canvas = document.getElementById('branchChart');
+  if (window.branchChartInstance) { window.branchChartInstance.destroy(); }
+  window.branchChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: breakdown.map(r => r.shop_name),
+      datasets: [
+        { label: T.stats_revenue_label, data: breakdown.map(r => r.revenue.total), backgroundColor: '#E63946' },
+        { label: T.branch_chart_profit_label, data: breakdown.map(r => r.profit), backgroundColor: '#1B8A5A' },
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+renderBranchStatsPresets();
 
 async function switchLanguage() {
   const newLang = LANG === 'ru' ? 'uz' : 'ru';
@@ -2060,6 +2183,24 @@ def api_aggregated_stats():
     })
 
 
+@app.route("/api/aggregated_stats/range")
+@login_required
+@profit_blocked
+def api_aggregated_stats_range():
+    """То же самое, но за произвольный период — для календаря на вкладке
+    'Все филиалы', как и у собственной статистики."""
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_from) or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_to):
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+    return jsonify({
+        "ok": True,
+        "revenue": db.get_aggregated_revenue_range(g.shop_id, date_from, date_to),
+        "profit": db.get_aggregated_profit_range(g.shop_id, date_from, date_to),
+        "breakdown": db.get_branch_breakdown_range(g.shop_id, date_from, date_to),
+    })
+
+
 @app.route("/api/my_branches")
 @login_required
 @profit_blocked
@@ -2454,6 +2595,9 @@ ADMIN_PAGE = """
 
   <div class="card">
     <h3 style="margin-top:0;">Все точки</h3>
+    <div class="field">
+      <input id="shopSearch" placeholder="Поиск по названию, логину или телефону..." oninput="filterShops()">
+    </div>
     <div class="table-wrap" style="overflow-x:auto;">
     <table>
       <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th><th>Филиалы</th><th>Группа</th></tr></thead>
@@ -2479,14 +2623,31 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+let allShopsCache = [];
+
 async function loadShops() {
   const res = await fetch('/api/admin/shops');
-  const shops = await res.json();
+  allShopsCache = await res.json();
 
   // список известных групп — для автодополнения в форме создания новой точки
-  const groupNames = [...new Set(shops.map(s => s.client_group).filter(Boolean))].sort();
+  const groupNames = [...new Set(allShopsCache.map(s => s.client_group).filter(Boolean))].sort();
   document.getElementById('clientGroupsList').innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}">`).join('');
 
+  renderShopsTable(allShopsCache);
+}
+
+function filterShops() {
+  const q = document.getElementById('shopSearch').value.trim().toLowerCase();
+  if (!q) { renderShopsTable(allShopsCache); return; }
+  const filtered = allShopsCache.filter(s =>
+    (s.shop_name || '').toLowerCase().includes(q) ||
+    (s.username || '').toLowerCase().includes(q) ||
+    (s.phone || '').toLowerCase().includes(q)
+  );
+  renderShopsTable(filtered);
+}
+
+function renderShopsTable(shops) {
   // группируем: сначала точки с группой (по алфавиту группы), потом без группы
   const grouped = {};
   const standalone = [];
@@ -2538,7 +2699,7 @@ async function loadShops() {
   });
   standalone.forEach(s => html += renderShopRow(s));
 
-  document.getElementById('shops-body').innerHTML = html;
+  document.getElementById('shops-body').innerHTML = html || `<tr><td colspan="10" class="hint-text" style="padding:14px;">Ничего не найдено.</td></tr>`;
 }
 
 async function setClientGroup(shopId, value) {
