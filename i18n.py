@@ -98,6 +98,8 @@ RU = {
     "kc_visits_total": "визитов всего:",
     "kc_add_service_btn": "Добавить замену этому клиенту",
     "kc_add_service_hint": "Имя, телефон и марка уже заполнены ниже",
+    "kc_history_card_title": "Карточка клиента",
+    "kc_full_history_label": "Вся история",
 
     "field_car_brand": "Марка авто",
     "field_car_model": "Модель",
@@ -386,6 +388,8 @@ UZ = {
     "kc_visits_total": "jami tashriflar:",
     "kc_add_service_btn": "Ushbu mijozga almashtirish qo'shish",
     "kc_add_service_hint": "Ism, telefon va marka pastda allaqachon to'ldirilgan",
+    "kc_history_card_title": "Mijoz kartochkasi",
+    "kc_full_history_label": "Barcha tarix",
 
     "field_car_brand": "Avto markasi",
     "field_car_model": "Modeli",

@@ -338,7 +338,6 @@ PAGE = """
   .modal a.wa-btn { display:block; text-decoration:none; }
   .close-btn { background:transparent; border:none; color:var(--hint); font-size:14px; cursor:pointer; margin-top:6px; width:100%; padding:8px; }
   .history-toggle { background:transparent; border:none; color:var(--btn); font-size:12px; cursor:pointer; text-decoration:underline; padding:0; }
-  .history-row td { background:var(--field-bg); white-space:normal; }
   .history-entry { padding:6px 0; border-bottom:1px dashed var(--border); font-size:12px; }
   .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
   .stats-card {
@@ -381,6 +380,16 @@ PAGE = """
     display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 14px rgba(29,78,216,.28);
   }
   .known-client .kc-action-hint { font-size:11.5px; color:var(--hint); text-align:center; margin-top:8px; }
+  .kc-hist-list { margin-top:14px; }
+  .kc-hist-entry { background:var(--field-bg); border-radius:12px; padding:12px 13px; margin-bottom:8px; }
+  .kc-hist-entry .kc-he-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .kc-hist-entry .kc-he-service { font-size:14px; font-weight:700; color:var(--text); }
+  .kc-hist-entry .kc-he-date { font-size:11.5px; color:var(--hint); margin-top:2px; }
+  .kc-hist-entry .kc-he-cost { font-size:15px; font-weight:700; color:var(--blue); flex:none; white-space:nowrap; }
+  .kc-hist-entry .kc-he-meta { font-size:12px; color:var(--hint); margin-top:6px; }
+  .kc-hist-entry .kc-he-items { font-size:12px; color:var(--text); margin-top:6px; line-height:1.5; }
+  .kc-hist-entry .kc-he-notes { font-size:12px; color:var(--hint); margin-top:6px; }
+  .kc-hist-entry .kc-he-actions { margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); }
 </style>
 </head>
 <body>
@@ -518,6 +527,7 @@ PAGE = """
 
   <div id="view-table" style="display:none;">
     <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable()">
+    <div id="clientCardPanel" style="display:none; margin-bottom:12px;"></div>
     <div class="table-wrap">
       <table>
         <thead>
@@ -1821,61 +1831,83 @@ function renderTable() {
           : `<button class="badge unlinked" onclick="openModal(${escapeHtml(JSON.stringify(c.plate_number))}, ${escapeHtml(JSON.stringify(c.client_link || ''))}, ${escapeHtml(JSON.stringify(c.owner_phone || ''))})">${T.badge_unlinked_btn}</button>`}</td>
       <td><button class="history-toggle" onclick="toggleHistory('${c.plate_number}')">${T.history_more}</button></td>
     </tr>
-    <tr class="history-row" id="hist-${c.plate_number}" style="display:none;"><td colspan="12"><div id="hist-body-${c.plate_number}">${T.history_loading}</div></td></tr>
   `).join('');
 }
 
 async function toggleHistory(plate) {
-  const row = document.getElementById('hist-' + plate);
-  if (!row) return;  // строки может не быть в DOM, если фильтр поиска её скрыл
-  const isOpen = row.style.display !== 'none';
-  if (openHistoryRow && openHistoryRow !== plate) {
-    const prevRow = document.getElementById('hist-' + openHistoryRow);
-    if (prevRow) prevRow.style.display = 'none';  // прошлая открытая строка могла исчезнуть при поиске
-  }
-  if (isOpen) {
-    row.style.display = 'none';
+  const panel = document.getElementById('clientCardPanel');
+  if (openHistoryRow === plate) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
     openHistoryRow = null;
     return;
   }
-  row.style.display = '';
   openHistoryRow = plate;
+  panel.style.display = '';
+  panel.innerHTML = T.history_loading;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const res = await fetch('/api/history/' + encodeURIComponent(plate));
   const data = await res.json();
   const history = data.history || [];
   historyDataCache[plate] = history;
-  const body = document.getElementById('hist-body-' + plate);
-  const addBtnHtml = `<div style="margin-bottom:10px;"><button class="submit" style="padding:8px;" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})">${T.add_service_btn}</button></div>`;
-  if (!history.length) {
-    body.innerHTML = addBtnHtml + T.history_empty;
-    return;
-  }
-  body.innerHTML = addBtnHtml + history.map(h => {
+  const body = panel;
+
+  const car = data.car || {};
+  const name = car.owner_name || T.kc_no_name;
+  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+  const carLine = [car.car_brand, car.car_model].filter(Boolean).join(' ');
+  const metaParts = [car.owner_phone, carLine].filter(Boolean);
+
+  const entriesHtml = history.length ? history.map(h => {
     let itemsHtml = '';
     if (h.items_json) {
       try {
         const items = JSON.parse(h.items_json);
-        itemsHtml = '<div style="margin:4px 0 4px 12px;">' + items.map(it =>
-          `• ${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
+        itemsHtml = '<div class="kc-he-items">' + items.map(it =>
+          `${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
         ).join('<br>') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
     return `
-    <div class="history-entry" id="hist-entry-${h.id}">
-      📅 ${h.change_date} — ${escapeHtml(h.service_type || T.history_service_fallback)} |
-      ${T.history_mileage_label} ${h.mileage || '—'} км | ${T.history_next_mileage_label} ${h.next_mileage || '—'} км
-      ${h.cost ? ' | ' + T.history_total_label + ' ' + h.cost.toLocaleString('ru-RU') + ' ' + T.currency : ''}
-      | ${T.history_next_label} ${h.next_change_date || '—'}
+    <div class="kc-hist-entry" id="hist-entry-${h.id}">
+      <div class="kc-he-top">
+        <div>
+          <div class="kc-he-service">${escapeHtml(h.service_type || T.history_service_fallback)}</div>
+          <div class="kc-he-date">${h.change_date} · ${T.history_mileage_label} ${h.mileage || '—'} км</div>
+        </div>
+        <div class="kc-he-cost">${h.cost ? h.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
+      </div>
+      <div class="kc-he-meta">${T.history_next_mileage_label} ${h.next_mileage || '—'} км · ${T.history_next_label} ${h.next_change_date || '—'}</div>
       ${itemsHtml}
-      ${h.notes ? '<span style="color:var(--hint)">' + T.history_notes_label + ' ' + escapeHtml(h.notes) + '</span>' : ''}
-      <div style="margin-top:6px;">
+      ${h.notes ? `<div class="kc-he-notes">${T.history_notes_label} ${escapeHtml(h.notes)}</div>` : ''}
+      <div class="kc-he-actions">
         <button class="history-toggle" onclick="openEditModalById(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_edit}</button>
         &nbsp;·&nbsp;
         <button class="history-toggle" style="color:#B3241C;" onclick="deleteEntry(${h.id}, ${escapeHtml(JSON.stringify(plate))})">${T.entry_delete}</button>
       </div>
     </div>
   `;
-  }).join('');
+  }).join('') : `<div class="kc-hist-entry" style="color:var(--hint); text-align:center;">${T.history_empty}</div>`;
+
+  body.innerHTML = `
+    <div class="known-client">
+      <div class="kc-header"><i class="fa-solid fa-user"></i><span>${T.kc_history_card_title}</span></div>
+      <div class="kc-body">
+        <div class="kc-person">
+          <div class="kc-avatar">${escapeHtml(initials)}</div>
+          <div>
+            <div class="kc-name">${escapeHtml(name)}</div>
+            <div class="kc-meta">${escapeHtml(metaParts.join(' · '))}</div>
+          </div>
+        </div>
+        <button type="button" class="kc-action-btn" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
+        <div class="kc-hist-list">
+          <div class="kc-history-label">${T.kc_full_history_label} (${history.length})</div>
+          ${entriesHtml}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function escapeHtml(str) {
