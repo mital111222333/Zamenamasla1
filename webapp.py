@@ -2789,12 +2789,19 @@ async function loadBranches(shopId) {
   const res = await fetch(`/api/admin/shops/${shopId}/branches`);
   const branches = await res.json();
   const list = branches.length ? branches.map(b => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
-      <span>${escapeHtml(b.shop_name || b.username)} <span class="hint-text">(${b.username}, клиентов: ${b.client_count})</span></span>
-      <span style="display:flex; align-items:center; gap:8px;">
-        <span style="font-family:monospace;">${b.password_plain || '—'}</span>
-        <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetPassword(${b.id}, ${escapeHtml(JSON.stringify(b.username))})">сбросить</button>
-      </span>
+    <div style="padding:8px 0; border-bottom:1px dashed var(--border); font-size:13px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span>${escapeHtml(b.shop_name || b.username)} <span class="hint-text">(${b.username}, клиентов: ${b.client_count})</span></span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span style="font-family:monospace;">${b.password_plain || '—'}</span>
+          <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetPassword(${b.id}, ${escapeHtml(JSON.stringify(b.username))})">сбросить</button>
+        </span>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="badge ${b.is_active ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle', ${b.is_active ? 0 : 1})">${b.is_active ? 'активен' : 'выключен'}</button>
+        <button class="badge ${b.sms_enabled ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle_sms', ${b.sms_enabled ? 0 : 1})">SMS: ${b.sms_enabled ? 'включён' : 'выключен'}</button>
+        <button class="badge ${b.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle_warehouse', ${b.warehouse_enabled ? 0 : 1})">Склад: ${b.warehouse_enabled ? 'включён' : 'выключен'}</button>
+      </div>
     </div>
   `).join('') : `<div class="hint-text">У этой точки пока нет филиалов.</div>`;
   panel.innerHTML = `
@@ -2836,6 +2843,14 @@ async function toggleShop(id, makeActive) {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({active: !!makeActive})
   });
   loadShops();
+}
+
+async function toggleBranchField(headShopId, branchId, endpoint, value) {
+  const bodyKey = endpoint === 'toggle' ? 'active' : 'enabled';
+  await fetch(`/api/admin/shops/${branchId}/${endpoint}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({[bodyKey]: !!value})
+  });
+  loadBranches(headShopId);
 }
 
 async function toggleSms(id, makeEnabled) {
