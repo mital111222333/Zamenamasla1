@@ -601,6 +601,21 @@ PAGE = """
     </div>
 
     <div id="whOwnView">
+      {% if not is_branch %}
+      <div class="card" id="usdRateCard">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
+        <div class="row2">
+          <div class="field">
+            <label>{{ T.usd_rate_label }}</label>
+            <input id="usd_rate_input" type="number" step="0.01" placeholder="12700" value="{{ usd_rate or '' }}">
+          </div>
+        </div>
+        <button class="submit" onclick="saveUsdRate()">{{ T.usd_rate_save }}</button>
+        <div id="usdRateSaved" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
+        <p class="hint-text" style="margin-top:10px; margin-bottom:0;">{{ T.usd_rate_hint }}</p>
+      </div>
+      {% endif %}
+
       <div class="card">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_add_product }}</label>
         <div class="row2">
@@ -627,8 +642,12 @@ PAGE = """
           </div>
           <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
             <label>{{ T.wh_purchase_price }}</label>
-            <input id="wh_new_purchase_price" type="number" placeholder="30000">
+            <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd')">
           </div>
+        </div>
+        <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
+          <label>{{ T.usd_price_label }}</label>
+          <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
         </div>
         <div class="field">
           <label>{{ T.wh_initial_stock }}</label>
@@ -681,7 +700,11 @@ MODAL_AND_SCRIPT = """
     </div>
     <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
       <label>{{ T.wh_purchase_price }}</label>
-      <input id="restock_price" type="number">
+      <input id="restock_price" type="number" oninput="onSumFieldEdited('restock_price', 'restock_price_usd')">
+    </div>
+    <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
+      <label>{{ T.usd_price_label }}</label>
+      <input id="restock_price_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('restock_price_usd', 'restock_price')">
     </div>
     <div class="field">
       <label>{{ T.wh_restock_date }}</label>
@@ -778,6 +801,7 @@ const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const IS_BRANCH = {{ is_branch|tojson }};
+let USD_RATE = {{ usd_rate|tojson }};
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -921,6 +945,38 @@ function renderProductsTable() {
   }).join('');
 }
 
+function onUsdFieldEdited(usdFieldId, sumFieldId) {
+  const usdVal = parseFloat(document.getElementById(usdFieldId).value);
+  const sumField = document.getElementById(sumFieldId);
+  if (!USD_RATE || isNaN(usdVal)) return;
+  sumField.value = Math.round(usdVal * USD_RATE);
+}
+
+function onSumFieldEdited(sumFieldId, usdFieldId) {
+  // если сумма меняется вручную (не через пересчёт из $), поле $ больше не
+  // соответствует новой сумме однозначно - просто очищаем его, чтобы не
+  // вводить в заблуждение несоответствующим числом
+  const usdField = document.getElementById(usdFieldId);
+  if (usdField) usdField.value = '';
+}
+
+async function saveUsdRate() {
+  const rateInput = document.getElementById('usd_rate_input');
+  const rate = rateInput.value;
+  const res = await fetch('/api/usd_rate', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({rate})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    USD_RATE = data.rate;
+    const saved = document.getElementById('usdRateSaved');
+    saved.style.display = 'block';
+    setTimeout(() => { saved.style.display = 'none'; }, 1500);
+  } else {
+    showMsg(T.usd_rate_error || data.error, false);
+  }
+}
+
 async function createProduct() {
   const catEl = document.getElementById('wh_new_category');
   const nameEl = document.getElementById('wh_new_name');
@@ -941,7 +997,7 @@ async function createProduct() {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.wh_product_added, true);
-    ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
+    ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_purchase_usd','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('wh_new_unit_row').style.display = 'none';
     loadWarehouse();
   } else {
@@ -966,6 +1022,8 @@ function openRestockModal(id, name) {
   document.getElementById('restockModalTitle').textContent = T.wh_restock_title + ': ' + name;
   document.getElementById('restock_qty').value = '';
   document.getElementById('restock_price').value = '';
+  const restockUsd = document.getElementById('restock_price_usd');
+  if (restockUsd) restockUsd.value = '';
   document.getElementById('restock_date').value = fmtDate(new Date());
   document.getElementById('restockModal').classList.add('open');
 }
@@ -1086,12 +1144,18 @@ async function loadBranchProducts(branchId) {
   const products = await (await fetch(`/api/branches/${branchId}/products`)).json();
   if (!products.length) { panel.innerHTML = `<div class="hint-text">${T.wh_no_products}</div>`; return; }
   panel.innerHTML = products.map(p => `
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
-      <span style="flex:1; min-width:0;">${escapeHtml(p.name)} <span class="hint-text">(${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l})</span></span>
-      <input id="branch_price_${branchId}_${p.id}" type="number" value="${p.purchase_price ?? ''}" placeholder="${T.wh_purchase_price}"
-             style="width:100px; padding:5px 8px; font-size:12px; flex:none;">
-      <button class="badge active" style="flex:none;" onclick="setBranchPurchasePrice(${branchId}, ${p.id})">${T.branch_save_price}</button>
-      <span id="branch_price_saved_${branchId}_${p.id}" style="display:none; color:#1B8A5A; font-size:15px; flex:none;">✓</span>
+    <div style="padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
+      <div>${escapeHtml(p.name)} <span class="hint-text">(${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l})</span></div>
+      <div style="display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap;">
+        <input id="branch_price_${branchId}_${p.id}" type="number" value="${p.purchase_price ?? ''}" placeholder="${T.wh_purchase_price}"
+               style="width:100px; padding:5px 8px; font-size:12px; flex:none;"
+               oninput="onSumFieldEdited('branch_price_${branchId}_${p.id}', 'branch_price_usd_${branchId}_${p.id}')">
+        <input id="branch_price_usd_${branchId}_${p.id}" type="number" step="0.01" placeholder="$"
+               style="width:80px; padding:5px 8px; font-size:12px; flex:none;"
+               oninput="onUsdFieldEdited('branch_price_usd_${branchId}_${p.id}', 'branch_price_${branchId}_${p.id}')">
+        <button class="badge active" style="flex:none;" onclick="setBranchPurchasePrice(${branchId}, ${p.id})">${T.branch_save_price}</button>
+        <span id="branch_price_saved_${branchId}_${p.id}" style="display:none; color:#1B8A5A; font-size:15px; flex:none;">✓</span>
+      </div>
     </div>
   `).join('');
 }
@@ -2007,6 +2071,7 @@ def index():
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         is_employee=g.is_employee,
         is_branch=g.is_branch,
+        usd_rate=shop.get("usd_rate") if shop else None,
     )
 
 
@@ -2019,6 +2084,23 @@ def api_set_language():
         return jsonify({"ok": False, "error": "invalid language"}), 400
     db.set_shop_language(g.shop_id, lang)
     return jsonify({"ok": True})
+
+
+@app.route("/api/usd_rate", methods=["POST"])
+@login_required
+@profit_blocked
+def api_set_usd_rate():
+    """Владелец точки/главный аккаунт сам выставляет свой курс доллара —
+    сотруднику и филиалу это не нужно (они не вписывают цену закупки)."""
+    data = request.get_json(force=True)
+    try:
+        rate = float(data.get("rate")) if data.get("rate") not in (None, "") else None
+        if rate is not None and rate <= 0:
+            raise ValueError()
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "укажите положительное число"}), 400
+    db.set_shop_usd_rate(g.shop_id, rate)
+    return jsonify({"ok": True, "rate": rate})
 
 
 @app.route("/api/cars")

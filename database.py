@@ -96,6 +96,7 @@ def init_db():
             warehouse_enabled INTEGER DEFAULT 0,
             client_group TEXT,
             parent_shop_id INTEGER,
+            usd_rate REAL,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -228,6 +229,7 @@ def _migrate(conn):
         "warehouse_enabled": "INTEGER DEFAULT 0",
         "client_group": "TEXT",
         "parent_shop_id": "INTEGER",
+        "usd_rate": "REAL",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
@@ -446,6 +448,15 @@ def set_shop_client_group(shop_id: int, client_group: str):
     Пустая строка снимает группировку (точка снова отдельная)."""
     with get_conn() as conn:
         conn.execute("UPDATE shops SET client_group=? WHERE id=?", (client_group or None, shop_id))
+        conn.commit()
+
+
+def set_shop_usd_rate(shop_id: int, rate):
+    """Владелец точки (или главный аккаунт) сам выставляет свой курс доллара
+    — используется только для перевода при вводе цены закупки в $, ничего
+    не пересчитывает задним числом для уже сохранённых товаров."""
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET usd_rate=? WHERE id=?", (rate, shop_id))
         conn.commit()
 
 
