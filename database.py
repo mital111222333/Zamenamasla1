@@ -1428,19 +1428,26 @@ def get_branch_breakdown_range(parent_shop_id: int, date_from: str, date_to: str
 
 
 def get_branch_warehouse_summary(parent_shop_id: int):
-    """По каждому филиалу — сколько товаров на складе и у скольких из них
-    ещё не проставлена цена закупки. Чтобы видеть это одним взглядом, не
-    заходя по очереди в склад каждого филиала."""
+    """По каждому филиалу — сколько товаров на складе, у скольких из них
+    ещё не проставлена цена закупки, и общая стоимость остатка по цене
+    закупки (товары без цены в неё просто не входят — их стоимость пока
+    неизвестна). Чтобы видеть это одним взглядом, не заходя по очереди в
+    склад каждого филиала."""
     branches = get_branches(parent_shop_id)
     result = []
     for b in branches:
         products = list_products(b["id"])
         missing = sum(1 for p in products if p.get("purchase_price") is None)
+        stock_value = sum(
+            p["stock_qty"] * p["purchase_price"]
+            for p in products if p.get("purchase_price") is not None
+        )
         result.append({
             "id": b["id"],
             "shop_name": b.get("shop_name") or b["username"],
             "product_count": len(products),
             "missing_price_count": missing,
+            "stock_value": stock_value,
         })
     return result
 

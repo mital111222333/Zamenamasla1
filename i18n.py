@@ -69,6 +69,9 @@ RU = {
     "usd_rate_hint": "Действует с этого момента — на уже добавленные товары не влияет. Если завтра измените курс, новые товары будут пересчитываться уже по новому курсу.",
     "usd_price_label": "Цена в $",
     "usd_rate_error": "Не удалось сохранить курс",
+    "branch_stock_value": "Стоимость остатка (закупка):",
+    "wh_stock_value_label": "Стоимость остатка склада (по цене закупки):",
+
 
     "branch_products_count": "товаров:",
     "branch_missing_price": "без цены закупки:",
@@ -349,6 +352,9 @@ UZ = {
     "usd_rate_hint": "Hozirdan boshlab amal qiladi — qo'shilgan mahsulotlarga ta'sir qilmaydi. Ertaga kursni o'zgartirsangiz, yangi mahsulotlar yangi kurs bo'yicha hisoblanadi.",
     "usd_price_label": "$ dagi narx",
     "usd_rate_error": "Kursni saqlab bo'lmadi",
+    "branch_stock_value": "Qoldiq qiymati (sotib olish):",
+    "wh_stock_value_label": "Ombor qoldig'ining qiymati (sotib olish narxida):",
+
 
     "branch_products_count": "mahsulotlar:",
     "branch_missing_price": "narxsiz:",

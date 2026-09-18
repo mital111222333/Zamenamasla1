@@ -658,6 +658,9 @@ PAGE = """
 
       <div class="card" style="margin-top:14px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_products_title }}</label>
+        {% if not is_branch %}
+        <div id="whStockValue" class="hint-text" style="margin-bottom:10px;"></div>
+        {% endif %}
         <div class="table-wrap" style="overflow-x:auto;">
           <table>
             <thead><tr>
@@ -897,9 +900,12 @@ async function loadWarehouse() {
           `<option value="">${T.branch_prices_pick}</option>` +
           branches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
         document.getElementById('branchWarehouseSummary').innerHTML = branches.map(b => `
-          <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px dashed var(--border);">
-            <span>${escapeHtml(b.shop_name || b.username)}</span>
-            <span>${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}</span>
+          <div style="padding:6px 0; font-size:12px; border-bottom:1px dashed var(--border);">
+            <div style="display:flex; justify-content:space-between;">
+              <span>${escapeHtml(b.shop_name || b.username)}</span>
+              <span>${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}</span>
+            </div>
+            <div style="color:#9A3412; font-weight:600; margin-top:2px;">${T.branch_stock_value} ${b.stock_value.toLocaleString('ru-RU')} ${T.currency}</div>
           </div>
         `).join('');
       } else {
@@ -921,6 +927,16 @@ function renderProductsTable() {
   const body = document.getElementById('products-body');
   if (!body) return;
   const colCount = IS_BRANCH ? 5 : 6;
+
+  const valueEl = document.getElementById('whStockValue');
+  if (valueEl) {
+    const totalValue = productsCache.reduce((sum, p) =>
+      sum + (p.purchase_price != null ? p.stock_qty * p.purchase_price : 0), 0);
+    const missingCount = productsCache.filter(p => p.purchase_price == null).length;
+    valueEl.innerHTML = `${T.wh_stock_value_label} <b style="color:#9A3412;">${totalValue.toLocaleString('ru-RU')} ${T.currency}</b>` +
+      (missingCount > 0 ? ` <span style="color:#B3241C;">(⚠️ ${T.branch_missing_price} ${missingCount})</span>` : '');
+  }
+
   if (!productsCache.length) {
     body.innerHTML = `<tr><td colspan="${colCount}">${T.wh_no_products}</td></tr>`;
     return;
@@ -2294,10 +2310,11 @@ def api_my_branches():
     summary = {s["id"]: s for s in db.get_branch_warehouse_summary(g.shop_id)}
     result = []
     for b in branches:
-        s = summary.get(b["id"], {"product_count": 0, "missing_price_count": 0})
+        s = summary.get(b["id"], {"product_count": 0, "missing_price_count": 0, "stock_value": 0})
         result.append({
             "id": b["id"], "shop_name": b["shop_name"], "username": b["username"],
             "product_count": s["product_count"], "missing_price_count": s["missing_price_count"],
+            "stock_value": s.get("stock_value", 0),
         })
     return jsonify(result)
 
