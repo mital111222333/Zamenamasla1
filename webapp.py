@@ -379,17 +379,44 @@ PAGE = """
   .known-client .kc-history-label { font-size:11px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px; }
   .known-client .kc-last-visit {
     background:var(--field-bg); border-radius:12px; padding:11px 13px; margin-bottom:14px;
-    display:flex; justify-content:space-between; align-items:center; gap:8px;
   }
+  .known-client .kc-last-visit .kc-lv-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .known-client .kc-last-visit .kc-lv-service { font-size:14px; font-weight:700; color:var(--text); }
   .known-client .kc-last-visit .kc-lv-date { font-size:12px; color:var(--hint); margin-top:2px; }
   .known-client .kc-last-visit .kc-lv-cost { font-size:16px; font-weight:700; color:var(--blue); flex:none; }
+  .known-client .kc-lv-items { margin-top:9px; padding-top:9px; border-top:1px dashed var(--border); }
+  .known-client .kc-lv-item {
+    display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
+    padding:3px 0;
+  }
+  .known-client .kc-lv-item span:last-child { color:var(--hint); flex:none; }
   .known-client .kc-action-btn {
     width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, #1D4ED8 0%, #1E40AF 55%, #312E81 100%);
     color:#fff; font-size:15px; font-weight:700; font-family:var(--font-body); cursor:pointer;
     display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 14px rgba(29,78,216,.28);
   }
   .known-client .kc-action-hint { font-size:11.5px; color:var(--hint); text-align:center; margin-top:8px; }
+  .car-card {
+    background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:14px;
+    margin-bottom:10px; cursor:pointer; transition:border-color .12s, box-shadow .12s;
+  }
+  .car-card:active { border-color:var(--blue); box-shadow:0 2px 10px rgba(15,82,186,.1); }
+  .car-card .cc-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; gap:8px; }
+  .car-card .cc-plate {
+    font-family:var(--font-mono); font-weight:700; font-size:14.5px; letter-spacing:0.5px; color:var(--blue);
+    background:var(--field-bg); padding:3px 9px; border-radius:7px; flex:none;
+  }
+  .car-card .cc-linkbtn { flex:none; }
+  .car-card .cc-owner { font-size:15px; font-weight:700; color:var(--text); }
+  .car-card .cc-meta { font-size:12.5px; color:var(--hint); margin-top:2px; }
+  .car-card .cc-bottom {
+    display:flex; justify-content:space-between; align-items:center; margin-top:10px;
+    padding-top:10px; border-top:1px dashed var(--border);
+  }
+  .car-card .cc-cost { font-size:15px; font-weight:700; color:var(--blue); }
+  .car-card .cc-cost-date { font-size:11px; color:var(--hint); font-weight:400; }
+  .car-card .cc-next { font-size:11.5px; color:var(--hint); text-align:right; }
+  .car-card .cc-chevron { color:var(--hint); font-size:13px; flex:none; }
   .kc-hist-list { margin-top:14px; }
   .kc-hist-entry { background:var(--field-bg); border-radius:12px; padding:12px 13px; margin-bottom:8px; }
   .kc-hist-entry .kc-he-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -539,17 +566,7 @@ PAGE = """
   <div id="view-table" style="display:none;">
     <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable()">
     <div id="clientCardPanel" style="display:none; margin-bottom:12px;"></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>{{ T.th_plate }}</th><th>{{ T.th_owner }}</th><th>{{ T.th_phone }}</th><th>{{ T.th_car }}</th>
-            <th>{{ T.th_last_change }}</th><th>{{ T.th_mileage }}</th><th>{{ T.th_next_mileage }}</th><th>{{ T.th_service }}</th><th>{{ T.th_total }}</th><th>{{ T.th_next_change }}</th><th>{{ T.th_client }}</th><th>{{ T.th_history }}</th>
-          </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-      </table>
-    </div>
+    <div id="table-body"></div>
   </div>
 
   <div id="view-broadcast" class="card" style="display:none;">
@@ -1768,13 +1785,25 @@ async function lookupPlate() {
 
     const last = data.history[0];
     const visitCount = data.history.length;
+    let lastItemsHtml = '';
+    if (last && last.items_json) {
+      try {
+        const items = JSON.parse(last.items_json);
+        lastItemsHtml = '<div class="kc-lv-items">' + items.map(it =>
+          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}</span><span>${it.total.toLocaleString('ru-RU')} ${T.currency}</span></div>`
+        ).join('') + '</div>';
+      } catch (e) { /* старая запись без items_json — просто не показываем разбивку */ }
+    }
     const lastVisitHtml = last ? `
       <div class="kc-last-visit">
-        <div>
-          <div class="kc-lv-service">${escapeHtml(last.service_type || T.history_service_fallback)}</div>
-          <div class="kc-lv-date">${last.change_date}${visitCount > 1 ? ` · ${T.kc_visits_total} ${visitCount}` : ''}</div>
+        <div class="kc-lv-top">
+          <div>
+            <div class="kc-lv-service">${escapeHtml(last.service_type || T.history_service_fallback)}</div>
+            <div class="kc-lv-date">${last.change_date}${visitCount > 1 ? ` · ${T.kc_visits_total} ${visitCount}` : ''}</div>
+          </div>
+          <div class="kc-lv-cost">${last.cost ? last.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
         </div>
-        <div class="kc-lv-cost">${last.cost ? last.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
+        ${lastItemsHtml}
       </div>
     ` : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
 
@@ -1867,24 +1896,26 @@ function renderTable() {
   const rows = carsCache.filter(c =>
     (c.plate_number || '').toLowerCase().includes(q) || (c.owner_name || '').toLowerCase().includes(q)
   );
-  document.getElementById('table-body').innerHTML = rows.map((c, i) => `
-    <tr>
-      <td><b>${c.plate_number}</b></td>
-      <td>${c.owner_name || ''}</td>
-      <td>${c.owner_phone || ''}</td>
-      <td>${(c.car_brand || '')} ${(c.car_model || '')}</td>
-      <td>${c.change_date || '—'}</td>
-      <td>${c.mileage || '—'}</td>
-      <td>${c.next_mileage || '—'}</td>
-      <td>${c.service_type || '—'}</td>
-      <td>${c.cost ? c.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
-      <td>${c.next_change_date || '—'}</td>
-      <td>${c.telegram_id
-          ? `<span class="badge linked">${T.badge_linked}</span>`
-          : `<button class="badge unlinked" onclick="openModal(${escapeHtml(JSON.stringify(c.plate_number))}, ${escapeHtml(JSON.stringify(c.client_link || ''))}, ${escapeHtml(JSON.stringify(c.owner_phone || ''))})">${T.badge_unlinked_btn}</button>`}</td>
-      <td><button class="history-toggle" onclick="toggleHistory('${c.plate_number}')">${T.history_more}</button></td>
-    </tr>
-  `).join('');
+  document.getElementById('table-body').innerHTML = rows.length ? rows.map((c, i) => `
+    <div class="car-card" onclick="toggleHistory(${escapeHtml(JSON.stringify(c.plate_number))})">
+      <div class="cc-top">
+        <span class="cc-plate">${escapeHtml(c.plate_number)}</span>
+        ${c.telegram_id
+            ? `<span class="badge linked cc-linkbtn">${T.badge_linked}</span>`
+            : `<button class="badge unlinked cc-linkbtn" onclick="event.stopPropagation(); openModal(${escapeHtml(JSON.stringify(c.plate_number))}, ${escapeHtml(JSON.stringify(c.client_link || ''))}, ${escapeHtml(JSON.stringify(c.owner_phone || ''))})">${T.badge_unlinked_btn}</button>`}
+      </div>
+      <div class="cc-owner">${escapeHtml(c.owner_name || T.kc_no_name)}</div>
+      <div class="cc-meta">${escapeHtml([c.owner_phone, [c.car_brand, c.car_model].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div>
+      <div class="cc-bottom">
+        <div>
+          <div class="cc-cost">${c.cost ? c.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
+          <div class="cc-cost-date">${c.change_date || '—'}</div>
+        </div>
+        <div class="cc-next">${T.th_next_change}<br>${c.next_change_date || '—'}</div>
+        <i class="fa-solid fa-chevron-right cc-chevron"></i>
+      </div>
+    </div>
+  `).join('') : `<div class="hint-text" style="text-align:center; padding:20px;">${T.table_empty}</div>`;
 }
 
 async function toggleHistory(plate) {

@@ -148,6 +148,7 @@ RU = {
 
     # --- Таблица «База» ---
     "search_ph": "Поиск по госномеру или имени...",
+    "table_empty": "Ничего не найдено.",
     "th_plate": "Госномер",
     "th_owner": "Владелец",
     "th_phone": "Телефон",
@@ -437,6 +438,7 @@ UZ = {
     "msg_error": "Xato:",
 
     "search_ph": "Davlat raqami yoki ism bo'yicha qidirish...",
+    "table_empty": "Hech narsa topilmadi.",
     "th_plate": "Davlat raqami",
     "th_owner": "Egasi",
     "th_phone": "Telefon",
