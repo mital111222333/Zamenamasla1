@@ -183,6 +183,35 @@ def init_db():
         )
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS installment_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            car_id INTEGER NOT NULL,
+            oil_change_id INTEGER,
+            total_amount INTEGER NOT NULL,
+            paid_amount INTEGER NOT NULL DEFAULT 0,
+            installment_amount INTEGER NOT NULL,
+            interval_days INTEGER NOT NULL,
+            next_due_date TEXT NOT NULL,
+            last_reminder_date TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (car_id) REFERENCES cars(id)
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS installment_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            paid_date TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (plan_id) REFERENCES installment_plans(id)
+        )
+        """)
+
         # --- индексы на часто используемые поля — чтобы поиск оставался
         # быстрым по мере роста числа точек, клиентов и записей. Безопасно
         # выполнять при каждом запуске (IF NOT EXISTS) и на уже существующих
@@ -194,6 +223,9 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_status_next ON oil_changes(status, next_change_date)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_broadcasts_shop ON broadcasts(shop_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop ON shop_users(shop_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_plans_shop ON installment_plans(shop_id, status)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_plans_due ON installment_plans(status, next_due_date)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_payments_plan ON installment_payments(plan_id)")
 
         conn.commit()
         _migrate(conn)
@@ -1120,6 +1152,124 @@ def delete_oil_change(oc_id: int, shop_id: int):
                 conn.execute("UPDATE oil_changes SET status='active' WHERE id=?", (next_row["id"],))
         conn.commit()
     return True
+
+
+def create_installment_plan(shop_id: int, car_id: int, total_amount: int, installment_amount: int,
+                             interval_days: int, oil_change_id: int = None):
+    """Оформляет остаток суммы в рассрочку — первый платёж ожидается через
+    interval_days от сегодня. Возвращает созданный план."""
+    next_due = (datetime.now() + timedelta(days=interval_days)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO installment_plans
+                (shop_id, car_id, oil_change_id, total_amount, paid_amount, installment_amount,
+                 interval_days, next_due_date, status)
+            VALUES (?, ?, ?, ?, 0, ?, ?, ?, 'active')
+        """, (shop_id, car_id, oil_change_id, total_amount, installment_amount, interval_days, next_due))
+        conn.commit()
+        return get_installment_plan(cur.lastrowid, shop_id)
+
+
+def get_installment_plan(plan_id: int, shop_id: int):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM installment_plans WHERE id=? AND shop_id=?", (plan_id, shop_id)).fetchone()
+        return dict(row) if row else None
+
+
+def get_active_debts(shop_id: int):
+    """Все непогашенные долги этой точки — с именем клиента, машиной и
+    остатком, для вкладки 'Долги'. Просроченные (next_due_date в прошлом)
+    помечаются отдельным полем is_overdue."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT ip.*, c.plate_number, c.car_brand, c.car_model,
+                   cl.full_name as owner_name, cl.phone as owner_phone, cl.telegram_id
+            FROM installment_plans ip
+            JOIN cars c ON c.id = ip.car_id
+            JOIN clients cl ON cl.id = c.client_id
+            WHERE ip.shop_id=? AND ip.status='active'
+            ORDER BY ip.next_due_date ASC
+        """, (shop_id,)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["remaining"] = d["total_amount"] - d["paid_amount"]
+            d["is_overdue"] = d["next_due_date"] < today
+            result.append(d)
+        return result
+
+
+def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None):
+    """Отмечает поступивший платёж по долгу — увеличивает paid_amount,
+    сдвигает следующую дату на interval_days вперёд, и закрывает план,
+    если долг полностью погашен. Возвращает обновлённый план или None,
+    если план не найден (или принадлежит другой точке)."""
+    plan = get_installment_plan(plan_id, shop_id)
+    if not plan:
+        return None
+    paid_date = paid_date or datetime.now().strftime("%Y-%m-%d")
+    new_paid = plan["paid_amount"] + amount
+    new_status = "completed" if new_paid >= plan["total_amount"] else "active"
+    next_due = (datetime.strptime(plan["next_due_date"], "%Y-%m-%d") + timedelta(days=plan["interval_days"])).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO installment_payments (plan_id, amount, paid_date) VALUES (?, ?, ?)",
+            (plan_id, amount, paid_date)
+        )
+        conn.execute(
+            "UPDATE installment_plans SET paid_amount=?, next_due_date=?, status=? WHERE id=?",
+            (new_paid, next_due, new_status, plan_id)
+        )
+        conn.commit()
+    return get_installment_plan(plan_id, shop_id)
+
+
+def get_installment_payments(plan_id: int, shop_id: int):
+    """История платежей по конкретному плану — только если план
+    принадлежит указанной точке."""
+    if not get_installment_plan(plan_id, shop_id):
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM installment_payments WHERE plan_id=? ORDER BY paid_date DESC, id DESC", (plan_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_due_installment_reminders():
+    """Для фонового задания бота — все активные планы по ВСЕМ точкам, чей
+    следующий платёж наступил или просрочен, и сегодня ещё не напоминали.
+    Возвращает данные клиента/владельца точки, нужные для отправки
+    напоминания в Telegram."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT ip.*, c.plate_number, cl.full_name as owner_name, cl.telegram_id,
+                   s.notify_telegram_id, s.shop_name, s.language
+            FROM installment_plans ip
+            JOIN cars c ON c.id = ip.car_id
+            JOIN clients cl ON cl.id = c.client_id
+            JOIN shops s ON s.id = ip.shop_id
+            WHERE ip.status='active' AND ip.next_due_date <= ?
+              AND (ip.last_reminder_date IS NULL OR ip.last_reminder_date != ?)
+        """, (today, today)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["remaining"] = d["total_amount"] - d["paid_amount"]
+            d["is_overdue"] = d["next_due_date"] < today
+            result.append(d)
+        return result
+
+
+def mark_installment_reminded(plan_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE installment_plans SET last_reminder_date=? WHERE id=?",
+            (datetime.now().strftime("%Y-%m-%d"), plan_id)
+        )
+        conn.commit()
 
 
 def get_due_reminders():

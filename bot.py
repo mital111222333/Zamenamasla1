@@ -599,6 +599,41 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
         # (не отмечаем как отправленное — вдруг клиент привяжет Telegram позже)
 
 
+async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYPE):
+    """Напоминания о платежах по рассрочке — клиенту, если он привязан к
+    боту, иначе владельцу точки (в его уведомления), чтобы напомнил сам."""
+    due = db.get_due_installment_reminders()
+    for plan in due:
+        lang = plan.get("language") or "ru"
+        shop_name = plan.get("shop_name") or SHOP_NAME
+        amount = plan["installment_amount"]
+        remaining = plan["remaining"]
+        sent = False
+
+        if plan.get("telegram_id"):
+            text = i18n.t("debt_reminder_client", lang, plate=plan["plate_number"], shop=shop_name,
+                           amount=f"{amount:,}".replace(",", " "), remaining=f"{remaining:,}".replace(",", " "))
+            try:
+                await context.bot.send_message(chat_id=plan["telegram_id"], text=text)
+                sent = True
+            except Exception as e:
+                logger.error(f"Не удалось отправить напоминание о рассрочке {plan['id']} клиенту: {e}")
+
+        if not sent and plan.get("notify_telegram_id"):
+            text = i18n.t("debt_reminder_owner", lang, plate=plan["plate_number"],
+                           amount=f"{amount:,}".replace(",", " "), remaining=f"{remaining:,}".replace(",", " "))
+            try:
+                await context.bot.send_message(chat_id=plan["notify_telegram_id"], text=text)
+                sent = True
+            except Exception as e:
+                logger.error(f"Не удалось отправить напоминание о рассрочке {plan['id']} владельцу: {e}")
+
+        if sent:
+            db.mark_installment_reminded(plan["id"])
+        # иначе — ни клиент не привязан, ни у владельца не настроены уведомления,
+        # пропускаем без отметки (попробуем снова завтра)
+
+
 def main():
     db.init_db()
     webapp.run_webapp_in_thread()  # веб-панель поднимается в этом же процессе
@@ -653,6 +688,7 @@ def main():
 
     job_queue = app.job_queue
     job_queue.run_repeating(check_and_send_reminders, interval=6 * 3600, first=10)
+    job_queue.run_repeating(check_and_send_installment_reminders, interval=6 * 3600, first=20)
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)
 
     logger.info("Бот и веб-панель запущены...")

@@ -417,6 +417,15 @@ PAGE = """
   .car-card .cc-cost-date { font-size:11px; color:var(--hint); font-weight:400; }
   .car-card .cc-next { font-size:11.5px; color:var(--hint); text-align:right; }
   .car-card .cc-chevron { color:var(--hint); font-size:13px; flex:none; }
+  .debt-card { background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:14px; margin-bottom:10px; }
+  .debt-card.overdue { border-color:#F87171; background:linear-gradient(135deg, #FFFFFF, #FEF2F2); }
+  .debt-card .dc-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .debt-card .dc-owner { font-size:15px; font-weight:700; color:var(--text); }
+  .debt-card .dc-meta { font-size:12.5px; color:var(--hint); margin-top:2px; }
+  .debt-card .dc-remaining { font-size:18px; font-weight:700; color:var(--btn); font-family:var(--font-mono); text-align:right; }
+  .debt-card .dc-due { font-size:11.5px; color:var(--hint); margin-top:2px; text-align:right; }
+  .debt-card .dc-due.overdue-text { color:#B3241C; font-weight:700; }
+  .debt-card .dc-pay-row { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
   .kc-hist-list { margin-top:14px; }
   .kc-hist-entry { background:var(--field-bg); border-radius:12px; padding:12px 13px; margin-bottom:8px; }
   .kc-hist-entry .kc-he-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -449,6 +458,7 @@ PAGE = """
   <div class="tabs">
     <div class="tab active" id="tab-add" onclick="showTab('add')"><span class="tab-icon"><i class="fa-solid fa-oil-can"></i></span><span>{{ T.tab_add }}</span></div>
     <div class="tab" id="tab-table" onclick="showTab('table')"><span class="tab-icon"><i class="fa-solid fa-car"></i></span><span>{{ T.tab_table }}</span></div>
+    <div class="tab" id="tab-debts" onclick="showTab('debts')"><span class="tab-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span><span>{{ T.tab_debts }}</span></div>
     <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')"><span class="tab-icon"><i class="fa-solid fa-bullhorn"></i></span><span>{{ T.tab_broadcast }}</span></div>
     {% if not is_employee %}
     <div class="tab" id="tab-export" onclick="showTab('export')"><span class="tab-icon"><i class="fa-solid fa-file-arrow-down"></i></span><span>{{ T.tab_export }}</span></div>
@@ -558,6 +568,26 @@ PAGE = """
           <input id="pay_card" type="number" placeholder="0" oninput="onPayCardInput()">
         </div>
       </div>
+      <div class="checkbox-row" style="margin-top:10px; cursor:pointer;" onclick="document.getElementById('debt_enabled').click()">
+        <input type="checkbox" id="debt_enabled" onchange="toggleDebtSection()" onclick="event.stopPropagation()">
+        <label style="margin:0; cursor:pointer;">{{ T.debt_enable_label }}</label>
+      </div>
+      <div id="debtFields" style="display:none; margin-top:10px; padding:12px; background:var(--card); border:1.5px dashed var(--border); border-radius:10px;">
+        <div class="field">
+          <label style="font-size:11px;">{{ T.debt_remaining_label }}</label>
+          <div id="debtRemaining" style="font-size:18px; font-weight:700; color:var(--btn); font-family:var(--font-mono);">0</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label style="font-size:11px;">{{ T.debt_installment_amount }}</label>
+            <input id="debt_installment_amount" type="number" placeholder="100000">
+          </div>
+          <div class="field">
+            <label style="font-size:11px;">{{ T.debt_interval_days }}</label>
+            <input id="debt_interval_days" type="number" placeholder="14">
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="field" style="margin-top:14px;">
@@ -581,6 +611,10 @@ PAGE = """
     <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable()">
     <div id="clientCardPanel" style="display:none; margin-bottom:12px;"></div>
     <div id="table-body"></div>
+  </div>
+
+  <div id="view-debts" style="display:none;">
+    <div id="debtsList"></div>
   </div>
 
   <div id="view-broadcast" class="card" style="display:none;">
@@ -910,9 +944,11 @@ let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы к�
 function showTab(t) {
   document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
+  document.getElementById('view-debts').style.display = t === 'debts' ? 'block' : 'none';
   document.getElementById('view-broadcast').style.display = t === 'broadcast' ? 'block' : 'none';
   document.getElementById('tab-add').classList.toggle('active', t === 'add');
   document.getElementById('tab-table').classList.toggle('active', t === 'table');
+  document.getElementById('tab-debts').classList.toggle('active', t === 'debts');
   document.getElementById('tab-broadcast').classList.toggle('active', t === 'broadcast');
   const exportView = document.getElementById('view-export');
   const exportTab = document.getElementById('tab-export');
@@ -931,6 +967,7 @@ function showTab(t) {
   if (whView) whView.style.display = t === 'warehouse' ? 'block' : 'none';
   if (whTab) whTab.classList.toggle('active', t === 'warehouse');
   if (t === 'table') loadCars();
+  if (t === 'debts') loadDebts();
   if (t === 'broadcast') loadBroadcastInfo();
   if (t === 'stats') loadStats();
   if (t === 'warehouse') loadWarehouse();
@@ -1745,20 +1782,53 @@ function updateTotal() {
     payCash.value = total || '';
     payCard.value = '';
   }
+  updateDebtRemaining();
 }
 
 function onPayCashInput() {
   paymentSplitTouched = true;
-  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
-  const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
-  document.getElementById('pay_card').value = Math.max(0, Math.round(total - cash));
+  const debtEnabled = document.getElementById('debt_enabled').checked;
+  if (!debtEnabled) {
+    const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+    const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
+    document.getElementById('pay_card').value = Math.max(0, Math.round(total - cash));
+  }
+  updateDebtRemaining();
 }
 
 function onPayCardInput() {
   paymentSplitTouched = true;
+  const debtEnabled = document.getElementById('debt_enabled').checked;
+  if (!debtEnabled) {
+    const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+    const card = parseFloat(document.getElementById('pay_card').value) || 0;
+    document.getElementById('pay_cash').value = Math.max(0, Math.round(total - card));
+  }
+  updateDebtRemaining();
+}
+
+function updateDebtRemaining() {
+  const debtEl = document.getElementById('debtRemaining');
+  if (!debtEl) return;
   const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
   const card = parseFloat(document.getElementById('pay_card').value) || 0;
-  document.getElementById('pay_cash').value = Math.max(0, Math.round(total - card));
+  const remaining = Math.max(0, Math.round(total - cash - card));
+  debtEl.textContent = remaining.toLocaleString('ru-RU') + ' ' + T.currency;
+}
+
+function toggleDebtSection() {
+  const enabled = document.getElementById('debt_enabled').checked;
+  document.getElementById('debtFields').style.display = enabled ? 'block' : 'none';
+  if (!enabled) {
+    // выключили - возвращаем обычное поведение (наличные/карта снова = вся сумма)
+    paymentSplitTouched = false;
+    updateTotal();
+    document.getElementById('debt_installment_amount').value = '';
+    document.getElementById('debt_interval_days').value = '';
+  } else {
+    updateDebtRemaining();
+  }
 }
 
 function resetItemInputs() {
@@ -1906,6 +1976,7 @@ async function submitCar() {
   const items = collectItems();
   const payCashEl = document.getElementById('pay_cash');
   const payCardEl = document.getElementById('pay_card');
+  const debtEnabled = document.getElementById('debt_enabled') && document.getElementById('debt_enabled').checked;
   const payload = {
     plate: document.getElementById('plate').value.trim(),
     owner_name: document.getElementById('owner_name').value.trim(),
@@ -1921,6 +1992,18 @@ async function submitCar() {
     cash_amount: payCashEl ? payCashEl.value : null,
     card_amount: payCardEl ? payCardEl.value : null,
   };
+  if (debtEnabled) {
+    const total = items.reduce((sum, i) => sum + i.total, 0);
+    const cash = parseFloat(payCashEl.value) || 0;
+    const card = parseFloat(payCardEl.value) || 0;
+    payload.debt_amount = Math.max(0, Math.round(total - cash - card));
+    payload.installment_amount = document.getElementById('debt_installment_amount').value;
+    payload.interval_days = document.getElementById('debt_interval_days').value;
+    if (payload.debt_amount > 0 && (!payload.installment_amount || !payload.interval_days)) {
+      showMsg(T.debt_fill_required, false);
+      return;
+    }
+  }
   if (!payload.plate || !payload.owner_name || !payload.interval_value) {
     showMsg(T.msg_fill_required, false);
     return;
@@ -1940,6 +2023,13 @@ async function submitCar() {
     const payCard = document.getElementById('pay_card');
     if (payCash) payCash.value = '';
     if (payCard) payCard.value = '';
+    const debtCheckbox = document.getElementById('debt_enabled');
+    if (debtCheckbox) {
+      debtCheckbox.checked = false;
+      document.getElementById('debtFields').style.display = 'none';
+      document.getElementById('debt_installment_amount').value = '';
+      document.getElementById('debt_interval_days').value = '';
+    }
     if (data.client_link) {
       openModal(payload.plate, data.client_link, payload.owner_phone);
     }
@@ -1952,6 +2042,46 @@ async function loadCars() {
   const res = await fetch('/api/cars');
   carsCache = await res.json();
   renderTable();
+}
+
+async function loadDebts() {
+  const debts = await (await fetch('/api/debts')).json();
+  const list = document.getElementById('debtsList');
+  if (!debts.length) { list.innerHTML = `<div class="hint-text" style="text-align:center; padding:24px;">${T.debts_empty}</div>`; return; }
+  list.innerHTML = debts.map(d => `
+    <div class="debt-card ${d.is_overdue ? 'overdue' : ''}">
+      <div class="dc-top">
+        <div>
+          <div class="dc-owner">${escapeHtml(d.owner_name || T.kc_no_name)}</div>
+          <div class="dc-meta">${escapeHtml(d.plate_number)}${d.owner_phone ? ' · ' + escapeHtml(d.owner_phone) : ''}</div>
+        </div>
+        <div>
+          <div class="dc-remaining">${d.remaining.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dc-due ${d.is_overdue ? 'overdue-text' : ''}">${d.is_overdue ? T.debt_overdue : T.debt_next_due} ${d.next_due_date}</div>
+        </div>
+      </div>
+      <div class="dc-pay-row">
+        <input id="debt_pay_${d.id}" type="number" placeholder="${T.debt_pay_placeholder}" style="flex:1;">
+        <button class="badge active" style="flex:none;" onclick="payDebt(${d.id})">${T.debt_pay_btn}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function payDebt(planId) {
+  const input = document.getElementById(`debt_pay_${planId}`);
+  const amount = input.value;
+  if (!amount || parseFloat(amount) <= 0) { showMsg(T.debt_pay_invalid, false); return; }
+  const res = await fetch(`/api/debts/${planId}/pay`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({amount})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.debt_pay_success, true);
+    loadDebts();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
 }
 
 function renderTable() {
@@ -2482,6 +2612,9 @@ def api_add():
         notes = data.get("notes") or ""
         cash_amount = int(data["cash_amount"]) if data.get("cash_amount") not in (None, "") else None
         card_amount = int(data["card_amount"]) if data.get("card_amount") not in (None, "") else None
+        debt_amount = int(data["debt_amount"]) if data.get("debt_amount") not in (None, "") else 0
+        installment_amount = int(data["installment_amount"]) if data.get("installment_amount") not in (None, "") else None
+        interval_days = int(data["interval_days"]) if data.get("interval_days") not in (None, "") else None
 
         existing_car = db.find_car(g.shop_id, plate)
         if existing_car:
@@ -2492,10 +2625,15 @@ def api_add():
             client_id = client["id"]
             car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
 
-        _, next_date = db.add_oil_change(
+        oc_id, next_date = db.add_oil_change(
             car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
             next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
         )
+
+        if debt_amount > 0:
+            if not installment_amount or not interval_days:
+                return jsonify({"ok": False, "error": "укажите сумму платежа и период для рассрочки"}), 400
+            db.create_installment_plan(g.shop_id, car_id, debt_amount, installment_amount, interval_days, oil_change_id=oc_id)
 
         car_after, _ = db.get_car_history(g.shop_id, plate)
         link = None
@@ -2505,6 +2643,34 @@ def api_add():
         return jsonify({"ok": True, "next_date": next_date, "client_link": link})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@app.route("/api/debts")
+@login_required
+def api_list_debts():
+    return jsonify(db.get_active_debts(g.shop_id))
+
+
+@app.route("/api/debts/<int:plan_id>/pay", methods=["POST"])
+@login_required
+def api_pay_debt(plan_id):
+    data = request.get_json(force=True)
+    try:
+        amount = int(data["amount"])
+        if amount <= 0:
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "укажите положительную сумму платежа"}), 400
+    plan = db.log_installment_payment(plan_id, g.shop_id, amount, data.get("paid_date"))
+    if not plan:
+        return jsonify({"ok": False, "error": "долг не найден"}), 404
+    return jsonify({"ok": True, "plan": plan})
+
+
+@app.route("/api/debts/<int:plan_id>/payments")
+@login_required
+def api_debt_payments(plan_id):
+    return jsonify(db.get_installment_payments(plan_id, g.shop_id))
 
 
 # ============ Рассылки ============
