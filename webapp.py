@@ -510,6 +510,10 @@ PAGE = """
   .known-client .kc-last-visit .kc-lv-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .known-client .kc-last-visit .kc-lv-service { font-size:14px; font-weight:700; color:var(--text); }
   .known-client .kc-last-visit .kc-lv-date { font-size:12px; color:var(--hint); margin-top:2px; }
+  .known-client .kc-lv-mileage { font-size:12px; color:var(--blue); font-weight:600; margin-top:8px; }
+  .mileage-compare { font-size:12.5px; margin-top:6px; padding:8px 10px; border-radius:8px; }
+  .mileage-compare.over { background:#FEF2F2; color:#B3241C; font-weight:600; }
+  .mileage-compare.ok { background:#F0FDF4; color:#15803D; }
   .known-client .kc-last-visit .kc-lv-cost { font-size:16px; font-weight:700; color:var(--blue); flex:none; }
   .known-client .kc-lv-items { margin-top:9px; padding-top:9px; border-top:1px dashed var(--border); }
   .known-client .kc-lv-item {
@@ -639,7 +643,8 @@ PAGE = """
     <div class="row2">
       <div class="field">
         <label>{{ T.field_mileage }}</label>
-        <input id="mileage" type="number" placeholder="45000">
+        <input id="mileage" type="number" placeholder="45000" oninput="checkMileageVsDue()">
+        <div id="mileageCompare"></div>
       </div>
       <div class="field">
         <label>{{ T.field_next_mileage }}</label>
@@ -1065,6 +1070,21 @@ const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
 let carsCache = [];
+let lastKnownNextMileage = null;
+
+function checkMileageVsDue() {
+  const el = document.getElementById('mileageCompare');
+  if (!el) return;
+  const entered = parseFloat(document.getElementById('mileage').value);
+  if (!lastKnownNextMileage || isNaN(entered)) { el.innerHTML = ''; return; }
+  const diff = entered - lastKnownNextMileage;
+  if (diff > 0) {
+    el.innerHTML = `<div class="mileage-compare over">⚠️ ${T.mileage_over_due} ${lastKnownNextMileage.toLocaleString('ru-RU')} ${T.km_short} — ${T.mileage_over_by} ${diff.toLocaleString('ru-RU')} ${T.km_short}</div>`;
+  } else {
+    el.innerHTML = `<div class="mileage-compare ok">${T.mileage_within_due} ${lastKnownNextMileage.toLocaleString('ru-RU')} ${T.km_short}</div>`;
+  }
+}
+
 let openHistoryRow = null;
 let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы кнопки не тащили сырые данные записи (с заметками, апострофами и т.п.) прямо в HTML-атрибут onclick, а брали их отсюда по id
 
@@ -2018,11 +2038,11 @@ function onPlateBlur() {
 async function lookupPlate() {
   const plate = document.getElementById('plate').value.trim();
   const panel = document.getElementById('knownClientPanel');
-  if (!plate) { panel.innerHTML = ''; return; }
+  if (!plate) { panel.innerHTML = ''; lastKnownNextMileage = null; checkMileageVsDue(); return; }
   try {
     const res = await fetch('/api/history/' + encodeURIComponent(plate));
     const data = await res.json();
-    if (!data.car) { panel.innerHTML = ''; return; }
+    if (!data.car) { panel.innerHTML = ''; lastKnownNextMileage = null; checkMileageVsDue(); return; }
 
     document.getElementById('owner_name').value = data.car.owner_name || '';
     document.getElementById('owner_phone').value = data.car.owner_phone || '';
@@ -2036,6 +2056,7 @@ async function lookupPlate() {
 
     const last = data.history[0];
     const visitCount = data.history.length;
+    lastKnownNextMileage = last ? last.next_mileage : null;
     let lastItemsHtml = '';
     if (last && last.items_json) {
       try {
@@ -2045,6 +2066,9 @@ async function lookupPlate() {
         ).join('') + '</div>';
       } catch (e) { /* старая запись без items_json — просто не показываем разбивку */ }
     }
+    const mileageParts = [];
+    if (last && last.mileage) mileageParts.push(`${T.kc_last_mileage} ${last.mileage.toLocaleString('ru-RU')} ${T.km_short}`);
+    if (last && last.next_mileage) mileageParts.push(`${T.kc_due_mileage} ${last.next_mileage.toLocaleString('ru-RU')} ${T.km_short}`);
     const lastVisitHtml = last ? `
       <div class="kc-last-visit">
         <div class="kc-lv-top">
@@ -2054,6 +2078,7 @@ async function lookupPlate() {
           </div>
           <div class="kc-lv-cost">${last.cost ? last.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
         </div>
+        ${mileageParts.length ? `<div class="kc-lv-mileage">${mileageParts.join(' · ')}</div>` : ''}
         ${lastItemsHtml}
       </div>
     ` : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
@@ -2078,6 +2103,8 @@ async function lookupPlate() {
     `;
   } catch (e) {
     panel.innerHTML = '';
+    lastKnownNextMileage = null;
+    checkMileageVsDue();
   }
 }
 
@@ -2157,6 +2184,9 @@ async function submitCar() {
       document.getElementById('debt_installment_amount').value = '';
       document.getElementById('debt_interval_days').value = '';
     }
+    lastKnownNextMileage = null;
+    document.getElementById('mileageCompare').innerHTML = '';
+    document.getElementById('knownClientPanel').innerHTML = '';
     if (data.client_link) {
       openModal(payload.plate, data.client_link, payload.owner_phone);
     }
@@ -2305,6 +2335,35 @@ async function toggleHistory(plate) {
           </div>
         </div>
         <button type="button" class="kc-action-btn" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button type="button" class="history-toggle" style="flex:1;" onclick="toggleCarEditForm()">${T.kc_edit_car_btn}</button>
+          <button type="button" class="history-toggle" style="flex:1; color:#B3241C;" onclick="deleteCarCompletely(${escapeHtml(JSON.stringify(plate))})">${T.kc_delete_car_btn}</button>
+        </div>
+        <div id="carEditForm" style="display:none; margin-top:10px; padding:12px; background:var(--field-bg); border-radius:10px;">
+          <div class="field">
+            <label style="font-size:11px;">${T.field_plate}</label>
+            <input id="edit_car_plate" value="${escapeHtml(plate)}">
+          </div>
+          <div class="field">
+            <label style="font-size:11px;">${T.field_owner_name}</label>
+            <input id="edit_car_owner_name" value="${escapeHtml(name)}">
+          </div>
+          <div class="field">
+            <label style="font-size:11px;">${T.field_owner_phone}</label>
+            <input id="edit_car_owner_phone" value="${escapeHtml(car.owner_phone || '')}">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label style="font-size:11px;">${T.field_car_brand}</label>
+              <input id="edit_car_brand" value="${escapeHtml(car.car_brand || '')}">
+            </div>
+            <div class="field">
+              <label style="font-size:11px;">${T.field_car_model}</label>
+              <input id="edit_car_model" value="${escapeHtml(car.car_model || '')}">
+            </div>
+          </div>
+          <button type="button" class="submit" onclick="saveCarEdit(${escapeHtml(JSON.stringify(plate))})">${T.btn_save}</button>
+        </div>
         <div class="kc-hist-list">
           <div class="kc-history-label">${T.kc_full_history_label} (${history.length})</div>
           ${entriesHtml}
@@ -2581,6 +2640,52 @@ async function saveEdit() {
   }
 }
 
+function toggleCarEditForm() {
+  const form = document.getElementById('carEditForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveCarEdit(oldPlate) {
+  const payload = {
+    plate: document.getElementById('edit_car_plate').value.trim(),
+    owner_name: document.getElementById('edit_car_owner_name').value.trim(),
+    owner_phone: document.getElementById('edit_car_owner_phone').value.trim(),
+    car_brand: document.getElementById('edit_car_brand').value.trim(),
+    car_model: document.getElementById('edit_car_model').value.trim(),
+  };
+  if (!payload.plate || !payload.owner_name) {
+    showMsg(T.msg_fill_required, false);
+    return;
+  }
+  const res = await fetch('/api/car/' + encodeURIComponent(oldPlate), {
+    method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.kc_car_saved, true);
+    openHistoryRow = null;
+    toggleHistory(data.plate);
+    loadCars();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function deleteCarCompletely(plate) {
+  if (!confirm(T.kc_delete_car_confirm.replace('{plate}', plate))) return;
+  const res = await fetch('/api/car/' + encodeURIComponent(plate), { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.kc_car_deleted, true);
+    document.getElementById('clientCardPanel').style.display = 'none';
+    document.getElementById('clientCardPanel').innerHTML = '';
+    openHistoryRow = null;
+    loadCars();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
 async function deleteEntry(id, plate) {
   if (!confirm(T.entry_delete_confirm)) return;
   const res = await fetch('/api/oil_change/' + id, { method: 'DELETE' });
@@ -2716,6 +2821,37 @@ def api_delete_oil_change(oc_id):
     ok = db.delete_oil_change(oc_id, g.shop_id)
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/car/<plate>", methods=["PUT"])
+@login_required
+def api_update_car(plate):
+    """Редактирование данных клиента и машины — имя, телефон, госномер,
+    марка/модель. Доступно всем ролям (владелец, филиал, сотрудник),
+    ограничено только собственной точкой."""
+    data = request.get_json(force=True)
+    new_plate = (data.get("plate") or "").strip()
+    owner_name = (data.get("owner_name") or "").strip()
+    owner_phone = (data.get("owner_phone") or "").strip()
+    car_brand = data.get("car_brand") or None
+    car_model = (data.get("car_model") or "").strip() or None
+    if not new_plate or not owner_name:
+        return jsonify({"ok": False, "error": "госномер и имя обязательны"}), 400
+    ok = db.update_car_and_client(g.shop_id, plate, new_plate, owner_name, owner_phone, car_brand, car_model)
+    if not ok:
+        return jsonify({"ok": False, "error": "машина не найдена, или новый госномер уже занят другой машиной"}), 400
+    return jsonify({"ok": True, "plate": db.normalize_plate(new_plate)})
+
+
+@app.route("/api/car/<plate>", methods=["DELETE"])
+@login_required
+def api_delete_car(plate):
+    """Полное удаление машины — сама машина, вся её история, связанные
+    долги. Клиент (владелец) остаётся, если у него есть другие машины."""
+    ok = db.delete_car_completely(g.shop_id, plate)
+    if not ok:
+        return jsonify({"ok": False, "error": "машина не найдена"}), 404
     return jsonify({"ok": True})
 
 

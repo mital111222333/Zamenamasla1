@@ -963,6 +963,53 @@ def find_car(shop_id: int, plate_number: str):
         return dict(car) if car else None
 
 
+def update_car_and_client(shop_id: int, plate: str, new_plate: str, owner_name: str, owner_phone: str,
+                           car_brand: str, car_model: str):
+    """Редактирование данных клиента и машины целиком — имя, телефон,
+    госномер, марка/модель. Возвращает True при успехе; False, если машина
+    не найдена у этой точки, или новый госномер уже занят другой машиной
+    этой же точки."""
+    car = find_car(shop_id, plate)
+    if not car:
+        return False
+    new_plate = normalize_plate(new_plate)
+    if new_plate != car["plate_number"]:
+        clash = find_car(shop_id, new_plate)
+        if clash:
+            return False
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE clients SET full_name=?, phone=? WHERE id=?",
+            (owner_name, owner_phone, car["client_id"])
+        )
+        conn.execute(
+            "UPDATE cars SET plate_number=?, car_brand=?, car_model=? WHERE id=? AND shop_id=?",
+            (new_plate, car_brand, car_model, car["id"], shop_id)
+        )
+        conn.commit()
+    return True
+
+
+def delete_car_completely(shop_id: int, plate: str) -> bool:
+    """Полностью удаляет машину этой точки: саму машину, всю её историю
+    замен, и связанные с ней планы рассрочки вместе с платежами по ним.
+    Клиент (владелец) не удаляется — у него может быть другая машина."""
+    car = find_car(shop_id, plate)
+    if not car:
+        return False
+    with get_conn() as conn:
+        plan_ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM installment_plans WHERE car_id=? AND shop_id=?", (car["id"], shop_id)
+        ).fetchall()]
+        for pid in plan_ids:
+            conn.execute("DELETE FROM installment_payments WHERE plan_id=?", (pid,))
+        conn.execute("DELETE FROM installment_plans WHERE car_id=? AND shop_id=?", (car["id"], shop_id))
+        conn.execute("DELETE FROM oil_changes WHERE car_id=?", (car["id"],))
+        conn.execute("DELETE FROM cars WHERE id=? AND shop_id=?", (car["id"], shop_id))
+        conn.commit()
+    return True
+
+
 def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_brand: str = None, car_model: str = None):
     plate_number = normalize_plate(plate_number)
     with get_conn() as conn:
