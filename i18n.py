@@ -71,6 +71,9 @@ RU = {
     "usd_rate_error": "Не удалось сохранить курс",
     "branch_stock_value": "Стоимость остатка (закупка):",
     "wh_stock_value_label": "Стоимость остатка склада (по цене закупки):",
+    "payment_split_label": "Как оплатил клиент",
+    "payment_cash": "Наличными",
+    "payment_card": "Картой",
 
 
     "branch_products_count": "товаров:",
@@ -363,6 +366,9 @@ UZ = {
     "usd_rate_error": "Kursni saqlab bo'lmadi",
     "branch_stock_value": "Qoldiq qiymati (sotib olish):",
     "wh_stock_value_label": "Ombor qoldig'ining qiymati (sotib olish narxida):",
+    "payment_split_label": "Mijoz qanday to'ladi",
+    "payment_cash": "Naqd",
+    "payment_card": "Karta bilan",
 
 
     "branch_products_count": "mahsulotlar:",

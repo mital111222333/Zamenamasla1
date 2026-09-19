@@ -547,6 +547,20 @@ PAGE = """
     </div>
 
     <div class="field" style="margin-top:14px;">
+      <label>{{ T.payment_split_label }}</label>
+      <div class="row2">
+        <div class="field">
+          <label style="font-size:11px;"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</label>
+          <input id="pay_cash" type="number" placeholder="0" oninput="onPayCashInput()">
+        </div>
+        <div class="field">
+          <label style="font-size:11px;"><i class="fa-solid fa-credit-card"></i> {{ T.payment_card }}</label>
+          <input id="pay_card" type="number" placeholder="0" oninput="onPayCardInput()">
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:14px;">
       <label>{{ T.field_interval }}</label>
       <div style="display:flex; gap:8px;">
         <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;">
@@ -845,6 +859,20 @@ MODAL_AND_SCRIPT = """
     <div class="field" style="margin-top:10px; padding:12px; background:var(--field-bg); border-radius:10px;">
       <label style="font-size:15px;">{{ T.field_total }}</label>
       <div id="svcTotalCost" style="font-size:22px; font-weight:600; color:var(--btn); font-family:var(--font-mono);">0</div>
+    </div>
+
+    <div class="field" style="margin-top:10px;">
+      <label>{{ T.payment_split_label }}</label>
+      <div class="row2">
+        <div class="field">
+          <label style="font-size:11px;"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</label>
+          <input id="svc_pay_cash" type="number" placeholder="0" oninput="onSvcPayCashInput()">
+        </div>
+        <div class="field">
+          <label style="font-size:11px;"><i class="fa-solid fa-credit-card"></i> {{ T.payment_card }}</label>
+          <input id="svc_pay_card" type="number" placeholder="0" oninput="onSvcPayCardInput()">
+        </div>
+      </div>
     </div>
 
     <div class="field" style="margin-top:10px;">
@@ -1166,6 +1194,7 @@ async function loadStats() {
       <div class="label">${label}</div>
       <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${s[key].count}</div>
+      <div class="count">${T.payment_cash}: ${(s[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(s[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
   `).join('');
@@ -1194,6 +1223,7 @@ async function loadStats() {
                   <div class="label">${label}</div>
                   <div class="amount" style="color:#9A3412;">${agg.revenue[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
                   <div class="count">${T.stats_services_count} ${agg.revenue[key].count}</div>
+                  <div class="count">${T.payment_cash}: ${(agg.revenue[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(agg.revenue[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
                   <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${agg.profit[key].toLocaleString('ru-RU')} ${T.currency}</div>
                 </div>
               `).join('')}
@@ -1311,6 +1341,7 @@ async function applyStatsRange() {
       <div class="label">${T.stats_range_result} ${from} — ${to}</div>
       <div class="amount">${data.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.count}</div>
+      <div class="count">${T.payment_cash}: ${(data.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
     </div>
   `;
 }
@@ -1379,6 +1410,7 @@ async function applyBranchStatsRange() {
       <div class="label">${T.stats_range_result} ${from} — ${to}</div>
       <div class="amount" style="color:#9A3412;">${data.revenue.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.revenue.count}</div>
+      <div class="count">${T.payment_cash}: ${(data.revenue.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.revenue.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
     </div>
     <div class="table-wrap"><table>
@@ -1702,9 +1734,31 @@ function collectItems() {
   return items;
 }
 
+let paymentSplitTouched = false;
+
 function updateTotal() {
   const total = collectItems().reduce((sum, i) => sum + i.total, 0);
   document.getElementById('totalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
+  const payCash = document.getElementById('pay_cash');
+  const payCard = document.getElementById('pay_card');
+  if (payCash && payCard && !paymentSplitTouched) {
+    payCash.value = total || '';
+    payCard.value = '';
+  }
+}
+
+function onPayCashInput() {
+  paymentSplitTouched = true;
+  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
+  document.getElementById('pay_card').value = Math.max(0, Math.round(total - cash));
+}
+
+function onPayCardInput() {
+  paymentSplitTouched = true;
+  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const card = parseFloat(document.getElementById('pay_card').value) || 0;
+  document.getElementById('pay_cash').value = Math.max(0, Math.round(total - card));
 }
 
 function resetItemInputs() {
@@ -1850,6 +1904,8 @@ initItemForms();
 
 async function submitCar() {
   const items = collectItems();
+  const payCashEl = document.getElementById('pay_cash');
+  const payCardEl = document.getElementById('pay_card');
   const payload = {
     plate: document.getElementById('plate').value.trim(),
     owner_name: document.getElementById('owner_name').value.trim(),
@@ -1862,6 +1918,8 @@ async function submitCar() {
     interval_value: document.getElementById('interval_value').value,
     interval_unit: document.getElementById('interval_unit').value,
     notes: document.getElementById('notes').value.trim(),
+    cash_amount: payCashEl ? payCashEl.value : null,
+    card_amount: payCardEl ? payCardEl.value : null,
   };
   if (!payload.plate || !payload.owner_name || !payload.interval_value) {
     showMsg(T.msg_fill_required, false);
@@ -1877,6 +1935,11 @@ async function submitCar() {
     resetItemInputs();
     document.getElementById('interval_value').value = 3;
     document.getElementById('interval_unit').value = 'months';
+    paymentSplitTouched = false;
+    const payCash = document.getElementById('pay_cash');
+    const payCard = document.getElementById('pay_card');
+    if (payCash) payCash.value = '';
+    if (payCard) payCard.value = '';
     if (data.client_link) {
       openModal(payload.plate, data.client_link, payload.owner_phone);
     }
@@ -2101,9 +2164,31 @@ function collectSvcItems() {
   return items;
 }
 
+let svcPaymentSplitTouched = false;
+
 function updateSvcTotal() {
   const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
   document.getElementById('svcTotalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
+  const payCash = document.getElementById('svc_pay_cash');
+  const payCard = document.getElementById('svc_pay_card');
+  if (payCash && payCard && !svcPaymentSplitTouched) {
+    payCash.value = total || '';
+    payCard.value = '';
+  }
+}
+
+function onSvcPayCashInput() {
+  svcPaymentSplitTouched = true;
+  const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+  const cash = parseFloat(document.getElementById('svc_pay_cash').value) || 0;
+  document.getElementById('svc_pay_card').value = Math.max(0, Math.round(total - cash));
+}
+
+function onSvcPayCardInput() {
+  svcPaymentSplitTouched = true;
+  const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+  const card = parseFloat(document.getElementById('svc_pay_card').value) || 0;
+  document.getElementById('svc_pay_cash').value = Math.max(0, Math.round(total - card));
 }
 
 function resetSvcItemInputs() {
@@ -2176,6 +2261,9 @@ function openEditModal(plate, entry) {
     try { fillSvcItemsFrom(JSON.parse(entry.items_json)); } catch (e) {}
   }
   updateSvcTotal();
+  document.getElementById('svc_pay_cash').value = entry.cash_amount ?? entry.cost ?? '';
+  document.getElementById('svc_pay_card').value = entry.card_amount ?? '';
+  svcPaymentSplitTouched = true;  // это реальная сохранённая разбивка, не пересчитывать автоматически
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -2187,6 +2275,9 @@ function openAddServiceModal(plate) {
   document.getElementById('edit_interval_value').value = 3;
   document.getElementById('edit_interval_unit').value = 'months';
   document.getElementById('edit_notes').value = '';
+  svcPaymentSplitTouched = false;
+  document.getElementById('svc_pay_cash').value = '';
+  document.getElementById('svc_pay_card').value = '';
   resetSvcItemInputs();
   document.getElementById('editModal').classList.add('open');
 }
@@ -2202,12 +2293,14 @@ async function saveEdit() {
   const interval_value = document.getElementById('edit_interval_value').value || null;
   const interval_unit = document.getElementById('edit_interval_unit').value;
   const notes = document.getElementById('edit_notes').value;
+  const cash_amount = document.getElementById('svc_pay_cash').value || null;
+  const card_amount = document.getElementById('svc_pay_card').value || null;
 
   let res;
   if (svcModal.mode === 'edit') {
     res = await fetch('/api/oil_change/' + svcModal.id, {
       method: 'PUT', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ mileage, next_mileage, interval_value, interval_unit, notes, items }),
+      body: JSON.stringify({ mileage, next_mileage, interval_value, interval_unit, notes, items, cash_amount, card_amount }),
     });
   } else {
     const carRow = carsCache.find(c => c.plate_number === svcModal.plate);
@@ -2215,7 +2308,7 @@ async function saveEdit() {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         plate: svcModal.plate, owner_name: carRow ? carRow.owner_name : '', mileage, next_mileage,
-        interval_value, interval_unit, notes, items,
+        interval_value, interval_unit, notes, items, cash_amount, card_amount,
       }),
     });
   }
@@ -2223,7 +2316,7 @@ async function saveEdit() {
   if (data.ok) {
     closeEditModal();
     showMsg(svcModal.mode === 'edit' ? T.entry_saved : T.service_added, true);
-    document.getElementById('hist-' + svcModal.plate).style.display = 'none';
+    openHistoryRow = null;  // чтобы toggleHistory ниже заново открыл панель со свежими данными, а не закрыл её
     toggleHistory(svcModal.plate);
     loadCars();
   } else {
@@ -2237,7 +2330,7 @@ async function deleteEntry(id, plate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.entry_deleted, true);
-    document.getElementById('hist-' + plate).style.display = 'none';
+    openHistoryRow = null;
     toggleHistory(plate);
     loadCars();
   } else {
@@ -2298,6 +2391,8 @@ def api_set_usd_rate():
     return jsonify({"ok": True, "rate": rate})
 
 
+
+
 @app.route("/api/cars")
 @login_required
 def api_cars():
@@ -2348,6 +2443,8 @@ def api_update_oil_change(oc_id):
             interval_unit=data.get("interval_unit"),
             notes=data.get("notes"),
             items=data.get("items"),
+            cash_amount=int(data["cash_amount"]) if data.get("cash_amount") not in (None, "") else None,
+            card_amount=int(data["card_amount"]) if data.get("card_amount") not in (None, "") else None,
         )
     except (ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -2383,6 +2480,8 @@ def api_add():
         if interval_unit not in ("days", "months"):
             interval_unit = "months"
         notes = data.get("notes") or ""
+        cash_amount = int(data["cash_amount"]) if data.get("cash_amount") not in (None, "") else None
+        card_amount = int(data["card_amount"]) if data.get("card_amount") not in (None, "") else None
 
         existing_car = db.find_car(g.shop_id, plate)
         if existing_car:
@@ -2395,7 +2494,7 @@ def api_add():
 
         _, next_date = db.add_oil_change(
             car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
-            next_mileage=next_mileage, items=items
+            next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
         )
 
         car_after, _ = db.get_car_history(g.shop_id, plate)

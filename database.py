@@ -97,6 +97,7 @@ def init_db():
             client_group TEXT,
             parent_shop_id INTEGER,
             usd_rate REAL,
+            card_number TEXT,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -140,6 +141,8 @@ def init_db():
             oil_brand TEXT,
             filter_changed INTEGER DEFAULT 0,
             cost INTEGER,
+            cash_amount INTEGER,
+            card_amount INTEGER,
             interval_months INTEGER,
             interval_unit TEXT DEFAULT 'months',
             next_mileage INTEGER,
@@ -230,6 +233,7 @@ def _migrate(conn):
         "client_group": "TEXT",
         "parent_shop_id": "INTEGER",
         "usd_rate": "REAL",
+        "card_number": "TEXT",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
@@ -277,12 +281,18 @@ def _migrate(conn):
         "interval_unit": "TEXT DEFAULT 'months'",
         "next_mileage": "INTEGER",
         "items_json": "TEXT",
+        "cash_amount": "INTEGER",
+        "card_amount": "INTEGER",
     }
     for col, ddl in to_add.items():
         if col not in cols:
             conn.execute(f"ALTER TABLE oil_changes ADD COLUMN {col} {ddl}")
     if "reminder_sent" in cols and "reminder_count" not in cols:
         conn.execute("UPDATE oil_changes SET reminder_count=reminder_sent WHERE reminder_count=0")
+    if "cash_amount" not in cols:
+        # старые записи (до появления разбивки нал/карта) считаем полностью
+        # наличными — это было единственным способом оплаты на тот момент
+        conn.execute("UPDATE oil_changes SET cash_amount=cost, card_amount=0 WHERE cost IS NOT NULL AND cash_amount IS NULL")
 
     # --- clients: старая схема имела UNIQUE(telegram_id) без учёта shop_id.
     # Это ломается, если один и тот же человек — клиент ДВУХ РАЗНЫХ,
@@ -924,12 +934,14 @@ def get_all_cars_overview(shop_id: int):
 
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
-                    next_mileage=None, items=None):
+                    next_mileage=None, items=None, cash_amount=None, card_amount=None):
     """items (необязательно) — детализированный список позиций вида
     [{"name": "Моторное масло", "brand": "MITANOL", "unit_price": 45000, "qty": 4, "total": 180000}, ...]
     Если передан — стоимость и итоговое описание считаются по нему, а service_type/oil_brand/cost
     выше игнорируются (оставлены для обратной совместимости со старым простым способом внесения,
-    которым по-прежнему пользуется бот в Telegram)."""
+    которым по-прежнему пользуется бот в Telegram).
+    cash_amount/card_amount — разбивка оплаты (сколько наличными, сколько картой). Если не переданы —
+    вся сумма считается наличными (обратная совместимость со старыми вызовами и ботом)."""
     change_date = datetime.now().strftime("%Y-%m-%d")
     if interval_value:
         if interval_unit == "days":
@@ -961,15 +973,22 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         oil_brand = motor_oil["brand"] if motor_oil and motor_oil.get("brand") else None
         filter_changed = any((i.get("key") or "").startswith("filter_") for i in items)
 
+    if cash_amount is None and card_amount is None:
+        cash_amount, card_amount = cost, 0
+    else:
+        cash_amount = cash_amount or 0
+        card_amount = card_amount or 0
+
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
-                 interval_months, interval_unit, next_change_date, next_mileage, items_json, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                 cash_amount, card_amount, interval_months, interval_unit, next_change_date,
+                 next_mileage, items_json, notes, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
-              interval_value, interval_unit, next_date, next_mileage, items_json, notes))
+              cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes))
         conn.commit()
         return cur.lastrowid, next_date
 
@@ -987,7 +1006,8 @@ def get_oil_change_for_shop(oc_id: int, shop_id: int):
 
 
 def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, next_mileage=None,
-                       cost=None, interval_value=None, interval_unit=None, notes=None, items=None):
+                       cost=None, interval_value=None, interval_unit=None, notes=None, items=None,
+                       cash_amount=None, card_amount=None):
     """Редактирует уже сохранённую запись. Если передан НЕПУСТОЙ items — полностью
     пересчитывает стоимость, детализацию (жидкости/фильтры) и итоговое
     описание по нему (так же, как при создании новой записи); cost, которое
@@ -1041,6 +1061,11 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
         fields["filter_changed"] = int(any((i.get("key") or "").startswith("filter_") for i in items))
     elif cost is not None:
         fields["cost"] = cost
+
+    if cash_amount is not None:
+        fields["cash_amount"] = cash_amount
+    if card_amount is not None:
+        fields["card_amount"] = card_amount
 
     if interval_value is not None or interval_unit is not None:
         final_value = interval_value if interval_value is not None else existing["interval_months"]
@@ -1228,11 +1253,12 @@ def get_revenue_stats(shop_id: int) -> dict:
     with get_conn() as conn:
         def agg(date_filter, param):
             row = conn.execute(f"""
-                SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt
+                SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt,
+                       COALESCE(SUM(oc.cash_amount), 0) as cash, COALESCE(SUM(oc.card_amount), 0) as card
                 FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
                 WHERE c.shop_id=? AND oc.cost IS NOT NULL AND {date_filter}
             """, (shop_id, param)).fetchone()
-            return {"total": row["total"], "count": row["cnt"]}
+            return {"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"]}
 
         return {
             "today": agg("oc.change_date = ?", today),
@@ -1248,12 +1274,13 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
     сторон), например для выбора дат через календарь на сайте."""
     with get_conn() as conn:
         row = conn.execute("""
-            SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt
+            SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt,
+                   COALESCE(SUM(oc.cash_amount), 0) as cash, COALESCE(SUM(oc.card_amount), 0) as card
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.cost IS NOT NULL
               AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchone()
-        return {"total": row["total"], "count": row["cnt"]}
+        return {"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"]}
 
 
 def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
@@ -1348,13 +1375,14 @@ def get_aggregated_revenue_stats(parent_shop_id: int) -> dict:
     """Выручка главного аккаунта, сложенная со всеми его филиалами — по тем
     же периодам, что и обычная статистика."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
-    combined = {"today": {"total": 0, "count": 0}, "yesterday": {"total": 0, "count": 0},
-                "week": {"total": 0, "count": 0}, "month": {"total": 0, "count": 0}, "year": {"total": 0, "count": 0}}
+    combined = {p: {"total": 0, "count": 0, "cash": 0, "card": 0} for p in ("today", "yesterday", "week", "month", "year")}
     for sid in shop_ids:
         stats = get_revenue_stats(sid)
         for period in combined:
             combined[period]["total"] += stats[period]["total"]
             combined[period]["count"] += stats[period]["count"]
+            combined[period]["cash"] += stats[period]["cash"]
+            combined[period]["card"] += stats[period]["card"]
     return combined
 
 
@@ -1392,12 +1420,14 @@ def get_aggregated_revenue_range(parent_shop_id: int, date_from: str, date_to: s
     """Выручка за произвольный период, сложенная по главному аккаунту и всем
     его филиалам вместе."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
-    total, count = 0, 0
+    total, count, cash, card = 0, 0, 0, 0
     for sid in shop_ids:
         r = get_revenue_range(sid, date_from, date_to)
         total += r["total"]
         count += r["count"]
-    return {"total": total, "count": count}
+        cash += r["cash"]
+        card += r["card"]
+    return {"total": total, "count": count, "cash": cash, "card": card}
 
 
 def get_aggregated_profit_range(parent_shop_id: int, date_from: str, date_to: str) -> int:
