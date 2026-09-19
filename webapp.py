@@ -298,6 +298,16 @@ PAGE = """
     font-size:11px; font-weight:700; color:var(--hint); background:var(--border); padding:2px 6px; border-radius:5px;
   }
   #plate { padding-left:44px; font-family:var(--font-mono); font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+  .plate-suggest {
+    position:absolute; top:100%; left:0; right:0; margin-top:4px; background:var(--card);
+    border:1.5px solid var(--border); border-radius:12px; box-shadow:0 8px 20px rgba(20,20,25,.12);
+    z-index:20; overflow:hidden; max-height:240px; overflow-y:auto;
+  }
+  .plate-suggest .ps-item { padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border); }
+  .plate-suggest .ps-item:last-child { border-bottom:none; }
+  .plate-suggest .ps-item:active, .plate-suggest .ps-item:hover { background:var(--field-bg); }
+  .plate-suggest .ps-plate { font-family:var(--font-mono); font-weight:700; font-size:14px; letter-spacing:0.5px; color:var(--text); }
+  .plate-suggest .ps-owner { font-size:12px; color:var(--hint); margin-top:2px; }
   .checkbox-row { display:flex; align-items:center; gap:8px; }
   .checkbox-row input { width:auto; }
   .item-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
@@ -436,7 +446,8 @@ PAGE = """
       <label><i class="fa-solid fa-id-card"></i>{{ T.field_plate }}</label>
       <div class="plate-wrap">
         <span class="plate-chip">UZ</span>
-        <input id="plate" placeholder="01A123BC" onblur="lookupPlate()">
+        <input id="plate" placeholder="01A123BC" oninput="onPlateInput()" onblur="onPlateBlur()" autocomplete="off">
+        <div id="plateSuggest" class="plate-suggest" style="display:none;"></div>
       </div>
       <div id="knownClientPanel"></div>
     </div>
@@ -1692,6 +1703,48 @@ function resetItemInputs() {
   otherStockRows = [];
   renderOtherStockRows('other');
   updateTotal();
+}
+
+let plateSuggestLoading = false;
+
+async function ensureCarsCacheLoaded() {
+  if (carsCache.length || plateSuggestLoading) return;
+  plateSuggestLoading = true;
+  try {
+    const res = await fetch('/api/cars');
+    carsCache = await res.json();
+  } catch (e) { /* тихо — просто не будет подсказок в этот раз */ }
+  plateSuggestLoading = false;
+}
+
+async function onPlateInput() {
+  const val = document.getElementById('plate').value.trim().toUpperCase();
+  const dropdown = document.getElementById('plateSuggest');
+  if (!val) { dropdown.style.display = 'none'; dropdown.innerHTML = ''; return; }
+  await ensureCarsCacheLoaded();
+  const matches = carsCache.filter(c => (c.plate_number || '').toUpperCase().includes(val)).slice(0, 8);
+  if (!matches.length) { dropdown.style.display = 'none'; dropdown.innerHTML = ''; return; }
+  dropdown.innerHTML = matches.map(c => `
+    <div class="ps-item" onmousedown="selectPlateSuggestion(${escapeHtml(JSON.stringify(c.plate_number))})">
+      <div class="ps-plate">${escapeHtml(c.plate_number)}</div>
+      <div class="ps-owner">${escapeHtml(c.owner_name || '')}${c.car_brand ? ' · ' + escapeHtml(c.car_brand) + (c.car_model ? ' ' + escapeHtml(c.car_model) : '') : ''}</div>
+    </div>
+  `).join('');
+  dropdown.style.display = '';
+}
+
+function selectPlateSuggestion(plate) {
+  document.getElementById('plate').value = plate;
+  document.getElementById('plateSuggest').style.display = 'none';
+  lookupPlate();
+}
+
+function onPlateBlur() {
+  setTimeout(() => {
+    const dropdown = document.getElementById('plateSuggest');
+    if (dropdown) dropdown.style.display = 'none';
+  }, 150);
+  lookupPlate();
 }
 
 async function lookupPlate() {
