@@ -212,6 +212,17 @@ def init_db():
         )
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            code TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+        """)
+
         # --- индексы на часто используемые поля — чтобы поиск оставался
         # быстрым по мере роста числа точек, клиентов и записей. Безопасно
         # выполнять при каждом запуске (IF NOT EXISTS) и на уже существующих
@@ -226,6 +237,7 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_plans_shop ON installment_plans(shop_id, status)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_plans_due ON installment_plans(status, next_due_date)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_payments_plan ON installment_payments(plan_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_codes_shop ON password_reset_codes(shop_id, used, expires_at)")
 
         conn.commit()
         _migrate(conn)
@@ -326,6 +338,13 @@ def _migrate(conn):
         # наличными — это было единственным способом оплаты на тот момент
         conn.execute("UPDATE oil_changes SET cash_amount=cost, card_amount=0 WHERE cost IS NOT NULL AND cash_amount IS NULL")
 
+    # --- пароли больше нигде не хранятся в расшифровываемом виде (раньше
+    # шифровались обратимо, чтобы платформенный админ мог их посмотреть).
+    # Чистим то, что уже успело сохраниться раньше — идемпотентно, безопасно
+    # выполнять на каждом запуске.
+    conn.execute("UPDATE shops SET password_plain=NULL WHERE password_plain IS NOT NULL")
+    conn.execute("UPDATE shop_users SET password_plain=NULL WHERE password_plain IS NOT NULL")
+
     # --- clients: старая схема имела UNIQUE(telegram_id) без учёта shop_id.
     # Это ломается, если один и тот же человек — клиент ДВУХ РАЗНЫХ,
     # независимых точек на этой платформе (обычное дело): второй раз
@@ -415,9 +434,9 @@ def _bootstrap_accounts(conn):
         conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
                                 anpr_token, notify_telegram_id, is_active)
-            VALUES (?, ?, ?, 'shop', ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, ?, ?, 1)
         """, (
-            BOOTSTRAP_SHOP_USERNAME, generate_password_hash(shop_password), _encrypt_password(shop_password),
+            BOOTSTRAP_SHOP_USERNAME, generate_password_hash(shop_password),
             BOOTSTRAP_SHOP_NAME, BOOTSTRAP_SHOP_PHONE or None, BOOTSTRAP_SHOP_ADDRESS or None, BOOTSTRAP_SHOP_HOURS or None,
             float(BOOTSTRAP_SHOP_LAT) if BOOTSTRAP_SHOP_LAT else None,
             float(BOOTSTRAP_SHOP_LON) if BOOTSTRAP_SHOP_LON else None,
@@ -430,8 +449,8 @@ def _bootstrap_accounts(conn):
     try:
         conn.execute(
             "INSERT INTO shops (username, password_hash, password_plain, role, shop_name, is_active) "
-            "VALUES (?, ?, ?, 'admin', 'Платформа', 1)",
-            (BOOTSTRAP_ADMIN_USERNAME, generate_password_hash(admin_password), _encrypt_password(admin_password))
+            "VALUES (?, ?, NULL, 'admin', 'Платформа', 1)",
+            (BOOTSTRAP_ADMIN_USERNAME, generate_password_hash(admin_password))
         )
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -477,8 +496,8 @@ def create_shop(username: str, password: str, shop_name: str = None, phone: str 
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
                                 anpr_token, notify_telegram_id, is_active, client_group)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-        """, (username, generate_password_hash(password), _encrypt_password(password), role, shop_name,
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (username, generate_password_hash(password), role, shop_name,
               phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id, client_group or None))
         conn.commit()
         return get_shop(cur.lastrowid)
@@ -503,14 +522,69 @@ def set_shop_usd_rate(shop_id: int, rate):
 
 
 def reset_shop_password(shop_id: int, new_password: str):
-    """Сбрасывает пароль точки — обновляет и хэш (для входа), и зашифрованную
-    копию (чтобы платформенный админ мог посмотреть новый пароль в /admin)."""
+    """Сбрасывает пароль точки — обновляет только хэш (для входа). Пароль
+    нигде не сохраняется в расшифровываемом виде: платформенный админ видит
+    новый пароль один раз, сразу после сброса, в ответе на само действие —
+    а не хранящимся где-либо для повторного просмотра."""
     with get_conn() as conn:
         conn.execute(
-            "UPDATE shops SET password_hash=?, password_plain=? WHERE id=?",
-            (generate_password_hash(new_password), _encrypt_password(new_password), shop_id)
+            "UPDATE shops SET password_hash=?, password_plain=NULL WHERE id=?",
+            (generate_password_hash(new_password), shop_id)
         )
         conn.commit()
+
+
+def find_shop_by_username(username: str):
+    """Точка (владелец или филиал) по логину, без проверки пароля — для
+    восстановления доступа. Сотрудники и платформенные админы сюда не входят."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM shops WHERE username=? AND role IN ('shop', 'branch')", (username,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def create_password_reset_code(shop_id: int) -> str:
+    """Генерирует 6-значный код для восстановления пароля через Telegram,
+    действует 10 минут. Прошлые неиспользованные коды этой точки становятся
+    недействительными — чтобы старый запрос нельзя было использовать после
+    того, как запросили новый код."""
+    code = f"{secrets.randbelow(1000000):06d}"
+    expires_at = (datetime.now() + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        conn.execute("UPDATE password_reset_codes SET used=1 WHERE shop_id=? AND used=0", (shop_id,))
+        conn.execute(
+            "INSERT INTO password_reset_codes (shop_id, code, expires_at) VALUES (?, ?, ?)",
+            (shop_id, code, expires_at)
+        )
+        conn.commit()
+    return code
+
+
+def reset_password_with_code(username: str, code: str, new_password: str) -> bool:
+    """Проверяет код восстановления (не просрочен, не использован, совпадает)
+    и, если всё верно, меняет пароль точки. Возвращает True при успехе,
+    False — если логин, код или срок не подошли (без уточнения, что именно,
+    чтобы не подсказывать посторонним, какие логины существуют)."""
+    shop = find_shop_by_username(username)
+    if not shop:
+        return False
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM password_reset_codes WHERE shop_id=? AND code=? AND used=0 AND expires_at >= ? "
+            "ORDER BY id DESC LIMIT 1",
+            (shop["id"], code, now)
+        ).fetchone()
+        if not row:
+            return False
+        conn.execute("UPDATE password_reset_codes SET used=1 WHERE id=?", (row["id"],))
+        conn.execute(
+            "UPDATE shops SET password_hash=?, password_plain=NULL WHERE id=?",
+            (generate_password_hash(new_password), shop["id"])
+        )
+        conn.commit()
+    return True
 
 
 def authenticate_shop(username: str, password: str):
@@ -537,15 +611,16 @@ def authenticate_shop_employee(username: str, password: str):
 
 def create_shop_employee(shop_id: int, username: str, password: str = None, full_name: str = None):
     """Платформенный админ создаёт логин сотрудника для точки — ограниченный
-    доступ (без прибыли, цен закупки, статистики, экспорта)."""
+    доступ (без прибыли, цен закупки, статистики, экспорта). Пароль
+    возвращается один раз в ответе — нигде не сохраняется в расшифровываемом виде."""
     if not password:
         password = secrets.token_urlsafe(9)
     with get_conn() as conn:
         try:
             conn.execute(
                 "INSERT INTO shop_users (shop_id, username, password_hash, password_plain, full_name, role) "
-                "VALUES (?, ?, ?, ?, ?, 'employee')",
-                (shop_id, username, generate_password_hash(password), _encrypt_password(password), full_name)
+                "VALUES (?, ?, ?, NULL, ?, 'employee')",
+                (shop_id, username, generate_password_hash(password), full_name)
             )
             conn.commit()
         except sqlite3.IntegrityError:
@@ -554,17 +629,14 @@ def create_shop_employee(shop_id: int, username: str, password: str = None, full
 
 
 def list_shop_employees(shop_id: int):
+    """Список сотрудников точки — без пароля: он нигде не хранится в
+    расшифровываемом виде, только виден один раз сразу после создания/сброса."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, username, full_name, is_active, created_at, password_plain FROM shop_users "
+            "SELECT id, username, full_name, is_active, created_at FROM shop_users "
             "WHERE shop_id=? ORDER BY created_at DESC", (shop_id,)
         ).fetchall()
-        out = []
-        for r in rows:
-            d = dict(r)
-            d["password_plain"] = _decrypt_password(d["password_plain"]) if d.get("password_plain") else None
-            out.append(d)
-        return out
+        return [dict(r) for r in rows]
 
 
 def delete_shop_employee(employee_id: int, shop_id: int) -> bool:
@@ -579,8 +651,8 @@ def reset_shop_employee_password(employee_id: int, shop_id: int):
     new_password = secrets.token_urlsafe(9)
     with get_conn() as conn:
         cur = conn.execute(
-            "UPDATE shop_users SET password_hash=?, password_plain=? WHERE id=? AND shop_id=?",
-            (generate_password_hash(new_password), _encrypt_password(new_password), employee_id, shop_id)
+            "UPDATE shop_users SET password_hash=?, password_plain=NULL WHERE id=? AND shop_id=?",
+            (generate_password_hash(new_password), employee_id, shop_id)
         )
         conn.commit()
         if cur.rowcount == 0:
@@ -602,9 +674,8 @@ def get_shop_by_anpr_token(token: str):
 
 def list_shops():
     """Все точки (без платформенных админов) + число их клиентов — для админ-панели.
-    password_plain — расшифрованный пароль (чтобы платформенный админ мог его
-    посмотреть, если точка забудет); может быть None для очень старых точек,
-    заведённых до этой функции, или если SECRET_KEY менялся после создания."""
+    Пароль нигде не хранится в расшифровываемом виде — только виден один раз
+    сразу после создания или сброса, в ответе на само действие."""
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT s.*, (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) as client_count
@@ -613,8 +684,8 @@ def list_shops():
         result = []
         for r in rows:
             d = dict(r)
-            d["password_plain"] = _decrypt_password(d.get("password_plain"))
             del d["password_hash"]  # хэш не нужен на клиенте, чтобы не путать с настоящим паролем
+            del d["password_plain"]
             result.append(d)
         return result
 
@@ -1489,8 +1560,8 @@ def create_branch_shop(parent_shop_id: int, username: str, password: str, shop_n
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
                                 anpr_token, is_active, parent_shop_id)
-            VALUES (?, ?, ?, 'branch', ?, ?, ?, ?, 1, ?)
-        """, (username, generate_password_hash(password), _encrypt_password(password), shop_name,
+            VALUES (?, ?, NULL, 'branch', ?, ?, ?, ?, 1, ?)
+        """, (username, generate_password_hash(password), shop_name,
               phone, address, secrets.token_urlsafe(8), parent_shop_id))
         conn.commit()
         return get_shop(cur.lastrowid)
@@ -1498,7 +1569,7 @@ def create_branch_shop(parent_shop_id: int, username: str, password: str, shop_n
 
 def get_branches(parent_shop_id: int):
     """Все филиалы главного аккаунта + число их клиентов — для его собственной
-    панели и для админки."""
+    панели и для админки. Пароль нигде не хранится в расшифровываемом виде."""
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT s.*, (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) as client_count
@@ -1507,8 +1578,8 @@ def get_branches(parent_shop_id: int):
         result = []
         for r in rows:
             d = dict(r)
-            d["password_plain"] = _decrypt_password(d.get("password_plain"))
             del d["password_hash"]
+            del d["password_plain"]
             result.append(d)
         return result
 

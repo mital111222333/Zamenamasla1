@@ -16,6 +16,7 @@ import time
 import secrets
 import urllib.parse
 import threading
+import requests
 from functools import wraps
 from urllib.parse import quote
 from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g
@@ -29,7 +30,25 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 DISPLAY_SHOW_SECONDS = int(os.environ.get("DISPLAY_SHOW_SECONDS", "45"))
+
+
+def _send_telegram_message(chat_id, text) -> bool:
+    """Отправка сообщения напрямую через HTTP API Telegram — синхронно, без
+    участия основного бот-процесса (веб-панель работает в отдельном потоке
+    того же процесса, но без доступа к его асинхронному event loop)."""
+    if not BOT_TOKEN or not chat_id:
+        return False
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": text},
+            timeout=10,
+        )
+        return resp.ok
+    except Exception:
+        return False
 
 # Состояние табло — отдельно для каждой точки (по shop_id), чтобы камера
 # одной точки не могла подсветить экран другой.
@@ -124,11 +143,14 @@ LOGIN_PAGE = """
   input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:15px; margin-bottom:14px; }
   button { width:100%; padding:12px; border:none; border-radius:10px; background:#3a86ff; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
   .error { background:#3a1e1e; color:#dc6f6f; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
+  .ok-msg { background:#1e3a24; color:#6fdc86; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
   .lang-link { display:block; text-align:center; margin-top:14px; color:#9a9a9a; font-size:12px; text-decoration:none; }
+  .forgot-link { display:block; text-align:center; margin-top:12px; color:#3a86ff; font-size:13px; background:none; border:none; cursor:pointer; padding:0; }
+  .hint { font-size:12px; color:#7a7a7a; margin:-8px 0 14px; }
 </style>
 </head>
 <body>
-  <form class="box" method="POST">
+  <form class="box" method="POST" id="loginForm">
     <h1>🔧 {{ T.login_title }}</h1>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <input type="hidden" name="_lang" value="{{ lang }}">
@@ -137,8 +159,74 @@ LOGIN_PAGE = """
     <label>{{ T.login_password }}</label>
     <input name="password" type="password" required>
     <button type="submit">{{ T.login_button }}</button>
+    <button type="button" class="forgot-link" onclick="showForgot()">{{ T.forgot_password_link }}</button>
     <a class="lang-link" href="/login?lang={{ other_lang }}">{{ T.lang_switch }}</a>
   </form>
+
+  <div class="box" id="forgotBox" style="display:none;">
+    <h1>🔑 {{ T.forgot_title }}</h1>
+    <div id="forgotMsg"></div>
+    <div id="forgotStep1">
+      <label>{{ T.login_username }}</label>
+      <input id="forgot_username" autofocus>
+      <p class="hint">{{ T.forgot_hint }}</p>
+      <button type="button" onclick="requestResetCode()">{{ T.forgot_send_code }}</button>
+    </div>
+    <div id="forgotStep2" style="display:none;">
+      <label>{{ T.forgot_code_label }}</label>
+      <input id="forgot_code" inputmode="numeric" maxlength="6">
+      <label>{{ T.forgot_new_password }}</label>
+      <input id="forgot_new_password" type="password">
+      <button type="button" onclick="confirmResetCode()">{{ T.forgot_save_btn }}</button>
+    </div>
+    <button type="button" class="forgot-link" onclick="hideForgot()">{{ T.forgot_back }}</button>
+  </div>
+
+  <script>
+    function showForgot() {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('forgotBox').style.display = 'block';
+    }
+    function hideForgot() {
+      document.getElementById('forgotBox').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('forgotStep1').style.display = 'block';
+      document.getElementById('forgotStep2').style.display = 'none';
+      document.getElementById('forgotMsg').innerHTML = '';
+    }
+    async function requestResetCode() {
+      const username = document.getElementById('forgot_username').value.trim();
+      const msg = document.getElementById('forgotMsg');
+      if (!username) return;
+      const res = await fetch('/api/forgot_password/request', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username})
+      });
+      const data = await res.json();
+      if (data.ok) {
+        msg.innerHTML = `<div class="ok-msg">{{ T.forgot_code_sent }}</div>`;
+        document.getElementById('forgotStep1').style.display = 'none';
+        document.getElementById('forgotStep2').style.display = 'block';
+      } else {
+        msg.innerHTML = `<div class="error">${data.error}</div>`;
+      }
+    }
+    async function confirmResetCode() {
+      const username = document.getElementById('forgot_username').value.trim();
+      const code = document.getElementById('forgot_code').value.trim();
+      const new_password = document.getElementById('forgot_new_password').value;
+      const msg = document.getElementById('forgotMsg');
+      const res = await fetch('/api/forgot_password/confirm', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, code, new_password})
+      });
+      const data = await res.json();
+      if (data.ok) {
+        msg.innerHTML = `<div class="ok-msg">{{ T.forgot_success }}</div>`;
+        setTimeout(() => { window.location.href = '/login'; }, 1800);
+      } else {
+        msg.innerHTML = `<div class="error">${data.error}</div>`;
+      }
+    }
+  </script>
 </body>
 </html>
 """
@@ -177,6 +265,45 @@ def login_page():
         error = i18n.t("login_error", lang)
     T = i18n.get_texts(lang)
     return render_template_string(LOGIN_PAGE, error=error, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru")
+
+
+@app.route("/api/forgot_password/request", methods=["POST"])
+def api_forgot_password_request():
+    """Первый шаг восстановления пароля — отправляет 6-значный код в
+    привязанный Telegram точки. Если Telegram не привязан, честно говорит
+    об этом (это не секретная информация — точка и так это знает),
+    предлагая обратиться к администратору."""
+    data = request.get_json(force=True)
+    username = (data.get("username") or "").strip()
+    if not username:
+        return jsonify({"ok": False, "error": "укажите логин"}), 400
+    shop = db.find_shop_by_username(username)
+    if not shop:
+        return jsonify({"ok": False, "error": "точка с таким логином не найдена"}), 404
+    if not shop.get("notify_telegram_id"):
+        return jsonify({"ok": False, "error": "к этой точке не привязан Telegram — обратитесь к администратору платформы для сброса пароля", "no_telegram": True}), 400
+    code = db.create_password_reset_code(shop["id"])
+    lang = shop.get("language") or "ru"
+    text = i18n.t("password_reset_code_message", lang, code=code)
+    sent = _send_telegram_message(shop["notify_telegram_id"], text)
+    if not sent:
+        return jsonify({"ok": False, "error": "не удалось отправить код в Telegram, попробуйте позже или обратитесь к администратору"}), 500
+    return jsonify({"ok": True})
+
+
+@app.route("/api/forgot_password/confirm", methods=["POST"])
+def api_forgot_password_confirm():
+    """Второй шаг — проверяет код и, если верный, задаёт новый пароль."""
+    data = request.get_json(force=True)
+    username = (data.get("username") or "").strip()
+    code = (data.get("code") or "").strip()
+    new_password = data.get("new_password") or ""
+    if not username or not code or len(new_password) < 6:
+        return jsonify({"ok": False, "error": "заполните все поля (пароль — минимум 6 символов)"}), 400
+    ok = db.reset_password_with_code(username, code, new_password)
+    if not ok:
+        return jsonify({"ok": False, "error": "неверный или просроченный код"}), 400
+    return jsonify({"ok": True})
 
 
 @app.route("/logout")
@@ -3157,6 +3284,16 @@ function showMsg(text, ok) {
   setTimeout(() => { el.innerHTML = ''; }, 8000);
 }
 
+function showMsgSticky(text) {
+  // не исчезает сама - для одноразовых паролей, которые больше нигде не
+  // будут показаны повторно, чтобы админ точно успел их скопировать
+  const el = document.getElementById('msg');
+  el.innerHTML = `<div class="msg ok" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    <span>${text}</span>
+    <button type="button" onclick="this.closest('.msg').remove()" style="flex:none; background:none; border:none; color:inherit; font-size:18px; cursor:pointer; padding:0 4px;">×</button>
+  </div>`;
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -3207,9 +3344,7 @@ function renderShopsTable(shops) {
     <tr>
       <td>${s.shop_name || '—'}</td>
       <td>${s.username}</td>
-      <td>${s.password_plain
-          ? `<span style="font-family:monospace;">${s.password_plain}</span>`
-          : `<span class="hint-text">не сохранён</span>`}
+      <td><span class="hint-text">🔒 скрыт</span>
           <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
       <td>${s.phone || '—'}</td>
       <td>${s.client_count}</td>
@@ -3267,7 +3402,7 @@ async function loadEmployees(shopId) {
     <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
       <span>${escapeHtml(e.full_name || e.username)} <span class="hint-text">(${e.username})</span></span>
       <span style="display:flex; align-items:center; gap:8px;">
-        <span style="font-family:monospace;">${e.password_plain || '—'}</span>
+        <span class="hint-text">🔒 скрыт</span>
         <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetEmployeePassword(${e.id}, ${shopId}, ${escapeHtml(JSON.stringify(e.username))})">сбросить</button>
         <button class="badge inactive" onclick="deleteEmployee(${e.id}, ${shopId}, ${escapeHtml(JSON.stringify(e.username))})">удалить</button>
       </span>
@@ -3292,7 +3427,7 @@ async function createEmployee(shopId) {
   });
   const data = await res.json();
   if (data.ok) {
-    showMsg(`✅ Сотрудник «${username}» создан. Пароль: <b>${data.password}</b>`, true);
+    showMsgSticky(`✅ Сотрудник «${username}» создан. Пароль (больше не увидите — сохраните сейчас): <b>${data.password}</b>`);
     loadEmployees(shopId);
   } else {
     showMsg('Ошибка: ' + data.error, false);
@@ -3306,7 +3441,7 @@ async function resetEmployeePassword(employeeId, shopId, username) {
   });
   const data = await res.json();
   if (data.ok) {
-    showMsg(`✅ Новый пароль для «${username}»: <b>${data.password}</b>`, true);
+    showMsgSticky(`✅ Новый пароль для «${username}» (больше не увидите — сохраните сейчас): <b>${data.password}</b>`);
     loadEmployees(shopId);
   } else {
     showMsg('Ошибка: ' + data.error, false);
@@ -3336,7 +3471,7 @@ async function loadBranches(shopId) {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span>${escapeHtml(b.shop_name || b.username)} <span class="hint-text">(${b.username}, клиентов: ${b.client_count})</span></span>
         <span style="display:flex; align-items:center; gap:8px;">
-          <span style="font-family:monospace;">${b.password_plain || '—'}</span>
+          <span class="hint-text">🔒 скрыт</span>
           <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetPassword(${b.id}, ${escapeHtml(JSON.stringify(b.username))})">сбросить</button>
         </span>
       </div>
@@ -3367,7 +3502,7 @@ async function createBranch(shopId) {
   });
   const data = await res.json();
   if (data.ok) {
-    showMsg(`✅ Филиал «${shopName}» создан. Логин: <b>${username}</b>, пароль: <b>${data.password}</b>`, true);
+    showMsgSticky(`✅ Филиал «${shopName}» создан. Логин: <b>${username}</b>, пароль (больше не увидите — сохраните сейчас): <b>${data.password}</b>`);
     loadBranches(shopId);
   } else {
     showMsg('Ошибка: ' + data.error, false);
@@ -3408,7 +3543,7 @@ async function resetPassword(id, username) {
   const res = await fetch(`/api/admin/shops/${id}/reset_password`, { method: 'POST' });
   const data = await res.json();
   if (data.ok) {
-    showMsg(`✅ Новый пароль для «${username}»: <b>${data.password}</b> (он же теперь виден в таблице ниже)`, true);
+    showMsgSticky(`✅ Новый пароль для «${username}» (больше не увидите — сохраните сейчас): <b>${data.password}</b>`);
     loadShops();
   } else {
     showMsg('Ошибка: ' + data.error, false);
