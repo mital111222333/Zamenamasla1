@@ -223,6 +223,34 @@ def init_db():
         )
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS recurring_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            name TEXT,
+            amount INTEGER NOT NULL,
+            day_of_month INTEGER NOT NULL,
+            next_due_date TEXT NOT NULL,
+            last_reminder_date TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS expense_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            recurring_expense_id INTEGER,
+            category TEXT NOT NULL,
+            name TEXT,
+            amount INTEGER NOT NULL,
+            expense_date TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+        """)
+
         # --- индексы на часто используемые поля — чтобы поиск оставался
         # быстрым по мере роста числа точек, клиентов и записей. Безопасно
         # выполнять при каждом запуске (IF NOT EXISTS) и на уже существующих
@@ -238,6 +266,9 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_plans_due ON installment_plans(status, next_due_date)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_installment_payments_plan ON installment_payments(plan_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_codes_shop ON password_reset_codes(shop_id, used, expires_at)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_recurring_expenses_shop ON recurring_expenses(shop_id, status)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_recurring_expenses_due ON recurring_expenses(status, next_due_date)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_expense_entries_shop ON expense_entries(shop_id, expense_date)")
 
         conn.commit()
         _migrate(conn)
@@ -1376,13 +1407,40 @@ def get_top_products_by_qty(shop_id: int, days: int = 30, limit: int = 5):
     return [{"name": name, "qty": round(qty, 2)} for name, qty in ranked]
 
 
-def get_low_stock_products(shop_id: int, limit: int = 5):
-    """3-5 товаров с самым малым остатком на складе — без настраиваемого
-    порога, просто наименьшие по количеству, чтобы сразу было видно, что
-    вот-вот закончится."""
+def get_top_brands_for_category(shop_id: int, category_name: str, days: int = 30, limit: int = 10):
+    """Топ-10 брендов ВНУТРИ одной категории (например, внутри 'Моторное
+    масло' — какие марки берут чаще: MITANOL 5W-30, MATTEX и т.д.). Раскрытие
+    по клику на категорию в dashboard, а не отдельный плоский список."""
+    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.items_json IS NOT NULL
+        """, (shop_id, start_date)).fetchall()
+    totals = {}
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"])
+        except (TypeError, ValueError):
+            continue
+        for item in items:
+            if item.get("name") != category_name:
+                continue
+            brand = item.get("brand") or "без марки"
+            qty = item.get("qty") or 0
+            totals[brand] = totals.get(brand, 0) + qty
+    ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+    return [{"name": brand, "qty": round(qty, 2)} for brand, qty in ranked]
+
+
+def get_low_stock_products(shop_id: int, threshold: float = 50):
+    """Все товары, чей остаток меньше `threshold` (по умолчанию 50 — что в
+    литрах, что в штуках), а не только 3-5 самых малых — чтобы не пропустить
+    никого, кто реально заканчивается. Отсортировано по возрастанию остатка,
+    чтобы самое срочное было сверху."""
     products = list_products(shop_id)
-    ranked = sorted(products, key=lambda p: p["stock_qty"])[:limit]
-    return ranked
+    low = [p for p in products if p["stock_qty"] < threshold]
+    return sorted(low, key=lambda p: p["stock_qty"])
 
 
 def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None):
@@ -1455,6 +1513,160 @@ def mark_installment_reminded(plan_id: int):
             (datetime.now().strftime("%Y-%m-%d"), plan_id)
         )
         conn.commit()
+
+
+EXPENSE_PRESET_CATEGORIES = ["Аренда", "Коммунальные услуги", "Зарплата", "Реклама", "Транспорт", "Прочее"]
+
+
+def _compute_expense_due_date(day_of_month: int, from_date: datetime = None) -> str:
+    """Ближайшая дата с этим числом месяца, начиная с from_date (или
+    сегодня) — если число уже прошло в этом месяце, берём следующий."""
+    base = from_date or datetime.now()
+    day_of_month = max(1, min(28, day_of_month))
+    candidate = base.replace(day=day_of_month, hour=0, minute=0, second=0, microsecond=0)
+    if candidate.date() < base.date():
+        if base.month == 12:
+            candidate = candidate.replace(year=base.year + 1, month=1)
+        else:
+            candidate = candidate.replace(month=base.month + 1)
+    return candidate.strftime("%Y-%m-%d")
+
+
+def create_recurring_expense(shop_id: int, category: str, name: str, amount: int, day_of_month: int):
+    """Повторяющийся расход (аренда, зарплата и т.п.) — раз в месяц, в
+    указанное число, с напоминанием через бота. Возвращает созданную запись."""
+    next_due = _compute_expense_due_date(day_of_month)
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO recurring_expenses (shop_id, category, name, amount, day_of_month, next_due_date, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'active')
+        """, (shop_id, category, name, amount, max(1, min(28, day_of_month)), next_due))
+        conn.commit()
+        return get_recurring_expense(cur.lastrowid, shop_id)
+
+
+def get_recurring_expense(expense_id: int, shop_id: int):
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM recurring_expenses WHERE id=? AND shop_id=?", (expense_id, shop_id)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_recurring_expenses(shop_id: int):
+    """Все активные повторяющиеся расходы точки — для управления (пауза,
+    удаление) и чтобы видеть, что запланировано."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recurring_expenses WHERE shop_id=? AND status='active' ORDER BY day_of_month",
+            (shop_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_recurring_expense(expense_id: int, shop_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM recurring_expenses WHERE id=? AND shop_id=?", (expense_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def log_expense(shop_id: int, category: str, name: str, amount: int, expense_date: str = None,
+                 recurring_expense_id: int = None):
+    """Записывает фактически понесённый расход — разовый или как отметку
+    оплаты повторяющегося (тогда recurring_expense_id сдвигает следующую
+    дату на месяц вперёд от текущей, а не от сегодня — чтобы ранняя или
+    поздняя оплата не сбивала график)."""
+    expense_date = expense_date or datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO expense_entries (shop_id, recurring_expense_id, category, name, amount, expense_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (shop_id, recurring_expense_id, category, name, amount, expense_date))
+        if recurring_expense_id:
+            plan = get_recurring_expense(recurring_expense_id, shop_id)
+            if plan:
+                next_due = datetime.strptime(plan["next_due_date"], "%Y-%m-%d")
+                if next_due.month == 12:
+                    next_due = next_due.replace(year=next_due.year + 1, month=1, day=plan["day_of_month"])
+                else:
+                    next_due = next_due.replace(month=next_due.month + 1, day=plan["day_of_month"])
+                conn.execute(
+                    "UPDATE recurring_expenses SET next_due_date=? WHERE id=?",
+                    (next_due.strftime("%Y-%m-%d"), recurring_expense_id)
+                )
+        conn.commit()
+
+
+def get_expenses(shop_id: int, date_from: str, date_to: str):
+    """Журнал фактических расходов за период (включительно с обеих сторон)."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT * FROM expense_entries WHERE shop_id=? AND expense_date >= ? AND expense_date <= ?
+            ORDER BY expense_date DESC, id DESC
+        """, (shop_id, date_from, date_to)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_expense_summary(shop_id: int, days: int = 30) -> dict:
+    """Сумма расходов за последние `days` дней — итого и разбивка по
+    категориям, для dashboard."""
+    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT category, amount FROM expense_entries WHERE shop_id=? AND expense_date >= ?",
+            (shop_id, start_date)
+        ).fetchall()
+    by_category = {}
+    total = 0
+    for r in rows:
+        by_category[r["category"]] = by_category.get(r["category"], 0) + r["amount"]
+        total += r["amount"]
+    breakdown = sorted(
+        [{"category": k, "amount": v} for k, v in by_category.items()],
+        key=lambda x: x["amount"], reverse=True
+    )
+    return {"total": total, "breakdown": breakdown}
+
+
+def get_due_recurring_expenses():
+    """Для фонового задания бота — все активные повторяющиеся расходы по
+    ВСЕМ точкам, чей срок наступил или просрочен, и сегодня ещё не
+    напоминали. Напоминание уходит владельцу (клиент тут ни при чём —
+    расходы точки его не касаются)."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT re.*, s.notify_telegram_id, s.shop_name, s.language
+            FROM recurring_expenses re JOIN shops s ON s.id = re.shop_id
+            WHERE re.status='active' AND re.next_due_date <= ?
+              AND (re.last_reminder_date IS NULL OR re.last_reminder_date != ?)
+        """, (today, today)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def mark_expense_reminded(expense_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE recurring_expenses SET last_reminder_date=? WHERE id=?",
+            (datetime.now().strftime("%Y-%m-%d"), expense_id)
+        )
+        conn.commit()
+
+
+def get_net_profit_30d(shop_id: int) -> dict:
+    """Прибыль по марже на масле минус прочие расходы (аренда, зарплата и
+    т.п.) за последние 30 дней — 'настоящая' прибыль точки целиком, не
+    только по продаже масла."""
+    start_date = (datetime.now() - timedelta(days=29)).strftime("%Y-%m-%d")
+    today = datetime.now().strftime("%Y-%m-%d")
+    oil_profit = get_profit_range(shop_id, start_date, today)
+    expenses = get_expense_summary(shop_id, days=30)
+    return {
+        "oil_profit": oil_profit,
+        "expenses_total": expenses["total"],
+        "net_profit": oil_profit - expenses["total"],
+    }
 
 
 def get_due_reminders():

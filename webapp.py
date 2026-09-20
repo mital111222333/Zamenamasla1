@@ -574,6 +574,21 @@ PAGE = """
   .dash-summary-box .dsb-num { font-size:20px; font-weight:700; color:var(--text); font-family:var(--font-mono); }
   .dash-summary-box .dsb-num.warn { color:#B3241C; }
   .dash-summary-box .dsb-label { font-size:11px; color:var(--hint); margin-top:2px; }
+  .dash-brands-panel { background:var(--field-bg); border-radius:10px; margin:4px 0 8px; padding:2px 8px; }
+  .recur-exp-card {
+    background:var(--field-bg); border-radius:12px; padding:12px; margin-bottom:8px;
+  }
+  .recur-exp-card.overdue { background:#FEF2F2; }
+  .recur-exp-card .rec-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .recur-exp-card .rec-name { font-size:14px; font-weight:700; color:var(--text); }
+  .recur-exp-card .rec-meta { font-size:11.5px; color:var(--hint); margin-top:2px; }
+  .recur-exp-card .rec-amount { font-size:15px; font-weight:700; color:var(--blue); flex:none; }
+  .recur-exp-card .rec-actions { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+  .journal-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+  .journal-row:last-child { border-bottom:none; }
+  .journal-row .jr-cat { font-weight:700; color:var(--text); }
+  .journal-row .jr-meta { font-size:11.5px; color:var(--hint); margin-top:2px; }
+  .journal-row .jr-amount { color:#B3241C; font-weight:700; flex:none; }
   .kc-hist-list { margin-top:14px; }
   .kc-hist-entry { background:var(--field-bg); border-radius:12px; padding:12px 13px; margin-bottom:8px; }
   .kc-hist-entry .kc-he-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -607,6 +622,9 @@ PAGE = """
     <div class="tab active" id="tab-add" onclick="showTab('add')"><span class="tab-icon"><i class="fa-solid fa-oil-can"></i></span><span>{{ T.tab_add }}</span></div>
     <div class="tab" id="tab-table" onclick="showTab('table')"><span class="tab-icon"><i class="fa-solid fa-car"></i></span><span>{{ T.tab_table }}</span></div>
     <div class="tab" id="tab-debts" onclick="showTab('debts')"><span class="tab-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span><span>{{ T.tab_debts }}</span></div>
+    {% if not is_employee %}
+    <div class="tab" id="tab-expenses" onclick="showTab('expenses')"><span class="tab-icon"><i class="fa-solid fa-receipt"></i></span><span>{{ T.tab_expenses }}</span></div>
+    {% endif %}
     <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')"><span class="tab-icon"><i class="fa-solid fa-bullhorn"></i></span><span>{{ T.tab_broadcast }}</span></div>
     {% if not is_employee %}
     <div class="tab" id="tab-export" onclick="showTab('export')"><span class="tab-icon"><i class="fa-solid fa-file-arrow-down"></i></span><span>{{ T.tab_export }}</span></div>
@@ -766,6 +784,60 @@ PAGE = """
     <div id="debtsList"></div>
   </div>
 
+  {% if not is_employee %}
+  <div id="view-expenses" style="display:none;">
+    <div class="card">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.expense_add_title }}</label>
+      <div class="field">
+        <label>{{ T.expense_category_label }}</label>
+        <select id="exp_category" onchange="onExpenseCategoryChange('exp_category', 'exp_category_custom')"></select>
+        <input id="exp_category_custom" placeholder="{{ T.expense_custom_category_ph }}" style="display:none; margin-top:6px;">
+      </div>
+      <div class="field">
+        <label>{{ T.expense_name_label }}</label>
+        <input id="exp_name" placeholder="{{ T.expense_name_ph }}">
+      </div>
+      <div class="field">
+        <label>{{ T.expense_amount_label }}</label>
+        <input id="exp_amount" type="number" placeholder="100000">
+      </div>
+      <button class="submit" onclick="submitExpense()">{{ T.expense_add_btn }}</button>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.expense_recurring_title }}</label>
+      <div id="recurringExpensesList"></div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+        <div class="field">
+          <label>{{ T.expense_category_label }}</label>
+          <select id="rec_category" onchange="onExpenseCategoryChange('rec_category', 'rec_category_custom')"></select>
+          <input id="rec_category_custom" placeholder="{{ T.expense_custom_category_ph }}" style="display:none; margin-top:6px;">
+        </div>
+        <div class="field">
+          <label>{{ T.expense_name_label }}</label>
+          <input id="rec_name" placeholder="{{ T.expense_recurring_name_ph }}">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>{{ T.expense_amount_label }}</label>
+            <input id="rec_amount" type="number" placeholder="2000000">
+          </div>
+          <div class="field">
+            <label>{{ T.expense_day_of_month_label }}</label>
+            <input id="rec_day" type="number" min="1" max="28" placeholder="5">
+          </div>
+        </div>
+        <button class="submit" onclick="createRecurringExpense()">{{ T.expense_recurring_add_btn }}</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.expense_journal_title }}</label>
+      <div id="expensesJournal">{{ T.stats_loading }}</div>
+    </div>
+  </div>
+  {% endif %}
+
   <div id="view-broadcast" class="card" style="display:none;">
     <div class="field">
       <label>{{ T.broadcast_msg_label }}</label>
@@ -796,6 +868,13 @@ PAGE = """
 
     <div id="statsOwnView">
       <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+
+      {% if not is_employee %}
+      <div class="card" style="margin-top:16px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_net_profit_title }}</label>
+        <div id="dashNetProfit">{{ T.stats_loading }}</div>
+      </div>
+      {% endif %}
 
       <div class="card" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_revenue_chart_title }}</label>
@@ -1152,8 +1231,13 @@ function showTab(t) {
   const whTab = document.getElementById('tab-warehouse');
   if (whView) whView.style.display = t === 'warehouse' ? 'block' : 'none';
   if (whTab) whTab.classList.toggle('active', t === 'warehouse');
+  const expView = document.getElementById('view-expenses');
+  const expTab = document.getElementById('tab-expenses');
+  if (expView) expView.style.display = t === 'expenses' ? 'block' : 'none';
+  if (expTab) expTab.classList.toggle('active', t === 'expenses');
   if (t === 'table') loadCars();
   if (t === 'debts') loadDebts();
+  if (t === 'expenses') loadExpensesTab();
   if (t === 'broadcast') loadBroadcastInfo();
   if (t === 'stats') loadStats();
   if (t === 'warehouse') loadWarehouse();
@@ -1421,18 +1505,60 @@ function renderRevenueChart(dailyData) {
   });
 }
 
+async function toggleCategoryBrands(categoryName, idx) {
+  const panel = document.getElementById('catBrands_' + idx);
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  document.querySelectorAll('.dash-brands-panel').forEach(el => { if (el !== panel) el.style.display = 'none'; });
+  if (isOpen) { panel.style.display = 'none'; return; }
+  panel.innerHTML = T.stats_loading;
+  panel.style.display = 'block';
+  const brands = await (await fetch('/api/dashboard/top_brands?category=' + encodeURIComponent(categoryName))).json();
+  panel.innerHTML = brands.length ? brands.map((b, j) => `
+    <div class="dash-row" style="padding-left:28px; font-size:12.5px;">
+      <span class="dash-row-name">${j + 1}. ${escapeHtml(b.name)}</span>
+      <span class="dash-row-value">${b.qty.toLocaleString('ru-RU')}</span>
+    </div>
+  `).join('') : `<div class="hint-text" style="padding-left:28px;">${T.dash_no_data}</div>`;
+}
+
 async function loadDashboard() {
   const res = await fetch('/api/dashboard');
   const data = await res.json();
 
   renderRevenueChart(data.daily_revenue);
 
+  const netEl = document.getElementById('dashNetProfit');
+  if (netEl && data.net_profit) {
+    const np = data.net_profit;
+    const isNegative = np.net_profit < 0;
+    netEl.innerHTML = `
+      <div class="dash-summary-grid">
+        <div class="dash-summary-box">
+          <div class="dsb-num">${np.oil_profit.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dsb-label">${T.dash_oil_profit_label}</div>
+        </div>
+        <div class="dash-summary-box">
+          <div class="dsb-num warn">${np.expenses_total.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dsb-label">${T.dash_expenses_label}</div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
+        <div style="font-size:24px; font-weight:700; font-family:var(--font-mono); color:${isNegative ? '#B3241C' : '#15803D'};">${np.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
+        <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
+      </div>
+    `;
+  }
+
   const topEl = document.getElementById('dashTopProducts');
   if (topEl) {
     topEl.innerHTML = data.top_products.length ? data.top_products.map((p, i) => `
-      <div class="dash-row">
-        <span><span class="dash-row-rank">${i + 1}</span><span class="dash-row-name">${escapeHtml(p.name)}</span></span>
-        <span class="dash-row-value">${p.qty.toLocaleString('ru-RU')}</span>
+      <div>
+        <div class="dash-row" style="cursor:pointer;" onclick="toggleCategoryBrands(${escapeHtml(JSON.stringify(p.name))}, ${i})">
+          <span><span class="dash-row-rank">${i + 1}</span><span class="dash-row-name">${escapeHtml(p.name)}</span> <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--hint); margin-left:4px;"></i></span>
+          <span class="dash-row-value">${p.qty.toLocaleString('ru-RU')}</span>
+        </div>
+        <div id="catBrands_${i}" class="dash-brands-panel" style="display:none;"></div>
       </div>
     `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
   }
@@ -2347,6 +2473,146 @@ async function payDebt(planId) {
   }
 }
 
+let expenseCategoriesCache = [];
+
+async function loadExpenseCategoryOptions(selectId) {
+  if (!expenseCategoriesCache.length) {
+    expenseCategoriesCache = await (await fetch('/api/expenses/categories')).json();
+  }
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  select.innerHTML = expenseCategoriesCache.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+    + `<option value="__custom__">${T.expense_custom_category_option}</option>`;
+}
+
+function onExpenseCategoryChange(selectId, customInputId) {
+  const select = document.getElementById(selectId);
+  const customInput = document.getElementById(customInputId);
+  const isCustom = select.value === '__custom__';
+  customInput.style.display = isCustom ? 'block' : 'none';
+  if (isCustom) customInput.focus();
+}
+
+function getSelectedCategory(selectId, customInputId) {
+  const select = document.getElementById(selectId);
+  if (select.value === '__custom__') {
+    return document.getElementById(customInputId).value.trim();
+  }
+  return select.value;
+}
+
+async function loadExpensesTab() {
+  await loadExpenseCategoryOptions('exp_category');
+  await loadExpenseCategoryOptions('rec_category');
+  loadRecurringExpenses();
+  loadExpensesJournal();
+}
+
+async function submitExpense() {
+  const category = getSelectedCategory('exp_category', 'exp_category_custom');
+  const name = document.getElementById('exp_name').value.trim();
+  const amount = document.getElementById('exp_amount').value;
+  if (!category || !amount) { showMsg(T.msg_fill_required, false); return; }
+  const res = await fetch('/api/expenses', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category, name, amount}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.expense_saved, true);
+    document.getElementById('exp_name').value = '';
+    document.getElementById('exp_amount').value = '';
+    document.getElementById('exp_category_custom').value = '';
+    loadExpensesJournal();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function loadRecurringExpenses() {
+  const list = await (await fetch('/api/recurring_expenses')).json();
+  const el = document.getElementById('recurringExpensesList');
+  if (!el) return;
+  const today = new Date().toISOString().slice(0, 10);
+  el.innerHTML = list.length ? list.map(r => `
+    <div class="recur-exp-card ${r.next_due_date < today ? 'overdue' : ''}">
+      <div class="rec-top">
+        <div>
+          <div class="rec-name">${escapeHtml(r.name || r.category)}</div>
+          <div class="rec-meta">${escapeHtml(r.category)} · ${T.expense_next_due} ${r.next_due_date}</div>
+        </div>
+        <div class="rec-amount">${r.amount.toLocaleString('ru-RU')} ${T.currency}</div>
+      </div>
+      <div class="rec-actions">
+        <button class="badge active" style="flex:1;" onclick="payRecurringExpense(${r.id})">${T.expense_mark_paid_btn}</button>
+        <button class="badge inactive" style="flex:none;" onclick="deleteRecurringExpenseBtn(${r.id})">${T.entry_delete}</button>
+      </div>
+    </div>
+  `).join('') : `<div class="hint-text">${T.expense_no_recurring}</div>`;
+}
+
+async function createRecurringExpense() {
+  const category = getSelectedCategory('rec_category', 'rec_category_custom');
+  const name = document.getElementById('rec_name').value.trim();
+  const amount = document.getElementById('rec_amount').value;
+  const day_of_month = document.getElementById('rec_day').value;
+  if (!category || !amount || !day_of_month) { showMsg(T.msg_fill_required, false); return; }
+  const res = await fetch('/api/recurring_expenses', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category, name, amount, day_of_month}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.expense_recurring_created, true);
+    document.getElementById('rec_name').value = '';
+    document.getElementById('rec_amount').value = '';
+    document.getElementById('rec_day').value = '';
+    document.getElementById('rec_category_custom').value = '';
+    loadRecurringExpenses();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function payRecurringExpense(id) {
+  const res = await fetch(`/api/recurring_expenses/${id}/pay`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.expense_mark_paid_success, true);
+    loadRecurringExpenses();
+    loadExpensesJournal();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function deleteRecurringExpenseBtn(id) {
+  if (!confirm(T.expense_delete_recurring_confirm)) return;
+  const res = await fetch(`/api/recurring_expenses/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.entry_deleted, true);
+    loadRecurringExpenses();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function loadExpensesJournal() {
+  const journal = await (await fetch('/api/expenses')).json();
+  const el = document.getElementById('expensesJournal');
+  if (!el) return;
+  el.innerHTML = journal.length ? journal.slice(0, 30).map(e => `
+    <div class="journal-row">
+      <div>
+        <div class="jr-cat">${escapeHtml(e.name || e.category)}</div>
+        <div class="jr-meta">${escapeHtml(e.category)} · ${e.expense_date}</div>
+      </div>
+      <div class="jr-amount">−${e.amount.toLocaleString('ru-RU')} ${T.currency}</div>
+    </div>
+  `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
+}
+
 function renderTable() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   const rows = carsCache.filter(c =>
@@ -3032,15 +3298,113 @@ def api_dashboard():
         "top_products": db.get_top_products_by_qty(g.shop_id, days=30, limit=5),
         "debt_summary": db.get_debt_summary(g.shop_id),
         "low_stock": [],
+        "net_profit": None,
     }
+    if not g.is_employee:
+        result["net_profit"] = db.get_net_profit_30d(g.shop_id)
     shop = db.get_shop(g.shop_id)
     if shop and shop.get("warehouse_enabled") and not g.is_employee:
-        low_stock = db.get_low_stock_products(g.shop_id, limit=5)
+        low_stock = db.get_low_stock_products(g.shop_id)
         if g.is_branch:
             for p in low_stock:
                 p.pop("purchase_price", None)
         result["low_stock"] = low_stock
     return jsonify(result)
+
+
+@app.route("/api/dashboard/top_brands")
+@login_required
+def api_dashboard_top_brands():
+    """Топ-10 брендов внутри одной категории — для раскрытия по клику на
+    строку категории в dashboard."""
+    category = request.args.get("category", "")
+    if not category:
+        return jsonify({"ok": False, "error": "укажите категорию"}), 400
+    return jsonify(db.get_top_brands_for_category(g.shop_id, category, days=30, limit=10))
+
+
+@app.route("/api/expenses/categories")
+@login_required
+def api_expense_categories():
+    return jsonify(db.EXPENSE_PRESET_CATEGORIES)
+
+
+@app.route("/api/expenses")
+@login_required
+@employee_blocked
+def api_list_expenses():
+    """Журнал разовых расходов за период — сотруднику не показываем
+    (финансовая информация точки, как и цена закупки)."""
+    date_from = request.args.get("from") or "2000-01-01"
+    date_to = request.args.get("to") or "2100-01-01"
+    return jsonify(db.get_expenses(g.shop_id, date_from, date_to))
+
+
+@app.route("/api/expenses", methods=["POST"])
+@login_required
+@employee_blocked
+def api_log_expense():
+    data = request.get_json(force=True)
+    category = (data.get("category") or "").strip()
+    name = (data.get("name") or "").strip() or None
+    try:
+        amount = int(data["amount"])
+        if amount <= 0:
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "укажите положительную сумму"}), 400
+    if not category:
+        return jsonify({"ok": False, "error": "укажите категорию"}), 400
+    db.log_expense(g.shop_id, category, name, amount, data.get("expense_date"))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/recurring_expenses")
+@login_required
+@employee_blocked
+def api_list_recurring_expenses():
+    return jsonify(db.get_recurring_expenses(g.shop_id))
+
+
+@app.route("/api/recurring_expenses", methods=["POST"])
+@login_required
+@employee_blocked
+def api_create_recurring_expense():
+    data = request.get_json(force=True)
+    category = (data.get("category") or "").strip()
+    name = (data.get("name") or "").strip() or None
+    try:
+        amount = int(data["amount"])
+        day_of_month = int(data["day_of_month"])
+        if amount <= 0 or not (1 <= day_of_month <= 28):
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "укажите сумму и число месяца (1-28)"}), 400
+    if not category:
+        return jsonify({"ok": False, "error": "укажите категорию"}), 400
+    plan = db.create_recurring_expense(g.shop_id, category, name, amount, day_of_month)
+    return jsonify({"ok": True, "expense": plan})
+
+
+@app.route("/api/recurring_expenses/<int:expense_id>", methods=["DELETE"])
+@login_required
+@employee_blocked
+def api_delete_recurring_expense(expense_id):
+    ok = db.delete_recurring_expense(expense_id, g.shop_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "не найдено"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/recurring_expenses/<int:expense_id>/pay", methods=["POST"])
+@login_required
+@employee_blocked
+def api_pay_recurring_expense(expense_id):
+    plan = db.get_recurring_expense(expense_id, g.shop_id)
+    if not plan:
+        return jsonify({"ok": False, "error": "не найдено"}), 404
+    db.log_expense(g.shop_id, plan["category"], plan["name"], plan["amount"], recurring_expense_id=expense_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/debts/<int:plan_id>/pay", methods=["POST"])
