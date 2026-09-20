@@ -788,14 +788,14 @@ PAGE = """
   <div id="view-expenses" style="display:none;">
     {% if not is_branch %}
     <div class="card" id="usdRateCardExp" style="margin-bottom:14px;">
-      <label style="font-size:14px; color:var(--text); font-weight:600; display:block; margin-bottom:8px;">{{ T.usd_rate_title }}</label>
-      <div style="display:flex; gap:8px; align-items:flex-end;">
-        <div class="field" style="flex:1; margin-bottom:0;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
+      <div class="row2">
+        <div class="field">
           <label>{{ T.usd_rate_label }}</label>
           <input id="usd_rate_input_exp" type="number" step="0.01" placeholder="12700" value="{{ usd_rate or '' }}">
         </div>
-        <button class="submit" style="flex:none; margin-top:0;" onclick="saveUsdRate('usd_rate_input_exp', 'usdRateSaved_exp')">{{ T.usd_rate_save }}</button>
       </div>
+      <button class="submit" onclick="saveUsdRate('usd_rate_input_exp', 'usdRateSaved_exp')">{{ T.usd_rate_save }}</button>
       <div id="usdRateSaved_exp" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
     </div>
     {% endif %}
