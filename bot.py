@@ -24,8 +24,10 @@ LEGACY_ADMIN_SHOP_ID = 1
 
 import os
 import re
+import sqlite3
 import asyncio
 import logging
+from datetime import datetime, time as dtime
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
@@ -634,6 +636,39 @@ async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYP
         # пропускаем без отметки (попробуем снова завтра)
 
 
+async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
+    """Ежедневная резервная копия базы данных — отправляется в Telegram
+    владельцу платформы (ADMIN_TELEGRAM_ID). Копия делается через
+    встроенный backup API SQLite (а не простым копированием файла), чтобы
+    не захватить повреждённый снимок, если в этот момент идёт запись —
+    безопасно даже пока бот и сайт продолжают работать."""
+    if not ADMIN_TELEGRAM_ID:
+        logger.warning("ADMIN_TELEGRAM_ID не задан — резервную копию некому отправить")
+        return
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    backup_path = f"/tmp/oilbot_backup_{today_str}.db"
+    try:
+        src = sqlite3.connect(db.DB_PATH)
+        dst = sqlite3.connect(backup_path)
+        src.backup(dst)
+        dst.close()
+        src.close()
+        size_mb = os.path.getsize(backup_path) / 1024 / 1024
+        with open(backup_path, "rb") as f:
+            await context.bot.send_document(
+                chat_id=ADMIN_TELEGRAM_ID,
+                document=f,
+                filename=f"oilbot_backup_{today_str}.db",
+                caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ)",
+            )
+        logger.info(f"Резервная копия базы отправлена ({size_mb:.1f} МБ)")
+    except Exception as e:
+        logger.error(f"Не удалось создать/отправить резервную копию базы: {e}")
+    finally:
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+
+
 def main():
     db.init_db()
     webapp.run_webapp_in_thread()  # веб-панель поднимается в этом же процессе
@@ -689,6 +724,8 @@ def main():
     job_queue = app.job_queue
     job_queue.run_repeating(check_and_send_reminders, interval=6 * 3600, first=10)
     job_queue.run_repeating(check_and_send_installment_reminders, interval=6 * 3600, first=20)
+    # 1:00 по времени сервера (обычно UTC) — около 6 утра в Узбекистане, тихий час
+    job_queue.run_daily(send_daily_backup, time=dtime(hour=1, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)
 
     logger.info("Бот и веб-панель запущены...")
