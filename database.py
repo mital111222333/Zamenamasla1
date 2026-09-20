@@ -98,6 +98,7 @@ def init_db():
             parent_shop_id INTEGER,
             usd_rate REAL,
             card_number TEXT,
+            owner_link_token TEXT UNIQUE,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -309,10 +310,21 @@ def _migrate(conn):
         "parent_shop_id": "INTEGER",
         "usd_rate": "REAL",
         "card_number": "TEXT",
+        "owner_link_token": "TEXT",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
             conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
+
+    # --- у каждой точки должен быть токен для самостоятельной привязки
+    # владельца к боту (взамен ручного ввода Telegram ID платформенным
+    # админом) — генерируем недостающие, безопасно на каждом запуске
+    rows_needing_token = conn.execute("SELECT id FROM shops WHERE owner_link_token IS NULL").fetchall()
+    for row in rows_needing_token:
+        conn.execute(
+            "UPDATE shops SET owner_link_token=? WHERE id=?",
+            (secrets.token_urlsafe(12), row["id"])
+        )
 
     # --- склад: товары точки и история пополнений ---
     conn.execute("""
@@ -526,10 +538,11 @@ def create_shop(username: str, password: str, shop_name: str = None, phone: str 
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
-                                anpr_token, notify_telegram_id, is_active, client_group)
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                                anpr_token, notify_telegram_id, is_active, client_group, owner_link_token)
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         """, (username, generate_password_hash(password), role, shop_name,
-              phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id, client_group or None))
+              phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id, client_group or None,
+              secrets.token_urlsafe(12)))
         conn.commit()
         return get_shop(cur.lastrowid)
 
@@ -584,6 +597,22 @@ def find_shop_by_username(username: str):
             "SELECT * FROM shops WHERE username=? AND role IN ('shop', 'branch')", (username,)
         ).fetchone()
         return dict(row) if row else None
+
+
+def link_shop_owner_by_token(telegram_id: int, token: str):
+    """Владелец точки (или филиала) сам привязывает свой Telegram, перейдя
+    по персональной ссылке — вместо того чтобы платформенный админ вручную
+    вписывал ID. Раз владелец сам переходит по ссылке и пишет боту, Telegram
+    после этого разрешает боту писать ему первым (это и была причина, по
+    которой 'ручной' ID часто не срабатывал). Возвращает точку при успехе,
+    None — если токен не найден."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM shops WHERE owner_link_token=?", (token,)).fetchone()
+        if not row:
+            return None
+        conn.execute("UPDATE shops SET notify_telegram_id=? WHERE id=?", (str(telegram_id), row["id"]))
+        conn.commit()
+        return get_shop(row["id"])
 
 
 def create_password_reset_code(shop_id: int) -> str:
@@ -1929,10 +1958,10 @@ def create_branch_shop(parent_shop_id: int, username: str, password: str, shop_n
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
-                                anpr_token, is_active, parent_shop_id)
-            VALUES (?, ?, NULL, 'branch', ?, ?, ?, ?, 1, ?)
+                                anpr_token, is_active, parent_shop_id, owner_link_token)
+            VALUES (?, ?, NULL, 'branch', ?, ?, ?, ?, 1, ?, ?)
         """, (username, generate_password_hash(password), shop_name,
-              phone, address, secrets.token_urlsafe(8), parent_shop_id))
+              phone, address, secrets.token_urlsafe(8), parent_shop_id, secrets.token_urlsafe(12)))
         conn.commit()
         return get_shop(cur.lastrowid)
 

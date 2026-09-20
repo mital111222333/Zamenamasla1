@@ -4145,12 +4145,19 @@ function renderShopsTable(shops) {
       <td><span class="hint-text">🔒 скрыт</span>
           <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
       <td>${s.phone || '—'}</td>
-      <td>
-        <input id="notify_id_${s.id}" value="${escapeHtml(s.notify_telegram_id || '')}" placeholder="123456789" style="width:110px; font-size:12px; padding:5px;">
-        <div style="display:flex; gap:4px; margin-top:4px;">
-          <button class="badge" style="background:var(--border);color:var(--hint);" onclick="saveNotifyTelegram(${s.id})">сохранить</button>
-          <button class="badge" style="background:#EFF6FF;color:var(--blue);" onclick="testNotifyTelegram(${s.id})">проверить</button>
-        </div>
+      <td style="min-width:160px;">
+        ${s.notify_telegram_id
+          ? `<div style="font-size:11.5px; color:#1B8A5A; font-weight:600;">✅ привязан</div>`
+          : `<div style="font-size:11.5px; color:#B3241C; font-weight:600;">не привязан</div>`}
+        ${s.owner_link
+          ? `<button class="badge" style="background:#EFF6FF;color:var(--blue);margin-top:4px;" onclick="copyOwnerLink(${escapeHtml(JSON.stringify(s.owner_link))}, this)">🔗 ссылка для владельца</button>`
+          : ''}
+        <button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="testNotifyTelegram(${s.id})">проверить</button>
+        <details style="margin-top:4px;">
+          <summary style="font-size:11px; color:var(--hint); cursor:pointer;">вручную</summary>
+          <input id="notify_id_${s.id}" value="${escapeHtml(s.notify_telegram_id || '')}" placeholder="123456789" style="width:100px; font-size:11px; padding:4px; margin-top:4px;">
+          <button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="saveNotifyTelegram(${s.id})">сохранить</button>
+        </details>
       </td>
       <td>${s.client_count}</td>
       <td><button class="badge ${s.is_active ? 'active' : 'inactive'}" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">
@@ -4355,6 +4362,21 @@ async function resetPassword(id, username) {
   }
 }
 
+function copyOwnerLink(link, btn) {
+  const done = () => {
+    const original = btn.textContent;
+    btn.textContent = '✅ скопировано';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(done).catch(() => {
+      prompt('Скопируйте ссылку вручную:', link);
+    });
+  } else {
+    prompt('Скопируйте ссылку вручную:', link);
+  }
+}
+
 async function saveNotifyTelegram(id) {
   const notify_telegram_id = document.getElementById(`notify_id_${id}`).value.trim();
   const res = await fetch(`/api/admin/shops/${id}/notify_telegram`, {
@@ -4434,7 +4456,10 @@ def admin_page():
 @app.route("/api/admin/shops")
 @admin_required
 def api_admin_shops():
-    return jsonify(db.list_shops())
+    shops = db.list_shops()
+    for s in shops:
+        s["owner_link"] = _client_link(f"owner_{s['owner_link_token']}") if s.get("owner_link_token") else None
+    return jsonify(shops)
 
 
 @app.route("/api/admin/shops", methods=["POST"])
