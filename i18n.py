@@ -109,6 +109,13 @@ RU = {
     "kc_car_saved": "Данные обновлены",
     "kc_car_deleted": "Машина и вся её история удалены",
     "kc_delete_car_confirm": "Удалить машину {plate} со всей историей замен и долгами полностью? Отменить будет нельзя.",
+    "dash_revenue_chart_title": "Выручка за 30 дней",
+    "dash_top_products_title": "Топ товаров (за 30 дней, по количеству)",
+    "dash_debt_summary_title": "Долги и рассрочка",
+    "dash_low_stock_title": "Заканчивается на складе",
+    "dash_no_data": "Пока нет данных.",
+    "dash_total_owed": "Всего должны",
+    "dash_overdue_of_total": "просрочено из должников",
 
 
     "branch_products_count": "товаров:",
@@ -441,6 +448,13 @@ UZ = {
     "kc_car_saved": "Ma'lumotlar yangilandi",
     "kc_car_deleted": "Avtomobil va uning butun tarixi o'chirildi",
     "kc_delete_car_confirm": "{plate} avtomobilini butun almashtirish tarixi va qarzlari bilan birga o'chirilsinmi? Buni qaytarib bo'lmaydi.",
+    "dash_revenue_chart_title": "30 kunlik tushum",
+    "dash_top_products_title": "Top mahsulotlar (30 kun, miqdor bo'yicha)",
+    "dash_debt_summary_title": "Qarzlar va bo'lib to'lash",
+    "dash_low_stock_title": "Omborda tugayapti",
+    "dash_no_data": "Hozircha ma'lumot yo'q.",
+    "dash_total_owed": "Jami qarz",
+    "dash_overdue_of_total": "muddati o'tgan / jami qarzdorlar",
 
 
     "branch_products_count": "mahsulotlar:",

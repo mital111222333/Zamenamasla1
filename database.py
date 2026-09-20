@@ -1318,6 +1318,73 @@ def get_active_debts(shop_id: int):
         return result
 
 
+def get_debt_summary(shop_id: int) -> dict:
+    """Краткая сводка по долгам для dashboard — сколько всего должны и
+    сколько просрочено, без деталей по каждому клиенту отдельно."""
+    debts = get_active_debts(shop_id)
+    return {
+        "total_remaining": sum(d["remaining"] for d in debts),
+        "count": len(debts),
+        "overdue_count": sum(1 for d in debts if d["is_overdue"]),
+    }
+
+
+def get_daily_revenue(shop_id: int, days: int = 30):
+    """Выручка по дням за последние `days` дней — для графика динамики на
+    dashboard. Дни без единой продажи всё равно включены в список с total=0,
+    чтобы график не 'перепрыгивал' через пропуски."""
+    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date as date, COALESCE(SUM(oc.cost), 0) as total
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ?
+            GROUP BY oc.change_date
+        """, (shop_id, start_date)).fetchall()
+    by_date = {r["date"]: r["total"] for r in rows}
+    result = []
+    for i in range(days):
+        d = (datetime.now() - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+        result.append({"date": d, "total": by_date.get(d, 0)})
+    return result
+
+
+def get_top_products_by_qty(shop_id: int, days: int = 30, limit: int = 5):
+    """Топ проданных товаров за последние `days` дней, по количеству (литры
+    или штуки в зависимости от товара) — что берут чаще всего. Считается по
+    items_json каждой записи, так как это единственное место, где хранится
+    детализация по позициям."""
+    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.items_json IS NOT NULL
+        """, (shop_id, start_date)).fetchall()
+    totals = {}
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"])
+        except (TypeError, ValueError):
+            continue
+        for item in items:
+            name = item.get("name")
+            if not name:
+                continue
+            qty = item.get("qty") or 0
+            totals[name] = totals.get(name, 0) + qty
+    ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+    return [{"name": name, "qty": round(qty, 2)} for name, qty in ranked]
+
+
+def get_low_stock_products(shop_id: int, limit: int = 5):
+    """3-5 товаров с самым малым остатком на складе — без настраиваемого
+    порога, просто наименьшие по количеству, чтобы сразу было видно, что
+    вот-вот закончится."""
+    products = list_products(shop_id)
+    ranked = sorted(products, key=lambda p: p["stock_qty"])[:limit]
+    return ranked
+
+
 def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None):
     """Отмечает поступивший платёж по долгу — увеличивает paid_amount,
     сдвигает следующую дату на interval_days вперёд, и закрывает план,

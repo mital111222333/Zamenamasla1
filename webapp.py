@@ -557,6 +557,23 @@ PAGE = """
   .debt-card .dc-due { font-size:11.5px; color:var(--hint); margin-top:2px; text-align:right; }
   .debt-card .dc-due.overdue-text { color:#B3241C; font-weight:700; }
   .debt-card .dc-pay-row { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+  .dash-row {
+    display:flex; justify-content:space-between; align-items:center; padding:8px 0;
+    border-bottom:1px dashed var(--border); font-size:13.5px;
+  }
+  .dash-row:last-child { border-bottom:none; }
+  .dash-row .dash-row-rank {
+    display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px;
+    background:var(--field-bg); border-radius:50%; font-size:11px; font-weight:700; color:var(--hint); margin-right:8px; flex:none;
+  }
+  .dash-row .dash-row-name { color:var(--text); font-weight:600; }
+  .dash-row .dash-row-value { color:var(--blue); font-weight:700; flex:none; }
+  .dash-row .dash-row-value.warn { color:#B3241C; }
+  .dash-summary-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+  .dash-summary-box { background:var(--field-bg); border-radius:12px; padding:12px; text-align:center; }
+  .dash-summary-box .dsb-num { font-size:20px; font-weight:700; color:var(--text); font-family:var(--font-mono); }
+  .dash-summary-box .dsb-num.warn { color:#B3241C; }
+  .dash-summary-box .dsb-label { font-size:11px; color:var(--hint); margin-top:2px; }
   .kc-hist-list { margin-top:14px; }
   .kc-hist-entry { background:var(--field-bg); border-radius:12px; padding:12px 13px; margin-bottom:8px; }
   .kc-hist-entry .kc-he-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -779,6 +796,28 @@ PAGE = """
 
     <div id="statsOwnView">
       <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_revenue_chart_title }}</label>
+        <canvas id="revenueChart" height="180"></canvas>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_top_products_title }}</label>
+        <div id="dashTopProducts">{{ T.stats_loading }}</div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_debt_summary_title }}</label>
+        <div id="dashDebtSummary">{{ T.stats_loading }}</div>
+      </div>
+
+      {% if warehouse_enabled and not is_employee %}
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_low_stock_title }}</label>
+        <div id="dashLowStock">{{ T.stats_loading }}</div>
+      </div>
+      {% endif %}
 
       <div class="card" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.stats_custom_title }}</label>
@@ -1360,7 +1399,74 @@ async function loadRestockHistory() {
 }
 
 
+let revenueChartInstance = null;
+
+function renderRevenueChart(dailyData) {
+  const canvas = document.getElementById('revenueChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (revenueChartInstance) { revenueChartInstance.destroy(); }
+  revenueChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: dailyData.map(d => d.date.slice(5)),
+      datasets: [{
+        label: T.dash_revenue_chart_title,
+        data: dailyData.map(d => d.total),
+        borderColor: '#E63946',
+        backgroundColor: 'rgba(230,57,70,0.08)',
+        fill: true, tension: 0.3, pointRadius: 0,
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+async function loadDashboard() {
+  const res = await fetch('/api/dashboard');
+  const data = await res.json();
+
+  renderRevenueChart(data.daily_revenue);
+
+  const topEl = document.getElementById('dashTopProducts');
+  if (topEl) {
+    topEl.innerHTML = data.top_products.length ? data.top_products.map((p, i) => `
+      <div class="dash-row">
+        <span><span class="dash-row-rank">${i + 1}</span><span class="dash-row-name">${escapeHtml(p.name)}</span></span>
+        <span class="dash-row-value">${p.qty.toLocaleString('ru-RU')}</span>
+      </div>
+    `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
+  }
+
+  const debtEl = document.getElementById('dashDebtSummary');
+  if (debtEl) {
+    const ds = data.debt_summary;
+    debtEl.innerHTML = `
+      <div class="dash-summary-grid">
+        <div class="dash-summary-box">
+          <div class="dsb-num">${ds.total_remaining.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dsb-label">${T.dash_total_owed}</div>
+        </div>
+        <div class="dash-summary-box">
+          <div class="dsb-num ${ds.overdue_count > 0 ? 'warn' : ''}">${ds.overdue_count} / ${ds.count}</div>
+          <div class="dsb-label">${T.dash_overdue_of_total}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const lowEl = document.getElementById('dashLowStock');
+  if (lowEl) {
+    lowEl.innerHTML = data.low_stock.length ? data.low_stock.map(p => `
+      <div class="dash-row">
+        <span class="dash-row-name">${escapeHtml(p.name)}</span>
+        <span class="dash-row-value warn">${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l}</span>
+      </div>
+    `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
+  }
+}
+
 async function loadStats() {
+  loadDashboard();
   const res = await fetch('/api/stats');
   const s = await res.json();
   let profit = null;
@@ -2912,6 +3018,29 @@ def api_add():
 @login_required
 def api_list_debts():
     return jsonify(db.get_active_debts(g.shop_id))
+
+
+@app.route("/api/dashboard")
+@login_required
+def api_dashboard():
+    """Всё для dashboard одним запросом — график выручки за 30 дней, топ
+    товаров по количеству, сводка по долгам, и товары с малым остатком.
+    Склад и товары не относятся к филиалу/сотруднику без склада — тогда
+    просто возвращаются пустыми, без ошибки."""
+    result = {
+        "daily_revenue": db.get_daily_revenue(g.shop_id, days=30),
+        "top_products": db.get_top_products_by_qty(g.shop_id, days=30, limit=5),
+        "debt_summary": db.get_debt_summary(g.shop_id),
+        "low_stock": [],
+    }
+    shop = db.get_shop(g.shop_id)
+    if shop and shop.get("warehouse_enabled") and not g.is_employee:
+        low_stock = db.get_low_stock_products(g.shop_id, limit=5)
+        if g.is_branch:
+            for p in low_stock:
+                p.pop("purchase_price", None)
+        result["low_stock"] = low_stock
+    return jsonify(result)
 
 
 @app.route("/api/debts/<int:plan_id>/pay", methods=["POST"])
