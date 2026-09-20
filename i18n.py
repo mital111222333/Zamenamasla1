@@ -141,6 +141,8 @@ RU = {
     "dash_oil_profit_label": "Прибыль по маслу",
     "dash_expenses_label": "Расходы",
     "dash_net_profit_label": "Чистая прибыль",
+    "expense_date_label": "Дата",
+    "expense_delete_entry_confirm": "Удалить эту запись из журнала расходов? Отменить будет нельзя.",
 
 
     "branch_products_count": "товаров:",
@@ -505,6 +507,8 @@ UZ = {
     "dash_oil_profit_label": "Moy bo'yicha foyda",
     "dash_expenses_label": "Xarajatlar",
     "dash_net_profit_label": "Sof foyda",
+    "expense_date_label": "Sana",
+    "expense_delete_entry_confirm": "Ushbu yozuv xarajatlar jurnalidan o'chirilsinmi? Buni qaytarib bo'lmaydi.",
 
 
     "branch_products_count": "mahsulotlar:",

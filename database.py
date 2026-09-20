@@ -1608,6 +1608,39 @@ def get_expenses(shop_id: int, date_from: str, date_to: str):
         return [dict(r) for r in rows]
 
 
+def get_expense_entry(entry_id: int, shop_id: int):
+    """Одна запись журнала расходов — только если она принадлежит этой точке."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM expense_entries WHERE id=? AND shop_id=?", (entry_id, shop_id)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_expense_entry(entry_id: int, shop_id: int, category: str, name: str, amount: int, expense_date: str) -> bool:
+    """Редактирует уже внесённую запись расхода — сумму, категорию, название,
+    дату. Не трогает связь с повторяющимся расходом (recurring_expense_id),
+    если она была — только сами данные записи."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE expense_entries SET category=?, name=?, amount=?, expense_date=? WHERE id=? AND shop_id=?",
+            (category, name, amount, expense_date, entry_id, shop_id)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def delete_expense_entry(entry_id: int, shop_id: int) -> bool:
+    """Удаляет запись из журнала — только если она принадлежит этой точке.
+    Если запись была отметкой оплаты повторяющегося расхода, сам
+    повторяющийся расход и его график остаются нетронутыми — удаляется
+    только эта одна запись из журнала."""
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM expense_entries WHERE id=? AND shop_id=?", (entry_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
 def get_expense_summary(shop_id: int, days: int = 30) -> dict:
     """Сумма расходов за последние `days` дней — итого и разбивка по
     категориям, для dashboard."""

@@ -589,6 +589,11 @@ PAGE = """
   .journal-row .jr-cat { font-weight:700; color:var(--text); }
   .journal-row .jr-meta { font-size:11.5px; color:var(--hint); margin-top:2px; }
   .journal-row .jr-amount { color:#B3241C; font-weight:700; flex:none; }
+  .jr-icon-btn {
+    background:none; border:none; cursor:pointer; font-size:13px; padding:4px; color:var(--hint); flex:none;
+  }
+  .jr-icon-btn:active { color:var(--blue); }
+  .jr-edit-form { background:var(--field-bg); border-radius:10px; padding:12px; margin:2px 0 10px; }
   .kc-hist-list { margin-top:14px; }
   .kc-hist-entry { background:var(--field-bg); border-radius:12px; padding:12px 13px; margin-bottom:8px; }
   .kc-hist-entry .kc-he-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -2631,19 +2636,104 @@ async function deleteRecurringExpenseBtn(id) {
   }
 }
 
+let journalCache = [];
+
 async function loadExpensesJournal() {
-  const journal = await (await fetch('/api/expenses')).json();
+  journalCache = await (await fetch('/api/expenses')).json();
   const el = document.getElementById('expensesJournal');
   if (!el) return;
-  el.innerHTML = journal.length ? journal.slice(0, 30).map(e => `
-    <div class="journal-row">
-      <div>
-        <div class="jr-cat">${escapeHtml(e.name || e.category)}</div>
-        <div class="jr-meta">${escapeHtml(e.category)} · ${e.expense_date}</div>
+  el.innerHTML = journalCache.length ? journalCache.slice(0, 30).map(e => `
+    <div>
+      <div class="journal-row">
+        <div>
+          <div class="jr-cat">${escapeHtml(e.name || e.category)}</div>
+          <div class="jr-meta">${escapeHtml(e.category)} · ${e.expense_date}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="jr-amount">−${e.amount.toLocaleString('ru-RU')} ${T.currency}</div>
+          <button type="button" class="jr-icon-btn" onclick="toggleExpenseEditForm(${e.id})" title="${T.entry_edit}"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" class="jr-icon-btn" style="color:#B3241C;" onclick="deleteExpenseEntry(${e.id})" title="${T.entry_delete}"><i class="fa-solid fa-trash"></i></button>
+        </div>
       </div>
-      <div class="jr-amount">−${e.amount.toLocaleString('ru-RU')} ${T.currency}</div>
+      <div id="jredit-${e.id}" class="jr-edit-form" style="display:none;"></div>
     </div>
   `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
+}
+
+async function toggleExpenseEditForm(id) {
+  const panel = document.getElementById('jredit-' + id);
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  document.querySelectorAll('.jr-edit-form').forEach(el => { if (el !== panel) el.style.display = 'none'; });
+  if (isOpen) { panel.style.display = 'none'; return; }
+  const entry = journalCache.find(e => e.id === id);
+  if (!entry) return;
+  const catSelId = `jr_cat_${id}`, catCustomId = `jr_cat_custom_${id}`;
+  await loadExpenseCategoryOptions(catSelId);
+  const select = document.getElementById(catSelId);
+  const isKnown = expenseCategoriesCache.includes(entry.category);
+  panel.innerHTML = `
+    <div class="field">
+      <label>${T.expense_category_label}</label>
+      <select id="${catSelId}" onchange="onExpenseCategoryChange('${catSelId}', '${catCustomId}')"></select>
+      <input id="${catCustomId}" placeholder="${T.expense_custom_category_ph}" style="display:none; margin-top:6px;" value="${isKnown ? '' : escapeHtml(entry.category)}">
+    </div>
+    <div class="field">
+      <label>${T.expense_name_label}</label>
+      <input id="jr_name_${id}" value="${escapeHtml(entry.name || '')}">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>${T.expense_amount_label}</label>
+        <input id="jr_amount_${id}" type="number" value="${entry.amount}">
+      </div>
+      <div class="field">
+        <label>${T.expense_date_label}</label>
+        <input id="jr_date_${id}" type="date" value="${entry.expense_date}">
+      </div>
+    </div>
+    <button class="submit" onclick="saveExpenseEdit(${id})">${T.btn_save}</button>
+  `;
+  await loadExpenseCategoryOptions(catSelId);
+  const selectEl = document.getElementById(catSelId);
+  if (isKnown) {
+    selectEl.value = entry.category;
+  } else {
+    selectEl.value = '__custom__';
+    onExpenseCategoryChange(catSelId, catCustomId);
+  }
+  panel.style.display = 'block';
+}
+
+async function saveExpenseEdit(id) {
+  const category = getSelectedCategory(`jr_cat_${id}`, `jr_cat_custom_${id}`);
+  const name = document.getElementById(`jr_name_${id}`).value.trim();
+  const amount = document.getElementById(`jr_amount_${id}`).value;
+  const expense_date = document.getElementById(`jr_date_${id}`).value;
+  if (!category || !amount) { showMsg(T.msg_fill_required, false); return; }
+  const res = await fetch(`/api/expenses/${id}`, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category, name, amount, expense_date}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.expense_saved, true);
+    loadExpensesJournal();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function deleteExpenseEntry(id) {
+  if (!confirm(T.expense_delete_entry_confirm)) return;
+  const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.entry_deleted, true);
+    loadExpensesJournal();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
 }
 
 function renderTable() {
@@ -3389,6 +3479,39 @@ def api_log_expense():
     if not category:
         return jsonify({"ok": False, "error": "укажите категорию"}), 400
     db.log_expense(g.shop_id, category, name, amount, data.get("expense_date"))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/expenses/<int:entry_id>", methods=["PUT"])
+@login_required
+@employee_blocked
+def api_update_expense(entry_id):
+    data = request.get_json(force=True)
+    category = (data.get("category") or "").strip()
+    name = (data.get("name") or "").strip() or None
+    try:
+        amount = int(data["amount"])
+        if amount <= 0:
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "укажите положительную сумму"}), 400
+    if not category:
+        return jsonify({"ok": False, "error": "укажите категорию"}), 400
+    from datetime import datetime as _dt
+    expense_date = data.get("expense_date") or _dt.now().strftime("%Y-%m-%d")
+    ok = db.update_expense_entry(entry_id, g.shop_id, category, name, amount, expense_date)
+    if not ok:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/expenses/<int:entry_id>", methods=["DELETE"])
+@login_required
+@employee_blocked
+def api_delete_expense(entry_id):
+    ok = db.delete_expense_entry(entry_id, g.shop_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
     return jsonify({"ok": True})
 
 
