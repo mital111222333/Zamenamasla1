@@ -14,6 +14,7 @@ import os
 import re
 import time
 import secrets
+import logging
 import urllib.parse
 import threading
 import requests
@@ -23,6 +24,8 @@ from flask import Flask, request, jsonify, render_template_string, Response, ses
 
 import database as db
 import i18n
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
@@ -37,8 +40,14 @@ DISPLAY_SHOW_SECONDS = int(os.environ.get("DISPLAY_SHOW_SECONDS", "45"))
 def _send_telegram_message(chat_id, text) -> bool:
     """Отправка сообщения напрямую через HTTP API Telegram — синхронно, без
     участия основного бот-процесса (веб-панель работает в отдельном потоке
-    того же процесса, но без доступа к его асинхронному event loop)."""
-    if not BOT_TOKEN or not chat_id:
+    того же процесса, но без доступа к его асинхронному event loop).
+    Частая причина отказа: получатель ни разу не писал этому боту — Telegram
+    не разрешает боту писать первым, даже если chat_id указан верно."""
+    if not BOT_TOKEN:
+        logger.warning("Telegram-сообщение не отправлено: BOT_TOKEN не задан")
+        return False
+    if not chat_id:
+        logger.warning("Telegram-сообщение не отправлено: chat_id не указан")
         return False
     try:
         resp = requests.post(
@@ -46,8 +55,12 @@ def _send_telegram_message(chat_id, text) -> bool:
             json={"chat_id": chat_id, "text": text},
             timeout=10,
         )
+        if not resp.ok:
+            logger.warning(f"Telegram отклонил сообщение для chat_id={chat_id}: "
+                            f"HTTP {resp.status_code} — {resp.text[:300]}")
         return resp.ok
-    except Exception:
+    except Exception as e:
+        logger.error(f"Не удалось отправить Telegram-сообщение для chat_id={chat_id}: {e}")
         return False
 
 # Состояние табло — отдельно для каждой точки (по shop_id), чтобы камера
@@ -4055,7 +4068,7 @@ ADMIN_PAGE = """
     </div>
     <div class="table-wrap" style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th><th>Филиалы</th><th>Группа</th></tr></thead>
+      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Telegram</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th><th>Филиалы</th><th>Группа</th></tr></thead>
       <tbody id="shops-body"></tbody>
     </table>
     </div>
@@ -4132,6 +4145,13 @@ function renderShopsTable(shops) {
       <td><span class="hint-text">🔒 скрыт</span>
           <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
       <td>${s.phone || '—'}</td>
+      <td>
+        <input id="notify_id_${s.id}" value="${escapeHtml(s.notify_telegram_id || '')}" placeholder="123456789" style="width:110px; font-size:12px; padding:5px;">
+        <div style="display:flex; gap:4px; margin-top:4px;">
+          <button class="badge" style="background:var(--border);color:var(--hint);" onclick="saveNotifyTelegram(${s.id})">сохранить</button>
+          <button class="badge" style="background:#EFF6FF;color:var(--blue);" onclick="testNotifyTelegram(${s.id})">проверить</button>
+        </div>
+      </td>
       <td>${s.client_count}</td>
       <td><button class="badge ${s.is_active ? 'active' : 'inactive'}" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">
         ${s.is_active ? 'активна' : 'выключена'}
@@ -4335,6 +4355,29 @@ async function resetPassword(id, username) {
   }
 }
 
+async function saveNotifyTelegram(id) {
+  const notify_telegram_id = document.getElementById(`notify_id_${id}`).value.trim();
+  const res = await fetch(`/api/admin/shops/${id}/notify_telegram`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({notify_telegram_id}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg('✅ Telegram ID сохранён', true);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
+}
+
+async function testNotifyTelegram(id) {
+  const res = await fetch(`/api/admin/shops/${id}/test_telegram`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg('✅ Тестовое сообщение доставлено — связь работает', true);
+  } else {
+    showMsgSticky(`❌ Не удалось отправить: ${data.error}`);
+  }
+}
+
 async function createShop() {
   const payload = {
     shop_name: document.getElementById('new_shop_name').value.trim(),
@@ -4459,6 +4502,37 @@ def api_admin_reset_password(shop_id):
     new_password = secrets.token_urlsafe(6)
     db.reset_shop_password(shop_id, new_password)
     return jsonify({"ok": True, "password": new_password})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/notify_telegram", methods=["POST"])
+@admin_required
+def api_admin_set_notify_telegram(shop_id):
+    shop = db.get_shop(shop_id)
+    if not shop:
+        return jsonify({"ok": False, "error": "shop not found"}), 404
+    data = request.get_json(force=True)
+    notify_id = (data.get("notify_telegram_id") or "").strip()
+    db.set_shop_notify_telegram_id(shop_id, notify_id or None)
+    return jsonify({"ok": True, "notify_telegram_id": notify_id or None})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/test_telegram", methods=["POST"])
+@admin_required
+def api_admin_test_telegram(shop_id):
+    """Пробная отправка — сразу видно, реально ли бот может писать этому
+    получателю (частая причина 'не приходит' — получатель ни разу не писал
+    боту первым, Telegram такое запрещает)."""
+    shop = db.get_shop(shop_id)
+    if not shop:
+        return jsonify({"ok": False, "error": "shop not found"}), 404
+    notify_id = shop.get("notify_telegram_id")
+    if not notify_id:
+        return jsonify({"ok": False, "error": "у точки не указан Telegram ID"}), 400
+    text = f"✅ Тестовое сообщение от платформы — если вы это видите, связь с точкой «{shop.get('shop_name') or shop['username']}» настроена верно."
+    sent = _send_telegram_message(notify_id, text)
+    if not sent:
+        return jsonify({"ok": False, "error": "не удалось отправить — скорее всего, получатель ни разу не писал этому боту. Попросите его открыть бота в Telegram и нажать «Старт»"}), 400
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/shops/<int:shop_id>/employees")

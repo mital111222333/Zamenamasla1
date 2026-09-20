@@ -565,6 +565,17 @@ def reset_shop_password(shop_id: int, new_password: str):
         conn.commit()
 
 
+def set_shop_notify_telegram_id(shop_id: int, notify_telegram_id):
+    """Привязывает (или меняет) Telegram ID точки для уведомлений и
+    восстановления пароля. Пустое значение снимает привязку."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE shops SET notify_telegram_id=? WHERE id=?",
+            (notify_telegram_id or None, shop_id)
+        )
+        conn.commit()
+
+
 def find_shop_by_username(username: str):
     """Точка (владелец или филиал) по логину, без проверки пароля — для
     восстановления доступа. Сотрудники и платформенные админы сюда не входят."""
