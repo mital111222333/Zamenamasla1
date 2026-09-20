@@ -786,6 +786,20 @@ PAGE = """
 
   {% if not is_employee %}
   <div id="view-expenses" style="display:none;">
+    {% if not is_branch %}
+    <div class="card" id="usdRateCardExp" style="margin-bottom:14px;">
+      <label style="font-size:14px; color:var(--text); font-weight:600; display:block; margin-bottom:8px;">{{ T.usd_rate_title }}</label>
+      <div style="display:flex; gap:8px; align-items:flex-end;">
+        <div class="field" style="flex:1; margin-bottom:0;">
+          <label>{{ T.usd_rate_label }}</label>
+          <input id="usd_rate_input_exp" type="number" step="0.01" placeholder="12700" value="{{ usd_rate or '' }}">
+        </div>
+        <button class="submit" style="flex:none; margin-top:0;" onclick="saveUsdRate('usd_rate_input_exp', 'usdRateSaved_exp')">{{ T.usd_rate_save }}</button>
+      </div>
+      <div id="usdRateSaved_exp" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
+    </div>
+    {% endif %}
+
     <div class="card">
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.expense_add_title }}</label>
       <div class="field">
@@ -797,9 +811,15 @@ PAGE = """
         <label>{{ T.expense_name_label }}</label>
         <input id="exp_name" placeholder="{{ T.expense_name_ph }}">
       </div>
-      <div class="field">
-        <label>{{ T.expense_amount_label }}</label>
-        <input id="exp_amount" type="number" placeholder="100000">
+      <div class="row2">
+        <div class="field">
+          <label>{{ T.expense_amount_label }}</label>
+          <input id="exp_amount" type="number" placeholder="100000" oninput="onSumFieldEdited('exp_amount', 'exp_amount_usd')">
+        </div>
+        <div class="field">
+          <label>{{ T.usd_price_label }}</label>
+          <input id="exp_amount_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('exp_amount_usd', 'exp_amount')">
+        </div>
       </div>
       <button class="submit" onclick="submitExpense()">{{ T.expense_add_btn }}</button>
     </div>
@@ -820,12 +840,16 @@ PAGE = """
         <div class="row2">
           <div class="field">
             <label>{{ T.expense_amount_label }}</label>
-            <input id="rec_amount" type="number" placeholder="2000000">
+            <input id="rec_amount" type="number" placeholder="2000000" oninput="onSumFieldEdited('rec_amount', 'rec_amount_usd')">
           </div>
           <div class="field">
             <label>{{ T.expense_day_of_month_label }}</label>
             <input id="rec_day" type="number" min="1" max="28" placeholder="5">
           </div>
+        </div>
+        <div class="field">
+          <label>{{ T.usd_price_label }}</label>
+          <input id="rec_amount_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('rec_amount_usd', 'rec_amount')">
         </div>
         <button class="submit" onclick="createRecurringExpense()">{{ T.expense_recurring_add_btn }}</button>
       </div>
@@ -1378,8 +1402,10 @@ function onSumFieldEdited(sumFieldId, usdFieldId) {
   if (usdField) usdField.value = '';
 }
 
-async function saveUsdRate() {
-  const rateInput = document.getElementById('usd_rate_input');
+async function saveUsdRate(inputId, savedId) {
+  inputId = inputId || 'usd_rate_input';
+  savedId = savedId || 'usdRateSaved';
+  const rateInput = document.getElementById(inputId);
   const rate = rateInput.value;
   const res = await fetch('/api/usd_rate', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({rate})
@@ -1387,7 +1413,12 @@ async function saveUsdRate() {
   const data = await res.json();
   if (data.ok) {
     USD_RATE = data.rate;
-    const saved = document.getElementById('usdRateSaved');
+    // синхронизируем оба виджета курса, если на странице есть второй (Расходы)
+    ['usd_rate_input', 'usd_rate_input_exp'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && id !== inputId) el.value = data.rate ?? '';
+    });
+    const saved = document.getElementById(savedId);
     saved.style.display = 'block';
     setTimeout(() => { saved.style.display = 'none'; }, 1500);
   } else {
@@ -2523,6 +2554,7 @@ async function submitExpense() {
     document.getElementById('exp_name').value = '';
     document.getElementById('exp_amount').value = '';
     document.getElementById('exp_category_custom').value = '';
+    document.getElementById('exp_amount_usd').value = '';
     loadExpensesJournal();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -2568,6 +2600,7 @@ async function createRecurringExpense() {
     document.getElementById('rec_amount').value = '';
     document.getElementById('rec_day').value = '';
     document.getElementById('rec_category_custom').value = '';
+    document.getElementById('rec_amount_usd').value = '';
     loadRecurringExpenses();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
