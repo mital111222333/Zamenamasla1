@@ -1801,13 +1801,33 @@ async function applyStatsRange() {
   const res = await fetch(`/api/stats/range?from=${from}&to=${to}`);
   const data = await res.json();
   if (!data.ok) { document.getElementById('statsRangeResult').innerHTML = ''; return; }
+  const hasProfit = data.profit !== undefined;
   document.getElementById('statsRangeResult').innerHTML = `
     <div class="stats-card">
       <div class="label">${T.stats_range_result} ${from} — ${to}</div>
       <div class="amount">${data.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.count}</div>
       <div class="count">${T.payment_cash}: ${(data.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
+      ${hasProfit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
+    ${hasProfit ? `
+    <div class="stats-card" style="margin-top:10px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
+      <div class="dash-summary-grid">
+        <div class="dash-summary-box">
+          <div class="dsb-num">${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dsb-label">${T.dash_oil_profit_label}</div>
+        </div>
+        <div class="dash-summary-box">
+          <div class="dsb-num warn">${data.expenses.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dsb-label">${T.dash_expenses_label}</div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
+        <div style="font-size:22px; font-weight:700; font-family:var(--font-mono); color:${data.net_profit < 0 ? '#B3241C' : '#15803D'};">${data.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
+        <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
+      </div>
+    </div>
+    ` : ''}
   `;
 }
 
@@ -3727,6 +3747,12 @@ def api_stats_range():
         return jsonify({"ok": False, "error": "invalid date"}), 400
     result = db.get_revenue_range(g.shop_id, date_from, date_to)
     result["ok"] = True
+    if not g.is_branch:
+        profit = db.get_profit_range(g.shop_id, date_from, date_to)
+        expenses = sum(e["amount"] for e in db.get_expenses(g.shop_id, date_from, date_to))
+        result["profit"] = profit
+        result["expenses"] = expenses
+        result["net_profit"] = profit - expenses
     return jsonify(result)
 
 
