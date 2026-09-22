@@ -1420,17 +1420,48 @@ def get_daily_revenue(shop_id: int, days: int = 30):
     return result
 
 
-def get_top_products_by_qty(shop_id: int, days: int = 30, limit: int = 5):
-    """Топ проданных товаров за последние `days` дней, по количеству (литры
+def get_daily_revenue_range(shop_id: int, date_from: str, date_to: str):
+    """Выручка по дням за произвольный период (включительно с обеих сторон)
+    — для графика динамики, что на dashboard (30 дней), что при выборе
+    своих дат. Дни без единой продажи всё равно включены в список с
+    total=0, чтобы график не 'перепрыгивал' через пропуски."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date as date, COALESCE(SUM(oc.cost), 0) as total
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ? AND oc.change_date <= ?
+            GROUP BY oc.change_date
+        """, (shop_id, date_from, date_to)).fetchall()
+    by_date = {r["date"]: r["total"] for r in rows}
+    start = datetime.strptime(date_from, "%Y-%m-%d")
+    end = datetime.strptime(date_to, "%Y-%m-%d")
+    result = []
+    d = start
+    while d <= end:
+        d_str = d.strftime("%Y-%m-%d")
+        result.append({"date": d_str, "total": by_date.get(d_str, 0)})
+        d += timedelta(days=1)
+    return result
+
+
+def get_daily_revenue(shop_id: int, days: int = 30):
+    """Выручка по дням за последние `days` дней — обёртка над
+    get_daily_revenue_range с датами, посчитанными от сегодня."""
+    date_from = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    date_to = datetime.now().strftime("%Y-%m-%d")
+    return get_daily_revenue_range(shop_id, date_from, date_to)
+
+
+def get_top_products_by_qty_range(shop_id: int, date_from: str, date_to: str, limit: int = 5):
+    """Топ проданных товаров за произвольный период, по количеству (литры
     или штуки в зависимости от товара) — что берут чаще всего. Считается по
     items_json каждой записи, так как это единственное место, где хранится
     детализация по позициям."""
-    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.items_json IS NOT NULL
-        """, (shop_id, start_date)).fetchall()
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ? AND oc.items_json IS NOT NULL
+        """, (shop_id, date_from, date_to)).fetchall()
     totals = {}
     for r in rows:
         try:
@@ -1447,16 +1478,22 @@ def get_top_products_by_qty(shop_id: int, days: int = 30, limit: int = 5):
     return [{"name": name, "qty": round(qty, 2)} for name, qty in ranked]
 
 
-def get_top_brands_for_category(shop_id: int, category_name: str, days: int = 30, limit: int = 10):
-    """Топ-10 брендов ВНУТРИ одной категории (например, внутри 'Моторное
-    масло' — какие марки берут чаще: MITANOL 5W-30, MATTEX и т.д.). Раскрытие
-    по клику на категорию в dashboard, а не отдельный плоский список."""
-    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+def get_top_products_by_qty(shop_id: int, days: int = 30, limit: int = 5):
+    """Топ проданных товаров за последние `days` дней — обёртка над
+    get_top_products_by_qty_range с датами, посчитанными от сегодня."""
+    date_from = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    date_to = datetime.now().strftime("%Y-%m-%d")
+    return get_top_products_by_qty_range(shop_id, date_from, date_to, limit=limit)
+
+
+def get_top_brands_for_category_range(shop_id: int, category_name: str, date_from: str, date_to: str, limit: int = 10):
+    """Топ-10 брендов ВНУТРИ одной категории за произвольный период —
+    основа, используется и для dashboard (30 дней), и для выбора своих дат."""
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.items_json IS NOT NULL
-        """, (shop_id, start_date)).fetchall()
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ? AND oc.items_json IS NOT NULL
+        """, (shop_id, date_from, date_to)).fetchall()
     totals = {}
     for r in rows:
         try:
@@ -1471,6 +1508,15 @@ def get_top_brands_for_category(shop_id: int, category_name: str, days: int = 30
             totals[brand] = totals.get(brand, 0) + qty
     ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:limit]
     return [{"name": brand, "qty": round(qty, 2)} for brand, qty in ranked]
+
+
+def get_top_brands_for_category(shop_id: int, category_name: str, days: int = 30, limit: int = 10):
+    """Топ-10 брендов ВНУТРИ одной категории (например, внутри 'Моторное
+    масло' — какие марки берут чаще: MITANOL 5W-30, MATTEX и т.д.). Раскрытие
+    по клику на категорию в dashboard, а не отдельный плоский список."""
+    date_from = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    date_to = datetime.now().strftime("%Y-%m-%d")
+    return get_top_brands_for_category_range(shop_id, category_name, date_from, date_to, limit=limit)
 
 
 def get_low_stock_products(shop_id: int, threshold: float = 50):

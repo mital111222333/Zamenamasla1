@@ -18,6 +18,7 @@ import logging
 import urllib.parse
 import threading
 import requests
+from datetime import datetime
 from functools import wraps
 from urllib.parse import quote
 from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g
@@ -1794,10 +1795,13 @@ function renderStatsPresets() {
   if (!to.value) to.value = fmtDate(today);
 }
 
+let currentRangeFrom = null, currentRangeTo = null;
+
 async function applyStatsRange() {
   const from = document.getElementById('stats_from').value;
   const to = document.getElementById('stats_to').value;
   if (!from || !to) return;
+  currentRangeFrom = from; currentRangeTo = to;
   const res = await fetch(`/api/stats/range?from=${from}&to=${to}`);
   const data = await res.json();
   if (!data.ok) { document.getElementById('statsRangeResult').innerHTML = ''; return; }
@@ -1828,7 +1832,63 @@ async function applyStatsRange() {
       </div>
     </div>
     ` : ''}
+    <div class="stats-card" style="margin-top:10px;">
+      <label style="font-size:14px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">${T.dash_revenue_chart_title}</label>
+      <canvas id="rangeRevenueChart" height="180"></canvas>
+    </div>
+    <div class="stats-card" style="margin-top:10px;">
+      <label style="font-size:14px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">${T.dash_top_products_title}</label>
+      <div id="rangeTopProducts">
+        ${data.top_products.length ? data.top_products.map((p, i) => `
+          <div>
+            <div class="dash-row" style="cursor:pointer;" onclick="toggleRangeCategoryBrands(${escapeHtml(JSON.stringify(p.name))}, ${i})">
+              <span><span class="dash-row-rank">${i + 1}</span><span class="dash-row-name">${escapeHtml(p.name)}</span> <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--hint); margin-left:4px;"></i></span>
+              <span class="dash-row-value">${p.qty.toLocaleString('ru-RU')}</span>
+            </div>
+            <div id="rangeCatBrands_${i}" class="dash-brands-panel" style="display:none;"></div>
+          </div>
+        `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`}
+      </div>
+    </div>
   `;
+  renderRangeChart(data.daily_revenue);
+}
+
+let rangeChartInstance = null;
+function renderRangeChart(dailyData) {
+  const canvas = document.getElementById('rangeRevenueChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (rangeChartInstance) { rangeChartInstance.destroy(); }
+  rangeChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: dailyData.map(d => d.date.slice(5)),
+      datasets: [{
+        data: dailyData.map(d => d.total),
+        borderColor: '#E63946', backgroundColor: 'rgba(230,57,70,0.08)',
+        fill: true, tension: 0.3, pointRadius: 0,
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+async function toggleRangeCategoryBrands(categoryName, idx) {
+  const panel = document.getElementById('rangeCatBrands_' + idx);
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  document.querySelectorAll('.dash-brands-panel').forEach(el => { if (el !== panel) el.style.display = 'none'; });
+  if (isOpen) { panel.style.display = 'none'; return; }
+  panel.innerHTML = T.stats_loading;
+  panel.style.display = 'block';
+  const url = `/api/dashboard/top_brands?category=${encodeURIComponent(categoryName)}&from=${currentRangeFrom}&to=${currentRangeTo}`;
+  const brands = await (await fetch(url)).json();
+  panel.innerHTML = brands.length ? brands.map((b, j) => `
+    <div class="dash-row" style="padding-left:28px; font-size:12.5px;">
+      <span class="dash-row-name">${j + 1}. ${escapeHtml(b.name)}</span>
+      <span class="dash-row-value">${b.qty.toLocaleString('ru-RU')}</span>
+    </div>
+  `).join('') : `<div class="hint-text" style="padding-left:28px;">${T.dash_no_data}</div>`;
 }
 
 renderStatsPresets();
@@ -3472,10 +3532,15 @@ def api_dashboard():
 @login_required
 def api_dashboard_top_brands():
     """Топ-10 брендов внутри одной категории — для раскрытия по клику на
-    строку категории в dashboard."""
+    строку категории, что на dashboard (30 дней), что в произвольном
+    периоде (если переданы from/to)."""
     category = request.args.get("category", "")
     if not category:
         return jsonify({"ok": False, "error": "укажите категорию"}), 400
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    if date_from and date_to:
+        return jsonify(db.get_top_brands_for_category_range(g.shop_id, category, date_from, date_to, limit=10))
     return jsonify(db.get_top_brands_for_category(g.shop_id, category, days=30, limit=10))
 
 
@@ -3747,6 +3812,13 @@ def api_stats_range():
         return jsonify({"ok": False, "error": "invalid date"}), 400
     result = db.get_revenue_range(g.shop_id, date_from, date_to)
     result["ok"] = True
+    # график по дням разворачивает каждый день диапазона — при случайно
+    # огромном периоде (например, опечатка в годе) это могло бы дать
+    # десятки тысяч точек; сами суммы (revenue/top_products/прибыль) не
+    # затронуты, они считаются агрегатно, а не по дням
+    span_days = (datetime.strptime(date_to, "%Y-%m-%d") - datetime.strptime(date_from, "%Y-%m-%d")).days
+    result["daily_revenue"] = db.get_daily_revenue_range(g.shop_id, date_from, date_to) if 0 <= span_days <= 730 else []
+    result["top_products"] = db.get_top_products_by_qty_range(g.shop_id, date_from, date_to, limit=5)
     if not g.is_branch:
         profit = db.get_profit_range(g.shop_id, date_from, date_to)
         expenses = sum(e["amount"] for e in db.get_expenses(g.shop_id, date_from, date_to))
