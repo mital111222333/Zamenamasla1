@@ -3443,6 +3443,34 @@ def api_delete_car(plate):
     return jsonify({"ok": True})
 
 
+def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date):
+    """Присылает клиенту чек в Telegram сразу после внесения замены — что
+    залили, сколько стоило, когда следующая. Отдельно от напоминания о
+    следующей замене (то приходит позже, ближе к сроку). Молча ничего не
+    делает, если клиент не привязан к боту — это не должно мешать
+    основному сохранению записи."""
+    telegram_id = shop.get("_receipt_telegram_id")
+    if not telegram_id:
+        return
+    total = sum((it.get("total") or 0) for it in (items or []))
+    lang = shop.get("language") or "ru"
+    lines = "\n".join(
+        f"• {it.get('name', '')}"
+        + (f" ({it['brand']})" if it.get("brand") else "")
+        + (f" — {it['qty']} {i18n.t('liters_ph', lang)}" if it.get("qty") and it.get("qty") != 1 else "")
+        + f": {int(it.get('total') or 0):,}".replace(",", " ")
+        for it in (items or [])
+    )
+    text = i18n.t(
+        "bot_service_receipt", lang,
+        plate=plate, shop=shop.get("shop_name") or shop.get("username") or "",
+        items=lines or "—", total=f"{total:,}".replace(",", " "),
+        cash=f"{(cash_amount or 0):,}".replace(",", " "), card=f"{(card_amount or 0):,}".replace(",", " "),
+        next_date=next_date or "—",
+    )
+    _send_telegram_message(telegram_id, text)
+
+
 @app.route("/api/add", methods=["POST"])
 @login_required
 def api_add():
@@ -3490,6 +3518,11 @@ def api_add():
         link = None
         if car_after and not car_after["telegram_id"]:
             link = _client_link(car_after["link_token"])
+        elif car_after and car_after["telegram_id"]:
+            shop = db.get_shop(g.shop_id)
+            if shop:
+                shop["_receipt_telegram_id"] = car_after["telegram_id"]
+                _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date)
 
         return jsonify({"ok": True, "next_date": next_date, "client_link": link})
     except Exception as e:
