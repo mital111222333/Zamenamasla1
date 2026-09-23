@@ -126,6 +126,7 @@ def init_db():
             client_id INTEGER NOT NULL,
             car_brand TEXT,
             car_model TEXT,
+            passport_token TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (client_id) REFERENCES clients(id),
             UNIQUE (shop_id, plate_number)
@@ -453,6 +454,16 @@ def _migrate(conn):
         common = [c for c in ["id", "plate_number", "client_id", "car_brand", "car_model", "created_at"] if c in old_cols]
         conn.execute(f"INSERT INTO cars (shop_id, {', '.join(common)}) SELECT 1, {', '.join(common)} FROM cars_old")
         conn.execute("DROP TABLE cars_old")
+
+    # --- у каждой машины должен быть токен для публичной ссылки на
+    # сервисный паспорт — проверяем заново (не по возможно устаревшему
+    # car_cols выше, если только что была полная пересборка таблицы)
+    car_cols_now = {row["name"] for row in conn.execute("PRAGMA table_info(cars)").fetchall()}
+    if "passport_token" not in car_cols_now:
+        conn.execute("ALTER TABLE cars ADD COLUMN passport_token TEXT")
+    rows_needing_passport_token = conn.execute("SELECT id FROM cars WHERE passport_token IS NULL").fetchall()
+    for row in rows_needing_passport_token:
+        conn.execute("UPDATE cars SET passport_token=? WHERE id=?", (secrets.token_urlsafe(16), row["id"]))
 
     conn.commit()
 
@@ -1096,8 +1107,8 @@ def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_br
             return existing["id"]
         else:
             cur = conn.execute(
-                "INSERT INTO cars (shop_id, plate_number, client_id, car_brand, car_model) VALUES (?, ?, ?, ?, ?)",
-                (shop_id, plate_number, client_id, car_brand, car_model)
+                "INSERT INTO cars (shop_id, plate_number, client_id, car_brand, car_model, passport_token) VALUES (?, ?, ?, ?, ?, ?)",
+                (shop_id, plate_number, client_id, car_brand, car_model, secrets.token_urlsafe(16))
             )
             conn.commit()
             return cur.lastrowid
@@ -1117,6 +1128,31 @@ def get_car_history(shop_id: int, plate_number: str):
         history = conn.execute(
             "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC",
             (row["id"],)
+        ).fetchall()
+        return dict(row), [dict(h) for h in history]
+
+
+def get_car_by_passport_token(token: str):
+    """Машина по токену сервисного паспорта — для публичной страницы, без
+    входа в систему. Специально НЕ отдаёт телефон владельца и внутренние
+    ID — это публичная ссылка, её может открыть кто угодно (например,
+    покупатель машины), только то, что нужно для подтверждения истории
+    обслуживания."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT c.plate_number, c.car_brand, c.car_model, c.passport_token,
+                   cl.full_name as owner_name, s.shop_name, s.id as shop_id, c.id as car_id
+            FROM cars c
+            JOIN clients cl ON cl.id = c.client_id
+            JOIN shops s ON s.id = c.shop_id
+            WHERE c.passport_token=?
+        """, (token,)).fetchone()
+        if not row:
+            return None, []
+        history = conn.execute(
+            "SELECT change_date, mileage, service_type, cost, items_json, notes FROM oil_changes "
+            "WHERE car_id=? ORDER BY change_date DESC, id DESC",
+            (row["car_id"],)
         ).fetchall()
         return dict(row), [dict(h) for h in history]
 

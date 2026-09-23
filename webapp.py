@@ -13,6 +13,7 @@
 import os
 import re
 import time
+import json
 import secrets
 import logging
 import urllib.parse
@@ -244,6 +245,218 @@ LOGIN_PAGE = """
 </body>
 </html>
 """
+
+
+PASSPORT_PAGE = """
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сервисный паспорт — {{ car.plate_number }}</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#F1F4F9; color:#1A1D24; }
+  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 40px; }
+  .stripe { height:6px; background:linear-gradient(90deg, #1D4ED8 33%, #E10600 33%, #E10600 66%, #38BDF8 66%); }
+  .head { text-align:center; padding:24px 0 18px; }
+  .head .badge { display:inline-block; background:#1D4ED8; color:#fff; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:4px 12px; border-radius:20px; margin-bottom:10px; }
+  .head h1 { font-size:26px; margin:6px 0 2px; font-family:'Courier New',monospace; letter-spacing:1px; }
+  .head .sub { color:#6B7280; font-size:14px; }
+  .card { background:#fff; border:1px solid #E5E9F0; border-radius:16px; padding:18px; margin-bottom:14px; }
+  .card .label { font-size:11px; color:#8A93A6; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .card .value { font-size:16px; font-weight:600; }
+  .owner-row { display:flex; justify-content:space-between; gap:12px; }
+  .owner-row > div { flex:1; }
+  .hist-title { font-size:15px; font-weight:700; margin:22px 0 10px; }
+  .entry { background:#fff; border:1px solid #E5E9F0; border-radius:14px; padding:14px; margin-bottom:10px; }
+  .entry .top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .entry .date { font-weight:700; font-size:14.5px; }
+  .entry .mileage { color:#6B7280; font-size:12.5px; margin-top:2px; }
+  .entry .cost { font-weight:700; color:#1D4ED8; font-family:'Courier New',monospace; white-space:nowrap; }
+  .entry .items { margin-top:8px; padding-top:8px; border-top:1px dashed #E5E9F0; font-size:13px; color:#4B5563; }
+  .entry .items div { display:flex; justify-content:space-between; padding:2px 0; }
+  .empty { text-align:center; color:#8A93A6; padding:30px 0; }
+  .footer { text-align:center; color:#9AA3B2; font-size:12px; margin-top:26px; line-height:1.6; }
+  .footer b { color:#4B5563; }
+</style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <div class="wrap">
+    <div class="head">
+      <span class="badge">✓ Сервисный паспорт</span>
+      <h1>{{ car.plate_number }}</h1>
+      <div class="sub">{{ car.car_brand or '' }} {{ car.car_model or '' }}</div>
+    </div>
+
+    <div class="card">
+      <div class="owner-row">
+        <div>
+          <div class="label">Владелец</div>
+          <div class="value">{{ car.owner_name or '—' }}</div>
+        </div>
+        <div>
+          <div class="label">Обслуживается в</div>
+          <div class="value">{{ car.shop_name or '—' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hist-title">История обслуживания ({{ history|length }})</div>
+    {% if history %}
+      {% for h in history %}
+      <div class="entry">
+        <div class="top">
+          <div>
+            <div class="date">{{ h.service_type or 'Замена масла' }}</div>
+            <div class="mileage">{{ h.change_date }}{% if h.mileage %} · {{ "{:,}".format(h.mileage).replace(',', ' ') }} км{% endif %}</div>
+          </div>
+          {% if h.cost %}<div class="cost">{{ "{:,}".format(h.cost).replace(',', ' ') }} сум</div>{% endif %}
+        </div>
+        {% if h.items_list %}
+        <div class="items">
+          {% for it in h.items_list %}
+          <div><span>{{ it.name }}{% if it.brand %} ({{ it.brand }}){% endif %}{% if it.qty and it.qty != 1 %} — {{ it.qty }} л{% endif %}</span><span>{{ "{:,}".format(it.total|int).replace(',', ' ') }}</span></div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">Записей пока нет.</div>
+    {% endif %}
+
+    <div class="footer">
+      Подтверждённая история обслуживания.<br>
+      Данные предоставлены точкой <b>{{ car.shop_name or '' }}</b> через платформу учёта замены масла.
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+@app.route("/passport/<token>")
+def public_passport(token):
+    """Публичная страница сервисного паспорта машины — без входа в систему.
+    Можно показать покупателю при продаже авто как подтверждение истории
+    обслуживания."""
+    car, history = db.get_car_by_passport_token(token)
+    if not car:
+        return "Паспорт не найден", 404
+    for h in history:
+        h["items_list"] = None
+        if h.get("items_json"):
+            try:
+                h["items_list"] = json.loads(h["items_json"])
+            except (TypeError, ValueError):
+                pass
+    return render_template_string(PASSPORT_PAGE, car=car, history=history)
+
+
+def _register_pdf_fonts():
+    """Регистрирует шрифт с поддержкой кириллицы для reportlab — встроен
+    прямо в проект (fonts/), чтобы PDF одинаково работал что локально, что
+    на любом хостинге, независимо от того, какие шрифты есть на сервере."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    if "DejaVuSans" in pdfmetrics.getRegisteredFontNames():
+        return
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pdfmetrics.registerFont(TTFont("DejaVuSans", os.path.join(base_dir, "fonts", "DejaVuSans.ttf")))
+    pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", os.path.join(base_dir, "fonts", "DejaVuSans-Bold.ttf")))
+
+
+def _generate_passport_pdf(car, history, output_path):
+    """Строит PDF сервисного паспорта — та же информация, что на публичной
+    странице, но в виде файла, который можно скачать и переслать."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import ParagraphStyle
+
+    _register_pdf_fonts()
+    doc = SimpleDocTemplate(output_path, pagesize=A4, topMargin=18 * mm, bottomMargin=18 * mm,
+                             leftMargin=18 * mm, rightMargin=18 * mm)
+    styles = {
+        "title": ParagraphStyle("title", fontName="DejaVuSans-Bold", fontSize=20, leading=26, spaceAfter=8),
+        "sub": ParagraphStyle("sub", fontName="DejaVuSans", fontSize=12, textColor=colors.HexColor("#6B7280"), spaceAfter=14),
+        "label": ParagraphStyle("label", fontName="DejaVuSans", fontSize=9, textColor=colors.HexColor("#8A93A6")),
+        "value": ParagraphStyle("value", fontName="DejaVuSans-Bold", fontSize=12, spaceAfter=10),
+        "hist_title": ParagraphStyle("hist_title", fontName="DejaVuSans-Bold", fontSize=13, spaceBefore=10, spaceAfter=8),
+        "cell": ParagraphStyle("cell", fontName="DejaVuSans", fontSize=9, leading=12),
+        "cell_bold": ParagraphStyle("cell_bold", fontName="DejaVuSans-Bold", fontSize=9, leading=12),
+        "footer": ParagraphStyle("footer", fontName="DejaVuSans", fontSize=8, textColor=colors.HexColor("#9AA3B2"), spaceBefore=16),
+    }
+    story = [
+        Paragraph(f"✓ Сервисный паспорт — {car['plate_number']}", styles["title"]),
+        Paragraph(f"{car.get('car_brand') or ''} {car.get('car_model') or ''}".strip() or "—", styles["sub"]),
+        Paragraph("ВЛАДЕЛЕЦ", styles["label"]),
+        Paragraph(car.get("owner_name") or "—", styles["value"]),
+        Paragraph("ОБСЛУЖИВАЕТСЯ В", styles["label"]),
+        Paragraph(car.get("shop_name") or "—", styles["value"]),
+        Paragraph(f"История обслуживания ({len(history)})", styles["hist_title"]),
+    ]
+    if history:
+        rows = [[Paragraph("Дата", styles["cell_bold"]), Paragraph("Пробег", styles["cell_bold"]),
+                 Paragraph("Услуга / состав", styles["cell_bold"]), Paragraph("Стоимость", styles["cell_bold"])]]
+        for h in history:
+            desc = h.get("service_type") or "Замена масла"
+            if h.get("items_json"):
+                try:
+                    items = json.loads(h["items_json"])
+                    desc += "<br/>" + "<br/>".join(
+                        f"• {it.get('name', '')}" + (f" ({it['brand']})" if it.get("brand") else "")
+                        for it in items
+                    )
+                except (TypeError, ValueError):
+                    pass
+            mileage = f"{h['mileage']:,}".replace(",", " ") + " км" if h.get("mileage") else "—"
+            cost = f"{h['cost']:,}".replace(",", " ") + " сум" if h.get("cost") else "—"
+            rows.append([
+                Paragraph(h["change_date"], styles["cell"]),
+                Paragraph(mileage, styles["cell"]),
+                Paragraph(desc, styles["cell"]),
+                Paragraph(cost, styles["cell"]),
+            ])
+        table = Table(rows, colWidths=[24 * mm, 24 * mm, 82 * mm, 30 * mm])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F4F9")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E5E9F0")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(table)
+    else:
+        story.append(Paragraph("Записей пока нет.", styles["cell"]))
+    story.append(Paragraph(
+        f"Подтверждённая история обслуживания. Данные предоставлены точкой «{car.get('shop_name') or ''}» "
+        f"через платформу учёта замены масла.", styles["footer"]
+    ))
+    doc.build(story)
+
+
+@app.route("/passport/<token>/pdf")
+def public_passport_pdf(token):
+    """Скачивание сервисного паспорта в виде PDF — та же публичная ссылка,
+    без входа в систему."""
+    car, history = db.get_car_by_passport_token(token)
+    if not car:
+        return "Паспорт не найден", 404
+    output_path = f"/tmp/passport_{token}.pdf"
+    try:
+        _generate_passport_pdf(car, history, output_path)
+        return Response(
+            open(output_path, "rb").read(),
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=passport_{car['plate_number']}.pdf"}
+        )
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -2924,6 +3137,9 @@ async function toggleHistory(plate) {
         </div>
         <button type="button" class="kc-action-btn" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
         <div style="display:flex; gap:8px; margin-top:8px;">
+          <button type="button" class="history-toggle" style="flex:1;" onclick="sharePassport(${escapeHtml(JSON.stringify(car.passport_token || ''))})"><i class="fa-solid fa-shield-halved"></i> ${T.kc_passport_btn}</button>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
           <button type="button" class="history-toggle" style="flex:1;" onclick="toggleCarEditForm()">${T.kc_edit_car_btn}</button>
           <button type="button" class="history-toggle" style="flex:1; color:#B3241C;" onclick="deleteCarCompletely(${escapeHtml(JSON.stringify(plate))})">${T.kc_delete_car_btn}</button>
         </div>
@@ -2968,6 +3184,17 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function sharePassport(token) {
+  if (!token) { showMsg(T.kc_passport_no_token, false); return; }
+  const link = window.location.origin + '/passport/' + token;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => {
+      showMsg(T.kc_passport_copied, true);
+    }).catch(() => {});
+  }
+  window.open(link, '_blank');
 }
 
 function openModal(plate, link, phone) {

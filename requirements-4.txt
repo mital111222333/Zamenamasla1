@@ -1,0 +1,7 @@
+python-telegram-bot[job-queue]==21.6
+flask==3.0.3
+python-dateutil==2.9.0.post0
+cryptography==43.0.3
+requests==2.32.3
+openpyxl==3.1.5
+reportlab==4.4.10
