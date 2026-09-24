@@ -1117,6 +1117,7 @@ PAGE = """
   </div>
 
   <div id="view-table" style="display:none;">
+    <div id="baseClientCount" style="font-size:13px; color:var(--hint); margin-bottom:8px;"></div>
     <div style="position:relative;">
       <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable(); toggleSearchClearBtn();" style="padding-right:40px;">
       <button type="button" id="searchClearBtn" onclick="clearSearch()" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--hint); font-size:18px; cursor:pointer; padding:4px 6px;">✕</button>
@@ -3215,6 +3216,11 @@ function renderTable() {
     panel.style.display = 'none';
     panel.innerHTML = '';
     openHistoryRow = null;
+  }
+  const countEl = document.getElementById('baseClientCount');
+  if (countEl) {
+    const uniqueClients = new Set(carsCache.map(c => c.client_id)).size;
+    countEl.textContent = `${T.base_total_clients} ${uniqueClients} · ${T.base_total_cars} ${carsCache.length}`;
   }
   const rows = carsCache.filter(c =>
     (c.plate_number || '').toLowerCase().includes(q) || (c.owner_name || '').toLowerCase().includes(q)
