@@ -1117,7 +1117,10 @@ PAGE = """
   </div>
 
   <div id="view-table" style="display:none;">
-    <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable()">
+    <div style="position:relative;">
+      <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable(); toggleSearchClearBtn();" style="padding-right:40px;">
+      <button type="button" id="searchClearBtn" onclick="clearSearch()" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--hint); font-size:18px; cursor:pointer; padding:4px 6px;">✕</button>
+    </div>
     <div id="clientCardPanel" style="display:none; margin-bottom:12px;"></div>
     <div id="table-body"></div>
   </div>
@@ -3193,8 +3196,26 @@ async function deleteExpenseEntry(id) {
   }
 }
 
+function toggleSearchClearBtn() {
+  const btn = document.getElementById('searchClearBtn');
+  if (!btn) return;
+  btn.style.display = document.getElementById('search').value ? 'block' : 'none';
+}
+
+function clearSearch() {
+  document.getElementById('search').value = '';
+  toggleSearchClearBtn();
+  renderTable();
+}
+
 function renderTable() {
   const q = (document.getElementById('search').value || '').toLowerCase();
+  if (openHistoryRow !== null) {
+    const panel = document.getElementById('clientCardPanel');
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    openHistoryRow = null;
+  }
   const rows = carsCache.filter(c =>
     (c.plate_number || '').toLowerCase().includes(q) || (c.owner_name || '').toLowerCase().includes(q)
   );
