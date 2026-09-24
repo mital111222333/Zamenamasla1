@@ -89,6 +89,47 @@ def _create_and_send_backup(chat_id):
         if os.path.exists(backup_path):
             os.remove(backup_path)
 
+
+def _validate_sqlite_backup(file_path):
+    """Проверяет, что загруженный файл — действительно база данных этой
+    платформы (SQLite с нужными таблицами), а не случайный или чужой файл,
+    прежде чем позволить им заменить текущую живую базу."""
+    import sqlite3
+    required_tables = {"shops", "clients", "cars", "oil_changes"}
+    try:
+        conn = sqlite3.connect(file_path)
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        conn.close()
+    except Exception as e:
+        return False, f"Это не похоже на файл базы данных: {e}"
+    missing = required_tables - tables
+    if missing:
+        return False, f"В файле нет нужных таблиц ({', '.join(sorted(missing))}) — это не резервная копия этой платформы"
+    return True, None
+
+
+def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
+    """Заменяет текущую базу данных на загруженную резервную копию —
+    атомарно (через os.replace, чтобы не оставить базу в 'наполовину
+    заменённой' при сбое посередине). Временный файл кладём В ТУ ЖЕ папку,
+    что и текущая база (а не просто /tmp) — иначе на Railway, где база
+    лежит на отдельном постоянном диске (Volume), atomic-замена между
+    разными дисками может не сработать. Перед заменой отправляет ТЕКУЩУЮ
+    базу владельцу как safety-копию — чтобы даже ошибочное восстановление
+    можно было откатить."""
+    same_dir_tmp = os.path.join(os.path.dirname(os.path.abspath(db.DB_PATH)), ".restore_upload.db")
+    with open(same_dir_tmp, "wb") as f:
+        f.write(uploaded_bytes)
+    valid, err = _validate_sqlite_backup(same_dir_tmp)
+    if not valid:
+        os.remove(same_dir_tmp)
+        return False, err
+    if notify_chat_id:
+        _create_and_send_backup(notify_chat_id)  # снимок ТЕКУЩЕГО состояния перед заменой, для отката
+    os.replace(same_dir_tmp, db.DB_PATH)
+    return True, None
+
+
 DISPLAY_SHOW_SECONDS = int(os.environ.get("DISPLAY_SHOW_SECONDS", "45"))
 
 
@@ -4488,9 +4529,28 @@ ADMIN_PAGE = """
 
   <div class="card">
     <h3 style="margin-top:0;">📦 Резервная копия базы данных</h3>
-    <p class="hint-text" style="margin-top:0;">Автоматически отправляется каждую ночь. Если сомневаешься, что доходит — проверь прямо сейчас.</p>
+    <p class="hint-text" style="margin-top:0;">Автоматически отправляется каждую ночь. Если сомневаешься, что доходит — проверь прямо сейчас.<br>Если копия не находится в чате с ботом — напиши боту <code>/myid</code> и сверь число с ADMIN_TELEGRAM_ID на Railway.</p>
     <button class="submit" style="width:auto; padding:10px 20px;" onclick="triggerBackupNow()">Отправить сейчас</button>
     <div id="backupResult" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card" style="border:1.5px solid #FCA5A5;">
+    <h3 style="margin-top:0; color:#B3241C;">⚠️ Восстановить базу из копии</h3>
+    <p class="hint-text" style="margin-top:0;">
+      <b>Внимание:</b> это заменит АБСОЛЮТНО ВСЕ текущие данные платформы (все точки, клиентов, историю) на содержимое загруженного файла.
+      Всё, что было добавлено после даты этой копии, будет потеряно безвозвратно.<br>
+      Перед заменой мы сами отправим тебе копию ТЕКУЩЕГО состояния — на случай, если восстановление окажется ошибкой.
+    </p>
+    <div class="field">
+      <label>Файл резервной копии (.db)</label>
+      <input type="file" id="restore_file" accept=".db">
+    </div>
+    <div class="field">
+      <label>Чтобы подтвердить, впиши слово <code>ЗАМЕНИТЬ</code></label>
+      <input id="restore_confirm" placeholder="ЗАМЕНИТЬ">
+    </div>
+    <button class="submit" style="width:auto; padding:10px 20px; background:linear-gradient(135deg, #DC2626, #991B1B);" onclick="triggerRestore()">Восстановить из этого файла</button>
+    <div id="restoreResult" style="margin-top:10px;"></div>
   </div>
 
   <div class="card">
@@ -4851,6 +4911,43 @@ async function triggerBackupNow() {
   }
 }
 
+async function triggerRestore() {
+  const fileInput = document.getElementById('restore_file');
+  const confirmInput = document.getElementById('restore_confirm');
+  const resultEl = document.getElementById('restoreResult');
+  const file = fileInput.files[0];
+  if (!file) { resultEl.innerHTML = `<div class="msg err">Выбери файл резервной копии</div>`; return; }
+  if (confirmInput.value.trim() !== 'ЗАМЕНИТЬ') {
+    resultEl.innerHTML = `<div class="msg err">Впиши точно слово ЗАМЕНИТЬ, чтобы подтвердить</div>`;
+    return;
+  }
+  if (!confirm(`Точно заменить ВСЮ текущую базу файлом «${file.name}»? Это необратимо без отдельной копии.`)) return;
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Восстанавливаю...';
+  resultEl.innerHTML = '';
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('confirm', confirmInput.value.trim());
+    const res = await fetch('/api/admin/restore_backup', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.ok) {
+      resultEl.innerHTML = `<div class="msg ok">✅ База восстановлена. Копия прежнего состояния отправлена тебе в Telegram на всякий случай. Обнови страницу.</div>`;
+      confirmInput.value = '';
+      fileInput.value = '';
+    } else {
+      resultEl.innerHTML = `<div class="msg err">❌ Не удалось: ${data.error}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="msg err">❌ Ошибка сети: ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Восстановить из этого файла';
+  }
+}
+
 async function resetPassword(id, username) {
   if (!confirm(`Сбросить пароль для «${username}»? Старый пароль перестанет работать.`)) return;
   const res = await fetch(`/api/admin/shops/${id}/reset_password`, { method: 'POST' });
@@ -4975,6 +5072,24 @@ def api_admin_backup_now():
     if not ok:
         return jsonify({"ok": False, "error": err}), 500
     return jsonify({"ok": True, "size_mb": round(size_mb, 1), "bot_username": BOT_USERNAME or None})
+
+
+@app.route("/api/admin/restore_backup", methods=["POST"])
+@admin_required
+def api_admin_restore_backup():
+    """Восстановление базы из загруженного файла — заменяет ВСЕ текущие
+    данные платформы. Требует точную фразу-подтверждение (не просто
+    галочку в интерфейсе) — вторая линия защиты от случайного нажатия,
+    раз действие необратимо без отдельной резервной копии."""
+    if request.form.get("confirm") != "ЗАМЕНИТЬ":
+        return jsonify({"ok": False, "error": "не подтверждено — введите точно 'ЗАМЕНИТЬ'"}), 400
+    uploaded = request.files.get("file")
+    if not uploaded:
+        return jsonify({"ok": False, "error": "файл не выбран"}), 400
+    ok, err = _restore_from_backup(uploaded.read(), notify_chat_id=ADMIN_TELEGRAM_ID or None)
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/shops", methods=["POST"])
