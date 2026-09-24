@@ -4836,7 +4836,10 @@ async function triggerBackupNow() {
     const res = await fetch('/api/admin/backup_now', { method: 'POST' });
     const data = await res.json();
     if (data.ok) {
-      resultEl.innerHTML = `<div class="msg ok">✅ Копия отправлена в Telegram (${data.size_mb} МБ). Проверь личные сообщения от бота.</div>`;
+      const botLine = data.bot_username
+        ? `Открой чат с ботом <b>@${data.bot_username}</b> в Telegram — <a href="https://t.me/${data.bot_username}" target="_blank" style="color:#0F52BA; font-weight:700;">нажми сюда, чтобы открыть сразу</a>.`
+        : `Имя бота не настроено на сервере (BOT_USERNAME) — но сообщение реально ушло, просто не могу подсказать точный чат.`;
+      resultEl.innerHTML = `<div class="msg ok">✅ Копия отправлена в Telegram (${data.size_mb} МБ). ${botLine}</div>`;
     } else {
       resultEl.innerHTML = `<div class="msg err">❌ Не отправилось: ${data.error}</div>`;
     }
@@ -4971,7 +4974,7 @@ def api_admin_backup_now():
     ok, err, size_mb = _create_and_send_backup(ADMIN_TELEGRAM_ID)
     if not ok:
         return jsonify({"ok": False, "error": err}), 500
-    return jsonify({"ok": True, "size_mb": round(size_mb, 1)})
+    return jsonify({"ok": True, "size_mb": round(size_mb, 1), "bot_username": BOT_USERNAME or None})
 
 
 @app.route("/api/admin/shops", methods=["POST"])
