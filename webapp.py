@@ -36,6 +36,59 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+ADMIN_TELEGRAM_ID = os.environ.get("ADMIN_TELEGRAM_ID", "")
+
+
+def _send_telegram_document(chat_id, file_path, filename, caption=""):
+    """Отправка файла (например, резервной копии базы) напрямую через HTTP
+    API Telegram, без участия асинхронного бот-процесса. Возвращает
+    (успех, сообщение) — сообщение объясняет причину, если не получилось,
+    чтобы её можно было сразу показать в интерфейсе, а не только в логах
+    сервера, которые обычному пользователю недоступны."""
+    if not BOT_TOKEN:
+        return False, "BOT_TOKEN не задан на сервере"
+    if not chat_id:
+        return False, "ADMIN_TELEGRAM_ID не задан на сервере — некому отправлять"
+    try:
+        with open(file_path, "rb") as f:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
+                data={"chat_id": chat_id, "caption": caption},
+                files={"document": (filename, f)},
+                timeout=60,
+            )
+        if resp.ok:
+            return True, None
+        return False, f"Telegram отклонил файл: HTTP {resp.status_code} — {resp.text[:300]}"
+    except Exception as e:
+        return False, f"Не удалось отправить файл: {e}"
+
+
+def _create_and_send_backup(chat_id):
+    """Строит резервную копию базы (через безопасный backup API SQLite —
+    не ломается, даже если в этот момент кто-то пишет в базу) и
+    отправляет её файлом в Telegram. Общая логика для ночной автоматической
+    отправки и для кнопки 'отправить сейчас' в админке — чтобы не
+    дублировать её в двух местах."""
+    import sqlite3
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    backup_path = f"/tmp/oilbot_backup_manual_{today_str}.db"
+    try:
+        src = sqlite3.connect(db.DB_PATH)
+        dst = sqlite3.connect(backup_path)
+        src.backup(dst)
+        dst.close()
+        src.close()
+        size_mb = os.path.getsize(backup_path) / 1024 / 1024
+        ok, err = _send_telegram_document(
+            chat_id, backup_path, f"oilbot_backup_{today_str}.db",
+            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ)",
+        )
+        return ok, err, size_mb
+    finally:
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+
 DISPLAY_SHOW_SECONDS = int(os.environ.get("DISPLAY_SHOW_SECONDS", "45"))
 
 
@@ -4434,6 +4487,13 @@ ADMIN_PAGE = """
   <div id="msg"></div>
 
   <div class="card">
+    <h3 style="margin-top:0;">📦 Резервная копия базы данных</h3>
+    <p class="hint-text" style="margin-top:0;">Автоматически отправляется каждую ночь. Если сомневаешься, что доходит — проверь прямо сейчас.</p>
+    <button class="submit" style="width:auto; padding:10px 20px;" onclick="triggerBackupNow()">Отправить сейчас</button>
+    <div id="backupResult" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card">
     <h3 style="margin-top:0;">➕ Добавить новую точку</h3>
     <div class="field">
       <label>Название точки</label>
@@ -4766,6 +4826,28 @@ async function toggleSms(id, makeEnabled) {
   loadShops();
 }
 
+async function triggerBackupNow() {
+  const btn = event.target;
+  const resultEl = document.getElementById('backupResult');
+  btn.disabled = true;
+  btn.textContent = 'Отправляю...';
+  resultEl.innerHTML = '';
+  try {
+    const res = await fetch('/api/admin/backup_now', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      resultEl.innerHTML = `<div class="msg ok">✅ Копия отправлена в Telegram (${data.size_mb} МБ). Проверь личные сообщения от бота.</div>`;
+    } else {
+      resultEl.innerHTML = `<div class="msg err">❌ Не отправилось: ${data.error}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="msg err">❌ Ошибка сети: ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Отправить сейчас';
+  }
+}
+
 async function resetPassword(id, username) {
   if (!confirm(`Сбросить пароль для «${username}»? Старый пароль перестанет работать.`)) return;
   const res = await fetch(`/api/admin/shops/${id}/reset_password`, { method: 'POST' });
@@ -4876,6 +4958,20 @@ def api_admin_shops():
     for s in shops:
         s["owner_link"] = _client_link(f"owner_{s['owner_link_token']}") if s.get("owner_link_token") else None
     return jsonify(shops)
+
+
+@app.route("/api/admin/backup_now", methods=["POST"])
+@admin_required
+def api_admin_backup_now():
+    """Ручной запуск резервной копии — чтобы проверить прямо сейчас, не
+    дожидаясь ночной автоматической отправки, и сразу увидеть настоящую
+    причину, если что-то не так (например, не задан ADMIN_TELEGRAM_ID)."""
+    if not ADMIN_TELEGRAM_ID:
+        return jsonify({"ok": False, "error": "ADMIN_TELEGRAM_ID не задан на сервере — некому отправлять резервную копию"}), 400
+    ok, err, size_mb = _create_and_send_backup(ADMIN_TELEGRAM_ID)
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 500
+    return jsonify({"ok": True, "size_mb": round(size_mb, 1)})
 
 
 @app.route("/api/admin/shops", methods=["POST"])
