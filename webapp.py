@@ -715,6 +715,22 @@ PAGE = """
     margin-top:12px; background:var(--card); border:2px solid #BFDBFE; border-radius:18px;
     overflow:hidden; box-shadow: 0 6px 16px rgba(15,82,186,.08);
   }
+  .cross-network-card {
+    margin-top:12px; background:var(--card); border:1.5px solid #A7F3D0; border-radius:16px;
+    padding:14px; box-shadow: 0 4px 12px rgba(5,150,105,.06);
+  }
+  .cross-network-card .cn-header {
+    display:flex; align-items:center; gap:8px; color:#047857; font-weight:700; font-size:13.5px; margin-bottom:4px;
+  }
+  .cross-network-card .cn-hint { font-size:11.5px; color:var(--hint); margin-bottom:10px; }
+  .cross-network-card .cn-entry {
+    background:var(--field-bg); border-radius:10px; padding:10px 12px; margin-bottom:6px;
+  }
+  .cross-network-card .cn-entry:last-child { margin-bottom:0; }
+  .cross-network-card .cn-entry-shop { font-size:13px; font-weight:700; color:var(--text); }
+  .cross-network-card .cn-entry-date { font-size:11.5px; color:var(--hint); margin-top:1px; }
+  .cross-network-card .kc-lv-items { margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); }
+  .cross-network-card .kc-lv-item { font-size:12px; color:var(--text); padding:1px 0; }
   .known-client .kc-header {
     background:linear-gradient(90deg, var(--blue), #1a6fd4); color:#fff; padding:12px 14px;
     display:flex; align-items:center; gap:8px;
@@ -2616,7 +2632,15 @@ async function lookupPlate() {
   try {
     const res = await fetch('/api/history/' + encodeURIComponent(plate));
     const data = await res.json();
-    if (!data.car) { panel.innerHTML = ''; lastKnownNextMileage = null; checkMileageVsDue(); return; }
+
+    const crossHtml = renderCrossNetworkHistory(data.cross_history);
+
+    if (!data.car) {
+      panel.innerHTML = crossHtml;
+      lastKnownNextMileage = null;
+      checkMileageVsDue();
+      return;
+    }
 
     document.getElementById('owner_name').value = data.car.owner_name || '';
     document.getElementById('owner_phone').value = data.car.owner_phone || '';
@@ -2674,12 +2698,45 @@ async function lookupPlate() {
           <div class="kc-action-hint">${T.kc_add_service_hint}</div>
         </div>
       </div>
-    `;
+    ` + crossHtml;
   } catch (e) {
     panel.innerHTML = '';
     lastKnownNextMileage = null;
     checkMileageVsDue();
   }
+}
+
+function renderCrossNetworkHistory(crossHistory) {
+  if (!crossHistory || !crossHistory.length) return '';
+  const entries = crossHistory.map(h => {
+    let itemsHtml = '';
+    if (h.items_json) {
+      try {
+        const items = JSON.parse(h.items_json);
+        itemsHtml = '<div class="kc-lv-items">' + items.map(it =>
+          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}</span></div>`
+        ).join('') + '</div>';
+      } catch (e) {}
+    }
+    return `
+      <div class="cn-entry">
+        <div class="cn-entry-top">
+          <div>
+            <div class="cn-entry-shop">${escapeHtml(h.shop_name || '—')}</div>
+            <div class="cn-entry-date">${h.change_date}${h.mileage ? ' · ' + h.mileage.toLocaleString('ru-RU') + ' ' + T.km_short : ''}</div>
+          </div>
+        </div>
+        ${itemsHtml}
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="cross-network-card">
+      <div class="cn-header"><i class="fa-solid fa-globe"></i><span>${T.cn_history_title}</span></div>
+      <div class="cn-hint">${T.cn_history_hint}</div>
+      ${entries}
+    </div>
+  `;
 }
 
 function focusNextEntry() {
@@ -3603,7 +3660,8 @@ def api_history(plate):
     car, history = db.get_car_history(g.shop_id, plate)
     if g.is_employee or g.is_branch:
         history = _strip_cost_price(history)
-    return jsonify({"car": car, "history": history})
+    cross_history = db.get_cross_network_history(plate, g.shop_id)
+    return jsonify({"car": car, "history": history, "cross_history": cross_history})
 
 
 @app.route("/api/oil_change/<int:oc_id>", methods=["PUT"])

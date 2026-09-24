@@ -259,6 +259,7 @@ def init_db():
         # базах — данные не трогаются, только ускоряется поиск. ---
         cur.execute("CREATE INDEX IF NOT EXISTS idx_clients_shop ON clients(shop_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_shop ON cars(shop_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_plate_only ON cars(plate_number)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_client ON cars(client_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_car ON oil_changes(car_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_status_next ON oil_changes(status, next_change_date)")
@@ -1130,6 +1131,28 @@ def get_car_history(shop_id: int, plate_number: str):
             (row["id"],)
         ).fetchall()
         return dict(row), [dict(h) for h in history]
+
+
+def get_cross_network_history(plate: str, exclude_shop_id: int):
+    """История этой машины на ДРУГИХ точках платформы (не текущей) — по
+    госномеру, между вообще всеми точками, независимо от владельца.
+    Сознательно БЕЗ цены — только дата, пробег, что делали: стоимость
+    услуги остаётся внутренним делом каждой отдельной точки, а факт и
+    состав обслуживания — общая история самой машины. Доступно
+    автоматически всем ролям точки (владелец/филиал/сотрудник), явного
+    согласия клиента не требуется — решение принято осознанно, риск
+    минимален, раз не передаются ни телефон, ни деньги."""
+    plate = normalize_plate(plate)
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT s.shop_name, oc.change_date, oc.mileage, oc.service_type, oc.items_json, oc.notes
+            FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            JOIN shops s ON s.id = c.shop_id
+            WHERE c.plate_number = ? AND c.shop_id != ?
+            ORDER BY oc.change_date DESC, oc.id DESC
+        """, (plate, exclude_shop_id)).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_car_by_passport_token(token: str):
