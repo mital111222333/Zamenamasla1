@@ -240,6 +240,17 @@ LOGIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ T.app_title }}</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0A2540">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Замена масла">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -553,6 +564,19 @@ def public_passport_pdf(token):
             os.remove(output_path)
 
 
+@app.route("/sw.js")
+def service_worker():
+    """Service worker обязательно отдаётся с корня (не из /static/), иначе
+    его область действия (scope) ограничится только папкой /static/ и он
+    не сможет ничего перехватывать на реальных страницах приложения."""
+    response = Response(
+        open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "sw.js")).read(),
+        mimetype="application/javascript",
+    )
+    response.headers["Service-Worker-Allowed"] = "/"
+    return response
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     error = None
@@ -640,6 +664,17 @@ PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ shop_name }} — панель</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0A2540">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Замена масла">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4494,6 +4529,15 @@ ADMIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Админ-панель — точки</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0A2540">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
