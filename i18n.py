@@ -8,6 +8,9 @@ RU = {
     # --- Общее / шапка ---
     "app_title": "MoyBook",
     "logout": "Выйти",
+    "nav_add_short": "Замена",
+    "nav_more": "Ещё",
+    "lang_switch_short": "UZ",
     "lang_switch": "O'zbekcha",
 
     # --- Вход ---
@@ -446,6 +449,9 @@ RU = {
 UZ = {
     "app_title": "MoyBook",
     "logout": "Chiqish",
+    "nav_add_short": "Almashtirish",
+    "nav_more": "Yana",
+    "lang_switch_short": "RU",
     "lang_switch": "Русский",
 
     "login_title": "🔧 Panelga kirish",

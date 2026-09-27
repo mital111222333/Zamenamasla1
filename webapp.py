@@ -662,7 +662,7 @@ PAGE = """
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{{ shop_name }} — MoyBook</title>
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#0A2540">
@@ -724,6 +724,54 @@ if ('serviceWorker' in navigator) {
   .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
   .lang-btn { background: #EFF6FF; border: 1px solid #BFDBFE; color: var(--blue); font-size: 12px; font-weight:700; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
   .tabs { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom: 10px; }
+  /* ---- навигация: телефон ---- */
+  .container { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .topbar { margin: 10px 0 12px; gap:10px; }
+  .topbar h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .side-nav { display:none; }
+  .bottom-bar { position:fixed; left:0; right:0; bottom:0; z-index:50; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); background:rgba(255,255,255,0.97); border-top:1px solid var(--border); padding:6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -4px 16px rgba(15,23,42,0.06); }
+  .bb-item { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; min-height:50px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
+  .bb-item i { font-size:19px; }
+  .bb-item span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bb-item.active { color:var(--blue); }
+  .bb-item.active:not(.bb-add)::before { content:''; position:absolute; top:-6px; width:28px; height:3px; border-radius:2px; background:var(--blue); }
+  .bb-plus { width:48px; height:48px; margin-top:-22px; border-radius:50%; background:var(--btn); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(200,30,43,0.35); border:3px solid #fff; }
+  .bb-plus i { font-size:20px; }
+  .bb-add.active span { color:var(--btn); }
+  .nav-badge { display:none; position:absolute; top:0; right:calc(50% - 22px); min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--btn); color:#fff; font-size:10px; font-weight:800; line-height:17px; text-align:center; }
+  .nav-badge.show { display:block; }
+  .more-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.35); z-index:60; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .more-backdrop.open { opacity:1; pointer-events:auto; }
+  .more-sheet { position:fixed; left:0; right:0; bottom:0; z-index:61; background:#fff; border-radius:20px 20px 0 0; padding:8px 14px calc(14px + env(safe-area-inset-bottom, 0px)); transform:translateY(105%); transition:transform .25s ease; box-shadow:0 -10px 30px rgba(15,23,42,0.15); max-height:80vh; overflow-y:auto; }
+  .more-sheet.open { transform:translateY(0); }
+  .more-grab { width:40px; height:5px; border-radius:3px; background:#CBD5E1; margin:2px auto 10px; }
+  .more-item { position:relative; display:flex; align-items:center; gap:14px; padding:14px 6px; border-bottom:1px solid #F1F5F9; font-size:15px; font-weight:600; color:var(--text); cursor:pointer; text-decoration:none; }
+  .more-item i { width:22px; text-align:center; font-size:18px; color:#64748B; }
+  .more-item.active, .more-item.active i { color:var(--blue); }
+  .more-item.hidden-in-more { display:none; }
+  .more-item .nav-badge { position:static; margin-left:auto; }
+  .more-logout, .more-logout i { color:var(--btn); border-bottom:none; }
+  /* ---- навигация: планшет и компьютер ---- */
+  @media (min-width: 900px) {
+    .bottom-bar, .more-sheet, .more-backdrop, .topbar { display:none !important; }
+    .container { padding-bottom:24px; margin-left:240px; max-width:1100px; padding-left:24px; padding-right:24px; }
+    .side-nav { display:flex; flex-direction:column; position:fixed; top:6px; left:0; bottom:0; width:232px; background:#fff; border-right:1px solid var(--border); padding:16px 12px; z-index:40; overflow-y:auto; }
+    .side-brand { display:flex; align-items:center; gap:10px; padding:4px 6px 16px; border-bottom:1px solid #F1F5F9; margin-bottom:10px; }
+    .side-shop { font-family:var(--font-display); font-weight:800; font-style:italic; font-size:18px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .side-list { display:flex; flex-direction:column; gap:2px; }
+    .side-item { position:relative; display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; font-size:14px; font-weight:600; color:#475569; cursor:pointer; }
+    .side-item i { width:18px; text-align:center; color:#94A3B8; }
+    .side-item:hover { background:#F8FAFC; }
+    .side-item.active { background:#EFF6FF; color:var(--blue); }
+    .side-item.active i { color:var(--blue); }
+    .side-add { background:var(--danger-bg); color:var(--btn); margin-bottom:8px; }
+    .side-add i { color:var(--btn); }
+    .side-add.active { background:var(--btn); color:#fff; }
+    .side-add.active i { color:#fff; }
+    .side-item .nav-badge { position:static; margin-left:auto; }
+    .side-foot { margin-top:auto; padding-top:14px; border-top:1px solid #F1F5F9; display:flex; flex-direction:column; gap:8px; }
+    .side-foot .lang-btn, .side-foot .logout { text-align:center; padding:9px 10px; display:block; }
+  }
   .subtabs { display:flex; gap:8px; margin-bottom:14px; }
   .subtab {
     flex:1; text-align:center; padding:10px; border-radius:10px; background:var(--field-bg);
@@ -1061,43 +1109,82 @@ if ('serviceWorker' in navigator) {
 </head>
 <body>
 <div class="speedline"></div>
+<!-- Навигация: на телефоне — нижняя панель + шторка «Ещё», на широком экране — меню слева.
+     Пункты бокового меню несут id="tab-..." (на них опирается showTab), нижняя панель и
+     шторка помечены только data-tab — активный пункт подсвечивается везде сразу. -->
+<aside class="side-nav">
+  <div class="side-brand">
+    <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
+    <div style="min-width:0;">
+      <div class="side-shop">{{ shop_name }}</div>
+      <div class="logo-sub">MoyBook</div>
+    </div>
+  </div>
+  <nav class="side-list">
+    <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span></div>
+    <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
+    {% if not is_employee %}<div class="side-item" id="tab-stats" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
+    {% if warehouse_enabled and not is_employee %}<div class="side-item" id="tab-warehouse" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>{% endif %}
+    <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+    {% if not is_employee %}<div class="side-item" id="tab-expenses" data-tab="expenses" onclick="showTab('expenses')"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
+    <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
+    {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
+    {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+  </nav>
+  <div class="side-foot">
+    <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
+    <a class="logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> {{ T.logout }}</a>
+  </div>
+</aside>
+
+{% set bar_slot2 = 'debts' if is_employee else 'stats' %}
+{% set bar_slot4 = 'warehouse' if (warehouse_enabled and not is_employee) else ('broadcast' if is_employee else 'debts') %}
+<nav class="bottom-bar" id="bottomBar">
+  <div class="bb-item" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
+  {% if bar_slot2 == 'stats' %}
+  <div class="bb-item" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>
+  {% else %}
+  <div class="bb-item" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+  {% endif %}
+  <div class="bb-item bb-add active" data-tab="add" onclick="showTab('add')"><div class="bb-plus"><i class="fa-solid fa-plus"></i></div><span>{{ T.nav_add_short }}</span></div>
+  {% if bar_slot4 == 'warehouse' %}
+  <div class="bb-item" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>
+  {% elif bar_slot4 == 'debts' %}
+  <div class="bb-item" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+  {% else %}
+  <div class="bb-item" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
+  {% endif %}
+  <div class="bb-item" id="bbMore" onclick="openMore()"><i class="fa-solid fa-ellipsis"></i><span>{{ T.nav_more }}</span><b class="nav-badge" id="moreBadge"></b></div>
+</nav>
+
+<div class="more-backdrop" id="moreBackdrop" onclick="closeMore()"></div>
+<div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
+  <div class="more-grab"></div>
+  <div class="more-list">
+      <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
+      {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
+      {% if warehouse_enabled and not is_employee %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>{% endif %}
+      <div class="more-item" data-tab="debts" data-more-slot="debts" onclick="showTab('debts'); closeMore();"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+      {% if not is_employee %}<div class="more-item" data-tab="expenses" data-more-slot="expenses" onclick="showTab('expenses'); closeMore();"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
+      <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
+      {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+      <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
+      <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
+  </div>
+</div>
+
 <div class="container">
   <div class="topbar">
-    <div style="display:flex; align-items:center; gap:10px;">
-      <div class="logo-badge"><i class="fa-solid fa-wrench"></i></div>
-      <div>
+    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+      <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
+      <div style="min-width:0;">
         <h1>{{ shop_name }}</h1>
         <div class="logo-sub">MoyBook</div>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
-      <a class="logout" href="/logout">{{ T.logout }}</a>
-    </div>
+    <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch_short }}</button>
   </div>
-
-  <div class="tabs">
-    <div class="tab active" id="tab-add" onclick="showTab('add')"><span class="tab-icon"><i class="fa-solid fa-oil-can"></i></span><span>{{ T.tab_add }}</span></div>
-    <div class="tab" id="tab-table" onclick="showTab('table')"><span class="tab-icon"><i class="fa-solid fa-car"></i></span><span>{{ T.tab_table }}</span></div>
-    <div class="tab" id="tab-debts" onclick="showTab('debts')"><span class="tab-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span><span>{{ T.tab_debts }}</span></div>
-    {% if not is_employee %}
-    <div class="tab" id="tab-expenses" onclick="showTab('expenses')"><span class="tab-icon"><i class="fa-solid fa-receipt"></i></span><span>{{ T.tab_expenses }}</span></div>
-    {% endif %}
-    <div class="tab" id="tab-broadcast" onclick="showTab('broadcast')"><span class="tab-icon"><i class="fa-solid fa-bullhorn"></i></span><span>{{ T.tab_broadcast }}</span></div>
-    {% if not is_employee %}
-    <div class="tab" id="tab-export" onclick="showTab('export')"><span class="tab-icon"><i class="fa-solid fa-file-arrow-down"></i></span><span>{{ T.tab_export }}</span></div>
-    <div class="tab" id="tab-stats" onclick="showTab('stats')"><span class="tab-icon"><i class="fa-solid fa-chart-column"></i></span><span>{{ T.tab_stats }}</span></div>
-    {% endif %}
-    {% if sms_enabled %}<div class="tab" id="tab-sms" onclick="showTab('sms')"><span class="tab-icon"><i class="fa-solid fa-comment-sms"></i></span><span>{{ T.tab_sms }}</span></div>{% endif %}
-  </div>
-
-  {% if warehouse_enabled and not is_employee %}
-  <div class="wh-banner" id="tab-warehouse" onclick="showTab('warehouse')">
-    <div class="stripe-pair"><span style="background:var(--blue);"></span><span style="background:var(--btn);"></span></div>
-    <div class="wh-label"><i class="fa-solid fa-boxes-stacked"></i> {{ T.tab_warehouse }}</div>
-    <div class="stripe-pair"><span style="background:var(--btn);"></span><span style="background:var(--cyan);"></span></div>
-  </div>
-  {% endif %}
 
   <div id="msg"></div>
 
@@ -1774,9 +1861,63 @@ function showTab(t) {
   if (t === 'debts') loadDebts();
   if (t === 'expenses') loadExpensesTab();
   if (t === 'broadcast') loadBroadcastInfo();
+  document.querySelectorAll('[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  // пункт «Ещё» подсвечен, если открыт раздел, которого нет в нижней панели
+  const sheet = document.getElementById('moreSheet');
+  const bbMore = document.getElementById('bbMore');
+  if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(t));
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   if (t === 'stats') loadStats();
   if (t === 'warehouse') loadWarehouse();
 }
+
+function openMore() {
+  document.getElementById('moreSheet').classList.add('open');
+  document.getElementById('moreBackdrop').classList.add('open');
+}
+
+function closeMore() {
+  document.getElementById('moreSheet').classList.remove('open');
+  document.getElementById('moreBackdrop').classList.remove('open');
+}
+
+(function setupMoreSheet() {
+  // в шторке «Ещё» прячем то, что уже есть в нижней панели
+  const sheet = document.getElementById('moreSheet');
+  if (!sheet) return;
+  const inBar = sheet.dataset.bar.split(',');
+  sheet.querySelectorAll('[data-more-slot]').forEach(el => {
+    if (inBar.includes(el.dataset.moreSlot)) el.classList.add('hidden-in-more');
+  });
+  // закрытие свайпом вниз
+  let startY = null;
+  sheet.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+  sheet.addEventListener('touchend', e => {
+    if (startY !== null && e.changedTouches[0].clientY - startY > 60) closeMore();
+    startY = null;
+  });
+})();
+
+async function refreshNavBadges() {
+  // красная цифра — число просроченных долгов (видна на «Долгах» и на «Ещё»)
+  try {
+    const debts = await (await fetch('/api/debts')).json();
+    const overdue = (debts || []).filter(d => d.is_overdue).length;
+    document.querySelectorAll('[data-badge="debts"]').forEach(b => {
+      b.textContent = overdue;
+      b.classList.toggle('show', overdue > 0);
+    });
+    const sheet = document.getElementById('moreSheet');
+    const moreBadge = document.getElementById('moreBadge');
+    if (sheet && moreBadge) {
+      const debtsInMore = !sheet.dataset.bar.split(',').includes('debts');
+      moreBadge.textContent = overdue;
+      moreBadge.classList.toggle('show', debtsInMore && overdue > 0);
+    }
+  } catch (e) {}
+}
+refreshNavBadges();
+setInterval(refreshNavBadges, 5 * 60 * 1000);
 
 async function saveSmsSettings() {
   const emailEl = document.getElementById('eskiz_email');
