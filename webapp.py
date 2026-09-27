@@ -992,6 +992,24 @@ if ('serviceWorker' in navigator) {
   .rv-chart-wrap { position:relative; height:240px; }
   .rv-legend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:#64748B; margin-top:8px; }
   .rv-legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+  .net-cmp { width:100%; border-collapse:collapse; font-size:13px; min-width:640px; }
+  .net-cmp th { text-align:right; font-size:11.5px; font-weight:600; color:#64748B; padding:8px 6px; border-bottom:1px solid var(--border); white-space:normal; line-height:1.25; vertical-align:bottom; background:none; text-transform:none; letter-spacing:0; }
+  .net-cmp th:first-child, .net-cmp td:first-child { text-align:left; position:sticky; left:0; background:#fff; z-index:1; }
+  .net-cmp tbody tr:hover td:first-child { background:#F8FAFC; }
+  .net-cmp tbody tr.active td:first-child { background:#EFF6FF; }
+  .net-cmp tfoot td:first-child { background:#F8FAFC; }
+  .net-cmp td { text-align:right; padding:10px 6px; border-bottom:1px solid #F1F5F9; white-space:nowrap; color:var(--text); }
+  .net-cmp tbody tr { cursor:pointer; }
+  .net-cmp tbody tr:hover { background:#F8FAFC; }
+  .net-cmp tbody tr.active { background:#EFF6FF; }
+  .net-cmp .shop-cell { display:flex; align-items:center; gap:8px; font-weight:700; }
+  .net-cmp .shop-cell small { font-weight:500; color:#94A3B8; }
+  .net-cmp .best { color:#15803D; font-weight:800; }
+  .net-cmp .neg { color:#B91C1C; font-weight:700; }
+  .net-cmp tfoot td { font-weight:800; border-top:2px solid var(--border); border-bottom:none; background:#F8FAFC; }
+  .net-cmp-chart-wrap { position:relative; margin-top:16px; }
+  .net-detail-head { margin:22px 0 10px; }
+  .net-detail-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:8px; }
   .dash-row {
     display:flex; justify-content:space-between; align-items:center; padding:8px 0;
     border-bottom:1px dashed var(--border); font-size:13.5px;
@@ -1391,7 +1409,50 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="statsBranchesView" style="display:none;">
-      <div id="statsAggregated"></div>
+      <div id="statsAggregated">
+        <div class="card">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.net_compare_title }}</label>
+          <div class="hint-text" style="margin-bottom:12px;">{{ T.net_compare_hint }}</div>
+          <div class="brand-period" id="netComparePeriod"></div>
+          <div id="netCompareBody">{{ T.stats_loading }}</div>
+          <div class="net-cmp-chart-wrap" id="netCompareChartWrap"><canvas id="netCompareChart"></canvas></div>
+        </div>
+
+        <div class="net-detail-head" id="netDetailHead">
+          <div class="net-detail-title">{{ T.net_detail_title }}</div>
+          <div class="brand-chips" id="netScopeChips"></div>
+        </div>
+        <div id="netStatsGrid">{{ T.stats_loading }}</div>
+
+        <div class="card" style="margin-top:16px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_net_profit_title }}</label>
+          <div id="netNetProfit">{{ T.stats_loading }}</div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_revenue_chart_title }}</label>
+          <div id="netRevenueSummary" class="rv-summary"></div>
+          <div class="rv-chart-wrap"><canvas id="netRevenueChart"></canvas></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.stats_brands_title }}</label>
+          <div class="hint-text" style="margin-bottom:12px;">{{ T.stats_brands_hint }}</div>
+          <div class="brand-period" id="netBrandPeriod"></div>
+          <div class="brand-chips" id="netBrandCategoryChips"></div>
+          <div id="netBrandBody">{{ T.stats_loading }}</div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_debt_summary_title }}</label>
+          <div id="netDebtSummary">{{ T.stats_loading }}</div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_low_stock_title }}</label>
+          <div id="netLowStock">{{ T.stats_loading }}</div>
+        </div>
+      </div>
 
       <div class="card" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.stats_custom_title }}</label>
@@ -2104,74 +2165,64 @@ async function loadDashboard() {
   renderRevenueChart(data.daily_revenue);
 
   const netEl = document.getElementById('dashNetProfit');
-  if (netEl && data.net_profit) {
-    const np = data.net_profit;
-    const isNegative = np.net_profit < 0;
-    netEl.innerHTML = `
-      <div class="dash-summary-grid">
-        <div class="dash-summary-box">
-          <div class="dsb-num">${np.oil_profit.toLocaleString('ru-RU')} ${T.currency}</div>
-          <div class="dsb-label">${T.dash_oil_profit_label}</div>
-        </div>
-        <div class="dash-summary-box">
-          <div class="dsb-num warn">${np.expenses_total.toLocaleString('ru-RU')} ${T.currency}</div>
-          <div class="dsb-label">${T.dash_expenses_label}</div>
-        </div>
-      </div>
-      <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
-        <div style="font-size:24px; font-weight:700; font-family:var(--font-mono); color:${isNegative ? '#B3241C' : '#15803D'};">${np.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
-        <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
-      </div>
-    `;
-  }
-
-  const topEl = document.getElementById('dashTopProducts');
-  if (topEl) {
-    topEl.innerHTML = data.top_products.length ? data.top_products.map((p, i) => `
-      <div>
-        <div class="dash-row" style="cursor:pointer;" onclick="toggleCategoryBrands(${escapeHtml(JSON.stringify(p.name))}, ${i})">
-          <span><span class="dash-row-rank">${i + 1}</span><span class="dash-row-name">${escapeHtml(p.name)}</span> <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--hint); margin-left:4px;"></i></span>
-          <span class="dash-row-value">${p.qty.toLocaleString('ru-RU')}</span>
-        </div>
-        <div id="catBrands_${i}" class="dash-brands-panel" style="display:none;"></div>
-      </div>
-    `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
-  }
-
+  if (netEl && data.net_profit) netEl.innerHTML = renderNetProfitHtml(data.net_profit);
   const debtEl = document.getElementById('dashDebtSummary');
-  if (debtEl) {
-    const ds = data.debt_summary;
-    debtEl.innerHTML = `
-      <div class="dash-summary-grid">
-        <div class="dash-summary-box">
-          <div class="dsb-num">${ds.total_remaining.toLocaleString('ru-RU')} ${T.currency}</div>
-          <div class="dsb-label">${T.dash_total_owed}</div>
-        </div>
-        <div class="dash-summary-box">
-          <div class="dsb-num ${ds.overdue_count > 0 ? 'warn' : ''}">${ds.overdue_count} / ${ds.count}</div>
-          <div class="dsb-label">${T.dash_overdue_of_total}</div>
-        </div>
-      </div>
-    `;
-  }
-
+  if (debtEl) debtEl.innerHTML = renderDebtHtml(data.debt_summary);
   const lowEl = document.getElementById('dashLowStock');
-  if (lowEl) {
-    lowEl.innerHTML = data.low_stock.length ? data.low_stock.map(p => `
-      <div class="dash-row">
-        <span class="dash-row-name">${escapeHtml(p.name)}</span>
-        <span class="dash-row-value warn">${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l}</span>
+  if (lowEl) lowEl.innerHTML = renderLowStockHtml(data.low_stock, false);
+}
+
+function renderNetProfitHtml(np) {
+  const isNegative = np.net_profit < 0;
+  return `
+    <div class="dash-summary-grid">
+      <div class="dash-summary-box">
+        <div class="dsb-num">${np.oil_profit.toLocaleString('ru-RU')} ${T.currency}</div>
+        <div class="dsb-label">${T.dash_oil_profit_label}</div>
       </div>
-    `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
-  }
+      <div class="dash-summary-box">
+        <div class="dsb-num warn">${np.expenses_total.toLocaleString('ru-RU')} ${T.currency}</div>
+        <div class="dsb-label">${T.dash_expenses_label}</div>
+      </div>
+    </div>
+    <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
+      <div style="font-size:24px; font-weight:700; font-family:var(--font-mono); color:${isNegative ? '#B3241C' : '#15803D'};">${np.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
+      <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
+    </div>`;
+}
+
+function renderDebtHtml(ds) {
+  return `
+    <div class="dash-summary-grid">
+      <div class="dash-summary-box">
+        <div class="dsb-num">${ds.total_remaining.toLocaleString('ru-RU')} ${T.currency}</div>
+        <div class="dsb-label">${T.dash_total_owed}</div>
+      </div>
+      <div class="dash-summary-box">
+        <div class="dsb-num ${ds.overdue_count > 0 ? 'warn' : ''}">${ds.overdue_count} / ${ds.count}</div>
+        <div class="dsb-label">${T.dash_overdue_of_total}</div>
+      </div>
+    </div>`;
+}
+
+function renderLowStockHtml(list, withShop) {
+  if (!list || !list.length) return `<div class="hint-text">${T.dash_no_data}</div>`;
+  return list.map(p => `
+    <div class="dash-row">
+      <span class="dash-row-name">${escapeHtml(p.name)}${withShop && p.shop_name ? ` <span class="hint-text">· ${escapeHtml(p.shop_name)}</span>` : ''}</span>
+      <span class="dash-row-value warn">${p.stock_qty} ${p.unit === 'pc' ? T.unit_pc : T.unit_l}</span>
+    </div>`).join('');
 }
 
 const BRAND_COLORS = ['#0F52BA', '#E63946', '#F4A261', '#2A9D8F', '#8E44AD', '#E9C46A', '#1D3557', '#06B6D4', '#84CC16', '#EC4899'];
 const BRAND_OTHERS_COLOR = '#CBD5E1';
-let brandData = null;
-let brandActiveCat = null;
-let brandDays = 30;
-let brandChartInstance = null;
+// Карточка брендов — одна логика для своей точки (prefix 'brand') и для сети
+// филиалов (prefix 'netBrand', scope = 'all' или id филиала).
+const BRAND_W = {};
+function bw(p) {
+  if (!BRAND_W[p]) BRAND_W[p] = { data: null, cat: null, days: 30, chart: null, scope: '' };
+  return BRAND_W[p];
+}
 
 function fmtNum(n) { return Number(n || 0).toLocaleString('ru-RU'); }
 
@@ -2181,59 +2232,61 @@ function brandUnitLabel(unit) {
   return '';
 }
 
-function renderBrandPeriod() {
-  const el = document.getElementById('brandPeriod');
+function renderBrandPeriod(p) {
+  const el = document.getElementById(p + 'Period');
   if (!el) return;
   const opts = [[30, T.brands_period_30], [90, T.brands_period_90], [365, T.brands_period_365]];
   el.innerHTML = opts.map(([d, label]) =>
-    `<button class="${d === brandDays ? 'active' : ''}" onclick="setBrandDays(${d})">${label}</button>`
+    `<button class="${d === bw(p).days ? 'active' : ''}" onclick="setBrandDays('${p}', ${d})">${label}</button>`
   ).join('');
 }
 
-function setBrandDays(d) {
-  brandDays = d;
-  loadBrandStats();
+function setBrandDays(p, d) {
+  bw(p).days = d;
+  loadBrandStats(p);
 }
 
-async function loadBrandStats() {
-  const body = document.getElementById('brandBody');
+async function loadBrandStats(p) {
+  p = p || 'brand';
+  const body = document.getElementById(p + 'Body');
   if (!body) return;
-  renderBrandPeriod();
+  renderBrandPeriod(p);
   const to = new Date();
   const from = new Date();
-  from.setDate(to.getDate() - (brandDays - 1));
+  from.setDate(to.getDate() - (bw(p).days - 1));
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   try {
-    const res = await fetch(`/api/stats/brands?from=${iso(from)}&to=${iso(to)}`);
-    brandData = await res.json();
-  } catch (e) { brandData = null; }
-  const cats = (brandData && brandData.categories) || [];
-  const chips = document.getElementById('brandCategoryChips');
+    const scopeQs = bw(p).scope ? `&scope=${bw(p).scope}` : '';
+    const res = await fetch(`/api/stats/brands?from=${iso(from)}&to=${iso(to)}${scopeQs}`);
+    bw(p).data = await res.json();
+  } catch (e) { bw(p).data = null; }
+  const cats = (bw(p).data && bw(p).data.categories) || [];
+  const chips = document.getElementById(p + 'CategoryChips');
   if (!cats.length) {
     chips.innerHTML = '';
     body.innerHTML = `<div class="hint-text">${T.brands_empty}</div>`;
-    if (brandChartInstance) { brandChartInstance.destroy(); brandChartInstance = null; }
+    if (bw(p).chart) { bw(p).chart.destroy(); bw(p).chart = null; }
     return;
   }
-  if (!cats.some(c => c.key === brandActiveCat)) brandActiveCat = cats[0].key;
+  if (!cats.some(c => c.key === bw(p).cat)) bw(p).cat = cats[0].key;
   chips.innerHTML = cats.map(c => {
     const sub = c.metric === 'sum' ? '' : `<span class="bc-sub">${fmtNum(c.total_qty)} ${brandUnitLabel(c.unit)}</span>`;
-    return `<div class="brand-chip ${c.key === brandActiveCat ? 'active' : ''}" onclick="selectBrandCategory('${c.key}')">${escapeHtml(T[c.key] || c.key)}${sub}</div>`;
+    return `<div class="brand-chip ${c.key === bw(p).cat ? 'active' : ''}" onclick="selectBrandCategory('${p}', '${c.key}')">${escapeHtml(T[c.key] || c.key)}${sub}</div>`;
   }).join('');
-  renderBrandCategory();
+  renderBrandCategory(p);
 }
 
-function selectBrandCategory(key) {
-  brandActiveCat = key;
-  document.querySelectorAll('#brandCategoryChips .brand-chip').forEach(el => {
+function selectBrandCategory(p, key) {
+  bw(p).cat = key;
+  document.querySelectorAll(`#${p}CategoryChips .brand-chip`).forEach(el => {
     el.classList.toggle('active', el.getAttribute('onclick').indexOf(`'${key}'`) !== -1);
   });
-  renderBrandCategory();
+  renderBrandCategory(p);
 }
 
-function renderBrandCategory() {
-  const body = document.getElementById('brandBody');
-  const c = ((brandData && brandData.categories) || []).find(x => x.key === brandActiveCat);
+function renderBrandCategory(p) {
+  const body = document.getElementById(p + 'Body');
+  const c = ((bw(p).data && bw(p).data.categories) || []).find(x => x.key === bw(p).cat);
   if (!c) return;
   const unit = brandUnitLabel(c.unit);
   const bySum = c.metric === 'sum';
@@ -2272,16 +2325,16 @@ function renderBrandCategory() {
       <div><b>${fmtNum(c.total_sum)}</b><span>${T.brands_revenue}, ${T.currency}</span></div>
       <div><b>${c.brand_count}</b><span>${bySum ? T.brands_items : T.brands_count}</span></div>
     </div>
-    <div class="brand-donut-wrap"><canvas id="brandDonut"></canvas></div>
+    <div class="brand-donut-wrap"><canvas id="${p}Donut"></canvas></div>
     ${rows}${othersRow}
   `;
-  renderBrandDonut(c, bySum ? `${fmtNum(c.total_sum)}` : `${fmtNum(c.total_qty)}`, bySum ? T.currency : unit);
+  renderBrandDonut(p, c, bySum ? `${fmtNum(c.total_sum)}` : `${fmtNum(c.total_qty)}`, bySum ? T.currency : unit);
 }
 
-function renderBrandDonut(c, centerValue, centerUnit) {
-  const canvas = document.getElementById('brandDonut');
+function renderBrandDonut(p, c, centerValue, centerUnit) {
+  const canvas = document.getElementById(p + 'Donut');
   if (!canvas || typeof Chart === 'undefined') return;
-  if (brandChartInstance) brandChartInstance.destroy();
+  if (bw(p).chart) bw(p).chart.destroy();
   const bySum = c.metric === 'sum';
   const labels = c.top.map(b => b.no_brand ? T.brands_no_brand : b.name);
   const values = c.top.map(b => bySum ? b.sum : b.qty);
@@ -2310,7 +2363,7 @@ function renderBrandDonut(c, centerValue, centerUnit) {
       ctx.restore();
     }
   };
-  brandChartInstance = new Chart(canvas.getContext('2d'), {
+  bw(p).chart = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
     data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#fff', borderWidth: 2, hoverOffset: 6 }] },
     options: {
@@ -2408,6 +2461,156 @@ const ST_PERIODS = () => [
   ['year', T.stats_year, T.st_vs_year],
 ];
 
+const NET = { scope: 'all', period: 'month', shops: [], revChart: null, cmpChart: null };
+
+function setNetScope(scope) {
+  NET.scope = String(scope);
+  loadNetwork();
+  const head = document.getElementById('netDetailHead');
+  if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadNetwork() {
+  const grid = document.getElementById('netStatsGrid');
+  if (!grid) return;
+  let data;
+  try {
+    data = await (await fetch(`/api/network/overview?scope=${encodeURIComponent(NET.scope)}`)).json();
+  } catch (e) { return; }
+  if (!data.ok) return;
+  NET.shops = data.shops || [];
+  const isAll = NET.scope === 'all';
+
+  document.getElementById('netScopeChips').innerHTML =
+    [`<div class="brand-chip ${isAll ? 'active' : ''}" onclick="setNetScope('all')">${T.net_all}<span class="bc-sub">${NET.shops.length}</span></div>`]
+      .concat(NET.shops.map(sh => `<div class="brand-chip ${NET.scope === String(sh.id) ? 'active' : ''}" onclick="setNetScope('${sh.id}')">${escapeHtml(sh.name)}${sh.is_head ? `<span class="bc-sub">${T.branch_head_label}</span>` : ''}</div>`))
+      .join('');
+
+  grid.innerHTML =
+    renderTodayStrip(data.stats.today, data.profit.today) +
+    `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
+      label, d: data.stats[key], cmp: data.comparison[key], cmpNote: note,
+      profit: data.profit[key], orange: isAll,
+    })).join('')}</div>`;
+
+  document.getElementById('netNetProfit').innerHTML = renderNetProfitHtml(data.net_profit);
+  NET.revChart = drawRevenueBars('netRevenueChart', 'netRevenueSummary', data.daily_revenue, NET.revChart);
+  document.getElementById('netDebtSummary').innerHTML = renderDebtHtml(data.debt_summary);
+  document.getElementById('netLowStock').innerHTML = renderLowStockHtml(data.low_stock, isAll);
+
+  bw('netBrand').scope = NET.scope;
+  loadBrandStats('netBrand');
+
+  document.querySelectorAll('#netCompareBody tbody tr').forEach(tr => {
+    tr.classList.toggle('active', tr.dataset.shop === NET.scope);
+  });
+}
+
+function setNetComparePeriod(p) {
+  NET.period = p;
+  loadNetworkCompare();
+}
+
+async function loadNetworkCompare() {
+  const body = document.getElementById('netCompareBody');
+  if (!body) return;
+  document.getElementById('netComparePeriod').innerHTML =
+    [['week', T.stats_week], ['month', T.stats_month], ['year', T.stats_year]]
+      .map(([k, label]) => `<button class="${k === NET.period ? 'active' : ''}" onclick="setNetComparePeriod('${k}')">${label}</button>`).join('');
+  let data;
+  try {
+    data = await (await fetch(`/api/network/compare?period=${NET.period}`)).json();
+  } catch (e) { return; }
+  if (!data.ok) return;
+  const rows = data.rows || [];
+  if (!rows.length) { body.innerHTML = `<div class="hint-text">${T.dash_no_data}</div>`; return; }
+
+  // лучший показатель в каждой колонке подсвечиваем зелёным
+  const maxOf = f => Math.max(...rows.map(f));
+  const best = {
+    total: maxOf(r => r.total), count: maxOf(r => r.count), avg: maxOf(r => r.avg),
+    clients: maxOf(r => r.clients.total), profit: maxOf(r => r.profit), net: maxOf(r => r.net_profit),
+  };
+  const many = rows.length > 1;
+  const cls = (v, b) => (many && v > 0 && v === b) ? 'best' : '';
+  const sum = f => rows.reduce((a, r) => a + f(r), 0);
+  const totPaid = sum(r => r.paid_count);
+  const tot = {
+    total: sum(r => r.total), count: sum(r => r.count),
+    clients: sum(r => r.clients.total), newc: sum(r => r.clients.new),
+    profit: sum(r => r.profit), expenses: sum(r => r.expenses), net: sum(r => r.net_profit),
+  };
+  const totAvg = totPaid ? Math.round(tot.total / totPaid) : 0;
+
+  body.innerHTML = `
+    <div class="table-wrap"><table class="net-cmp">
+      <thead><tr>
+        <th>${T.net_col_shop}</th><th>${T.net_col_revenue}</th><th>${T.net_col_change}</th>
+        <th>${T.net_col_services}</th><th>${T.net_col_avg}</th><th>${T.net_col_clients}</th>
+        <th>${T.net_col_profit}</th><th>${T.net_col_expenses}</th><th>${T.net_col_net}</th>
+      </tr></thead>
+      <tbody>${rows.map((r, i) => `
+        <tr data-shop="${r.id}" class="${NET.scope === String(r.id) ? 'active' : ''}" onclick="setNetScope('${r.id}')">
+          <td><div class="shop-cell"><span class="brand-rank" style="background:${BRAND_COLORS[i % BRAND_COLORS.length]};">${i + 1}</span>${escapeHtml(r.name)}${r.is_head ? ` <small>${T.branch_head_label}</small>` : ''}${i === 0 && many && r.total > 0 ? ' 🏆' : ''}</div></td>
+          <td class="${cls(r.total, best.total)}">${fmtNum(r.total)}</td>
+          <td>${r.pct === null || r.pct === undefined ? '—' : stBadge(r.pct)}</td>
+          <td class="${cls(r.count, best.count)}">${r.count}</td>
+          <td class="${cls(r.avg, best.avg)}">${r.paid_count ? fmtNum(r.avg) : '—'}</td>
+          <td class="${cls(r.clients.total, best.clients)}">${r.clients.total} <span class="hint-text">(${r.clients.new})</span></td>
+          <td class="${cls(r.profit, best.profit)}">${fmtNum(r.profit)}</td>
+          <td>${fmtNum(r.expenses)}</td>
+          <td class="${r.net_profit < 0 ? 'neg' : cls(r.net_profit, best.net)}">${fmtNum(r.net_profit)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr>
+        <td>${T.net_total_row}</td><td>${fmtNum(tot.total)}</td><td></td><td>${tot.count}</td>
+        <td>${totPaid ? fmtNum(totAvg) : '—'}</td><td>${tot.clients} <span class="hint-text">(${tot.newc})</span></td>
+        <td>${fmtNum(tot.profit)}</td><td>${fmtNum(tot.expenses)}</td>
+        <td class="${tot.net < 0 ? 'neg' : ''}">${fmtNum(tot.net)}</td>
+      </tr></tfoot>
+    </table></div>
+    <div class="hint-text" style="margin-top:6px;">${T.net_sum_note} ${T.currency}. ${T.net_clients_note}</div>`;
+
+  // горизонтальные столбцы: выручка и чистая прибыль по каждой точке
+  const wrap = document.getElementById('netCompareChartWrap');
+  const canvas = document.getElementById('netCompareChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  wrap.style.height = (60 + rows.length * 56) + 'px';
+  let legend = wrap.nextElementSibling;
+  if (!legend || !legend.classList.contains('rv-legend')) {
+    legend = document.createElement('div');
+    legend.className = 'rv-legend';
+    wrap.after(legend);
+  }
+  legend.innerHTML = `
+    <span><i style="background:#0F52BA;"></i>${T.net_col_revenue}</span>
+    <span><i style="background:#22C55E;"></i>${T.net_col_net}</span>
+    <span><i style="background:#E63946;"></i>${T.net_loss}</span>`;
+  if (NET.cmpChart) NET.cmpChart.destroy();
+  NET.cmpChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.name),
+      datasets: [
+        { label: T.net_col_revenue, data: rows.map(r => r.total), backgroundColor: '#0F52BA', borderRadius: 5, maxBarThickness: 20 },
+        { label: T.net_col_net, data: rows.map(r => r.net_profit), backgroundColor: rows.map(r => r.net_profit < 0 ? '#E63946' : '#22C55E'), borderRadius: 5, maxBarThickness: 20 },
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: it => ` ${it.dataset.label}: ${fmtNum(it.raw)} ${T.currency}` } },
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#F1F5F9' }, border: { display: false }, ticks: { color: '#94A3B8', callback: v => fmtShort(v), maxTicksLimit: 5, maxRotation: 0 } },
+        y: { grid: { display: false }, ticks: { color: '#0F172A', font: { weight: '600' } } },
+      },
+      onClick: (evt, els) => { if (els.length) setNetScope(String(rows[els[0].index].id)); },
+    }
+  });
+}
+
 async function loadStats() {
   loadDashboard();
   loadBrandStats();  // для сотрудника карточки нет — функция сама выйдет
@@ -2431,32 +2634,11 @@ async function loadStats() {
       const branchBtn = document.getElementById('substat-branches');
       if (agg.has_branches) {
         branchBtn.style.display = '';
-        const breakdownRows = (agg.breakdown || []).map(r => `
-          <tr>
-            <td>${escapeHtml(r.shop_name)}${r.is_head ? ` <span class="hint-text">(${T.branch_head_label})</span>` : ''}</td>
-            <td>${r.revenue.today.total.toLocaleString('ru-RU')} ${T.currency}</td>
-            <td style="color:#1B8A5A;">${r.profit.today.toLocaleString('ru-RU')} ${T.currency}</td>
-          </tr>
-        `).join('');
-        document.getElementById('statsAggregated').innerHTML = `
-          <div class="card" style="border-color:#FDBA74;">
-            <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">
-              ${T.stats_all_branches_title} (${agg.branch_count})
-            </label>
-            <div class="st-grid">
-              ${[['today', T.stats_today]].concat(ST_PERIODS()).map(([key, label]) => renderStatCard({
-                label, d: agg.revenue[key], profit: agg.profit[key], orange: true,
-              })).join('')}
-            </div>
-            <div style="margin-top:14px; padding-top:14px; border-top:1px dashed #FDBA74;">
-              <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">${T.branch_breakdown_title}</label>
-              <div class="table-wrap"><table>
-                <thead><tr><th>${T.branch_col_label}</th><th>${T.stats_today}</th><th>${T.stats_profit_label}</th></tr></thead>
-                <tbody>${breakdownRows}</tbody>
-              </table></div>
-            </div>
-          </div>
-        `;
+        // сама сводка грузится при открытии вкладки (см. showStatsSubTab)
+        if (document.getElementById('statsBranchesView').style.display !== 'none') {
+          loadNetworkCompare();
+          loadNetwork();
+        }
       } else {
         branchBtn.style.display = 'none';
       }
@@ -2469,6 +2651,10 @@ function showStatsSubTab(t) {
   document.getElementById('statsBranchesView').style.display = t === 'branches' ? 'block' : 'none';
   document.getElementById('substat-own').classList.toggle('active', t === 'own');
   document.getElementById('substat-branches').classList.toggle('active', t === 'branches');
+  if (t === 'branches') {
+    loadNetworkCompare();
+    loadNetwork();
+  }
 }
 
 async function loadBranchProducts(branchId) {
@@ -4640,7 +4826,55 @@ def api_stats_brands():
     date_to = request.args.get("to", "")
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_from) or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_to):
         return jsonify({"ok": False, "error": "invalid date"}), 400
-    result = db.get_brand_breakdown(g.shop_id, date_from, date_to, limit=10)
+    scope = request.args.get("scope", "")
+    if scope:
+        # сводка по сети — только главному аккаунту и только по своим филиалам
+        if g.is_branch:
+            return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
+        shop_ids = _resolve_network_scope(scope)
+        if not shop_ids:
+            return jsonify({"ok": False, "error": "нет доступа к этой точке"}), 403
+    else:
+        shop_ids = [g.shop_id]
+    result = db.get_brand_breakdown(shop_ids, date_from, date_to, limit=10)
+    result["ok"] = True
+    return jsonify(result)
+
+
+def _resolve_network_scope(scope: str):
+    """'all' — главный + все его филиалы; число — одна точка, но только если это
+    сам главный или ЕГО филиал (чужой филиал подставить нельзя)."""
+    if scope == "all":
+        return [g.shop_id] + [b["id"] for b in db.get_branches(g.shop_id)]
+    try:
+        sid = int(scope)
+    except (TypeError, ValueError):
+        return None
+    if sid == g.shop_id or db.is_branch_of(sid, g.shop_id):
+        return [sid]
+    return None
+
+
+@app.route("/api/network/overview")
+@login_required
+@profit_blocked
+def api_network_overview():
+    """Полная картина по сети филиалов (или по одному филиалу) для главного."""
+    shop_ids = _resolve_network_scope(request.args.get("scope", "all"))
+    if not shop_ids:
+        return jsonify({"ok": False, "error": "нет доступа к этой точке"}), 403
+    result = db.get_network_overview(shop_ids)
+    result["shops"] = db.network_shops(g.shop_id)
+    result["ok"] = True
+    return jsonify(result)
+
+
+@app.route("/api/network/compare")
+@login_required
+@profit_blocked
+def api_network_compare():
+    """Сравнение филиалов между собой за неделю/месяц/год."""
+    result = db.get_network_compare(g.shop_id, request.args.get("period", "month"))
     result["ok"] = True
     return jsonify(result)
 

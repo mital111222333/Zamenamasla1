@@ -1603,13 +1603,15 @@ def _item_category_key(item: dict, name_to_key: dict):
     return "other"
 
 
-def get_brand_breakdown(shop_id: int, date_from: str, date_to: str, limit: int = 10) -> dict:
+def get_brand_breakdown(shop_id, date_from: str, date_to: str, limit: int = 10) -> dict:
     """Какие бренды продаются: по каждой категории (моторное масло, АКПП,
     антифриз, фильтры...) — топ-N брендов по объёму (литры/штуки) + всё
     остальное одной строкой «Остальные». Для «Прочего» бренда нет, поэтому
     там группируем по названию товара и ранжируем по выручке.
     Написание бренда нормализуем: «Mitanol», «MITANOL » и «mitanol» — один бренд."""
     import i18n
+    # можно передать одну точку или список (для сводки по сети филиалов)
+    shop_ids = list(shop_id) if isinstance(shop_id, (list, tuple)) else [shop_id]
     name_to_key = {}
     for lang_texts in i18n.TEXTS.values():
         for k in BRAND_CATEGORY_ORDER:
@@ -1618,10 +1620,11 @@ def get_brand_breakdown(shop_id: int, date_from: str, date_to: str, limit: int =
     other_prefixes = tuple(f"{t.get('other_prefix', '')}:" for t in i18n.TEXTS.values())
 
     with get_conn() as conn:
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT oc.id, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ? AND oc.items_json IS NOT NULL
-        """, (shop_id, date_from, date_to)).fetchall()
+            WHERE c.shop_id IN ({",".join("?" * len(shop_ids))})
+              AND oc.change_date >= ? AND oc.change_date <= ? AND oc.items_json IS NOT NULL
+        """, (*shop_ids, date_from, date_to)).fetchall()
 
     # cats[key][norm] = {"qty", "sum", "visits": set, "spellings": {написание: сколько раз}}
     cats = {}
@@ -2168,6 +2171,22 @@ def get_revenue_stats(shop_id: int) -> dict:
         return result
 
 
+def _pct_change(current, previous):
+    if not previous:
+        return None
+    return round((current - previous) / previous * 100, 1)
+
+
+def _pack_comparison(cur_total, cur_paid, prev_total, prev_paid) -> dict:
+    cur_avg = _avg_check(cur_total, cur_paid)
+    prev_avg = _avg_check(prev_total, prev_paid)
+    return {"current": cur_total, "previous": prev_total, "pct": _pct_change(cur_total, prev_total),
+            "paid_current": cur_paid, "paid_previous": prev_paid,
+            "avg_current": cur_avg, "avg_previous": prev_avg,
+            # если в текущем периоде ещё нет платных визитов — сравнивать нечего
+            "avg_pct": _pct_change(cur_avg, prev_avg) if cur_avg else None}
+
+
 def get_revenue_comparison(shop_id: int) -> dict:
     """Сравнение текущей недели/месяца/года с ПРЕДЫДУЩИМ аналогичным
     периодом — честно, "яблоки к яблокам": раз текущий месяц ещё не
@@ -2187,7 +2206,7 @@ def get_revenue_comparison(shop_id: int) -> dict:
                 FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
                 WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ? AND oc.change_date <= ?
             """, (shop_id, date_from, date_to)).fetchone()
-            return row["total"], _avg_check(row["total"], row["paid_cnt"] or 0)
+            return row["total"], row["paid_cnt"] or 0
 
     def pct_change(current: int, previous: int):
         if not previous:
@@ -2223,11 +2242,8 @@ def get_revenue_comparison(shop_id: int) -> dict:
     year_prev = total_for(prev_year_start.strftime("%Y-%m-%d"), prev_year_end.strftime("%Y-%m-%d"))
 
     def pack(cur, prev):
-        (cur_total, cur_avg), (prev_total, prev_avg) = cur, prev
-        return {"current": cur_total, "previous": prev_total, "pct": pct_change(cur_total, prev_total),
-                "avg_current": cur_avg, "avg_previous": prev_avg,
-                # если в текущем периоде ещё нет платных визитов — сравнивать нечего
-                "avg_pct": pct_change(cur_avg, prev_avg) if cur_avg else None}
+        (cur_total, cur_paid), (prev_total, prev_paid) = cur, prev
+        return _pack_comparison(cur_total, cur_paid, prev_total, prev_paid)
 
     return {
         "week": pack(week_cur, week_prev),
@@ -2527,3 +2543,109 @@ def export_shop_data(shop_id: int) -> dict:
             "cars": cars_out,
             "broadcasts": [dict(b) for b in broadcasts],
         }
+
+
+
+# ---------- Сеть филиалов: полная картина для главного аккаунта ----------
+
+def network_shops(parent_shop_id: int):
+    """Главный аккаунт + его филиалы: [{id, name, is_head}] — для кнопок выбора."""
+    parent = get_shop(parent_shop_id)
+    out = []
+    for shop in [parent] + get_branches(parent_shop_id):
+        if shop:
+            out.append({"id": shop["id"], "name": shop.get("shop_name") or shop["username"],
+                        "is_head": shop["id"] == parent_shop_id})
+    return out
+
+
+def _sum_revenue_period(parts) -> dict:
+    out = {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0}
+    for p in parts:
+        for k in out:
+            out[k] += p.get(k) or 0
+    _with_avg(out)
+    out["clients"] = _sum_client_splits([p["clients"] for p in parts])
+    return out
+
+
+def get_network_overview(shop_ids) -> dict:
+    """Всё то же, что главный видит по своей точке, но для выбранного набора
+    точек (вся сеть или один филиал): карточки периодов со сравнением,
+    чистая прибыль за 30 дней, выручка по дням, долги, заканчивающиеся товары."""
+    periods = ("today", "week", "month", "year")
+    rev = [get_revenue_stats(sid) for sid in shop_ids]
+    cmp_parts = [get_revenue_comparison(sid) for sid in shop_ids]
+    prof = [get_profit_stats(sid) for sid in shop_ids]
+
+    stats = {p: _sum_revenue_period([r[p] for r in rev]) for p in periods}
+    comparison = {}
+    for p in ("week", "month", "year"):
+        comparison[p] = _pack_comparison(
+            sum(c[p]["current"] for c in cmp_parts), sum(c[p]["paid_current"] for c in cmp_parts),
+            sum(c[p]["previous"] for c in cmp_parts), sum(c[p]["paid_previous"] for c in cmp_parts))
+    profit = {p: sum(x[p] for x in prof) for p in periods}
+
+    net = {"oil_profit": 0, "expenses_total": 0, "net_profit": 0}
+    for sid in shop_ids:
+        n = get_net_profit_30d(sid)
+        for k in net:
+            net[k] += n[k]
+
+    daily = None
+    for sid in shop_ids:
+        d = get_daily_revenue(sid, days=30)
+        if daily is None:
+            daily = d
+        else:
+            for a, b in zip(daily, d):
+                a["total"] += b["total"]
+                a["count"] += b["count"]
+
+    debt = {"total_remaining": 0, "count": 0, "overdue_count": 0}
+    low_stock = []
+    for sid in shop_ids:
+        ds = get_debt_summary(sid)
+        for k in debt:
+            debt[k] += ds[k]
+        shop = get_shop(sid)
+        shop_name = (shop or {}).get("shop_name") or (shop or {}).get("username")
+        if shop and shop.get("warehouse_enabled"):
+            for p in get_low_stock_products(sid):
+                low_stock.append({"name": p["name"], "stock_qty": p["stock_qty"], "unit": p["unit"],
+                                  "shop_name": shop_name})
+    low_stock.sort(key=lambda p: p["stock_qty"])
+
+    return {"stats": stats, "comparison": comparison, "profit": profit, "net_profit": net,
+            "daily_revenue": daily or [], "debt_summary": debt, "low_stock": low_stock}
+
+
+def get_network_compare(parent_shop_id: int, period: str) -> dict:
+    """Сравнение филиалов между собой за неделю/месяц/год (с начала периода
+    по сегодня): выручка и её изменение, услуги, средний чек, клиенты,
+    прибыль, расходы и чистая прибыль по каждой точке."""
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    starts = {
+        "week": (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d"),
+        "month": now.strftime("%Y-%m-01"),
+        "year": now.strftime("%Y-01-01"),
+    }
+    if period not in starts:
+        period = "month"
+    date_from = starts[period]
+    rows = []
+    for shop in network_shops(parent_shop_id):
+        sid = shop["id"]
+        r = get_revenue_range(sid, date_from, today)
+        cmp = get_revenue_comparison(sid)[period]
+        profit = get_profit_range(sid, date_from, today)
+        expenses = sum(e["amount"] for e in get_expenses(sid, date_from, today))
+        rows.append({
+            **shop,
+            "total": r["total"], "count": r["count"], "avg": r["avg"], "paid_count": r["paid_count"],
+            "clients": r["clients"], "pct": cmp["pct"],
+            "profit": profit, "expenses": expenses, "net_profit": profit - expenses,
+        })
+    rows.sort(key=lambda x: x["total"], reverse=True)
+    return {"period": period, "date_from": date_from, "date_to": today, "rows": rows}
