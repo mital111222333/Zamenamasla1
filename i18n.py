@@ -6,7 +6,7 @@
 
 RU = {
     # --- Общее / шапка ---
-    "app_title": "Замена масла",
+    "app_title": "MoyBook",
     "logout": "Выйти",
     "lang_switch": "O'zbekcha",
 
@@ -444,7 +444,7 @@ RU = {
 }
 
 UZ = {
-    "app_title": "Moy almashtirish",
+    "app_title": "MoyBook",
     "logout": "Chiqish",
     "lang_switch": "Русский",
 

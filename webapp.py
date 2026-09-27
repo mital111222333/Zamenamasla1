@@ -245,7 +245,7 @@ LOGIN_PAGE = """
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Замена масла">
+<meta name="apple-mobile-web-app-title" content="MoyBook">
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
@@ -663,13 +663,13 @@ PAGE = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ shop_name }} — панель</title>
+<title>{{ shop_name }} — MoyBook</title>
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Замена масла">
+<meta name="apple-mobile-web-app-title" content="MoyBook">
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
@@ -1067,7 +1067,7 @@ if ('serviceWorker' in navigator) {
       <div class="logo-badge"><i class="fa-solid fa-wrench"></i></div>
       <div>
         <h1>{{ shop_name }}</h1>
-        <div class="logo-sub">MITAL AUTO SERVICE</div>
+        <div class="logo-sub">MoyBook</div>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
@@ -5131,7 +5131,7 @@ ADMIN_PAGE = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Админ-панель — точки</title>
+<title>MoyBook — админ-панель</title>
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -5193,7 +5193,7 @@ if ('serviceWorker' in navigator) {
       <div class="logo-badge"><i class="fa-solid fa-flag-checkered"></i></div>
       <div>
         <h1>Точки замены масла</h1>
-        <div class="logo-sub">MITAL PLATFORM</div>
+        <div class="logo-sub">MoyBook Platform</div>
       </div>
     </div>
     <a class="logout" href="/logout">Выйти</a>
@@ -5231,7 +5231,7 @@ if ('serviceWorker' in navigator) {
     <h3 style="margin-top:0;">➕ Добавить новую точку</h3>
     <div class="field">
       <label>Название точки</label>
-      <input id="new_shop_name" placeholder="MITAL Namangan">
+      <input id="new_shop_name" placeholder="Avto Servis Namangan">
     </div>
     <div class="field">
       <label>Клиент / группа (необяз.) — для филиала укажи то же, что у других точек этого клиента</label>
