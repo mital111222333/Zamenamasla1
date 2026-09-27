@@ -16,6 +16,7 @@
 
 import os
 import json
+import math
 import sqlite3
 import secrets
 import hashlib
@@ -354,6 +355,21 @@ def _migrate(conn):
         created_at TEXT DEFAULT (datetime('now'))
     )
     """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS stock_transfers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        parent_shop_id INTEGER NOT NULL,
+        from_shop_id INTEGER NOT NULL,
+        to_shop_id INTEGER NOT NULL,
+        from_product_id INTEGER NOT NULL,
+        to_product_id INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        transfer_date TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_transfers_from ON stock_transfers(from_shop_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_transfers_to ON stock_transfers(to_shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_shop_category ON products(shop_id, category)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_restocks_shop ON stock_restocks(shop_id)")
@@ -2649,3 +2665,192 @@ def get_network_compare(parent_shop_id: int, period: str) -> dict:
         })
     rows.sort(key=lambda x: x["total"], reverse=True)
     return {"period": period, "date_from": date_from, "date_to": today, "rows": rows}
+
+
+
+# ---------- Склад: сводка, прогноз, склады сети, перемещения ----------
+
+WH_LOW_THRESHOLD = 50       # как в get_low_stock_products: меньше 50 л/шт — «мало», если продаж ещё нет
+WH_LOW_DAYS = 7             # если по скорости продаж хватит меньше чем на неделю — «заканчивается»
+WH_COVER_DAYS = 30          # список закупки: сколько нужно, чтобы хватило на месяц
+WH_DEAD_DAYS = 30           # «не продавался» — ни одной продажи за 30 дней
+
+
+def get_product_sales(shop_id: int, days: int = 30) -> dict:
+    """Сколько каждого товара склада продано за последние `days` дней
+    (по записям о заменах, где товар выбран из склада) и дата последней продажи."""
+    since = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.items_json IS NOT NULL
+        """, (shop_id, since)).fetchall()
+    out = {}
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"]) or []
+        except (TypeError, ValueError):
+            continue
+        for item in items:
+            pid = item.get("product_id")
+            if not pid:
+                continue
+            e = out.setdefault(pid, {"qty": 0, "last_sale": None})
+            e["qty"] += item.get("qty") or 0
+            if not e["last_sale"] or r["change_date"] > e["last_sale"]:
+                e["last_sale"] = r["change_date"]
+    return out
+
+
+def get_warehouse_overview(shop_id: int, days: int = 30) -> dict:
+    """Товары склада с прогнозом («хватит на N дней», сколько заказать) и
+    сводка: стоимость остатка, возможная наценка, сколько заканчивается и
+    сколько лежит без продаж. Прогноз честный: если продаж за 30 дней не было,
+    дни не считаем, а пишем «нет продаж»."""
+    products = list_products(shop_id)
+    sales = get_product_sales(shop_id, days)
+    old_enough = (datetime.now() - timedelta(days=WH_DEAD_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    items = []
+    summary = {"product_count": len(products), "stock_value": 0, "retail_value": 0,
+               "potential_margin": 0, "missing_price_count": 0,
+               "low_count": 0, "out_count": 0, "dead_count": 0, "dead_value": 0, "reorder_count": 0}
+    for p in products:
+        sold = round(sales.get(p["id"], {}).get("qty", 0), 2)
+        per_day = sold / days if sold else 0
+        stock = p["stock_qty"] or 0
+        days_left = round(stock / per_day) if per_day and stock > 0 else (0 if per_day and stock <= 0 else None)
+        need = per_day * WH_COVER_DAYS
+        reorder = max(0, math.ceil(need - stock)) if per_day else 0
+        if stock <= 0:
+            status = "out"
+        elif per_day and days_left is not None and days_left < WH_LOW_DAYS:
+            status = "low"
+        elif not per_day and stock < WH_LOW_THRESHOLD and (p.get("created_at") or "") < old_enough:
+            status = "low"
+        else:
+            status = "ok"
+        dead = stock > 0 and not sold and (p.get("created_at") or "") < old_enough
+        buy, sell = p.get("purchase_price"), p.get("sell_price")
+        margin_pct = round((sell - buy) / buy * 100) if buy and sell else None
+        items.append({**p, "sold_30d": sold, "per_day": round(per_day, 2), "days_left": days_left,
+                      "reorder_qty": reorder, "status": status, "dead": dead,
+                      "last_sale": sales.get(p["id"], {}).get("last_sale"), "margin_pct": margin_pct})
+        if buy is None:
+            summary["missing_price_count"] += 1
+        if stock > 0:
+            if buy is not None:
+                summary["stock_value"] += stock * buy
+            if sell:
+                summary["retail_value"] += stock * sell
+            if buy is not None and sell:
+                summary["potential_margin"] += stock * (sell - buy)
+        if status == "low":
+            summary["low_count"] += 1
+        if status == "out":
+            summary["out_count"] += 1
+        if dead:
+            summary["dead_count"] += 1
+            if buy is not None:
+                summary["dead_value"] += stock * buy
+        if reorder > 0:
+            summary["reorder_count"] += 1
+    for k in ("stock_value", "retail_value", "potential_margin", "dead_value"):
+        summary[k] = round(summary[k])
+    return {"products": items, "summary": summary}
+
+
+def _norm_product_key(p) -> tuple:
+    return (p["category"], " ".join((p["name"] or "").upper().split()))
+
+
+def get_network_stock_matrix(parent_shop_id: int) -> dict:
+    """Остатки всех складов сети в одной таблице: строка — товар (одинаковое
+    название и тип считаются одним товаром), колонка — точка."""
+    shops = [s for s in network_shops(parent_shop_id)
+             if (get_shop(s["id"]) or {}).get("warehouse_enabled")]
+    rows = {}
+    for shop in shops:
+        ov = get_warehouse_overview(shop["id"])
+        for p in ov["products"]:
+            key = _norm_product_key(p)
+            row = rows.setdefault(key, {"category": p["category"], "name": p["name"], "unit": p["unit"], "cells": {}})
+            row["cells"][str(shop["id"])] = {"product_id": p["id"], "qty": p["stock_qty"], "status": p["status"],
+                                             "days_left": p["days_left"]}
+    out = sorted(rows.values(), key=lambda r: (r["category"], r["name"].upper()))
+    return {"shops": shops, "rows": out}
+
+
+def _in_network(parent_shop_id: int, shop_id: int) -> bool:
+    return shop_id == parent_shop_id or is_branch_of(shop_id, parent_shop_id)
+
+
+def transfer_stock(parent_shop_id: int, from_shop_id: int, product_id: int, to_shop_id: int,
+                   quantity: float) -> dict:
+    """Перемещение товара между складами сети (главный ↔ филиал, филиал ↔ филиал).
+    На складе-получателе ищем такой же товар (тот же тип и название); если его
+    нет — заводим с теми же ценами. Списание и зачисление — одной транзакцией,
+    чтобы остатки никогда не разъехались."""
+    if from_shop_id == to_shop_id:
+        return {"ok": False, "error": "same_shop"}
+    if not (_in_network(parent_shop_id, from_shop_id) and _in_network(parent_shop_id, to_shop_id)):
+        return {"ok": False, "error": "not_your_shop"}
+    if not quantity or quantity <= 0:
+        return {"ok": False, "error": "bad_qty"}
+    src = get_product(product_id, from_shop_id)
+    if not src:
+        return {"ok": False, "error": "no_product"}
+    if quantity > (src["stock_qty"] or 0):
+        return {"ok": False, "error": "not_enough", "available": src["stock_qty"]}
+    key = _norm_product_key(src)
+    dst = next((p for p in list_products(to_shop_id) if _norm_product_key(p) == key), None)
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        if not dst:
+            cur = conn.execute("""
+                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 1)
+            """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
+            dst_id = cur.lastrowid
+        else:
+            dst_id = dst["id"]
+            if dst.get("purchase_price") is None and src.get("purchase_price") is not None:
+                conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (src["purchase_price"], dst_id))
+        conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (quantity, src["id"]))
+        conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (quantity, dst_id))
+        conn.execute("""
+            INSERT INTO stock_transfers (parent_shop_id, from_shop_id, to_shop_id, from_product_id, to_product_id, quantity, transfer_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (parent_shop_id, from_shop_id, to_shop_id, src["id"], dst_id, quantity, today))
+        conn.commit()
+    return {"ok": True, "to_product_id": dst_id}
+
+
+def get_stock_movements(shop_id: int, limit: int = 60) -> list:
+    """История движения склада точки: пополнения + перемещения (пришло/ушло)."""
+    out = []
+    for r in get_restock_history(shop_id, limit):
+        out.append({"type": "restock", "date": r["restock_date"], "product_name": r["product_name"],
+                    "unit": r["unit"], "quantity": r["quantity"], "purchase_price": r.get("purchase_price"),
+                    "sort": (r["restock_date"], r["created_at"] or "")})
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT t.*, p.name as product_name, p.unit,
+                   sf.shop_name as from_name, sf.username as from_user,
+                   st.shop_name as to_name, st.username as to_user
+            FROM stock_transfers t
+            JOIN products p ON p.id = CASE WHEN t.from_shop_id=? THEN t.from_product_id ELSE t.to_product_id END
+            JOIN shops sf ON sf.id = t.from_shop_id
+            JOIN shops st ON st.id = t.to_shop_id
+            WHERE t.from_shop_id=? OR t.to_shop_id=?
+            ORDER BY t.transfer_date DESC, t.id DESC LIMIT ?
+        """, (shop_id, shop_id, shop_id, limit)).fetchall()
+    for r in rows:
+        outgoing = r["from_shop_id"] == shop_id
+        out.append({"type": "transfer_out" if outgoing else "transfer_in", "date": r["transfer_date"],
+                    "product_name": r["product_name"], "unit": r["unit"], "quantity": r["quantity"],
+                    "other_shop": (r["to_name"] or r["to_user"]) if outgoing else (r["from_name"] or r["from_user"]),
+                    "sort": (r["transfer_date"], r["created_at"] or "")})
+    out.sort(key=lambda x: x["sort"], reverse=True)
+    for x in out:
+        x.pop("sort", None)
+    return out[:limit]

@@ -743,7 +743,8 @@ if ('serviceWorker' in navigator) {
   .more-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.35); z-index:60; opacity:0; pointer-events:none; transition:opacity .2s; }
   .more-backdrop.open { opacity:1; pointer-events:auto; }
   .more-sheet { position:fixed; left:0; right:0; bottom:0; z-index:61; background:#fff; border-radius:20px 20px 0 0; padding:8px 14px calc(14px + env(safe-area-inset-bottom, 0px)); transform:translateY(105%); transition:transform .25s ease; box-shadow:0 -10px 30px rgba(15,23,42,0.15); max-height:80vh; overflow-y:auto; }
-  .more-sheet.open { transform:translateY(0); }
+  .more-sheet:not(.open) { visibility:hidden; transition:transform .25s ease, visibility 0s .25s; }
+  .more-sheet.open { transform:translateY(0); visibility:visible; }
   .more-grab { width:40px; height:5px; border-radius:3px; background:#CBD5E1; margin:2px auto 10px; }
   .more-item { position:relative; display:flex; align-items:center; gap:14px; padding:14px 6px; border-bottom:1px solid #F1F5F9; font-size:15px; font-weight:600; color:var(--text); cursor:pointer; text-decoration:none; }
   .more-item i { width:22px; text-align:center; font-size:18px; color:#64748B; }
@@ -1058,6 +1059,71 @@ if ('serviceWorker' in navigator) {
   .net-cmp-chart-wrap { position:relative; margin-top:16px; }
   .net-detail-head { margin:22px 0 10px; }
   .net-detail-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:8px; }
+  .modal-overlay { z-index:70 !important; }
+  .modal-wide { max-height:88vh; }
+  .wh-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; }
+  .wh-kpi { background:#F8FAFC; border-radius:12px; padding:10px 12px; }
+  .wh-kpi b { display:block; font-size:18px; font-family:var(--font-display); color:var(--text); line-height:1.2; }
+  .wh-kpi span { font-size:11.5px; color:#64748B; }
+  .wh-kpi.good b { color:#15803D; }
+  .wh-kpi.bad { background:#FEF2F2; }
+  .wh-kpi.bad b { color:#B91C1C; }
+  .wh-kpi.muted { background:#F1F5F9; }
+  .wh-att-title { font-size:12px; font-weight:700; color:#64748B; margin:14px 0 4px; }
+  .wh-att { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F1F5F9; font-size:13px; }
+  .wh-att:last-child { border-bottom:none; }
+  .wh-att i.fa-solid { width:18px; text-align:center; }
+  .wh-att .wa-main { flex:1; min-width:0; }
+  .wh-att .wa-main b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+  .wh-att .wa-main span { font-size:11.5px; color:#64748B; }
+  .wh-toolbar { display:flex; gap:8px; margin-bottom:10px; }
+  .wh-search { flex:1; display:flex; align-items:center; gap:8px; background:var(--field-bg); border:1px solid var(--border); border-radius:12px; padding:0 12px; }
+  .wh-search i { color:#94A3B8; }
+  .wh-search input { border:none !important; background:transparent !important; padding:10px 0 !important; margin:0 !important; box-shadow:none !important; outline:none; width:100%; font-size:14px; }
+  .wh-tbtn { border:1px solid var(--border); background:#fff; color:var(--text); border-radius:12px; padding:9px 12px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:inherit; }
+  .wh-tbtn-primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .wh-tbtn-wide { width:100%; margin-top:10px; }
+  .wh-tbtn-sm { padding:6px 10px; font-size:12px; border-radius:10px; }
+  .wh-tbtn-icon { padding:6px 9px; font-size:12px; border-radius:10px; color:#64748B; }
+  .whc { border:1px solid var(--border); border-radius:14px; padding:12px; margin-top:8px; background:#fff; }
+  .whc.st-out { border-color:#FCA5A5; background:#FFFBFB; }
+  .whc.st-low { border-color:#FCD34D; }
+  .whc-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .whc-name { min-width:0; }
+  .whc-name b { display:block; font-size:14.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; }
+  .whc-name span { font-size:11.5px; color:#94A3B8; }
+  .whc-qty { font-family:var(--font-display); font-weight:800; font-size:18px; color:var(--text); white-space:nowrap; }
+  .whc.st-out .whc-qty { color:#B91C1C; }
+  .whc.st-low .whc-qty { color:#B45309; }
+  .whc-bar { height:6px; border-radius:3px; background:#F1F5F9; margin:8px 0 6px; overflow:hidden; }
+  .whc-bar i { display:block; height:100%; border-radius:3px; }
+  .whc-info { font-size:12px; color:#64748B; }
+  .whc-info .warn { color:#B91C1C; font-weight:700; }
+  .whc-info .amber { color:#B45309; font-weight:700; }
+  .whc-bottom { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .whc-price { font-size:12px; color:#475569; }
+  .whc-price .mg { color:#15803D; font-weight:700; }
+  .whc-actions { display:flex; gap:6px; margin-left:auto; }
+  .pl-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #F1F5F9; font-size:13px; }
+  .pl-row .pl-name { flex:1; min-width:0; }
+  .pl-row .pl-name b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pl-row .pl-name span { font-size:11px; color:#64748B; }
+  .pl-row input[type=number] { width:78px !important; padding:6px 8px !important; margin:0 !important; font-size:13px; }
+  .pl-row input[type=checkbox] { width:18px; height:18px; margin:0; }
+  .whn-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:6px; }
+  .whn-shop { background:#F8FAFC; border-radius:12px; padding:9px 11px; font-size:12px; color:#64748B; }
+  .whn-shop b { display:block; color:var(--text); font-size:13px; }
+  .whn-shop .v { color:#9A3412; font-weight:700; font-size:14px; }
+  .wh-mx { border-collapse:collapse; font-size:12.5px; width:100%; }
+  .wh-mx th { font-size:11.5px; font-weight:700; color:#64748B; padding:8px 6px; border-bottom:1px solid var(--border); text-align:right; white-space:normal; background:#fff; text-transform:none; letter-spacing:0; }
+  .wh-mx td { padding:8px 6px; border-bottom:1px solid #F1F5F9; text-align:right; white-space:nowrap; }
+  .wh-mx th:first-child, .wh-mx td:first-child { text-align:left; position:sticky; left:0; background:#fff; z-index:1; white-space:normal; min-width:130px; }
+  .wh-mx td:first-child span { display:block; font-size:11px; color:#94A3B8; }
+  .wh-mx td.cell { cursor:pointer; }
+  .wh-mx td.cell:hover { background:#F8FAFC; }
+  .wh-mx .q-out { color:#B91C1C; font-weight:800; background:#FEF2F2; border-radius:6px; padding:2px 6px; }
+  .wh-mx .q-low { color:#B45309; font-weight:800; background:#FEF3C7; border-radius:6px; padding:2px 6px; }
+  .wh-mx .q-none { color:#CBD5E1; }
   .dash-row {
     display:flex; justify-content:space-between; align-items:center; padding:8px 0;
     border-bottom:1px dashed var(--border); font-size:13.5px;
@@ -1588,8 +1654,29 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="whOwnView">
+      <div class="card" id="whSummaryCard">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_title }}</label>
+        <div class="wh-kpis" id="whKpis">{{ T.stats_loading }}</div>
+        <div id="whAttention"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="wh-toolbar">
+          <div class="wh-search"><i class="fa-solid fa-magnifying-glass"></i><input id="whSearch" placeholder="{{ T.whs_search }}" oninput="renderProductCards()" autocomplete="off"></div>
+          <button class="wh-tbtn wh-tbtn-primary" onclick="openAddProductModal()"><i class="fa-solid fa-plus"></i> {{ T.whs_add_short }}</button>
+        </div>
+        <div class="brand-chips" id="whCatChips"></div>
+        <div id="whCards"></div>
+        <button class="wh-tbtn wh-tbtn-wide" id="whPurchaseBtn" onclick="openPurchaseList()"><i class="fa-solid fa-clipboard-list"></i> <span>{{ T.whs_purchase_list }}</span></button>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_movements }}</label>
+        <div id="restockHistory"></div>
+      </div>
+
       {% if not is_branch %}
-      <div class="card" id="usdRateCard">
+      <div class="card" id="usdRateCard" style="margin-top:14px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
         <div class="row2">
           <div class="field">
@@ -1603,78 +1690,106 @@ if ('serviceWorker' in navigator) {
       </div>
       {% endif %}
 
-      <div class="card">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_add_product }}</label>
-        <div class="row2">
-          <div class="field">
-            <label>{{ T.wh_category }}</label>
-            <select id="wh_new_category" onchange="onWhCategoryChanged()"></select>
-          </div>
-          <div class="field">
-            <label>{{ T.wh_product_name }}</label>
-            <input id="wh_new_name" placeholder="MITANOL 5W-30">
-          </div>
-        </div>
-        <div class="field" id="wh_new_unit_row" style="display:none;">
-          <label>{{ T.wh_unit }}</label>
-          <select id="wh_new_unit">
-            <option value="pc">{{ T.unit_pc }}</option>
-            <option value="l">{{ T.unit_l }}</option>
-          </select>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label>{{ T.wh_sell_price }}</label>
-            <input id="wh_new_sell_price" type="number" placeholder="45000">
-          </div>
-          <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
-            <label>{{ T.wh_purchase_price }}</label>
-            <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd')">
-          </div>
-        </div>
-        <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
-          <label>{{ T.usd_price_label }}</label>
-          <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
-        </div>
-        <div class="field">
-          <label>{{ T.wh_initial_stock }}</label>
-          <input id="wh_new_stock" type="number" placeholder="0">
-        </div>
-        <button class="submit" onclick="createProduct()">{{ T.wh_add_btn }}</button>
-      </div>
 
-      <div class="card" style="margin-top:14px;">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_products_title }}</label>
-        {% if not is_branch %}
-        <div id="whStockValue" class="hint-text" style="margin-bottom:10px;"></div>
-        {% endif %}
-        <div class="table-wrap" style="overflow-x:auto;">
-          <table>
-            <thead><tr>
-              <th>{{ T.wh_category }}</th><th>{{ T.wh_product_name }}</th><th>{{ T.wh_stock }}</th>
-              <th>{{ T.wh_sell_price }}</th>{% if not is_branch %}<th>{{ T.wh_purchase_price }}</th>{% endif %}<th></th>
-            </tr></thead>
-            <tbody id="products-body"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:14px;">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.wh_restock_history }}</label>
-        <div id="restockHistory"></div>
-      </div>
     </div>
 
     <div id="whBranchesView" style="display:none;">
       <div class="card">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.whn_title }}</label>
+        <div class="hint-text" style="margin-bottom:12px;">{{ T.whn_hint }}</div>
+        <div id="branchWarehouseSummary" class="whn-summary"></div>
+        <button class="wh-tbtn wh-tbtn-primary wh-tbtn-wide" onclick="openTransferModal({})" style="margin:4px 0 12px;"><i class="fa-solid fa-right-left"></i> {{ T.whn_transfer }}</button>
+        <div id="whNetMatrix">{{ T.stats_loading }}</div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.branch_prices_title }}</label>
-        <div id="branchWarehouseSummary" style="margin-bottom:12px;"></div>
         <select id="branchPriceSelect" onchange="loadBranchProducts(this.value)">
           <option value="">{{ T.branch_prices_pick }}</option>
         </select>
         <div id="branchProductsPanel" style="margin-top:10px;"></div>
       </div>
+
     </div>
+
+      <div class="modal-overlay" id="addProductModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.wh_add_product }}</h3>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.wh_category }}</label>
+              <select id="wh_new_category" onchange="onWhCategoryChanged()"></select>
+            </div>
+            <div class="field">
+              <label>{{ T.wh_product_name }}</label>
+              <input id="wh_new_name" placeholder="MITANOL 5W-30">
+            </div>
+          </div>
+          <div class="field" id="wh_new_unit_row" style="display:none;">
+            <label>{{ T.wh_unit }}</label>
+            <select id="wh_new_unit">
+              <option value="pc">{{ T.unit_pc }}</option>
+              <option value="l">{{ T.unit_l }}</option>
+            </select>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.wh_sell_price }}</label>
+              <input id="wh_new_sell_price" type="number" placeholder="45000">
+            </div>
+            <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
+              <label>{{ T.wh_purchase_price }}</label>
+              <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd')">
+            </div>
+          </div>
+          <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
+            <label>{{ T.usd_price_label }}</label>
+            <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
+          </div>
+          <div class="field">
+            <label>{{ T.wh_initial_stock }}</label>
+            <input id="wh_new_stock" type="number" placeholder="0">
+          </div>
+          <button class="submit" onclick="createProduct()">{{ T.wh_add_btn }}</button>
+          <button class="close-btn" onclick="closeWhModal('addProductModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      <div class="modal-overlay" id="purchaseListModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.whs_purchase_list }}</h3>
+          <div class="hint-text" style="margin-bottom:10px;">{{ T.whs_purchase_hint }}</div>
+          <div id="purchaseListBody"></div>
+          <button class="submit" onclick="sendPurchaseList('tg')" style="background:#2AABEE;"><i class="fa-brands fa-telegram"></i> {{ T.whs_send_tg }}</button>
+          <button class="submit" onclick="sendPurchaseList('copy')" style="background:var(--border); color:var(--text);"><i class="fa-regular fa-copy"></i> {{ T.whs_copy }}</button>
+          <button class="close-btn" onclick="closeWhModal('purchaseListModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      <div class="modal-overlay" id="transferModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.whn_transfer }}</h3>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.whn_from }}</label>
+              <select id="tr_from" onchange="onTransferFromChanged()"></select>
+            </div>
+            <div class="field">
+              <label>{{ T.whn_to }}</label>
+              <select id="tr_to"></select>
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ T.whn_product }}</label>
+            <select id="tr_product" onchange="onTransferProductChanged()"></select>
+            <div class="hint-text" id="tr_available"></div>
+          </div>
+          <div class="field">
+            <label>{{ T.whn_qty }}</label>
+            <input id="tr_qty" type="number" step="0.5" min="0">
+          </div>
+          <button class="submit" onclick="submitTransfer()">{{ T.whn_send }}</button>
+          <button class="close-btn" onclick="closeWhModal('transferModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
   </div>
   {% endif %}
 </div>
@@ -1957,14 +2072,20 @@ function onWhCategoryChanged() {
 
 async function loadWarehouse() {
   renderWarehouseCategoryOptions();
-  const res = await fetch('/api/products');
-  productsCache = await res.json();
-  renderProductsTable();
+  let data = null;
+  try { data = await (await fetch('/api/warehouse/overview')).json(); } catch (e) {}
+  if (data && data.ok) {
+    productsCache = data.products;
+    WH.summary = data.summary;
+  } else {
+    productsCache = await (await fetch('/api/products')).json();
+    WH.summary = null;
+  }
+  renderWarehouseSummary();
+  renderWhCategoryChips();
+  renderProductCards();
   loadRestockHistory();
-  // склад мог поменяться (добавили/удалили/пополнили товар) — обновляем поля
-  // "марка" в форме "Внести замену" и в форме редактирования/добавления из
-  // истории, чтобы новый товар сразу стал доступен в списке, без
-  // перезагрузки всей страницы
+  // склад мог поменяться — обновляем списки «марка» в формах замены
   renderItemLists();
   renderSvcItemLists();
 
@@ -1972,24 +2093,323 @@ async function loadWarehouse() {
     try {
       const branches = await (await fetch('/api/my_branches')).json();
       const branchBtn = document.getElementById('subwh-branches');
+      WH.hasBranches = branches.length > 0;
       if (branches.length) {
         branchBtn.style.display = '';
         document.getElementById('branchPriceSelect').innerHTML =
           `<option value="">${T.branch_prices_pick}</option>` +
           branches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
         document.getElementById('branchWarehouseSummary').innerHTML = branches.map(b => `
-          <div style="padding:6px 0; font-size:12px; border-bottom:1px dashed var(--border);">
-            <div style="display:flex; justify-content:space-between;">
-              <span>${escapeHtml(b.shop_name || b.username)}</span>
-              <span>${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}</span>
-            </div>
-            <div style="color:#9A3412; font-weight:600; margin-top:2px;">${T.branch_stock_value} ${b.stock_value.toLocaleString('ru-RU')} ${T.currency}</div>
-          </div>
-        `).join('');
+          <div class="whn-shop">
+            <b>${escapeHtml(b.shop_name || b.username)}</b>
+            <div class="v">${fmtShort(b.stock_value)} ${T.currency}</div>
+            ${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}
+          </div>`).join('');
       } else {
         branchBtn.style.display = 'none';
       }
-    } catch (e) { /* не главный аккаунт или ошибка - просто не показываем подвкладку */ }
+      renderProductCards();
+    } catch (e) { /* не главный аккаунт — подвкладку не показываем */ }
+  }
+}
+
+const WH = { summary: null, cat: 'all', hasBranches: false, net: null };
+
+function whUnit(u) { return u === 'pc' ? T.unit_pc : T.unit_l; }
+function whQty(q) { return (Math.round((q || 0) * 100) / 100).toLocaleString('ru-RU'); }
+
+function renderWarehouseSummary() {
+  const kpis = document.getElementById('whKpis');
+  if (!kpis) return;
+  const s = WH.summary;
+  if (!s) { kpis.innerHTML = ''; return; }
+  const problems = (s.low_count || 0) + (s.out_count || 0);
+  const boxes = [];
+  if (!IS_BRANCH) {
+    boxes.push(`<div class="wh-kpi"><b>${fmtShort(s.stock_value)}</b><span>${T.whs_kpi_value}</span></div>`);
+    boxes.push(`<div class="wh-kpi good"><b>+${fmtShort(s.potential_margin)}</b><span>${T.whs_kpi_margin}</span></div>`);
+  } else {
+    boxes.push(`<div class="wh-kpi"><b>${s.product_count}</b><span>${T.whs_kpi_products}</span></div>`);
+    boxes.push(`<div class="wh-kpi"><b>${s.reorder_count}</b><span>${T.whs_kpi_reorder}</span></div>`);
+  }
+  boxes.push(`<div class="wh-kpi ${problems ? 'bad' : ''}"><b>${problems}</b><span>${T.whs_kpi_low}</span></div>`);
+  boxes.push(`<div class="wh-kpi ${s.dead_count ? 'muted' : ''}"><b>${s.dead_count}</b><span>${T.whs_kpi_dead}</span></div>`);
+  kpis.innerHTML = boxes.join('');
+
+  const att = document.getElementById('whAttention');
+  const urgent = productsCache.filter(p => p.status === 'out' || p.status === 'low')
+    .sort((a, b) => (a.stock_qty || 0) - (b.stock_qty || 0)).slice(0, 6);
+  const dead = productsCache.filter(p => p.dead)
+    .sort((a, b) => (b.stock_qty * (b.purchase_price || 0)) - (a.stock_qty * (a.purchase_price || 0))).slice(0, 4);
+  let html = '';
+  if (urgent.length) {
+    html += `<div class="wh-att-title">${T.whs_att_urgent}</div>` + urgent.map(p => `
+      <div class="wh-att">
+        <i class="fa-solid fa-triangle-exclamation" style="color:${p.status === 'out' ? '#DC2626' : '#D97706'};"></i>
+        <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${whStatusText(p)}</span></div>
+        <button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">+ ${T.wh_restock_action}</button>
+      </div>`).join('');
+  }
+  if (dead.length) {
+    html += `<div class="wh-att-title">${T.whs_att_dead}</div>` + dead.map(p => `
+      <div class="wh-att">
+        <i class="fa-solid fa-hourglass-half" style="color:#94A3B8;"></i>
+        <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${whQty(p.stock_qty)} ${whUnit(p.unit)}${!IS_BRANCH && p.purchase_price ? ` · ${T.whs_frozen} ${fmtShort(p.stock_qty * p.purchase_price)} ${T.currency}` : ''}</span></div>
+      </div>`).join('');
+  }
+  if (!html && productsCache.length) html = `<div class="wh-att-title" style="color:#15803D;"><i class="fa-solid fa-circle-check"></i> ${T.whs_att_ok}</div>`;
+  att.innerHTML = html;
+}
+
+function whStatusText(p) {
+  const u = whUnit(p.unit);
+  if (p.status === 'out') return `<span class="warn">${T.whs_out}</span>${p.per_day ? ` · ~${whQty(p.per_day)} ${u}${T.whs_per_day}` : ''}`;
+  if (p.per_day) {
+    const cls = p.status === 'low' ? 'warn' : (p.days_left < 14 ? 'amber' : '');
+    let t = `~${whQty(p.per_day)} ${u}${T.whs_per_day} · <span class="${cls}">${T.whs_enough_for} ${p.days_left} ${T.whs_days}</span>`;
+    if (p.reorder_qty > 0) t += ` · ${T.whs_order} ${whQty(p.reorder_qty)} ${u}`;
+    return t;
+  }
+  if (p.dead) return T.whs_no_sales_30;
+  if (p.status === 'low') return `<span class="amber">${T.whs_low_left}</span>`;
+  return T.whs_no_sales_yet;
+}
+
+function renderWhCategoryChips() {
+  const el = document.getElementById('whCatChips');
+  if (!el) return;
+  const counts = {};
+  productsCache.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+  const order = FLUID_KEYS.concat(FILTER_KEYS, ['other']).filter(k => counts[k]);
+  if (WH.cat !== 'all' && !counts[WH.cat]) WH.cat = 'all';
+  el.innerHTML = [`<div class="brand-chip ${WH.cat === 'all' ? 'active' : ''}" onclick="setWhCat('all')">${T.whs_all}<span class="bc-sub">${productsCache.length}</span></div>`]
+    .concat(order.map(k => `<div class="brand-chip ${WH.cat === k ? 'active' : ''}" onclick="setWhCat('${k}')">${escapeHtml(k === 'other' ? T.wh_category_other : (T[k] || k))}<span class="bc-sub">${counts[k]}</span></div>`))
+    .join('');
+}
+
+function setWhCat(k) {
+  WH.cat = k;
+  renderWhCategoryChips();
+  renderProductCards();
+}
+
+function renderProductCards() {
+  const box = document.getElementById('whCards');
+  if (!box) return;
+  const q = ((document.getElementById('whSearch') || {}).value || '').trim().toLowerCase();
+  const rank = { out: 0, low: 1, ok: 2 };
+  const list = productsCache
+    .filter(p => WH.cat === 'all' || p.category === WH.cat)
+    .filter(p => !q || p.name.toLowerCase().includes(q))
+    .sort((a, b) => (rank[a.status] ?? 2) - (rank[b.status] ?? 2) || a.name.localeCompare(b.name));
+  const maxStock = Math.max(1, ...productsCache.map(p => p.stock_qty || 0));
+
+  const btn = document.getElementById('whPurchaseBtn');
+  if (btn) {
+    const n = productsCache.filter(p => p.reorder_qty > 0 || p.status === 'out').length;
+    btn.querySelector('span').textContent = `${T.whs_purchase_list}${n ? ` (${n})` : ''}`;
+  }
+
+  if (!productsCache.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.wh_no_products}</div>`; return; }
+  if (!list.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.whs_nothing_found}</div>`; return; }
+
+  box.innerHTML = list.map(p => {
+    const st = p.status || 'ok';
+    let width, color;
+    if (p.days_left !== null && p.days_left !== undefined) {
+      width = Math.min(100, Math.max(3, p.days_left / 60 * 100));
+    } else {
+      width = Math.min(100, Math.max(3, (p.stock_qty || 0) / maxStock * 100));
+    }
+    color = st === 'out' ? '#DC2626' : st === 'low' ? '#F59E0B' : (p.dead ? '#CBD5E1' : '#22C55E');
+    const price = [
+      p.sell_price ? `${fmtNum(p.sell_price)} ${T.currency}` : '',
+      !IS_BRANCH && p.purchase_price ? `${T.whs_buy} ${fmtNum(p.purchase_price)}` : '',
+      !IS_BRANCH && p.margin_pct !== null && p.margin_pct !== undefined ? `<span class="mg">+${p.margin_pct}%</span>` : '',
+    ].filter(Boolean).join(' · ');
+    const name = escapeHtml(JSON.stringify(p.name));
+    return `
+      <div class="whc st-${st}">
+        <div class="whc-top">
+          <div class="whc-name"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.category === 'other' ? T.wh_category_other : (T[p.category] || p.category))}</span></div>
+          <div class="whc-qty">${whQty(p.stock_qty)} ${whUnit(p.unit)}</div>
+        </div>
+        <div class="whc-bar"><i style="width:${width}%; background:${color};"></i></div>
+        <div class="whc-info">${whStatusText(p)}</div>
+        <div class="whc-bottom">
+          <span class="whc-price">${price || '—'}</span>
+          <div class="whc-actions">
+            <button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${name})">+ ${T.wh_restock_action}</button>
+            ${!IS_BRANCH && WH.hasBranches ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.whn_transfer}" onclick="openTransferModal({fromOwnProduct: ${p.id}})"><i class="fa-solid fa-right-left"></i></button>` : ''}
+            <button class="wh-tbtn wh-tbtn-icon" title="${T.wh_delete_action}" onclick="deleteProduct(${p.id}, ${name})"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openAddProductModal() {
+  renderWarehouseCategoryOptions();
+  if (WH.cat !== 'all') document.getElementById('wh_new_category').value = WH.cat;
+  onWhCategoryChanged();
+  document.getElementById('addProductModal').classList.add('open');
+}
+
+function closeWhModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ---- список закупки ----
+function openPurchaseList() {
+  const items = productsCache
+    .filter(p => p.reorder_qty > 0 || p.status === 'out')
+    .sort((a, b) => (a.days_left ?? -1) - (b.days_left ?? -1));
+  const body = document.getElementById('purchaseListBody');
+  body.innerHTML = items.length ? items.map(p => `
+    <div class="pl-row">
+      <input type="checkbox" id="pl_on_${p.id}" checked>
+      <div class="pl-name"><b>${escapeHtml(p.name)}</b><span>${T.whs_now} ${whQty(p.stock_qty)} ${whUnit(p.unit)}${p.per_day ? ` · ~${whQty(p.per_day)}${T.whs_per_day}` : ''}</span></div>
+      <input type="number" id="pl_qty_${p.id}" value="${p.reorder_qty || ''}" placeholder="${T.whn_qty}" min="0">
+      <span style="font-size:12px; color:#64748B;">${whUnit(p.unit)}</span>
+    </div>`).join('') : `<div class="hint-text" style="padding:10px 0;">${T.whs_purchase_empty}</div>`;
+  WH.purchaseItems = items;
+  document.getElementById('purchaseListModal').classList.add('open');
+}
+
+function buildPurchaseText() {
+  const shop = (document.querySelector('.side-shop') || {}).textContent || '';
+  const lines = [];
+  (WH.purchaseItems || []).forEach(p => {
+    const on = document.getElementById('pl_on_' + p.id);
+    const qty = parseFloat((document.getElementById('pl_qty_' + p.id) || {}).value);
+    if (on && on.checked && qty > 0) lines.push(`${lines.length + 1}. ${p.name} — ${whQty(qty)} ${whUnit(p.unit)}`);
+  });
+  if (!lines.length) return '';
+  return `${T.whs_order_title} — ${shop.trim()} (${fmtDate(new Date())})\\n` + lines.join('\\n');
+}
+
+async function sendPurchaseList(mode) {
+  const text = buildPurchaseText();
+  if (!text) { showMsg(T.whs_purchase_pick, false); return; }
+  if (mode === 'tg') {
+    window.open('https://t.me/share/url?url=' + encodeURIComponent(' ') + '&text=' + encodeURIComponent(text), '_blank');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showMsg(T.whs_copied, true);
+  } catch (e) {
+    prompt(T.whs_copy, text);
+  }
+}
+
+// ---- склады сети (главный) ----
+async function loadNetworkStock() {
+  const box = document.getElementById('whNetMatrix');
+  if (!box) return;
+  let data;
+  try { data = await (await fetch('/api/warehouse/network')).json(); } catch (e) { return; }
+  if (!data.ok) return;
+  WH.net = data;
+  if (!data.rows.length) { box.innerHTML = `<div class="hint-text">${T.wh_no_products}</div>`; return; }
+  const shops = data.shops;
+  box.innerHTML = `
+    <div class="table-wrap"><table class="wh-mx">
+      <thead><tr><th>${T.whn_product}</th>${shops.map(s => `<th>${escapeHtml(s.name)}${s.is_head ? `<br><span style="font-weight:500; color:#94A3B8;">${T.branch_head_label}</span>` : ''}</th>`).join('')}</tr></thead>
+      <tbody>${data.rows.map((r, i) => `
+        <tr>
+          <td>${escapeHtml(r.name)}<span>${escapeHtml(r.category === 'other' ? T.wh_category_other : (T[r.category] || r.category))}</span></td>
+          ${shops.map(s => {
+            const c = r.cells[String(s.id)];
+            if (!c) return `<td class="cell" onclick="openTransferModal({row: ${i}, to: ${s.id}})"><span class="q-none">—</span></td>`;
+            const cls = c.status === 'out' ? 'q-out' : c.status === 'low' ? 'q-low' : '';
+            return `<td class="cell" onclick="openTransferModal({row: ${i}, to: ${s.id}})"><span class="${cls}">${whQty(c.qty)}</span></td>`;
+          }).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+    <div class="rv-legend">
+      <span><i style="background:#FEE2E2; border:1px solid #FCA5A5;"></i>${T.whs_out}</span>
+      <span><i style="background:#FEF3C7; border:1px solid #FCD34D;"></i>${T.whn_legend_low}</span>
+      <span>${T.whn_legend_click}</span>
+    </div>`;
+}
+
+async function openTransferModal(opts) {
+  if (!WH.net) await loadNetworkStock();
+  if (!WH.net) return;
+  const shops = WH.net.shops;
+  const opt = s => `<option value="${s.id}">${escapeHtml(s.name)}${s.is_head ? ' (' + T.branch_head_label + ')' : ''}</option>`;
+  const fromSel = document.getElementById('tr_from');
+  const toSel = document.getElementById('tr_to');
+  fromSel.innerHTML = shops.map(opt).join('');
+  toSel.innerHTML = shops.map(opt).join('');
+  const head = shops.find(s => s.is_head) || shops[0];
+  let fromId = head.id, productKey = null, toId = null;
+
+  if (opts.fromOwnProduct) {
+    const row = WH.net.rows.find(r => r.cells[String(head.id)] && r.cells[String(head.id)].product_id === opts.fromOwnProduct);
+    if (row) productKey = WH.net.rows.indexOf(row);
+  }
+  if (opts.row !== undefined) {
+    productKey = opts.row;
+    toId = opts.to;
+    // отправляем с той точки, где этого товара больше всего
+    const cells = WH.net.rows[opts.row].cells;
+    const best = shops.filter(s => s.id !== opts.to && cells[String(s.id)] && cells[String(s.id)].qty > 0)
+      .sort((a, b) => cells[String(b.id)].qty - cells[String(a.id)].qty)[0];
+    if (best) fromId = best.id;
+  }
+  fromSel.value = fromId;
+  const firstOther = shops.find(s => s.id !== fromId);
+  toSel.value = toId && toId !== fromId ? toId : (firstOther ? firstOther.id : fromId);
+  onTransferFromChanged(productKey);
+  document.getElementById('tr_qty').value = '';
+  document.getElementById('transferModal').classList.add('open');
+}
+
+function onTransferFromChanged(preselectRow) {
+  const fromId = document.getElementById('tr_from').value;
+  const sel = document.getElementById('tr_product');
+  const rows = WH.net.rows.map((r, i) => ({ r, i })).filter(x => x.r.cells[fromId] && x.r.cells[fromId].qty > 0);
+  sel.innerHTML = rows.length
+    ? rows.map(x => `<option value="${x.i}">${escapeHtml(x.r.name)} — ${whQty(x.r.cells[fromId].qty)} ${whUnit(x.r.unit)}</option>`).join('')
+    : `<option value="">${T.whn_nothing_to_send}</option>`;
+  if (preselectRow !== undefined && preselectRow !== null && rows.some(x => x.i === preselectRow)) sel.value = preselectRow;
+  onTransferProductChanged();
+}
+
+function onTransferProductChanged() {
+  const fromId = document.getElementById('tr_from').value;
+  const idx = document.getElementById('tr_product').value;
+  const el = document.getElementById('tr_available');
+  if (idx === '') { el.textContent = ''; return; }
+  const r = WH.net.rows[idx];
+  el.textContent = `${T.whn_available} ${whQty(r.cells[fromId].qty)} ${whUnit(r.unit)}`;
+}
+
+async function submitTransfer() {
+  const fromId = document.getElementById('tr_from').value;
+  const toId = document.getElementById('tr_to').value;
+  const idx = document.getElementById('tr_product').value;
+  const qty = parseFloat(document.getElementById('tr_qty').value);
+  if (idx === '' || !(qty > 0)) { showMsg(T.whn_err_fill, false); return; }
+  if (fromId === toId) { showMsg(T.whn_err_same, false); return; }
+  const r = WH.net.rows[idx];
+  const res = await fetch('/api/warehouse/transfer', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ from_shop_id: fromId, to_shop_id: toId, product_id: r.cells[fromId].product_id, quantity: qty })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    closeWhModal('transferModal');
+    showMsg(T.whn_done, true);
+    WH.net = null;
+    loadNetworkStock();
+    loadWarehouse();
+  } else {
+    const msg = data.error === 'not_enough' ? `${T.whn_err_not_enough} ${whQty(data.available)}` : (T['whn_err_' + data.error] || data.error);
+    showMsg(msg, false);
   }
 }
 
@@ -1998,45 +2418,7 @@ function showWhSubTab(t) {
   document.getElementById('whBranchesView').style.display = t === 'branches' ? 'block' : 'none';
   document.getElementById('subwh-own').classList.toggle('active', t === 'own');
   document.getElementById('subwh-branches').classList.toggle('active', t === 'branches');
-}
-
-
-function renderProductsTable() {
-  const body = document.getElementById('products-body');
-  if (!body) return;
-  const colCount = IS_BRANCH ? 5 : 6;
-
-  const valueEl = document.getElementById('whStockValue');
-  if (valueEl) {
-    const totalValue = productsCache.reduce((sum, p) =>
-      sum + (p.purchase_price != null ? p.stock_qty * p.purchase_price : 0), 0);
-    const missingCount = productsCache.filter(p => p.purchase_price == null).length;
-    valueEl.innerHTML = `${T.wh_stock_value_label} <b style="color:#9A3412;">${totalValue.toLocaleString('ru-RU')} ${T.currency}</b>` +
-      (missingCount > 0 ? ` <span style="color:#B3241C;">(⚠️ ${T.branch_missing_price} ${missingCount})</span>` : '');
-  }
-
-  if (!productsCache.length) {
-    body.innerHTML = `<tr><td colspan="${colCount}">${T.wh_no_products}</td></tr>`;
-    return;
-  }
-  body.innerHTML = productsCache.map(p => {
-    const isLow = p.stock_qty < 0;
-    const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
-    return `
-    <tr>
-      <td>${T[p.category] || p.category}</td>
-      <td>${escapeHtml(p.name)}</td>
-      <td style="${isLow ? 'color:#B3241C; font-weight:700;' : ''}">${isLow ? '⚠️ ' : ''}${p.stock_qty} ${unitLabel}</td>
-      <td>${p.sell_price ? p.sell_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>
-      ${IS_BRANCH ? '' : `<td>${p.purchase_price ? p.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</td>`}
-      <td>
-        <button class="history-toggle" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_restock_action}</button>
-        &nbsp;·&nbsp;
-        <button class="history-toggle" style="color:#B3241C;" onclick="deleteProduct(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">${T.wh_delete_action}</button>
-      </td>
-    </tr>
-  `;
-  }).join('');
+  if (t === 'branches') { WH.net = null; loadNetworkStock(); }
 }
 
 function onUsdFieldEdited(usdFieldId, sumFieldId) {
@@ -2100,6 +2482,7 @@ async function createProduct() {
     showMsg(T.wh_product_added, true);
     ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_purchase_usd','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('wh_new_unit_row').style.display = 'none';
+    closeWhModal('addProductModal');
     loadWarehouse();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -2155,14 +2538,21 @@ async function submitRestock() {
 async function loadRestockHistory() {
   const el = document.getElementById('restockHistory');
   if (!el) return;
-  const res = await fetch('/api/restock_history');
-  const history = await res.json();
-  el.innerHTML = history.length ? history.map(r => `
-    <div style="padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;">
-      ${r.restock_date} — ${escapeHtml(r.product_name)}: +${r.quantity} ${r.unit === 'pc' ? T.unit_pc : T.unit_l}
-      ${r.purchase_price ? ' (' + r.purchase_price.toLocaleString('ru-RU') + ' ' + T.currency + '/ед.)' : ''}
-    </div>
-  `).join('') : `<div class="hint-text">${T.wh_no_restocks}</div>`;
+  let moves = [];
+  try { moves = await (await fetch('/api/warehouse/movements')).json(); } catch (e) {}
+  if (!moves.length) { el.innerHTML = `<div class="hint-text">${T.wh_no_restocks}</div>`; return; }
+  const icon = { restock: ['fa-arrow-down', '#15803D'], transfer_in: ['fa-right-to-bracket', '#0F52BA'], transfer_out: ['fa-right-from-bracket', '#B45309'] };
+  el.innerHTML = moves.slice(0, 30).map(m => {
+    const [ic, col] = icon[m.type] || icon.restock;
+    const sign = m.type === 'transfer_out' ? '−' : '+';
+    const what = m.type === 'restock' ? T.whs_mv_restock : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`);
+    return `
+    <div class="wh-att">
+      <i class="fa-solid ${ic}" style="color:${col};"></i>
+      <div class="wa-main"><b>${escapeHtml(m.product_name)}</b><span>${m.date} · ${what}${m.purchase_price ? ` · ${fmtNum(m.purchase_price)} ${T.currency}/${T.whs_per_unit}` : ''}</span></div>
+      <b style="color:${col}; white-space:nowrap;">${sign}${whQty(m.quantity)} ${whUnit(m.unit)}</b>
+    </div>`;
+  }).join('');
 }
 
 
@@ -5161,6 +5551,61 @@ def api_restock_product(product_id):
     if not ok:
         return jsonify({"ok": False, "error": "товар не найден"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/warehouse/overview")
+@login_required
+@employee_blocked
+def api_warehouse_overview():
+    """Склад своей точки: товары с прогнозом + сводка. Филиалу закупочные
+    цены и всё, что из них считается (стоимость, наценка), не отдаём."""
+    denied = _warehouse_required()
+    if denied:
+        return denied
+    result = db.get_warehouse_overview(g.shop_id)
+    if g.is_branch:
+        for p in result["products"]:
+            p.pop("purchase_price", None)
+            p.pop("margin_pct", None)
+        for k in ("stock_value", "retail_value", "potential_margin", "dead_value", "missing_price_count"):
+            result["summary"].pop(k, None)
+    result["ok"] = True
+    return jsonify(result)
+
+
+@app.route("/api/warehouse/movements")
+@login_required
+@employee_blocked
+def api_warehouse_movements():
+    moves = db.get_stock_movements(g.shop_id)
+    if g.is_branch:
+        for m in moves:
+            m.pop("purchase_price", None)
+    return jsonify(moves)
+
+
+@app.route("/api/warehouse/network")
+@login_required
+@profit_blocked
+def api_warehouse_network():
+    """Остатки всех складов сети — только для главного аккаунта."""
+    result = db.get_network_stock_matrix(g.shop_id)
+    result["ok"] = True
+    return jsonify(result)
+
+
+@app.route("/api/warehouse/transfer", methods=["POST"])
+@login_required
+@profit_blocked
+def api_warehouse_transfer():
+    """Перемещение товара между складами своей сети (делает только главный)."""
+    data = request.get_json(force=True)
+    try:
+        result = db.transfer_stock(g.shop_id, int(data["from_shop_id"]), int(data["product_id"]),
+                                   int(data["to_shop_id"]), float(data["quantity"]))
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    return jsonify(result), (200 if result.get("ok") else 400)
 
 
 @app.route("/api/restock_history")
