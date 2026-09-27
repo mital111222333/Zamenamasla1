@@ -1653,6 +1653,7 @@ if ('serviceWorker' in navigator) {
     <div class="subtabs">
       <div class="subtab active" id="subwh-own" onclick="showWhSubTab('own')">{{ T.wh_sub_own }}</div>
       <div class="subtab" id="subwh-branches" onclick="showWhSubTab('branches')" style="display:none;">{{ T.wh_sub_branches }}</div>
+      <div class="subtab" id="subwh-network" onclick="showWhSubTab('network')" style="display:none;">{{ T.wh_sub_network }}</div>
     </div>
 
     <div id="whOwnView">
@@ -1695,19 +1696,17 @@ if ('serviceWorker' in navigator) {
 
     </div>
 
-    <div id="whBranchesView" style="display:none;">
+    <div id="whNetworkView" style="display:none;">
       <div class="card">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.whn_title }}</label>
         <div class="hint-text" style="margin-bottom:12px;">{{ T.whn_hint }}</div>
-        <div id="branchWarehouseSummary" class="whn-summary"></div>
-        <button class="wh-tbtn wh-tbtn-primary wh-tbtn-wide" onclick="openTransferModal({})" style="margin:4px 0 12px;"><i class="fa-solid fa-right-left"></i> {{ T.whn_transfer }}</button>
+        <button class="wh-tbtn wh-tbtn-primary wh-tbtn-wide" onclick="openTransferModal({})" style="margin:0 0 12px;"><i class="fa-solid fa-right-left"></i> {{ T.whn_transfer }}</button>
         <div id="whNetMatrix">{{ T.stats_loading }}</div>
       </div>
+    </div>
 
-      <div class="net-detail-head">
-        <div class="net-detail-title">{{ T.whb_detail_title }}</div>
-        <div class="brand-chips" id="whbChips"></div>
-      </div>
+    <div id="whBranchesView" style="display:none;">
+      <div id="branchWarehouseSummary" class="whn-summary" style="margin-bottom:12px;"></div>
       <div id="whbDetail" style="display:none;">
         <div class="card">
           <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_title }} — <span id="whbTitle"></span></label>
@@ -2123,6 +2122,8 @@ async function loadWarehouse() {
       const branchBtn = document.getElementById('subwh-branches');
       WH.hasBranches = branches.length > 0;
       WH.branches = branches;
+      const netBtn = document.getElementById('subwh-network');
+      if (netBtn) netBtn.style.display = branches.length ? '' : 'none';
       if (branches.length) {
         branchBtn.style.display = '';
         document.getElementById('branchWarehouseSummary').innerHTML = branches.map(b => `
@@ -2153,7 +2154,8 @@ function renderWarehouseSummary(key) {
   const boxes = [];
   if (ctx.showCost) {
     boxes.push(`<div class="wh-kpi"><b>${fmtShort(s.stock_value)}</b><span>${T.whs_kpi_value}</span></div>`);
-    boxes.push(`<div class="wh-kpi good"><b>+${fmtShort(s.potential_margin)}</b><span>${T.whs_kpi_margin}</span></div>`);
+    const neg = s.potential_margin < 0;
+    boxes.push(`<div class="wh-kpi ${neg ? 'bad' : 'good'}"><b>${neg ? '' : '+'}${fmtShort(s.potential_margin)}</b><span>${neg ? T.whs_kpi_margin_neg : T.whs_kpi_margin}</span></div>`);
   } else {
     boxes.push(`<div class="wh-kpi"><b>${s.product_count}</b><span>${T.whs_kpi_products}</span></div>`);
     boxes.push(`<div class="wh-kpi"><b>${s.reorder_count}</b><span>${T.whs_kpi_reorder}</span></div>`);
@@ -2264,7 +2266,8 @@ function renderProductCards(key) {
     const price = [
       p.sell_price ? `${fmtNum(p.sell_price)} ${T.currency}` : '',
       ctx.showCost && p.purchase_price ? `${T.whs_buy} ${fmtNum(p.purchase_price)}` : '',
-      ctx.showCost && p.margin_pct !== null && p.margin_pct !== undefined ? `<span class="mg">+${p.margin_pct}%</span>` : '',
+      ctx.showCost && p.margin_pct !== null && p.margin_pct !== undefined
+        ? (p.margin_pct < 0 ? `<span style="color:#B91C1C; font-weight:700;">⚠️ ${p.margin_pct}% ${T.whs_below_cost}</span>` : `<span class="mg">+${p.margin_pct}%</span>`) : '',
       missingPrice ? `<span style="color:#B3241C; font-weight:700;">⚠️ ${T.branch_missing_price.replace(':', '')}</span>` : '',
     ].filter(Boolean).join(' · ');
     const name = escapeHtml(JSON.stringify(p.name));
@@ -2503,14 +2506,14 @@ async function submitTransfer() {
 }
 
 function showWhSubTab(t) {
-  document.getElementById('whOwnView').style.display = t === 'own' ? 'block' : 'none';
-  document.getElementById('whBranchesView').style.display = t === 'branches' ? 'block' : 'none';
-  document.getElementById('subwh-own').classList.toggle('active', t === 'own');
-  document.getElementById('subwh-branches').classList.toggle('active', t === 'branches');
+  ['own', 'branches', 'network'].forEach(k => {
+    const view = document.getElementById({ own: 'whOwnView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
+    if (view) view.style.display = t === k ? 'block' : 'none';
+    const tab = document.getElementById('subwh-' + k);
+    if (tab) tab.classList.toggle('active', t === k);
+  });
+  if (t === 'network') { WH.net = null; loadNetworkStock(); }
   if (t === 'branches') {
-    WH.net = null;
-    loadNetworkStock();
-    renderWhBranchChips();
     if (!WH.branchId && WH.branches.length) selectWhBranch(WH.branches[0].id);
     else if (WH.branchId) selectWhBranch(WH.branchId);
   }
