@@ -4751,8 +4751,20 @@ function renderShopsTable(shops) {
   function renderShopRow(s) {
     return `
     <tr>
-      <td>${s.shop_name || '—'}</td>
-      <td>${s.username}</td>
+      <td>
+        <span id="name_view_${s.id}">${escapeHtml(s.shop_name || '—')}</span>
+        <div id="name_edit_${s.id}" style="display:none; margin-top:4px;">
+          <input id="name_input_${s.id}" value="${escapeHtml(s.shop_name || '')}" style="width:120px; font-size:12px; padding:4px;">
+        </div>
+        <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="toggleIdentityEdit(${s.id})">✏️ изменить</button>
+      </td>
+      <td>
+        <span id="username_view_${s.id}">${escapeHtml(s.username)}</span>
+        <div id="username_edit_${s.id}" style="display:none; margin-top:4px;">
+          <input id="username_input_${s.id}" value="${escapeHtml(s.username)}" style="width:120px; font-size:12px; padding:4px;">
+          <button class="badge active" style="margin-top:4px;" onclick="saveIdentity(${s.id})">сохранить</button>
+        </div>
+      </td>
       <td><span class="hint-text">🔒 скрыт</span>
           <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
       <td>${s.phone || '—'}</td>
@@ -5072,6 +5084,32 @@ async function triggerRestore() {
   }
 }
 
+function toggleIdentityEdit(id) {
+  const nameEdit = document.getElementById(`name_edit_${id}`);
+  const usernameEdit = document.getElementById(`username_edit_${id}`);
+  const isOpen = nameEdit.style.display !== 'none';
+  nameEdit.style.display = isOpen ? 'none' : 'block';
+  usernameEdit.style.display = isOpen ? 'none' : 'block';
+}
+
+async function saveIdentity(id) {
+  const shop_name = document.getElementById(`name_input_${id}`).value.trim();
+  const username = document.getElementById(`username_input_${id}`).value.trim();
+  if (!shop_name || !username) { showMsg('Укажите и название, и логин.', false); return; }
+  const res = await fetch(`/api/admin/shops/${id}/identity`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({shop_name, username})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    document.getElementById(`name_view_${id}`).textContent = data.shop_name;
+    document.getElementById(`username_view_${id}`).textContent = data.username;
+    toggleIdentityEdit(id);
+    showMsg('✅ Название и логин обновлены', true);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
+}
+
 async function resetPassword(id, username) {
   if (!confirm(`Сбросить пароль для «${username}»? Старый пароль перестанет работать.`)) return;
   const res = await fetch(`/api/admin/shops/${id}/reset_password`, { method: 'POST' });
@@ -5281,6 +5319,25 @@ def api_admin_reset_password(shop_id):
     new_password = secrets.token_urlsafe(6)
     db.reset_shop_password(shop_id, new_password)
     return jsonify({"ok": True, "password": new_password})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/identity", methods=["POST"])
+@admin_required
+def api_admin_update_identity(shop_id):
+    """Меняет название точки и/или логин — единственное, что нельзя было
+    поправить после создания точки."""
+    shop = db.get_shop(shop_id)
+    if not shop:
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    data = request.get_json(force=True)
+    shop_name = (data.get("shop_name") or "").strip()
+    username = (data.get("username") or "").strip()
+    if not shop_name or not username:
+        return jsonify({"ok": False, "error": "укажите и название, и логин"}), 400
+    if username != shop["username"] and db.username_taken(username):
+        return jsonify({"ok": False, "error": "такой логин уже занят"}), 400
+    db.update_shop_identity(shop_id, shop_name, username)
+    return jsonify({"ok": True, "shop_name": shop_name, "username": username})
 
 
 @app.route("/api/admin/shops/<int:shop_id>/notify_telegram", methods=["POST"])

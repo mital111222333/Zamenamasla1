@@ -943,6 +943,19 @@ def username_taken(username: str) -> bool:
         return conn.execute("SELECT 1 FROM shops WHERE username=?", (username,)).fetchone() is not None
 
 
+def update_shop_identity(shop_id: int, shop_name: str, username: str) -> bool:
+    """Меняет название точки и логин — то, что нельзя было поправить после
+    создания. Уникальность логина проверяется на уровне вызывающего кода
+    (webapp.py), здесь — только само обновление."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE shops SET shop_name=?, username=? WHERE id=?",
+            (shop_name, username, shop_id)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
 # ---------- Клиенты ----------
 
 def get_or_create_client(shop_id: int, owner_name: str, phone: str = None):
