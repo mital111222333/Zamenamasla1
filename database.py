@@ -1499,19 +1499,20 @@ def get_daily_revenue_range(shop_id: int, date_from: str, date_to: str):
     total=0, чтобы график не 'перепрыгивал' через пропуски."""
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT oc.change_date as date, COALESCE(SUM(oc.cost), 0) as total
+            SELECT oc.change_date as date, COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ? AND oc.change_date <= ?
             GROUP BY oc.change_date
         """, (shop_id, date_from, date_to)).fetchall()
     by_date = {r["date"]: r["total"] for r in rows}
+    count_by_date = {r["date"]: r["cnt"] for r in rows}
     start = datetime.strptime(date_from, "%Y-%m-%d")
     end = datetime.strptime(date_to, "%Y-%m-%d")
     result = []
     d = start
     while d <= end:
         d_str = d.strftime("%Y-%m-%d")
-        result.append({"date": d_str, "total": by_date.get(d_str, 0)})
+        result.append({"date": d_str, "total": by_date.get(d_str, 0), "count": count_by_date.get(d_str, 0)})
         d += timedelta(days=1)
     return result
 

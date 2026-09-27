@@ -952,6 +952,46 @@ if ('serviceWorker' in navigator) {
   .brand-bar { height:6px; background:#F1F5F9; border-radius:3px; margin:6px 0 4px 30px; overflow:hidden; }
   .brand-bar i { display:block; height:100%; border-radius:3px; }
   .brand-meta { font-size:11.5px; color:#94A3B8; margin-left:30px; }
+  .st-today { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; background:#fff; border:1px solid var(--border); border-radius:16px; padding:14px 18px; margin-bottom:12px; }
+  .st-today-main { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .st-today-label { font-size:13px; font-weight:600; color:#64748B; }
+  .st-today-amount { font-size:24px; font-weight:800; font-family:var(--font-display); color:var(--text); }
+  .st-today-amount small, .st-amount small { font-size:0.55em; font-weight:600; color:#64748B; margin-left:3px; }
+  .st-today-chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .st-chip { background:#F1F5F9; border-radius:999px; padding:5px 11px; font-size:12.5px; color:#334155; }
+  .st-chip b { color:var(--text); }
+  .st-empty { font-size:13px; color:#94A3B8; }
+  .st-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; }
+  .st-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px 16px 12px; display:flex; flex-direction:column; }
+  .st-card.orange { background:#FFFBF5; border-color:#FDBA74; }
+  .st-label { font-size:13px; font-weight:600; color:#64748B; }
+  .st-amount { font-size:26px; font-weight:800; font-family:var(--font-display); color:var(--blue); line-height:1.15; margin:4px 0 6px; }
+  .st-card.orange .st-amount { color:#9A3412; }
+  .st-badge { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:3px 9px; font-size:12px; font-weight:700; }
+  .st-badge.up { background:#DCFCE7; color:#15803D; }
+  .st-badge.down { background:#FEE2E2; color:#B91C1C; }
+  .st-badge-note { font-size:11.5px; color:#94A3B8; margin-left:6px; }
+  .st-badge-line { min-height:24px; margin-bottom:8px; }
+  .st-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-top:1px solid #F1F5F9; font-size:13px; color:#64748B; }
+  .st-row b { color:var(--text); font-weight:700; white-space:nowrap; }
+  .st-row .st-badge { padding:1px 7px; font-size:11px; margin-left:6px; }
+  .st-block { padding:8px 0; border-top:1px solid #F1F5F9; font-size:13px; color:#64748B; }
+  .st-block-head { display:flex; justify-content:space-between; margin-bottom:6px; }
+  .st-block-head b { color:var(--text); }
+  .st-split { display:flex; height:7px; border-radius:4px; overflow:hidden; background:#F1F5F9; }
+  .st-split i { display:block; height:100%; }
+  .st-legend { display:flex; justify-content:space-between; gap:8px; font-size:11.5px; margin-top:5px; }
+  .st-legend span::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--dot); }
+  .st-row.profit b { color:#15803D; }
+  .rv-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-bottom:14px; }
+  .rv-box { background:#F8FAFC; border-radius:12px; padding:10px 12px; }
+  .rv-box b { display:block; font-size:17px; font-family:var(--font-display); color:var(--text); line-height:1.2; }
+  .rv-box span { font-size:11.5px; color:#64748B; }
+  .rv-box.best { background:#FEF2F2; }
+  .rv-box.best b { color:#C81E2B; }
+  .rv-chart-wrap { position:relative; height:240px; }
+  .rv-legend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:#64748B; margin-top:8px; }
+  .rv-legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
   .dash-row {
     display:flex; justify-content:space-between; align-items:center; padding:8px 0;
     border-bottom:1px dashed var(--border); font-size:13.5px;
@@ -1295,7 +1335,7 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="statsOwnView">
-      <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+      <div id="statsGrid">{{ T.stats_loading }}</div>
 
       {% if not is_employee %}
       <div class="card" style="margin-top:16px;">
@@ -1316,12 +1356,8 @@ if ('serviceWorker' in navigator) {
 
       <div class="card" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_revenue_chart_title }}</label>
-        <canvas id="revenueChart" height="180"></canvas>
-      </div>
-
-      <div class="card" style="margin-top:16px;">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_top_products_title }}</label>
-        <div id="dashTopProducts">{{ T.stats_loading }}</div>
+        <div id="revenueSummary" class="rv-summary"></div>
+        <div class="rv-chart-wrap"><canvas id="revenueChart"></canvas></div>
       </div>
 
       <div class="card" style="margin-top:16px;">
@@ -1931,23 +1967,117 @@ async function loadRestockHistory() {
 let revenueChartInstance = null;
 
 function renderRevenueChart(dailyData) {
-  const canvas = document.getElementById('revenueChart');
-  if (!canvas || typeof Chart === 'undefined') return;
-  if (revenueChartInstance) { revenueChartInstance.destroy(); }
-  revenueChartInstance = new Chart(canvas.getContext('2d'), {
-    type: 'line',
+  revenueChartInstance = drawRevenueBars('revenueChart', 'revenueSummary', dailyData, revenueChartInstance);
+}
+
+function rvDateLabel(iso, withWeekday) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const months = T.st_months.split(',');
+  const wd = T.st_weekdays.split(',');  // с понедельника
+  const dow = (new Date(y, m - 1, d).getDay() + 6) % 7;
+  return (withWeekday ? wd[dow] + ', ' : '') + d + ' ' + months[m - 1];
+}
+
+function drawRevenueBars(canvasId, summaryId, dailyData, prevInstance) {
+  // Столбик на каждый день. Лучший день подсвечен красным, пунктир — средняя
+  // выручка за рабочий день (дни без продаж в среднее не входят).
+  const canvas = document.getElementById(canvasId);
+  if (prevInstance) prevInstance.destroy();
+  dailyData = dailyData || [];
+  const totals = dailyData.map(d => d.total || 0);
+  const sum = totals.reduce((a, b) => a + b, 0);
+  const workDays = totals.filter(v => v > 0).length;
+  const avg = workDays ? Math.round(sum / workDays) : 0;
+  const maxVal = Math.max(0, ...totals);
+  const bestIdx = maxVal > 0 ? totals.indexOf(maxVal) : -1;
+  const visits = dailyData.reduce((a, d) => a + (d.count || 0), 0);
+
+  const summaryEl = document.getElementById(summaryId);
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div class="rv-box"><b>${fmtShort(sum)}</b><span>${T.rv_total} · ${visits} ${T.brands_visits}</span></div>
+      <div class="rv-box"><b>${fmtShort(avg)}</b><span>${T.rv_avg_day}</span></div>
+      <div class="rv-box"><b>${workDays} / ${dailyData.length}</b><span>${T.rv_work_days}</span></div>
+      ${bestIdx >= 0 ? `<div class="rv-box best"><b>${fmtShort(maxVal)}</b><span>${T.rv_best_day}: ${rvDateLabel(dailyData[bestIdx].date, false)}</span></div>` : ''}
+    `;
+  }
+  if (!canvas || typeof Chart === 'undefined') return null;
+
+  // легенда под графиком (создаём один раз)
+  const wrap = canvas.parentElement;
+  let legend = wrap.nextElementSibling;
+  if (!legend || !legend.classList.contains('rv-legend')) {
+    legend = document.createElement('div');
+    legend.className = 'rv-legend';
+    wrap.after(legend);
+  }
+  legend.innerHTML = `
+    <span><i style="background:#0F52BA;"></i>${T.rv_legend_day}</span>
+    ${bestIdx >= 0 ? `<span><i style="background:#E63946;"></i>${T.rv_best_day}</span>` : ''}
+    ${avg ? `<span><i style="background:repeating-linear-gradient(90deg,#F59E0B 0 4px,transparent 4px 7px); height:3px; vertical-align:3px;"></i>${T.rv_avg_short}: ${fmtShort(avg)}</span>` : ''}
+  `;
+
+  const colors = totals.map((v, i) => i === bestIdx ? '#E63946' : '#0F52BA');
+  const avgLine = {
+    id: 'avgLine',
+    afterDatasetsDraw(chart) {
+      if (!avg) return;
+      const y = chart.scales.y.getPixelForValue(avg);
+      const area = chart.chartArea;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = '#F59E0B';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(area.left, y); ctx.lineTo(area.right, y); ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  const chart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
     data: {
-      labels: dailyData.map(d => d.date.slice(5)),
+      labels: dailyData.map(d => rvDateLabel(d.date, false)),
       datasets: [{
-        label: T.dash_revenue_chart_title,
-        data: dailyData.map(d => d.total),
-        borderColor: '#E63946',
-        backgroundColor: 'rgba(230,57,70,0.08)',
-        fill: true, tension: 0.3, pointRadius: 0,
+        data: totals,
+        backgroundColor: colors,
+        hoverBackgroundColor: totals.map((v, i) => i === bestIdx ? '#C81E2B' : '#0A3D8F'),
+        borderRadius: 5, borderSkipped: false,
+        maxBarThickness: 26, categoryPercentage: 0.8, barPercentage: 0.9,
       }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false, padding: 10,
+          callbacks: {
+            title: items => rvDateLabel(dailyData[items[0].dataIndex].date, true),
+            label: item => `${fmtNum(item.raw)} ${T.currency}`,
+            afterLabel: item => {
+              const d = dailyData[item.dataIndex];
+              return d.count ? `${d.count} ${T.brands_visits}` : T.rv_no_sales;
+            },
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { autoSkip: true, maxTicksLimit: 8, maxRotation: 0, color: '#94A3B8', font: { size: 11 } },
+        },
+        y: {
+          beginAtZero: true,
+          border: { display: false },
+          grid: { color: '#F1F5F9' },
+          ticks: { maxTicksLimit: 5, color: '#94A3B8', font: { size: 11 }, callback: v => fmtShort(v) },
+        }
+      }
+    },
+    plugins: [avgLine],
   });
+  return chart;
 }
 
 async function toggleCategoryBrands(categoryName, idx) {
@@ -2034,37 +2164,6 @@ async function loadDashboard() {
       </div>
     `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`;
   }
-}
-
-function renderComparisonBadge(cmp) {
-  // cmp.pct === null значит в прошлом периоде не было данных для сравнения
-  // (например, точка только начала работать) - тогда просто не показываем
-  // бейдж, а не "0%" или ошибку
-  if (!cmp || cmp.pct === null || cmp.pct === undefined) return '';
-  const up = cmp.pct >= 0;
-  const color = up ? '#1B8A5A' : '#B3241C';
-  const arrow = up ? '↑' : '↓';
-  const sign = up ? '+' : '';
-  return `<div style="font-size:12px; font-weight:700; color:${color}; margin-top:2px;">${arrow} ${sign}${cmp.pct}% ${T.stats_vs_prev_period}</div>`;
-}
-
-function renderAvgCheck(obj, avgPct) {
-  // средний чек = выручка / платные визиты (визиты с ценой 0 не считаются);
-  // если платных визитов в периоде нет — строку не показываем
-  if (!obj || !obj.paid_count) return '';
-  let badge = '';
-  if (avgPct !== null && avgPct !== undefined) {
-    const up = avgPct >= 0;
-    badge = ` <span style="font-weight:700; color:${up ? '#1B8A5A' : '#B3241C'};">${up ? '↑ +' : '↓ '}${avgPct}%</span>`;
-  }
-  return `<div class="count">${T.stats_avg_check} ${obj.avg.toLocaleString('ru-RU')} ${T.currency}${badge}</div>`;
-}
-
-function renderClientSplit(obj) {
-  // новые = первый визит в эту точку попал в период; повторные = уже бывали раньше
-  const c = obj && obj.clients;
-  if (!c || !c.total) return '';
-  return `<div class="count">${T.stats_clients_label} ${c.total} — <span style="color:#1D4ED8; font-weight:700;">${c.new} ${T.stats_clients_new}</span>, ${c.returning} ${T.stats_clients_returning}</div>`;
 }
 
 const BRAND_COLORS = ['#0F52BA', '#E63946', '#F4A261', '#2A9D8F', '#8E44AD', '#E9C46A', '#1D3557', '#06B6D4', '#84CC16', '#EC4899'];
@@ -2233,6 +2332,82 @@ function renderBrandDonut(c, centerValue, centerUnit) {
   });
 }
 
+function fmtShort(n) {
+  // компактно для второстепенных цифр: 19 496 586 -> 19,5 млн; 710 000 -> 710 тыс
+  n = Number(n || 0);
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return (Math.round(n / 1e5) / 10).toLocaleString('ru-RU') + ' ' + T.st_mln;
+  if (abs >= 1e4) return Math.round(n / 1e3).toLocaleString('ru-RU') + ' ' + T.st_thousand;
+  return n.toLocaleString('ru-RU');
+}
+
+function stBadge(pct, extraClass) {
+  if (pct === null || pct === undefined) return '';
+  const up = pct >= 0;
+  return `<span class="st-badge ${up ? 'up' : 'down'} ${extraClass || ''}">${up ? '↑' : '↓'} ${up ? '+' : ''}${String(pct).replace('.', ',')}%</span>`;
+}
+
+function renderStatCard(o) {
+  // o = { label, d: {total,count,avg,paid_count,cash,card,clients}, cmp, cmpNote, profit, orange }
+  const d = o.d || {};
+  const cmp = o.cmp || null;
+  const cl = d.clients || { total: 0, new: 0, returning: 0 };
+  const cash = d.cash || 0, card = d.card || 0, paySum = (cash + card) || 1;
+  const clSum = cl.total || 1;
+  const badgeLine = cmp && cmp.pct !== null && cmp.pct !== undefined
+    ? `${stBadge(cmp.pct)}<span class="st-badge-note">${o.cmpNote || ''}</span>` : '';
+  const empty = !d.count;
+  return `
+    <div class="st-card ${o.orange ? 'orange' : ''}">
+      <div class="st-label">${o.label}</div>
+      <div class="st-amount">${fmtNum(d.total)}<small>${T.currency}</small></div>
+      <div class="st-badge-line">${badgeLine}</div>
+      ${empty ? `<div class="st-empty">${T.st_no_visits}</div>` : `
+      <div class="st-row"><span>${T.st_services}</span><b>${d.count}</b></div>
+      ${d.paid_count ? `<div class="st-row"><span>${T.st_avg}</span><b>${fmtNum(d.avg)} ${T.currency}${cmp ? stBadge(cmp.avg_pct) : ''}</b></div>` : ''}
+      ${cl.total ? `
+      <div class="st-block">
+        <div class="st-block-head"><span>${T.st_clients}</span><b>${cl.total}</b></div>
+        <div class="st-split"><i style="width:${cl.new / clSum * 100}%; background:#3B82F6;"></i><i style="width:${cl.returning / clSum * 100}%; background:#14B8A6;"></i></div>
+        <div class="st-legend"><span style="--dot:#3B82F6;">${cl.new} ${T.st_new}</span><span style="--dot:#14B8A6;">${cl.returning} ${T.st_returning}</span></div>
+      </div>` : ''}
+      ${(cash || card) ? `
+      <div class="st-block">
+        <div class="st-block-head"><span>${T.st_payment}</span></div>
+        <div class="st-split"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i></div>
+        <div class="st-legend"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span></div>
+      </div>` : ''}
+      ${o.profit !== null && o.profit !== undefined ? `<div class="st-row profit"><span>${T.st_profit}</span><b>${fmtNum(o.profit)} ${T.currency}</b></div>` : ''}
+      `}
+    </div>`;
+}
+
+function renderTodayStrip(d, profit) {
+  d = d || {};
+  const cl = d.clients || {};
+  const chips = d.count ? `
+    <div class="st-today-chips">
+      <span class="st-chip">${T.st_services}: <b>${d.count}</b></span>
+      ${d.paid_count ? `<span class="st-chip">${T.st_avg}: <b>${fmtShort(d.avg)}</b></span>` : ''}
+      ${cl.total ? `<span class="st-chip">${T.st_clients}: <b>${cl.total}</b> (${cl.new} ${T.st_new})</span>` : ''}
+      ${profit !== null && profit !== undefined ? `<span class="st-chip" style="background:#DCFCE7;">${T.st_profit}: <b style="color:#15803D;">${fmtShort(profit)}</b></span>` : ''}
+    </div>` : `<div class="st-empty">${T.st_today_empty}</div>`;
+  return `
+    <div class="st-today">
+      <div class="st-today-main">
+        <span class="st-today-label">${T.stats_today}</span>
+        <span class="st-today-amount">${fmtNum(d.total)}<small>${T.currency}</small></span>
+      </div>
+      ${chips}
+    </div>`;
+}
+
+const ST_PERIODS = () => [
+  ['week', T.stats_week, T.st_vs_week],
+  ['month', T.stats_month, T.st_vs_month],
+  ['year', T.stats_year, T.st_vs_year],
+];
+
 async function loadStats() {
   loadDashboard();
   loadBrandStats();  // для сотрудника карточки нет — функция сама выйдет
@@ -2243,23 +2418,12 @@ async function loadStats() {
     const pRes = await fetch('/api/profit_stats');
     profit = await pRes.json();
   }
-  const periods = [
-    ['today', T.stats_today], ['yesterday', T.stats_yesterday], ['week', T.stats_week],
-    ['month', T.stats_month], ['year', T.stats_year],
-  ];
-
-  document.getElementById('statsGrid').innerHTML = periods.map(([key, label]) => `
-    <div class="stats-card">
-      <div class="label">${label}</div>
-      <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
-      ${renderComparisonBadge(s.comparison && s.comparison[key])}
-      <div class="count">${T.stats_services_count} ${s[key].count}</div>
-      ${renderAvgCheck(s[key], s.comparison && s.comparison[key] ? s.comparison[key].avg_pct : null)}
-      ${renderClientSplit(s[key])}
-      <div class="count">${T.payment_cash}: ${(s[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(s[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
-      ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
-    </div>
-  `).join('');
+  document.getElementById('statsGrid').innerHTML =
+    renderTodayStrip(s.today, profit ? profit.today : null) +
+    `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
+      label, d: s[key], cmp: s.comparison && s.comparison[key], cmpNote: note,
+      profit: profit ? profit[key] : null,
+    })).join('')}</div>`;
 
   if (!IS_BRANCH) {
     try {
@@ -2279,18 +2443,10 @@ async function loadStats() {
             <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">
               ${T.stats_all_branches_title} (${agg.branch_count})
             </label>
-            <div class="stats-grid">
-              ${periods.map(([key, label]) => `
-                <div class="stats-card" style="background:linear-gradient(135deg, #FFF7ED, #FEF3C7); border-color:#FDBA74;">
-                  <div class="label">${label}</div>
-                  <div class="amount" style="color:#9A3412;">${agg.revenue[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
-                  <div class="count">${T.stats_services_count} ${agg.revenue[key].count}</div>
-                  ${renderAvgCheck(agg.revenue[key], null)}
-                  ${renderClientSplit(agg.revenue[key])}
-                  <div class="count">${T.payment_cash}: ${(agg.revenue[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(agg.revenue[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
-                  <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${agg.profit[key].toLocaleString('ru-RU')} ${T.currency}</div>
-                </div>
-              `).join('')}
+            <div class="st-grid">
+              ${[['today', T.stats_today]].concat(ST_PERIODS()).map(([key, label]) => renderStatCard({
+                label, d: agg.revenue[key], profit: agg.profit[key], orange: true,
+              })).join('')}
             </div>
             <div style="margin-top:14px; padding-top:14px; border-top:1px dashed #FDBA74;">
               <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">${T.branch_breakdown_title}</label>
@@ -2405,15 +2561,7 @@ async function applyStatsRange() {
   if (!data.ok) { document.getElementById('statsRangeResult').innerHTML = ''; return; }
   const hasProfit = data.profit !== undefined;
   document.getElementById('statsRangeResult').innerHTML = `
-    <div class="stats-card">
-      <div class="label">${T.stats_range_result} ${from} — ${to}</div>
-      <div class="amount">${data.total.toLocaleString('ru-RU')} ${T.currency}</div>
-      <div class="count">${T.stats_services_count} ${data.count}</div>
-      ${renderAvgCheck(data, null)}
-      ${renderClientSplit(data)}
-      <div class="count">${T.payment_cash}: ${(data.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
-      ${hasProfit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
-    </div>
+    ${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data, profit: hasProfit ? data.profit : null })}
     ${hasProfit ? `
     <div class="stats-card" style="margin-top:10px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
       <div class="dash-summary-grid">
@@ -2434,21 +2582,8 @@ async function applyStatsRange() {
     ` : ''}
     <div class="stats-card" style="margin-top:10px;">
       <label style="font-size:14px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">${T.dash_revenue_chart_title}</label>
-      <canvas id="rangeRevenueChart" height="180"></canvas>
-    </div>
-    <div class="stats-card" style="margin-top:10px;">
-      <label style="font-size:14px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">${T.dash_top_products_title}</label>
-      <div id="rangeTopProducts">
-        ${data.top_products.length ? data.top_products.map((p, i) => `
-          <div>
-            <div class="dash-row" style="cursor:pointer;" onclick="toggleRangeCategoryBrands(${escapeHtml(JSON.stringify(p.name))}, ${i})">
-              <span><span class="dash-row-rank">${i + 1}</span><span class="dash-row-name">${escapeHtml(p.name)}</span> <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--hint); margin-left:4px;"></i></span>
-              <span class="dash-row-value">${p.qty.toLocaleString('ru-RU')}</span>
-            </div>
-            <div id="rangeCatBrands_${i}" class="dash-brands-panel" style="display:none;"></div>
-          </div>
-        `).join('') : `<div class="hint-text">${T.dash_no_data}</div>`}
-      </div>
+      <div id="rangeRevenueSummary" class="rv-summary"></div>
+      <div class="rv-chart-wrap"><canvas id="rangeRevenueChart"></canvas></div>
     </div>
   `;
   renderRangeChart(data.daily_revenue);
@@ -2456,21 +2591,7 @@ async function applyStatsRange() {
 
 let rangeChartInstance = null;
 function renderRangeChart(dailyData) {
-  const canvas = document.getElementById('rangeRevenueChart');
-  if (!canvas || typeof Chart === 'undefined') return;
-  if (rangeChartInstance) { rangeChartInstance.destroy(); }
-  rangeChartInstance = new Chart(canvas.getContext('2d'), {
-    type: 'line',
-    data: {
-      labels: dailyData.map(d => d.date.slice(5)),
-      datasets: [{
-        data: dailyData.map(d => d.total),
-        borderColor: '#E63946', backgroundColor: 'rgba(230,57,70,0.08)',
-        fill: true, tension: 0.3, pointRadius: 0,
-      }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
+  rangeChartInstance = drawRevenueBars('rangeRevenueChart', 'rangeRevenueSummary', dailyData, rangeChartInstance);
 }
 
 async function toggleRangeCategoryBrands(categoryName, idx) {
@@ -2551,15 +2672,7 @@ async function applyBranchStatsRange() {
   `).join('');
 
   document.getElementById('branchStatsRangeResult').innerHTML = `
-    <div class="stats-card" style="background:linear-gradient(135deg, #FFF7ED, #FEF3C7); border-color:#FDBA74; margin-bottom:14px;">
-      <div class="label">${T.stats_range_result} ${from} — ${to}</div>
-      <div class="amount" style="color:#9A3412;">${data.revenue.total.toLocaleString('ru-RU')} ${T.currency}</div>
-      <div class="count">${T.stats_services_count} ${data.revenue.count}</div>
-      ${renderAvgCheck(data.revenue, null)}
-      ${renderClientSplit(data.revenue)}
-      <div class="count">${T.payment_cash}: ${(data.revenue.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.revenue.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
-      <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
-    </div>
+    <div style="margin-bottom:14px;">${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data.revenue, profit: data.profit, orange: true })}</div>
     <div class="table-wrap"><table>
       <thead><tr><th>${T.branch_col_label}</th><th>${T.stats_revenue_label}</th><th>${T.stats_profit_label}</th></tr></thead>
       <tbody>${breakdownRows}</tbody>
