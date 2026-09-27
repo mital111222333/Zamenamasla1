@@ -2839,8 +2839,8 @@ def get_stock_movements(shop_id: int, limit: int = 60) -> list:
                    st.shop_name as to_name, st.username as to_user
             FROM stock_transfers t
             JOIN products p ON p.id = CASE WHEN t.from_shop_id=? THEN t.from_product_id ELSE t.to_product_id END
-            JOIN shops sf ON sf.id = t.from_shop_id
-            JOIN shops st ON st.id = t.to_shop_id
+            LEFT JOIN shops sf ON sf.id = t.from_shop_id
+            LEFT JOIN shops st ON st.id = t.to_shop_id
             WHERE t.from_shop_id=? OR t.to_shop_id=?
             ORDER BY t.transfer_date DESC, t.id DESC LIMIT ?
         """, (shop_id, shop_id, shop_id, limit)).fetchall()
@@ -2848,9 +2848,69 @@ def get_stock_movements(shop_id: int, limit: int = 60) -> list:
         outgoing = r["from_shop_id"] == shop_id
         out.append({"type": "transfer_out" if outgoing else "transfer_in", "date": r["transfer_date"],
                     "product_name": r["product_name"], "unit": r["unit"], "quantity": r["quantity"],
-                    "other_shop": (r["to_name"] or r["to_user"]) if outgoing else (r["from_name"] or r["from_user"]),
+                    "other_shop": ((r["to_name"] or r["to_user"]) if outgoing else (r["from_name"] or r["from_user"])) or "—",
                     "sort": (r["transfer_date"], r["created_at"] or "")})
     out.sort(key=lambda x: x["sort"], reverse=True)
     for x in out:
         x.pop("sort", None)
     return out[:limit]
+
+
+
+# ---------- Управление филиалами (изменение и удаление) ----------
+
+def update_branch_details(branch_id: int, shop_name: str, username: str, phone=None, address=None,
+                          hours=None, lat=None, lon=None, notify_telegram_id=None) -> bool:
+    """Меняет всё, что задаётся при создании филиала: название, логин,
+    телефон, адрес, часы, локацию, Telegram для уведомлений."""
+    with get_conn() as conn:
+        cur = conn.execute("""
+            UPDATE shops SET shop_name=?, username=?, phone=?, address=?, hours=?, lat=?, lon=?, notify_telegram_id=?
+            WHERE id=? AND role='branch'
+        """, (shop_name, username, phone, address, hours, lat, lon, notify_telegram_id, branch_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def branch_data_counts(branch_id: int) -> dict:
+    """Что пропадёт вместе с филиалом — показываем перед удалением."""
+    with get_conn() as conn:
+        one = lambda q: conn.execute(q, (branch_id,)).fetchone()[0]
+        return {
+            "clients": one("SELECT COUNT(*) FROM clients WHERE shop_id=?"),
+            "cars": one("SELECT COUNT(*) FROM cars WHERE shop_id=?"),
+            "services": one("SELECT COUNT(*) FROM oil_changes oc JOIN cars c ON c.id = oc.car_id WHERE c.shop_id=?"),
+            "products": one("SELECT COUNT(*) FROM products WHERE shop_id=? AND is_active=1"),
+            "debts": one("SELECT COUNT(*) FROM installment_plans WHERE shop_id=?"),
+            "employees": one("SELECT COUNT(*) FROM shop_users WHERE shop_id=?"),
+        }
+
+
+def delete_branch_with_data(branch_id: int) -> bool:
+    """Полностью удаляет филиал и все его данные одной транзакцией: либо
+    удаляется всё, либо (при любой ошибке) ничего. Перемещения товара между
+    складами остаются в истории других точек."""
+    shop = get_shop(branch_id)
+    if not shop or shop.get("role") != "branch":
+        return False
+    with get_conn() as conn:
+        try:
+            car_ids = "SELECT id FROM cars WHERE shop_id=?"
+            conn.execute(f"DELETE FROM installment_payments WHERE plan_id IN (SELECT id FROM installment_plans WHERE shop_id=?)", (branch_id,))
+            conn.execute("DELETE FROM installment_plans WHERE shop_id=?", (branch_id,))
+            conn.execute(f"DELETE FROM oil_changes WHERE car_id IN ({car_ids})", (branch_id,))
+            conn.execute("DELETE FROM cars WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM clients WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM stock_restocks WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM products WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM expense_entries WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM recurring_expenses WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM broadcasts WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM shop_users WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM password_reset_codes WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM shops WHERE id=? AND role='branch'", (branch_id,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return True

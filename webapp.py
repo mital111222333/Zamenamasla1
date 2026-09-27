@@ -64,7 +64,7 @@ def _send_telegram_document(chat_id, file_path, filename, caption=""):
         return False, f"Не удалось отправить файл: {e}"
 
 
-def _create_and_send_backup(chat_id):
+def _create_and_send_backup(chat_id, caption_note=""):
     """Строит резервную копию базы (через безопасный backup API SQLite —
     не ломается, даже если в этот момент кто-то пишет в базу) и
     отправляет её файлом в Telegram. Общая логика для ночной автоматической
@@ -82,7 +82,7 @@ def _create_and_send_backup(chat_id):
         size_mb = os.path.getsize(backup_path) / 1024 / 1024
         ok, err = _send_telegram_document(
             chat_id, backup_path, f"oilbot_backup_{today_str}.db",
-            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ)",
+            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ){caption_note}",
         )
         return ok, err, size_mb
     finally:
@@ -6099,10 +6099,13 @@ async function loadBranches(shopId) {
           <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetPassword(${b.id}, ${escapeHtml(JSON.stringify(b.username))})">сбросить</button>
         </span>
       </div>
+      <div id="branch-edit-${b.id}" style="display:none;"></div>
       <div style="display:flex; gap:6px; flex-wrap:wrap;">
         <button class="badge ${b.is_active ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle', ${b.is_active ? 0 : 1})">${b.is_active ? 'активен' : 'выключен'}</button>
         <button class="badge ${b.sms_enabled ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle_sms', ${b.sms_enabled ? 0 : 1})">SMS: ${b.sms_enabled ? 'включён' : 'выключен'}</button>
         <button class="badge ${b.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle_warehouse', ${b.warehouse_enabled ? 0 : 1})">Склад: ${b.warehouse_enabled ? 'включён' : 'выключен'}</button>
+        <button class="badge" style="background:#EFF6FF; color:#0F52BA;" onclick='openBranchEdit(${shopId}, ${escapeHtml(JSON.stringify(b))})'>✏️ изменить</button>
+        <button class="badge" style="background:#FEF2F2; color:#B3241C;" onclick="deleteBranch(${shopId}, ${b.id})">🗑 удалить</button>
       </div>
     </div>
   `).join('') : `<div class="hint-text">У этой точки пока нет филиалов.</div>`;
@@ -6145,6 +6148,91 @@ async function loadBranches(shopId) {
       <button class="badge active" style="padding:6px 14px; margin-top:6px;" onclick="createBranch(${shopId})">+ добавить филиал</button>
     </div>
   `;
+}
+
+function openBranchEdit(shopId, b) {
+  const box = document.getElementById(`branch-edit-${b.id}`);
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const v = x => escapeHtml(x == null ? '' : String(x));
+  const loc = (b.lat != null && b.lon != null) ? `${b.lat}, ${b.lon}` : '';
+  box.innerHTML = `
+    <div style="background:#F8FAFC; border:1px solid var(--border); border-radius:12px; padding:12px; margin:8px 0;">
+      <div class="row2">
+        <div class="field"><label>Название филиала</label><input id="be-name-${b.id}" value="${v(b.shop_name)}"></div>
+        <div class="field"><label>Логин</label><input id="be-user-${b.id}" value="${v(b.username)}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Телефон</label><input id="be-phone-${b.id}" value="${v(b.phone)}" placeholder="+998901112233"></div>
+        <div class="field"><label>Telegram ID для уведомлений</label><input id="be-notify-${b.id}" value="${v(b.notify_telegram_id)}"></div>
+      </div>
+      <div class="field"><label>Адрес</label><input id="be-address-${b.id}" value="${v(b.address)}"></div>
+      <div class="row2">
+        <div class="field"><label>Часы работы</label><input id="be-hours-${b.id}" value="${v(b.hours)}" placeholder="09:00–19:00"></div>
+        <div class="field"><label>Локация (широта, долгота)</label><input id="be-loc-${b.id}" value="${v(loc)}" placeholder="40.782123, 72.344567"></div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="badge active" style="padding:6px 14px;" onclick="saveBranchEdit(${shopId}, ${b.id})">💾 сохранить</button>
+        <button class="badge" style="padding:6px 14px; background:var(--border); color:var(--hint);" onclick="document.getElementById('branch-edit-${b.id}').style.display='none'">отмена</button>
+      </div>
+      <div class="hint-text" style="margin-top:6px;">Пароль меняется кнопкой «сбросить».</div>
+    </div>`;
+  box.style.display = 'block';
+}
+
+async function saveBranchEdit(shopId, branchId) {
+  const g = id => document.getElementById(`${id}-${branchId}`).value.trim();
+  const payload = {
+    shop_name: g('be-name'), username: g('be-user'), phone: g('be-phone'),
+    notify_telegram_id: g('be-notify'), address: g('be-address'), hours: g('be-hours'),
+  };
+  if (!payload.shop_name || !payload.username) { showMsg('Укажите название и логин.', false); return; }
+  const loc = g('be-loc');
+  if (loc) {
+    const parts = loc.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
+      showMsg('Локация должна быть в формате: широта, долгота (два числа через запятую).', false);
+      return;
+    }
+    payload.lat = parts[0]; payload.lon = parts[1];
+  } else {
+    payload.lat = ''; payload.lon = '';
+  }
+  const res = await fetch(`/api/admin/branches/${branchId}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg('✅ Филиал сохранён', true);
+    loadBranches(shopId);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
+}
+
+async function deleteBranch(shopId, branchId) {
+  const pre = await (await fetch(`/api/admin/branches/${branchId}/delete_preview`)).json();
+  if (!pre.ok) { showMsg('Ошибка: ' + pre.error, false); return; }
+  const c = pre.counts;
+  const warn = `Удалить филиал «${pre.name}» НАВСЕГДА?\n\n` +
+    `Вместе с ним удалятся: клиентов — ${c.clients}, машин — ${c.cars}, записей о заменах — ${c.services}, ` +
+    `товаров склада — ${c.products}, долгов — ${c.debts}, сотрудников — ${c.employees}.\n\n` +
+    `Перед удалением вся база автоматически отправится резервной копией в Telegram.\n` +
+    `Если нужно просто закрыть доступ и сохранить историю — нажмите «Отмена» и используйте кнопку «активен/выключен».`;
+  if (!confirm(warn)) return;
+  const typed = prompt(`Для подтверждения впишите название филиала точно так:\n${pre.name}`);
+  if (typed === null) return;
+  if (typed.trim() !== pre.name) { showMsg('Название не совпало — филиал не удалён.', false); return; }
+  showMsg('⏳ Отправляю резервную копию и удаляю филиал…', true);
+  const res = await fetch(`/api/admin/branches/${branchId}`, {
+    method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ confirm_name: typed.trim() })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showMsgSticky(`🗑 Филиал «${escapeHtml(pre.name)}» удалён. Резервная копия базы до удаления — в Telegram.`);
+    loadBranches(shopId);
+  } else {
+    showMsg('Ошибка: ' + data.error, false);
+  }
 }
 
 async function createBranch(shopId) {
@@ -6613,6 +6701,74 @@ def api_admin_create_branch(shop_id):
     )
     db.set_shop_warehouse_enabled(branch["id"], True)  # филиалу склад нужен сразу, это весь смысл филиала
     return jsonify({"ok": True, "id": branch["id"], "username": username, "password": password})
+
+
+def _admin_branch_or_404(branch_id):
+    shop = db.get_shop(branch_id)
+    if not shop or shop.get("role") != "branch":
+        return None
+    return shop
+
+
+@app.route("/api/admin/branches/<int:branch_id>", methods=["POST"])
+@admin_required
+def api_admin_update_branch(branch_id):
+    """Изменить филиал: название, логин, телефон, адрес, часы, локация, Telegram."""
+    branch = _admin_branch_or_404(branch_id)
+    if not branch:
+        return jsonify({"ok": False, "error": "филиал не найден"}), 404
+    data = request.get_json(force=True)
+    shop_name = (data.get("shop_name") or "").strip()
+    username = (data.get("username") or "").strip()
+    if not shop_name or not username:
+        return jsonify({"ok": False, "error": "укажите название и логин"}), 400
+    if username != branch["username"] and db.username_taken(username):
+        return jsonify({"ok": False, "error": "такой логин уже занят"}), 400
+    try:
+        lat = float(data["lat"]) if data.get("lat") not in (None, "") else None
+        lon = float(data["lon"]) if data.get("lon") not in (None, "") else None
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "неверная локация"}), 400
+    db.update_branch_details(
+        branch_id, shop_name, username,
+        phone=(data.get("phone") or "").strip() or None,
+        address=(data.get("address") or "").strip() or None,
+        hours=(data.get("hours") or "").strip() or None,
+        lat=lat, lon=lon,
+        notify_telegram_id=(data.get("notify_telegram_id") or "").strip() or None,
+    )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/branches/<int:branch_id>/delete_preview")
+@admin_required
+def api_admin_branch_delete_preview(branch_id):
+    branch = _admin_branch_or_404(branch_id)
+    if not branch:
+        return jsonify({"ok": False, "error": "филиал не найден"}), 404
+    return jsonify({"ok": True, "name": branch.get("shop_name") or branch["username"],
+                    "counts": db.branch_data_counts(branch_id)})
+
+
+@app.route("/api/admin/branches/<int:branch_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_branch(branch_id):
+    """Удаление филиала со всеми данными. Сначала — обязательная резервная
+    копия всей базы в Telegram; если она не ушла, филиал НЕ удаляется."""
+    branch = _admin_branch_or_404(branch_id)
+    if not branch:
+        return jsonify({"ok": False, "error": "филиал не найден"}), 404
+    data = request.get_json(force=True) or {}
+    name = branch.get("shop_name") or branch["username"]
+    if (data.get("confirm_name") or "").strip() != name:
+        return jsonify({"ok": False, "error": "название для подтверждения не совпадает"}), 400
+    if not ADMIN_TELEGRAM_ID:
+        return jsonify({"ok": False, "error": "ADMIN_TELEGRAM_ID не задан — без резервной копии удалять нельзя"}), 400
+    ok, err, _ = _create_and_send_backup(ADMIN_TELEGRAM_ID, caption_note=f"\n⚠️ Перед удалением филиала «{name}»")
+    if not ok:
+        return jsonify({"ok": False, "error": f"резервная копия не отправилась ({err}) — филиал не удалён"}), 500
+    db.delete_branch_with_data(branch_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/employees/<int:employee_id>/reset_password", methods=["POST"])
