@@ -1112,6 +1112,8 @@ if ('serviceWorker' in navigator) {
   .pl-row input[type=checkbox] { width:18px; height:18px; margin:0; }
   .whn-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:6px; }
   .whn-shop { background:#F8FAFC; border-radius:12px; padding:9px 11px; font-size:12px; color:#64748B; }
+  .whn-shop { cursor:pointer; border:1px solid transparent; }
+  .whn-shop.active { border-color:var(--blue); background:#EFF6FF; }
   .whn-shop b { display:block; color:var(--text); font-size:13px; }
   .whn-shop .v { color:#9A3412; font-weight:700; font-size:14px; }
   .wh-mx { border-collapse:collapse; font-size:12.5px; width:100%; }
@@ -1702,12 +1704,28 @@ if ('serviceWorker' in navigator) {
         <div id="whNetMatrix">{{ T.stats_loading }}</div>
       </div>
 
-      <div class="card" style="margin-top:14px;">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.branch_prices_title }}</label>
-        <select id="branchPriceSelect" onchange="loadBranchProducts(this.value)">
-          <option value="">{{ T.branch_prices_pick }}</option>
-        </select>
-        <div id="branchProductsPanel" style="margin-top:10px;"></div>
+      <div class="net-detail-head">
+        <div class="net-detail-title">{{ T.whb_detail_title }}</div>
+        <div class="brand-chips" id="whbChips"></div>
+      </div>
+      <div id="whbDetail" style="display:none;">
+        <div class="card">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_title }} — <span id="whbTitle"></span></label>
+          <div class="wh-kpis" id="whbKpis"></div>
+          <div id="whbAttention"></div>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <div class="wh-toolbar">
+            <div class="wh-search"><i class="fa-solid fa-magnifying-glass"></i><input id="whbSearch" placeholder="{{ T.whs_search }}" oninput="renderProductCards('br')" autocomplete="off"></div>
+          </div>
+          <div class="brand-chips" id="whbCatChips"></div>
+          <div id="whbCards"></div>
+          <button class="wh-tbtn wh-tbtn-wide" id="whbPurchaseBtn" onclick="openPurchaseList('br')"><i class="fa-solid fa-clipboard-list"></i> <span>{{ T.whs_purchase_list }}</span></button>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_movements }}</label>
+          <div id="whbHistory"></div>
+        </div>
       </div>
 
     </div>
@@ -2070,20 +2088,30 @@ function onWhCategoryChanged() {
   if (unitRow) unitRow.style.display = sel.value === 'other' ? 'block' : 'none';
 }
 
+// ---- Склад: одна логика отрисовки для своего склада (ctx 'own', элементы wh*)
+// и для склада выбранного филиала у главного (ctx 'br', элементы whb*).
+const WH = { hasBranches: false, net: null, branchId: null, branches: [] };
+const WHCTX = {
+  own: { p: 'wh', products: [], summary: null, cat: 'all', showCost: !IS_BRANCH, shopId: null, name: '' },
+  br:  { p: 'whb', products: [], summary: null, cat: 'all', showCost: true, shopId: null, name: '' },
+};
+
 async function loadWarehouse() {
   renderWarehouseCategoryOptions();
   let data = null;
   try { data = await (await fetch('/api/warehouse/overview')).json(); } catch (e) {}
   if (data && data.ok) {
     productsCache = data.products;
-    WH.summary = data.summary;
+    WHCTX.own.summary = data.summary;
   } else {
     productsCache = await (await fetch('/api/products')).json();
-    WH.summary = null;
+    WHCTX.own.summary = null;
   }
-  renderWarehouseSummary();
-  renderWhCategoryChips();
-  renderProductCards();
+  WHCTX.own.products = productsCache;
+  WHCTX.own.name = ((document.querySelector('.side-shop') || {}).textContent || '').trim();
+  renderWarehouseSummary('own');
+  renderWhCategoryChips('own');
+  renderProductCards('own');
   loadRestockHistory();
   // склад мог поменяться — обновляем списки «марка» в формах замены
   renderItemLists();
@@ -2094,13 +2122,11 @@ async function loadWarehouse() {
       const branches = await (await fetch('/api/my_branches')).json();
       const branchBtn = document.getElementById('subwh-branches');
       WH.hasBranches = branches.length > 0;
+      WH.branches = branches;
       if (branches.length) {
         branchBtn.style.display = '';
-        document.getElementById('branchPriceSelect').innerHTML =
-          `<option value="">${T.branch_prices_pick}</option>` +
-          branches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
         document.getElementById('branchWarehouseSummary').innerHTML = branches.map(b => `
-          <div class="whn-shop">
+          <div class="whn-shop ${WH.branchId === b.id ? 'active' : ''}" onclick="selectWhBranch(${b.id})">
             <b>${escapeHtml(b.shop_name || b.username)}</b>
             <div class="v">${fmtShort(b.stock_value)} ${T.currency}</div>
             ${T.branch_products_count} ${b.product_count}${b.missing_price_count > 0 ? ` · <span style="color:#B3241C;">⚠️ ${T.branch_missing_price} ${b.missing_price_count}</span>` : ''}
@@ -2108,24 +2134,24 @@ async function loadWarehouse() {
       } else {
         branchBtn.style.display = 'none';
       }
-      renderProductCards();
+      renderProductCards('own');
     } catch (e) { /* не главный аккаунт — подвкладку не показываем */ }
   }
 }
 
-const WH = { summary: null, cat: 'all', hasBranches: false, net: null };
-
 function whUnit(u) { return u === 'pc' ? T.unit_pc : T.unit_l; }
 function whQty(q) { return (Math.round((q || 0) * 100) / 100).toLocaleString('ru-RU'); }
+function whEl(key, suffix) { return document.getElementById(WHCTX[key].p + suffix); }
 
-function renderWarehouseSummary() {
-  const kpis = document.getElementById('whKpis');
+function renderWarehouseSummary(key) {
+  const ctx = WHCTX[key];
+  const kpis = whEl(key, 'Kpis');
   if (!kpis) return;
-  const s = WH.summary;
+  const s = ctx.summary;
   if (!s) { kpis.innerHTML = ''; return; }
   const problems = (s.low_count || 0) + (s.out_count || 0);
   const boxes = [];
-  if (!IS_BRANCH) {
+  if (ctx.showCost) {
     boxes.push(`<div class="wh-kpi"><b>${fmtShort(s.stock_value)}</b><span>${T.whs_kpi_value}</span></div>`);
     boxes.push(`<div class="wh-kpi good"><b>+${fmtShort(s.potential_margin)}</b><span>${T.whs_kpi_margin}</span></div>`);
   } else {
@@ -2136,28 +2162,38 @@ function renderWarehouseSummary() {
   boxes.push(`<div class="wh-kpi ${s.dead_count ? 'muted' : ''}"><b>${s.dead_count}</b><span>${T.whs_kpi_dead}</span></div>`);
   kpis.innerHTML = boxes.join('');
 
-  const att = document.getElementById('whAttention');
-  const urgent = productsCache.filter(p => p.status === 'out' || p.status === 'low')
+  const att = whEl(key, 'Attention');
+  const list = ctx.products;
+  const urgent = list.filter(p => p.status === 'out' || p.status === 'low')
     .sort((a, b) => (a.stock_qty || 0) - (b.stock_qty || 0)).slice(0, 6);
-  const dead = productsCache.filter(p => p.dead)
+  const dead = list.filter(p => p.dead)
     .sort((a, b) => (b.stock_qty * (b.purchase_price || 0)) - (a.stock_qty * (a.purchase_price || 0))).slice(0, 4);
+  const noPrice = ctx.showCost && key === 'br' ? list.filter(p => p.purchase_price == null) : [];
   let html = '';
   if (urgent.length) {
     html += `<div class="wh-att-title">${T.whs_att_urgent}</div>` + urgent.map(p => `
       <div class="wh-att">
         <i class="fa-solid fa-triangle-exclamation" style="color:${p.status === 'out' ? '#DC2626' : '#D97706'};"></i>
         <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${whStatusText(p)}</span></div>
-        <button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))})">+ ${T.wh_restock_action}</button>
+        <button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${escapeHtml(JSON.stringify(p.name))}, ${ctx.shopId || 'null'})">+ ${T.wh_restock_action}</button>
+      </div>`).join('');
+  }
+  if (noPrice.length) {
+    html += `<div class="wh-att-title">${T.whb_att_no_price}</div>` + noPrice.slice(0, 6).map(p => `
+      <div class="wh-att">
+        <i class="fa-solid fa-tag" style="color:#B3241C;"></i>
+        <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${T.whb_no_price_hint}</span></div>
+        <button class="wh-tbtn wh-tbtn-sm" onclick="editBranchPrice(${p.id}, ${escapeHtml(JSON.stringify(p.name))}, null)">${T.whb_set_price}</button>
       </div>`).join('');
   }
   if (dead.length) {
     html += `<div class="wh-att-title">${T.whs_att_dead}</div>` + dead.map(p => `
       <div class="wh-att">
         <i class="fa-solid fa-hourglass-half" style="color:#94A3B8;"></i>
-        <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${whQty(p.stock_qty)} ${whUnit(p.unit)}${!IS_BRANCH && p.purchase_price ? ` · ${T.whs_frozen} ${fmtShort(p.stock_qty * p.purchase_price)} ${T.currency}` : ''}</span></div>
+        <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${whQty(p.stock_qty)} ${whUnit(p.unit)}${ctx.showCost && p.purchase_price ? ` · ${T.whs_frozen} ${fmtShort(p.stock_qty * p.purchase_price)} ${T.currency}` : ''}</span></div>
       </div>`).join('');
   }
-  if (!html && productsCache.length) html = `<div class="wh-att-title" style="color:#15803D;"><i class="fa-solid fa-circle-check"></i> ${T.whs_att_ok}</div>`;
+  if (!html && list.length) html = `<div class="wh-att-title" style="color:#15803D;"><i class="fa-solid fa-circle-check"></i> ${T.whs_att_ok}</div>`;
   att.innerHTML = html;
 }
 
@@ -2175,59 +2211,70 @@ function whStatusText(p) {
   return T.whs_no_sales_yet;
 }
 
-function renderWhCategoryChips() {
-  const el = document.getElementById('whCatChips');
+function renderWhCategoryChips(key) {
+  const ctx = WHCTX[key];
+  const el = whEl(key, 'CatChips');
   if (!el) return;
   const counts = {};
-  productsCache.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+  ctx.products.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
   const order = FLUID_KEYS.concat(FILTER_KEYS, ['other']).filter(k => counts[k]);
-  if (WH.cat !== 'all' && !counts[WH.cat]) WH.cat = 'all';
-  el.innerHTML = [`<div class="brand-chip ${WH.cat === 'all' ? 'active' : ''}" onclick="setWhCat('all')">${T.whs_all}<span class="bc-sub">${productsCache.length}</span></div>`]
-    .concat(order.map(k => `<div class="brand-chip ${WH.cat === k ? 'active' : ''}" onclick="setWhCat('${k}')">${escapeHtml(k === 'other' ? T.wh_category_other : (T[k] || k))}<span class="bc-sub">${counts[k]}</span></div>`))
+  if (ctx.cat !== 'all' && !counts[ctx.cat]) ctx.cat = 'all';
+  el.innerHTML = [`<div class="brand-chip ${ctx.cat === 'all' ? 'active' : ''}" onclick="setWhCat('${key}', 'all')">${T.whs_all}<span class="bc-sub">${ctx.products.length}</span></div>`]
+    .concat(order.map(k => `<div class="brand-chip ${ctx.cat === k ? 'active' : ''}" onclick="setWhCat('${key}', '${k}')">${escapeHtml(k === 'other' ? T.wh_category_other : (T[k] || k))}<span class="bc-sub">${counts[k]}</span></div>`))
     .join('');
 }
 
-function setWhCat(k) {
-  WH.cat = k;
-  renderWhCategoryChips();
-  renderProductCards();
+function setWhCat(key, k) {
+  WHCTX[key].cat = k;
+  renderWhCategoryChips(key);
+  renderProductCards(key);
 }
 
-function renderProductCards() {
-  const box = document.getElementById('whCards');
+function renderProductCards(key) {
+  key = key || 'own';
+  const ctx = WHCTX[key];
+  const box = whEl(key, 'Cards');
   if (!box) return;
-  const q = ((document.getElementById('whSearch') || {}).value || '').trim().toLowerCase();
+  const q = ((whEl(key, 'Search') || {}).value || '').trim().toLowerCase();
   const rank = { out: 0, low: 1, ok: 2 };
-  const list = productsCache
-    .filter(p => WH.cat === 'all' || p.category === WH.cat)
+  const all = ctx.products;
+  const list = all
+    .filter(p => ctx.cat === 'all' || p.category === ctx.cat)
     .filter(p => !q || p.name.toLowerCase().includes(q))
     .sort((a, b) => (rank[a.status] ?? 2) - (rank[b.status] ?? 2) || a.name.localeCompare(b.name));
-  const maxStock = Math.max(1, ...productsCache.map(p => p.stock_qty || 0));
+  const maxStock = Math.max(1, ...all.map(p => p.stock_qty || 0));
 
-  const btn = document.getElementById('whPurchaseBtn');
+  const btn = whEl(key, 'PurchaseBtn');
   if (btn) {
-    const n = productsCache.filter(p => p.reorder_qty > 0 || p.status === 'out').length;
+    const n = all.filter(p => p.reorder_qty > 0 || p.status === 'out').length;
     btn.querySelector('span').textContent = `${T.whs_purchase_list}${n ? ` (${n})` : ''}`;
   }
 
-  if (!productsCache.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.wh_no_products}</div>`; return; }
+  if (!all.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.wh_no_products}</div>`; return; }
   if (!list.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.whs_nothing_found}</div>`; return; }
 
+  const canTransfer = !IS_BRANCH && WH.hasBranches;
   box.innerHTML = list.map(p => {
     const st = p.status || 'ok';
-    let width, color;
-    if (p.days_left !== null && p.days_left !== undefined) {
-      width = Math.min(100, Math.max(3, p.days_left / 60 * 100));
-    } else {
-      width = Math.min(100, Math.max(3, (p.stock_qty || 0) / maxStock * 100));
-    }
-    color = st === 'out' ? '#DC2626' : st === 'low' ? '#F59E0B' : (p.dead ? '#CBD5E1' : '#22C55E');
+    const width = (p.days_left !== null && p.days_left !== undefined)
+      ? Math.min(100, Math.max(3, p.days_left / 60 * 100))
+      : Math.min(100, Math.max(3, (p.stock_qty || 0) / maxStock * 100));
+    const color = st === 'out' ? '#DC2626' : st === 'low' ? '#F59E0B' : (p.dead ? '#CBD5E1' : '#22C55E');
+    const missingPrice = key === 'br' && p.purchase_price == null;
     const price = [
       p.sell_price ? `${fmtNum(p.sell_price)} ${T.currency}` : '',
-      !IS_BRANCH && p.purchase_price ? `${T.whs_buy} ${fmtNum(p.purchase_price)}` : '',
-      !IS_BRANCH && p.margin_pct !== null && p.margin_pct !== undefined ? `<span class="mg">+${p.margin_pct}%</span>` : '',
+      ctx.showCost && p.purchase_price ? `${T.whs_buy} ${fmtNum(p.purchase_price)}` : '',
+      ctx.showCost && p.margin_pct !== null && p.margin_pct !== undefined ? `<span class="mg">+${p.margin_pct}%</span>` : '',
+      missingPrice ? `<span style="color:#B3241C; font-weight:700;">⚠️ ${T.branch_missing_price.replace(':', '')}</span>` : '',
     ].filter(Boolean).join(' · ');
     const name = escapeHtml(JSON.stringify(p.name));
+    const shopArg = ctx.shopId || 'null';
+    const actions = [
+      `<button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${name}, ${shopArg})">+ ${T.wh_restock_action}</button>`,
+      key === 'br' ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.whb_set_price}" onclick="editBranchPrice(${p.id}, ${name}, ${p.purchase_price ?? 'null'})"><i class="fa-solid fa-tag"></i></button>` : '',
+      canTransfer ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.whn_transfer}" onclick="openTransferModal({fromShop: ${shopArg}, productId: ${p.id}})"><i class="fa-solid fa-right-left"></i></button>` : '',
+      key === 'own' ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.wh_delete_action}" onclick="deleteProduct(${p.id}, ${name})"><i class="fa-solid fa-trash-can"></i></button>` : '',
+    ].join('');
     return `
       <div class="whc st-${st}">
         <div class="whc-top">
@@ -2238,11 +2285,7 @@ function renderProductCards() {
         <div class="whc-info">${whStatusText(p)}</div>
         <div class="whc-bottom">
           <span class="whc-price">${price || '—'}</span>
-          <div class="whc-actions">
-            <button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${name})">+ ${T.wh_restock_action}</button>
-            ${!IS_BRANCH && WH.hasBranches ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.whn_transfer}" onclick="openTransferModal({fromOwnProduct: ${p.id}})"><i class="fa-solid fa-right-left"></i></button>` : ''}
-            <button class="wh-tbtn wh-tbtn-icon" title="${T.wh_delete_action}" onclick="deleteProduct(${p.id}, ${name})"><i class="fa-solid fa-trash-can"></i></button>
-          </div>
+          <div class="whc-actions">${actions}</div>
         </div>
       </div>`;
   }).join('');
@@ -2250,7 +2293,7 @@ function renderProductCards() {
 
 function openAddProductModal() {
   renderWarehouseCategoryOptions();
-  if (WH.cat !== 'all') document.getElementById('wh_new_category').value = WH.cat;
+  if (WHCTX.own.cat !== 'all') document.getElementById('wh_new_category').value = WHCTX.own.cat;
   onWhCategoryChanged();
   document.getElementById('addProductModal').classList.add('open');
 }
@@ -2260,12 +2303,13 @@ function closeWhModal(id) {
 }
 
 // ---- список закупки ----
-function openPurchaseList() {
-  const items = productsCache
+function openPurchaseList(key) {
+  key = key || 'own';
+  const ctx = WHCTX[key];
+  const items = ctx.products
     .filter(p => p.reorder_qty > 0 || p.status === 'out')
     .sort((a, b) => (a.days_left ?? -1) - (b.days_left ?? -1));
-  const body = document.getElementById('purchaseListBody');
-  body.innerHTML = items.length ? items.map(p => `
+  document.getElementById('purchaseListBody').innerHTML = items.length ? items.map(p => `
     <div class="pl-row">
       <input type="checkbox" id="pl_on_${p.id}" checked>
       <div class="pl-name"><b>${escapeHtml(p.name)}</b><span>${T.whs_now} ${whQty(p.stock_qty)} ${whUnit(p.unit)}${p.per_day ? ` · ~${whQty(p.per_day)}${T.whs_per_day}` : ''}</span></div>
@@ -2273,11 +2317,11 @@ function openPurchaseList() {
       <span style="font-size:12px; color:#64748B;">${whUnit(p.unit)}</span>
     </div>`).join('') : `<div class="hint-text" style="padding:10px 0;">${T.whs_purchase_empty}</div>`;
   WH.purchaseItems = items;
+  WH.purchaseShopName = ctx.name;
   document.getElementById('purchaseListModal').classList.add('open');
 }
 
 function buildPurchaseText() {
-  const shop = (document.querySelector('.side-shop') || {}).textContent || '';
   const lines = [];
   (WH.purchaseItems || []).forEach(p => {
     const on = document.getElementById('pl_on_' + p.id);
@@ -2285,7 +2329,7 @@ function buildPurchaseText() {
     if (on && on.checked && qty > 0) lines.push(`${lines.length + 1}. ${p.name} — ${whQty(qty)} ${whUnit(p.unit)}`);
   });
   if (!lines.length) return '';
-  return `${T.whs_order_title} — ${shop.trim()} (${fmtDate(new Date())})\\n` + lines.join('\\n');
+  return `${T.whs_order_title} — ${(WH.purchaseShopName || '').trim()} (${fmtDate(new Date())})\\n` + lines.join('\\n');
 }
 
 async function sendPurchaseList(mode) {
@@ -2301,6 +2345,49 @@ async function sendPurchaseList(mode) {
   } catch (e) {
     prompt(T.whs_copy, text);
   }
+}
+
+// ---- склад выбранного филиала (главный) ----
+async function selectWhBranch(branchId) {
+  WH.branchId = branchId;
+  document.querySelectorAll('#branchWarehouseSummary .whn-shop').forEach((el, i) => {
+    el.classList.toggle('active', WH.branches[i] && WH.branches[i].id === branchId);
+  });
+  document.querySelectorAll('#whbChips .brand-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === String(branchId));
+  });
+  const wrap = document.getElementById('whbDetail');
+  wrap.style.display = 'block';
+  let data;
+  try { data = await (await fetch(`/api/branches/${branchId}/warehouse`)).json(); } catch (e) { return; }
+  if (!data.ok) { showMsg(T.msg_error + ' ' + data.error, false); return; }
+  const ctx = WHCTX.br;
+  ctx.shopId = branchId;
+  ctx.products = data.products;
+  ctx.summary = data.summary;
+  ctx.name = data.name;
+  document.getElementById('whbTitle').textContent = data.name;
+  renderWarehouseSummary('br');
+  renderWhCategoryChips('br');
+  renderProductCards('br');
+  renderMovements(document.getElementById('whbHistory'), data.movements, true);
+}
+
+function renderWhBranchChips() {
+  const el = document.getElementById('whbChips');
+  if (!el) return;
+  el.innerHTML = WH.branches.map(b => `<div class="brand-chip ${WH.branchId === b.id ? 'active' : ''}" data-id="${b.id}" onclick="selectWhBranch(${b.id})">${escapeHtml(b.shop_name || b.username)}</div>`).join('');
+}
+
+async function editBranchPrice(productId, name, current) {
+  const val = prompt(`${T.whb_set_price}: ${name}`, current ?? '');
+  if (val === null) return;
+  const res = await fetch(`/api/branches/${WHCTX.br.shopId}/products/${productId}/purchase_price`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ purchase_price: val.trim() })
+  });
+  const data = await res.json();
+  if (data.ok) { showMsg(T.whb_price_saved, true); selectWhBranch(WHCTX.br.shopId); loadWarehouse(); }
+  else showMsg(T.msg_error + ' ' + data.error, false);
 }
 
 // ---- склады сети (главный) ----
@@ -2347,8 +2434,9 @@ async function openTransferModal(opts) {
   const head = shops.find(s => s.is_head) || shops[0];
   let fromId = head.id, productKey = null, toId = null;
 
-  if (opts.fromOwnProduct) {
-    const row = WH.net.rows.find(r => r.cells[String(head.id)] && r.cells[String(head.id)].product_id === opts.fromOwnProduct);
+  if (opts.productId) {
+    fromId = opts.fromShop || head.id;
+    const row = WH.net.rows.find(r => r.cells[String(fromId)] && r.cells[String(fromId)].product_id === opts.productId);
     if (row) productKey = WH.net.rows.indexOf(row);
   }
   if (opts.row !== undefined) {
@@ -2407,6 +2495,7 @@ async function submitTransfer() {
     WH.net = null;
     loadNetworkStock();
     loadWarehouse();
+    if (WH.branchId) selectWhBranch(WH.branchId);
   } else {
     const msg = data.error === 'not_enough' ? `${T.whn_err_not_enough} ${whQty(data.available)}` : (T['whn_err_' + data.error] || data.error);
     showMsg(msg, false);
@@ -2418,7 +2507,13 @@ function showWhSubTab(t) {
   document.getElementById('whBranchesView').style.display = t === 'branches' ? 'block' : 'none';
   document.getElementById('subwh-own').classList.toggle('active', t === 'own');
   document.getElementById('subwh-branches').classList.toggle('active', t === 'branches');
-  if (t === 'branches') { WH.net = null; loadNetworkStock(); }
+  if (t === 'branches') {
+    WH.net = null;
+    loadNetworkStock();
+    renderWhBranchChips();
+    if (!WH.branchId && WH.branches.length) selectWhBranch(WH.branches[0].id);
+    else if (WH.branchId) selectWhBranch(WH.branchId);
+  }
 }
 
 function onUsdFieldEdited(usdFieldId, sumFieldId) {
@@ -2501,8 +2596,11 @@ async function deleteProduct(id, name) {
   }
 }
 
-function openRestockModal(id, name) {
+let restockingShopId = null;  // null — свой склад; id филиала — пополнение склада филиала главным
+
+function openRestockModal(id, name, shopId) {
   restockingProductId = id;
+  restockingShopId = shopId || null;
   document.getElementById('restockModalTitle').textContent = T.wh_restock_title + ': ' + name;
   document.getElementById('restock_qty').value = '';
   document.getElementById('restock_price').value = '';
@@ -2522,13 +2620,17 @@ async function submitRestock() {
     purchase_price: document.getElementById('restock_price').value || null,
     restock_date: document.getElementById('restock_date').value || null,
   };
-  const res = await fetch(`/api/products/${restockingProductId}/restock`, {
+  const url = restockingShopId
+    ? `/api/branches/${restockingShopId}/products/${restockingProductId}/restock`
+    : `/api/products/${restockingProductId}/restock`;
+  const res = await fetch(url, {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
   });
   const data = await res.json();
   if (data.ok) {
     closeRestockModal();
     showMsg(T.wh_restocked, true);
+    if (restockingShopId) { selectWhBranch(restockingShopId); WH.net = null; loadNetworkStock(); }
     loadWarehouse();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -2540,7 +2642,12 @@ async function loadRestockHistory() {
   if (!el) return;
   let moves = [];
   try { moves = await (await fetch('/api/warehouse/movements')).json(); } catch (e) {}
-  if (!moves.length) { el.innerHTML = `<div class="hint-text">${T.wh_no_restocks}</div>`; return; }
+  renderMovements(el, moves, !IS_BRANCH);
+}
+
+function renderMovements(el, moves, showPrice) {
+  if (!el) return;
+  if (!moves || !moves.length) { el.innerHTML = `<div class="hint-text">${T.wh_no_restocks}</div>`; return; }
   const icon = { restock: ['fa-arrow-down', '#15803D'], transfer_in: ['fa-right-to-bracket', '#0F52BA'], transfer_out: ['fa-right-from-bracket', '#B45309'] };
   el.innerHTML = moves.slice(0, 30).map(m => {
     const [ic, col] = icon[m.type] || icon.restock;
@@ -2549,7 +2656,7 @@ async function loadRestockHistory() {
     return `
     <div class="wh-att">
       <i class="fa-solid ${ic}" style="color:${col};"></i>
-      <div class="wa-main"><b>${escapeHtml(m.product_name)}</b><span>${m.date} · ${what}${m.purchase_price ? ` · ${fmtNum(m.purchase_price)} ${T.currency}/${T.whs_per_unit}` : ''}</span></div>
+      <div class="wa-main"><b>${escapeHtml(m.product_name)}</b><span>${m.date} · ${what}${showPrice && m.purchase_price ? ` · ${fmtNum(m.purchase_price)} ${T.currency}/${T.whs_per_unit}` : ''}</span></div>
       <b style="color:${col}; white-space:nowrap;">${sign}${whQty(m.quantity)} ${whUnit(m.unit)}</b>
     </div>`;
   }).join('');
@@ -5582,6 +5689,44 @@ def api_warehouse_movements():
         for m in moves:
             m.pop("purchase_price", None)
     return jsonify(moves)
+
+
+@app.route("/api/branches/<int:branch_id>/warehouse")
+@login_required
+@profit_blocked
+def api_branch_warehouse(branch_id):
+    """Главный смотрит склад своего филиала так же подробно, как свой:
+    сводка, прогноз, закупочные цены, движение товара."""
+    if not db.is_branch_of(branch_id, g.shop_id):
+        return jsonify({"ok": False, "error": "это не ваш филиал"}), 403
+    result = db.get_warehouse_overview(branch_id)
+    result["movements"] = db.get_stock_movements(branch_id)
+    branch = db.get_shop(branch_id)
+    result["name"] = branch.get("shop_name") or branch["username"]
+    result["ok"] = True
+    return jsonify(result)
+
+
+@app.route("/api/branches/<int:branch_id>/products/<int:product_id>/restock", methods=["POST"])
+@login_required
+@profit_blocked
+def api_branch_restock(branch_id, product_id):
+    """Главный пополняет товар на складе своего филиала (с ценой закупки)."""
+    if not db.is_branch_of(branch_id, g.shop_id):
+        return jsonify({"ok": False, "error": "это не ваш филиал"}), 403
+    data = request.get_json(force=True)
+    try:
+        quantity = float(data["quantity"])
+        if quantity <= 0:
+            raise ValueError
+        purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        restock_date = data.get("restock_date") or None
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "неверные данные"}), 400
+    ok = db.restock_product(product_id, branch_id, quantity, purchase_price, restock_date)
+    if not ok:
+        return jsonify({"ok": False, "error": "товар не найден"}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/api/warehouse/network")
