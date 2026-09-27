@@ -113,6 +113,13 @@ def telegram_share_url(link: str) -> str:
 
 # ============ КЛИЕНТ (автовладелец) ============
 
+async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает отправителю его собственный numeric Telegram ID — чтобы
+    можно было сверить с тем, что настроено в ADMIN_TELEGRAM_ID на сервере,
+    если, например, резервные копии или уведомления уходят не в тот чат."""
+    await update.message.reply_text(f"Ваш Telegram ID: {update.effective_user.id}")
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
@@ -724,6 +731,7 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("myid", myid))
     app.add_handler(add_conv)
     app.add_handler(find_conv)
     app.add_handler(broadcast_conv)

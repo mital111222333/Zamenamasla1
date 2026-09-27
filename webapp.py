@@ -2003,6 +2003,30 @@ async function loadDashboard() {
   }
 }
 
+function renderComparisonBadge(cmp) {
+  // cmp.pct === null значит в прошлом периоде не было данных для сравнения
+  // (например, точка только начала работать) - тогда просто не показываем
+  // бейдж, а не "0%" или ошибку
+  if (!cmp || cmp.pct === null || cmp.pct === undefined) return '';
+  const up = cmp.pct >= 0;
+  const color = up ? '#1B8A5A' : '#B3241C';
+  const arrow = up ? '↑' : '↓';
+  const sign = up ? '+' : '';
+  return `<div style="font-size:12px; font-weight:700; color:${color}; margin-top:2px;">${arrow} ${sign}${cmp.pct}% ${T.stats_vs_prev_period}</div>`;
+}
+
+function renderAvgCheck(obj, avgPct) {
+  // средний чек = выручка / платные визиты (визиты с ценой 0 не считаются);
+  // если платных визитов в периоде нет — строку не показываем
+  if (!obj || !obj.paid_count) return '';
+  let badge = '';
+  if (avgPct !== null && avgPct !== undefined) {
+    const up = avgPct >= 0;
+    badge = ` <span style="font-weight:700; color:${up ? '#1B8A5A' : '#B3241C'};">${up ? '↑ +' : '↓ '}${avgPct}%</span>`;
+  }
+  return `<div class="count">${T.stats_avg_check} ${obj.avg.toLocaleString('ru-RU')} ${T.currency}${badge}</div>`;
+}
+
 async function loadStats() {
   loadDashboard();
   const res = await fetch('/api/stats');
@@ -2021,7 +2045,9 @@ async function loadStats() {
     <div class="stats-card">
       <div class="label">${label}</div>
       <div class="amount">${s[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
+      ${renderComparisonBadge(s.comparison && s.comparison[key])}
       <div class="count">${T.stats_services_count} ${s[key].count}</div>
+      ${renderAvgCheck(s[key], s.comparison && s.comparison[key] ? s.comparison[key].avg_pct : null)}
       <div class="count">${T.payment_cash}: ${(s[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(s[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
@@ -2051,6 +2077,7 @@ async function loadStats() {
                   <div class="label">${label}</div>
                   <div class="amount" style="color:#9A3412;">${agg.revenue[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
                   <div class="count">${T.stats_services_count} ${agg.revenue[key].count}</div>
+                  ${renderAvgCheck(agg.revenue[key], null)}
                   <div class="count">${T.payment_cash}: ${(agg.revenue[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(agg.revenue[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
                   <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${agg.profit[key].toLocaleString('ru-RU')} ${T.currency}</div>
                 </div>
@@ -2173,6 +2200,7 @@ async function applyStatsRange() {
       <div class="label">${T.stats_range_result} ${from} — ${to}</div>
       <div class="amount">${data.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.count}</div>
+      ${renderAvgCheck(data, null)}
       <div class="count">${T.payment_cash}: ${(data.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       ${hasProfit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
@@ -2317,6 +2345,7 @@ async function applyBranchStatsRange() {
       <div class="label">${T.stats_range_result} ${from} — ${to}</div>
       <div class="amount" style="color:#9A3412;">${data.revenue.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.revenue.count}</div>
+      ${renderAvgCheck(data.revenue, null)}
       <div class="count">${T.payment_cash}: ${(data.revenue.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.revenue.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
     </div>
@@ -4188,7 +4217,9 @@ def api_broadcast_create():
 @login_required
 @employee_blocked
 def api_stats():
-    return jsonify(db.get_revenue_stats(g.shop_id))
+    result = db.get_revenue_stats(g.shop_id)
+    result["comparison"] = db.get_revenue_comparison(g.shop_id)
+    return jsonify(result)
 
 
 @app.route("/api/aggregated_stats")
