@@ -2027,6 +2027,13 @@ function renderAvgCheck(obj, avgPct) {
   return `<div class="count">${T.stats_avg_check} ${obj.avg.toLocaleString('ru-RU')} ${T.currency}${badge}</div>`;
 }
 
+function renderClientSplit(obj) {
+  // новые = первый визит в эту точку попал в период; повторные = уже бывали раньше
+  const c = obj && obj.clients;
+  if (!c || !c.total) return '';
+  return `<div class="count">${T.stats_clients_label} ${c.total} — <span style="color:#1D4ED8; font-weight:700;">${c.new} ${T.stats_clients_new}</span>, ${c.returning} ${T.stats_clients_returning}</div>`;
+}
+
 async function loadStats() {
   loadDashboard();
   const res = await fetch('/api/stats');
@@ -2048,6 +2055,7 @@ async function loadStats() {
       ${renderComparisonBadge(s.comparison && s.comparison[key])}
       <div class="count">${T.stats_services_count} ${s[key].count}</div>
       ${renderAvgCheck(s[key], s.comparison && s.comparison[key] ? s.comparison[key].avg_pct : null)}
+      ${renderClientSplit(s[key])}
       <div class="count">${T.payment_cash}: ${(s[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(s[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       ${profit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${profit[key].toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
@@ -2078,6 +2086,7 @@ async function loadStats() {
                   <div class="amount" style="color:#9A3412;">${agg.revenue[key].total.toLocaleString('ru-RU')} ${T.currency}</div>
                   <div class="count">${T.stats_services_count} ${agg.revenue[key].count}</div>
                   ${renderAvgCheck(agg.revenue[key], null)}
+                  ${renderClientSplit(agg.revenue[key])}
                   <div class="count">${T.payment_cash}: ${(agg.revenue[key].cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(agg.revenue[key].card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
                   <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${agg.profit[key].toLocaleString('ru-RU')} ${T.currency}</div>
                 </div>
@@ -2201,6 +2210,7 @@ async function applyStatsRange() {
       <div class="amount">${data.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.count}</div>
       ${renderAvgCheck(data, null)}
+      ${renderClientSplit(data)}
       <div class="count">${T.payment_cash}: ${(data.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       ${hasProfit ? `<div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>` : ''}
     </div>
@@ -2346,6 +2356,7 @@ async function applyBranchStatsRange() {
       <div class="amount" style="color:#9A3412;">${data.revenue.total.toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count">${T.stats_services_count} ${data.revenue.count}</div>
       ${renderAvgCheck(data.revenue, null)}
+      ${renderClientSplit(data.revenue)}
       <div class="count">${T.payment_cash}: ${(data.revenue.cash || 0).toLocaleString('ru-RU')} ${T.currency} · ${T.payment_card}: ${(data.revenue.card || 0).toLocaleString('ru-RU')} ${T.currency}</div>
       <div class="count" style="color:#1B8A5A;">${T.stats_profit_label} ${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
     </div>

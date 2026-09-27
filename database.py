@@ -1989,6 +1989,36 @@ def _with_avg(d: dict) -> dict:
     return d
 
 
+def _client_split(conn, shop_id: int, date_from: str, date_to: str) -> dict:
+    """Сколько РАЗНЫХ клиентов приезжало за период и кто из них новый.
+    Новый = его самый первый визит в эту точку (по любой из его машин)
+    попадает внутрь периода. Повторный = он уже бывал здесь раньше.
+    Считаются все визиты, даже без цены: тут важен сам человек, а не деньги."""
+    row = conn.execute("""
+        SELECT COUNT(*) as total,
+               COALESCE(SUM(CASE WHEN first_ever >= ? THEN 1 ELSE 0 END), 0) as new_cnt
+        FROM (
+            SELECT c.client_id, MIN(oc.change_date) as first_ever
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id = ?
+            GROUP BY c.client_id
+            HAVING SUM(CASE WHEN oc.change_date >= ? AND oc.change_date <= ? THEN 1 ELSE 0 END) > 0
+        )
+    """, (date_from, shop_id, date_from, date_to)).fetchone()
+    total = row["total"] or 0
+    new = row["new_cnt"] or 0
+    return {"total": total, "new": new, "returning": total - new}
+
+
+def _sum_client_splits(parts) -> dict:
+    """Для сети филиалов: клиенты у каждой точки свои, поэтому просто складываем."""
+    out = {"total": 0, "new": 0, "returning": 0}
+    for p in parts:
+        for k in out:
+            out[k] += p[k]
+    return out
+
+
 def get_revenue_stats(shop_id: int) -> dict:
     """Выручка и число услуг за сегодня/вчера/эту неделю (с понедельника)/этот
     месяц/этот год — для точки. Считается по дате самой услуги (change_date),
@@ -2012,13 +2042,23 @@ def get_revenue_stats(shop_id: int) -> dict:
             return _with_avg({"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"],
                               "paid_count": row["paid_cnt"] or 0})
 
-        return {
+        result = {
             "today": agg("oc.change_date = ?", today),
             "yesterday": agg("oc.change_date = ?", yesterday),
             "week": agg("oc.change_date >= ?", week_start),
             "month": agg("oc.change_date >= ?", month_start),
             "year": agg("oc.change_date >= ?", year_start),
         }
+        far_future = "9999-12-31"
+        for key, (d_from, d_to) in {
+            "today": (today, today),
+            "yesterday": (yesterday, yesterday),
+            "week": (week_start, far_future),
+            "month": (month_start, far_future),
+            "year": (year_start, far_future),
+        }.items():
+            result[key]["clients"] = _client_split(conn, shop_id, d_from, d_to)
+        return result
 
 
 def get_revenue_comparison(shop_id: int) -> dict:
@@ -2101,8 +2141,10 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
             WHERE c.shop_id=? AND oc.cost IS NOT NULL
               AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchone()
-        return _with_avg({"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"],
-                          "paid_count": row["paid_cnt"] or 0})
+        result = _with_avg({"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"],
+                            "paid_count": row["paid_cnt"] or 0})
+        result["clients"] = _client_split(conn, shop_id, date_from, date_to)
+        return result
 
 
 def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
@@ -2204,11 +2246,15 @@ def get_aggregated_revenue_stats(parent_shop_id: int) -> dict:
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
     combined = {p: {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0}
                 for p in ("today", "yesterday", "week", "month", "year")}
+    client_parts = {p: [] for p in combined}
     for sid in shop_ids:
         stats = get_revenue_stats(sid)
         for period in combined:
             for k in ("total", "count", "cash", "card", "paid_count"):
                 combined[period][k] += stats[period][k]
+            client_parts[period].append(stats[period]["clients"])
+    for period in combined:
+        combined[period]["clients"] = _sum_client_splits(client_parts[period])
     # средний чек сети считаем из сумм, а не как среднее средних филиалов —
     # иначе маленький филиал весил бы столько же, сколько большой
     for period in combined:
@@ -2251,6 +2297,7 @@ def get_aggregated_revenue_range(parent_shop_id: int, date_from: str, date_to: s
     его филиалам вместе."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
     total, count, cash, card, paid = 0, 0, 0, 0, 0
+    client_parts = []
     for sid in shop_ids:
         r = get_revenue_range(sid, date_from, date_to)
         total += r["total"]
@@ -2258,7 +2305,10 @@ def get_aggregated_revenue_range(parent_shop_id: int, date_from: str, date_to: s
         cash += r["cash"]
         card += r["card"]
         paid += r["paid_count"]
-    return _with_avg({"total": total, "count": count, "cash": cash, "card": card, "paid_count": paid})
+        client_parts.append(r["clients"])
+    result = _with_avg({"total": total, "count": count, "cash": cash, "card": card, "paid_count": paid})
+    result["clients"] = _sum_client_splits(client_parts)
+    return result
 
 
 def get_aggregated_profit_range(parent_shop_id: int, date_from: str, date_to: str) -> int:
