@@ -2055,18 +2055,23 @@ def get_profit_stats(shop_id: int) -> dict:
 
 
 def create_branch_shop(parent_shop_id: int, username: str, password: str, shop_name: str = None,
-                        phone: str = None, address: str = None) -> dict:
+                        phone: str = None, address: str = None, hours: str = None,
+                        lat: float = None, lon: float = None, notify_telegram_id: str = None) -> dict:
     """Создаёт филиал — обычная точка (свой склад, своя база клиентов), но
     с role='branch' и привязкой к главному аккаунту (parent_shop_id).
     Права филиала (без прибыли, без цены закупки) применяются в webapp.py
-    по этому role, а не отдельным полем — так же, как role='admin'."""
+    по этому role, а не отдельным полем — так же, как role='admin'.
+    Принимает те же поля, что и обычная точка (телефон, адрес, часы работы,
+    локация, Telegram для уведомлений) — филиал настраивается так же
+    полноценно, как любая другая точка."""
     with get_conn() as conn:
         cur = conn.execute("""
-            INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
-                                anpr_token, is_active, parent_shop_id, owner_link_token)
-            VALUES (?, ?, NULL, 'branch', ?, ?, ?, ?, 1, ?, ?)
+            INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
+                                anpr_token, notify_telegram_id, is_active, parent_shop_id, owner_link_token)
+            VALUES (?, ?, NULL, 'branch', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         """, (username, generate_password_hash(password), shop_name,
-              phone, address, secrets.token_urlsafe(8), parent_shop_id, secrets.token_urlsafe(12)))
+              phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id,
+              parent_shop_id, secrets.token_urlsafe(12)))
         conn.commit()
         return get_shop(cur.lastrowid)
 

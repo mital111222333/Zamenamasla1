@@ -4697,6 +4697,10 @@ function showMsgSticky(text) {
     <span>${text}</span>
     <button type="button" onclick="this.closest('.msg').remove()" style="flex:none; background:none; border:none; color:inherit; font-size:18px; cursor:pointer; padding:0 4px;">×</button>
   </div>`;
+  // #msg находится в самом верху страницы — если действие вызвано далеко
+  // внизу (например, сброс пароля филиала в развёрнутой панели), человек
+  // иначе может не увидеть, что пароль вообще появился
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function escapeHtml(str) {
@@ -4904,10 +4908,40 @@ async function loadBranches(shopId) {
   panel.innerHTML = `
     <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Филиалы (полноценные точки — свой склад, своя база, без цены закупки и без прибыли по отдельности)</div>
     ${list}
-    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
-      <input id="new-branch-name-${shopId}" placeholder="название филиала" style="flex:1; min-width:140px;">
-      <input id="new-branch-username-${shopId}" placeholder="логин" style="flex:1; min-width:120px;">
-      <button class="badge active" style="padding:6px 14px;" onclick="createBranch(${shopId})">+ добавить филиал</button>
+    <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
+      <div class="field">
+        <label>Название филиала</label>
+        <input id="new-branch-name-${shopId}" placeholder="название филиала">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Логин</label>
+          <input id="new-branch-username-${shopId}" placeholder="логин">
+        </div>
+        <div class="field">
+          <label>Пароль (пусто = сгенерировать)</label>
+          <input id="new-branch-password-${shopId}" placeholder="необязательно">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Телефон филиала</label>
+          <input id="new-branch-phone-${shopId}" placeholder="+998901112233">
+        </div>
+        <div class="field">
+          <label>Telegram ID для уведомлений (необяз.)</label>
+          <input id="new-branch-notify-${shopId}" placeholder="123456789">
+        </div>
+      </div>
+      <div class="field">
+        <label>Адрес</label>
+        <input id="new-branch-address-${shopId}" placeholder="Наманган, ул. ...">
+      </div>
+      <div class="field">
+        <label>Локация (необяз.) — широта и долгота из Google Карт через запятую</label>
+        <input id="new-branch-location-${shopId}" placeholder="40.782123, 72.344567">
+      </div>
+      <button class="badge active" style="padding:6px 14px; margin-top:6px;" onclick="createBranch(${shopId})">+ добавить филиал</button>
     </div>
   `;
 }
@@ -4916,8 +4950,27 @@ async function createBranch(shopId) {
   const shopName = document.getElementById(`new-branch-name-${shopId}`).value.trim();
   const username = document.getElementById(`new-branch-username-${shopId}`).value.trim();
   if (!shopName || !username) { showMsg('Укажите название филиала и логин.', false); return; }
+  const payload = {
+    shop_name: shopName,
+    username,
+    password: document.getElementById(`new-branch-password-${shopId}`).value.trim(),
+    phone: document.getElementById(`new-branch-phone-${shopId}`).value.trim(),
+    notify_telegram_id: document.getElementById(`new-branch-notify-${shopId}`).value.trim(),
+    address: document.getElementById(`new-branch-address-${shopId}`).value.trim(),
+  };
+  const loc = document.getElementById(`new-branch-location-${shopId}`).value.trim();
+  if (loc) {
+    const parts = loc.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
+      payload.lat = parts[0];
+      payload.lon = parts[1];
+    } else {
+      showMsg('Локация должна быть в формате: широта, долгота (два числа через запятую).', false);
+      return;
+    }
+  }
   const res = await fetch(`/api/admin/shops/${shopId}/branches`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({shop_name: shopName, username})
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
   });
   const data = await res.json();
   if (data.ok) {
@@ -5307,6 +5360,10 @@ def api_admin_create_branch(shop_id):
     branch = db.create_branch_shop(
         shop_id, username, password, shop_name=shop_name,
         phone=data.get("phone") or None, address=data.get("address") or None,
+        hours=data.get("hours") or None,
+        lat=float(data["lat"]) if data.get("lat") else None,
+        lon=float(data["lon"]) if data.get("lon") else None,
+        notify_telegram_id=data.get("notify_telegram_id") or None,
     )
     db.set_shop_warehouse_enabled(branch["id"], True)  # филиалу склад нужен сразу, это весь смысл филиала
     return jsonify({"ok": True, "id": branch["id"], "username": username, "password": password})
