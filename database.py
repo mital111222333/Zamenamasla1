@@ -1582,6 +1582,112 @@ def get_top_brands_for_category_range(shop_id: int, category_name: str, date_fro
     return [{"name": brand, "qty": round(qty, 2)} for brand, qty in ranked]
 
 
+BRAND_CATEGORY_ORDER = ["fluid_0", "fluid_1", "fluid_2", "fluid_3", "fluid_4",
+                        "filter_0", "filter_1", "filter_2", "filter_3", "other"]
+_FLUID_KEYS = {"fluid_0", "fluid_1", "fluid_2", "fluid_3", "fluid_4"}
+
+
+def _item_category_key(item: dict, name_to_key: dict):
+    """Ключ категории позиции. У новых записей он лежит в item['key'];
+    у старых его нет — тогда узнаём категорию по названию (на русском или
+    узбекском, в зависимости от языка, на котором сохраняли)."""
+    key = item.get("key")
+    if key in ("other", "other_stock"):
+        return "other"
+    if key in BRAND_CATEGORY_ORDER:
+        return key
+    name = (item.get("name") or "").strip()
+    if name in name_to_key:
+        return name_to_key[name]
+    return "other"
+
+
+def get_brand_breakdown(shop_id: int, date_from: str, date_to: str, limit: int = 10) -> dict:
+    """Какие бренды продаются: по каждой категории (моторное масло, АКПП,
+    антифриз, фильтры...) — топ-N брендов по объёму (литры/штуки) + всё
+    остальное одной строкой «Остальные». Для «Прочего» бренда нет, поэтому
+    там группируем по названию товара и ранжируем по выручке.
+    Написание бренда нормализуем: «Mitanol», «MITANOL » и «mitanol» — один бренд."""
+    import i18n
+    name_to_key = {}
+    for lang_texts in i18n.TEXTS.values():
+        for k in BRAND_CATEGORY_ORDER:
+            if k in lang_texts:
+                name_to_key[lang_texts[k]] = k
+    other_prefixes = tuple(f"{t.get('other_prefix', '')}:" for t in i18n.TEXTS.values())
+
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.id, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ? AND oc.items_json IS NOT NULL
+        """, (shop_id, date_from, date_to)).fetchall()
+
+    # cats[key][norm] = {"qty", "sum", "visits": set, "spellings": {написание: сколько раз}}
+    cats = {}
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"])
+        except (TypeError, ValueError):
+            continue
+        for item in items or []:
+            cat = _item_category_key(item, name_to_key)
+            if cat == "other":
+                label = (item.get("name") or "").strip()
+                for pref in other_prefixes:
+                    if label.startswith(pref):
+                        label = label[len(pref):].strip()
+                        break
+            else:
+                label = (item.get("brand") or "").strip()
+            label = " ".join(label.split())
+            norm = label.upper()
+            b = cats.setdefault(cat, {}).setdefault(norm, {"qty": 0, "sum": 0, "visits": set(), "spellings": {}})
+            b["qty"] += item.get("qty") or 0
+            b["sum"] += item.get("total") or 0
+            b["visits"].add(r["id"])
+            if label:
+                b["spellings"][label] = b["spellings"].get(label, 0) + 1
+
+    result = []
+    for cat in BRAND_CATEGORY_ORDER:
+        brands = cats.get(cat)
+        if not brands:
+            continue
+        metric = "sum" if cat == "other" else "qty"
+        ranked = sorted(brands.items(), key=lambda kv: kv[1][metric], reverse=True)
+        total_qty = sum(b["qty"] for b in brands.values())
+        total_sum = sum(b["sum"] for b in brands.values())
+        total_metric = total_sum if metric == "sum" else total_qty
+
+        def share(v):
+            return round(v / total_metric * 100, 1) if total_metric else 0
+
+        top = []
+        for norm, b in ranked[:limit]:
+            display = max(b["spellings"].items(), key=lambda kv: kv[1])[0] if b["spellings"] else ""
+            top.append({
+                "name": display, "no_brand": not norm,
+                "qty": round(b["qty"], 2), "sum": round(b["sum"]), "visits": len(b["visits"]),
+                "share": share(b[metric]),
+            })
+        rest = ranked[limit:]
+        others = None
+        if rest:
+            o_qty = sum(b["qty"] for _, b in rest)
+            o_sum = sum(b["sum"] for _, b in rest)
+            others = {"count": len(rest), "qty": round(o_qty, 2), "sum": round(o_sum),
+                      "share": share(o_sum if metric == "sum" else o_qty)}
+        result.append({
+            "key": cat,
+            "unit": "l" if cat in _FLUID_KEYS else ("pc" if cat.startswith("filter_") else ""),
+            "metric": metric,
+            "total_qty": round(total_qty, 2), "total_sum": round(total_sum),
+            "brand_count": len(brands),
+            "top": top, "others": others,
+        })
+    return {"categories": result}
+
+
 def get_top_brands_for_category(shop_id: int, category_name: str, days: int = 30, limit: int = 10):
     """Топ-10 брендов ВНУТРИ одной категории (например, внутри 'Моторное
     масло' — какие марки берут чаще: MITANOL 5W-30, MATTEX и т.д.). Раскрытие

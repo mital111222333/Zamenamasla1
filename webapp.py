@@ -929,6 +929,29 @@ if ('serviceWorker' in navigator) {
   .debt-card .dc-due { font-size:11.5px; color:var(--hint); margin-top:2px; text-align:right; }
   .debt-card .dc-due.overdue-text { color:#B3241C; font-weight:700; }
   .debt-card .dc-pay-row { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+  .brand-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px; scrollbar-width:none; }
+  .brand-chips::-webkit-scrollbar { display:none; }
+  .brand-chip { flex:0 0 auto; border:1px solid var(--border); background:#fff; color:var(--text); border-radius:999px; padding:7px 12px; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .brand-chip.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .brand-chip .bc-sub { font-weight:500; opacity:0.7; margin-left:4px; }
+  .brand-period { display:inline-flex; background:#F1F5F9; border-radius:10px; padding:3px; margin-bottom:12px; }
+  .brand-period button { border:none; background:transparent; padding:6px 12px; font-size:12.5px; font-weight:600; color:#64748B; border-radius:8px; cursor:pointer; }
+  .brand-period button.active { background:#fff; color:var(--text); box-shadow:0 1px 2px rgba(15,23,42,0.12); }
+  .brand-summary { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px; }
+  .brand-summary div { background:#F8FAFC; border-radius:10px; padding:10px 8px; text-align:center; }
+  .brand-summary b { display:block; font-size:16px; font-family:var(--font-display); color:var(--text); }
+  .brand-summary span { font-size:11px; color:#64748B; }
+  .brand-donut-wrap { position:relative; max-width:240px; margin:0 auto 16px; }
+  .brand-row { padding:9px 0; border-bottom:1px solid #F1F5F9; }
+  .brand-row:last-child { border-bottom:none; }
+  .brand-row-top { display:flex; align-items:center; gap:8px; font-size:13.5px; }
+  .brand-rank { width:22px; height:22px; border-radius:50%; color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .brand-name { flex:1; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .brand-val { font-weight:700; color:var(--text); white-space:nowrap; }
+  .brand-share { font-size:12px; color:#64748B; width:46px; text-align:right; }
+  .brand-bar { height:6px; background:#F1F5F9; border-radius:3px; margin:6px 0 4px 30px; overflow:hidden; }
+  .brand-bar i { display:block; height:100%; border-radius:3px; }
+  .brand-meta { font-size:11.5px; color:#94A3B8; margin-left:30px; }
   .dash-row {
     display:flex; justify-content:space-between; align-items:center; padding:8px 0;
     border-bottom:1px dashed var(--border); font-size:13.5px;
@@ -1273,6 +1296,16 @@ if ('serviceWorker' in navigator) {
 
     <div id="statsOwnView">
       <div id="statsGrid" class="stats-grid">{{ T.stats_loading }}</div>
+
+      {% if not is_employee %}
+      <div class="card" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.stats_brands_title }}</label>
+        <div class="hint-text" style="margin-bottom:12px;">{{ T.stats_brands_hint }}</div>
+        <div class="brand-period" id="brandPeriod"></div>
+        <div class="brand-chips" id="brandCategoryChips"></div>
+        <div id="brandBody">{{ T.stats_loading }}</div>
+      </div>
+      {% endif %}
 
       {% if not is_employee %}
       <div class="card" style="margin-top:16px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
@@ -2034,8 +2067,175 @@ function renderClientSplit(obj) {
   return `<div class="count">${T.stats_clients_label} ${c.total} — <span style="color:#1D4ED8; font-weight:700;">${c.new} ${T.stats_clients_new}</span>, ${c.returning} ${T.stats_clients_returning}</div>`;
 }
 
+const BRAND_COLORS = ['#0F52BA', '#E63946', '#F4A261', '#2A9D8F', '#8E44AD', '#E9C46A', '#1D3557', '#06B6D4', '#84CC16', '#EC4899'];
+const BRAND_OTHERS_COLOR = '#CBD5E1';
+let brandData = null;
+let brandActiveCat = null;
+let brandDays = 30;
+let brandChartInstance = null;
+
+function fmtNum(n) { return Number(n || 0).toLocaleString('ru-RU'); }
+
+function brandUnitLabel(unit) {
+  if (unit === 'l') return T.unit_l;
+  if (unit === 'pc') return T.unit_pc;
+  return '';
+}
+
+function renderBrandPeriod() {
+  const el = document.getElementById('brandPeriod');
+  if (!el) return;
+  const opts = [[30, T.brands_period_30], [90, T.brands_period_90], [365, T.brands_period_365]];
+  el.innerHTML = opts.map(([d, label]) =>
+    `<button class="${d === brandDays ? 'active' : ''}" onclick="setBrandDays(${d})">${label}</button>`
+  ).join('');
+}
+
+function setBrandDays(d) {
+  brandDays = d;
+  loadBrandStats();
+}
+
+async function loadBrandStats() {
+  const body = document.getElementById('brandBody');
+  if (!body) return;
+  renderBrandPeriod();
+  const to = new Date();
+  const from = new Date();
+  from.setDate(to.getDate() - (brandDays - 1));
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  try {
+    const res = await fetch(`/api/stats/brands?from=${iso(from)}&to=${iso(to)}`);
+    brandData = await res.json();
+  } catch (e) { brandData = null; }
+  const cats = (brandData && brandData.categories) || [];
+  const chips = document.getElementById('brandCategoryChips');
+  if (!cats.length) {
+    chips.innerHTML = '';
+    body.innerHTML = `<div class="hint-text">${T.brands_empty}</div>`;
+    if (brandChartInstance) { brandChartInstance.destroy(); brandChartInstance = null; }
+    return;
+  }
+  if (!cats.some(c => c.key === brandActiveCat)) brandActiveCat = cats[0].key;
+  chips.innerHTML = cats.map(c => {
+    const sub = c.metric === 'sum' ? '' : `<span class="bc-sub">${fmtNum(c.total_qty)} ${brandUnitLabel(c.unit)}</span>`;
+    return `<div class="brand-chip ${c.key === brandActiveCat ? 'active' : ''}" onclick="selectBrandCategory('${c.key}')">${escapeHtml(T[c.key] || c.key)}${sub}</div>`;
+  }).join('');
+  renderBrandCategory();
+}
+
+function selectBrandCategory(key) {
+  brandActiveCat = key;
+  document.querySelectorAll('#brandCategoryChips .brand-chip').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('onclick').indexOf(`'${key}'`) !== -1);
+  });
+  renderBrandCategory();
+}
+
+function renderBrandCategory() {
+  const body = document.getElementById('brandBody');
+  const c = ((brandData && brandData.categories) || []).find(x => x.key === brandActiveCat);
+  if (!c) return;
+  const unit = brandUnitLabel(c.unit);
+  const bySum = c.metric === 'sum';
+  const mainVal = x => bySum ? `${fmtNum(x.sum)} ${T.currency}` : `${fmtNum(x.qty)} ${unit}`;
+  const brandLabel = b => b.no_brand ? T.brands_no_brand : escapeHtml(b.name);
+
+  // полоски считаем относительно лидера (лидер = полная полоска), а % справа — доля от всего
+  const leaderVal = c.top.length ? (bySum ? c.top[0].sum : c.top[0].qty) || 1 : 1;
+  const barW = x => Math.max(Math.round((bySum ? x.sum : x.qty) / leaderVal * 100), 2);
+  const rows = c.top.map((b, i) => `
+    <div class="brand-row">
+      <div class="brand-row-top">
+        <span class="brand-rank" style="background:${BRAND_COLORS[i]};">${i + 1}</span>
+        <span class="brand-name">${brandLabel(b)}${i === 0 && c.top.length > 1 ? ' 🏆' : ''}</span>
+        <span class="brand-val">${mainVal(b)}</span>
+        <span class="brand-share">${b.share}%</span>
+      </div>
+      <div class="brand-bar"><i style="width:${barW(b)}%; background:${BRAND_COLORS[i]};"></i></div>
+      <div class="brand-meta">${bySum ? '' : `${fmtNum(b.sum)} ${T.currency} · `}${b.visits} ${T.brands_visits}</div>
+    </div>
+  `).join('');
+  const othersRow = c.others ? `
+    <div class="brand-row">
+      <div class="brand-row-top">
+        <span class="brand-rank" style="background:${BRAND_OTHERS_COLOR}; color:#475569;">…</span>
+        <span class="brand-name" style="color:#64748B;">${T.brands_others} (${c.others.count})</span>
+        <span class="brand-val" style="color:#64748B;">${mainVal(c.others)}</span>
+        <span class="brand-share">${c.others.share}%</span>
+      </div>
+      <div class="brand-bar"><i style="width:${Math.min(barW(c.others), 100)}%; background:${BRAND_OTHERS_COLOR};"></i></div>
+    </div>` : '';
+
+  body.innerHTML = `
+    <div class="brand-summary">
+      <div><b>${bySum ? fmtNum(c.top.reduce((a, b) => a + b.visits, 0)) : fmtNum(c.total_qty) + ' ' + unit}</b><span>${bySum ? T.brands_visits : T.brands_total_sold}</span></div>
+      <div><b>${fmtNum(c.total_sum)}</b><span>${T.brands_revenue}, ${T.currency}</span></div>
+      <div><b>${c.brand_count}</b><span>${bySum ? T.brands_items : T.brands_count}</span></div>
+    </div>
+    <div class="brand-donut-wrap"><canvas id="brandDonut"></canvas></div>
+    ${rows}${othersRow}
+  `;
+  renderBrandDonut(c, bySum ? `${fmtNum(c.total_sum)}` : `${fmtNum(c.total_qty)}`, bySum ? T.currency : unit);
+}
+
+function renderBrandDonut(c, centerValue, centerUnit) {
+  const canvas = document.getElementById('brandDonut');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (brandChartInstance) brandChartInstance.destroy();
+  const bySum = c.metric === 'sum';
+  const labels = c.top.map(b => b.no_brand ? T.brands_no_brand : b.name);
+  const values = c.top.map(b => bySum ? b.sum : b.qty);
+  const colors = c.top.map((_, i) => BRAND_COLORS[i]);
+  if (c.others) {
+    labels.push(`${T.brands_others} (${c.others.count})`);
+    values.push(bySum ? c.others.sum : c.others.qty);
+    colors.push(BRAND_OTHERS_COLOR);
+  }
+  const centerText = {
+    id: 'centerText',
+    afterDraw(chart) {
+      const meta = chart.getDatasetMeta(0);
+      if (!meta || !meta.data || !meta.data.length) return;
+      const x = meta.data[0].x, y = meta.data[0].y;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#0F172A';
+      ctx.font = "700 20px 'Space Grotesk', sans-serif";
+      ctx.fillText(centerValue, x, y - 8);
+      ctx.fillStyle = '#64748B';
+      ctx.font = "500 12px sans-serif";
+      ctx.fillText(centerUnit, x, y + 13);
+      ctx.restore();
+    }
+  };
+  brandChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#fff', borderWidth: 2, hoverOffset: 6 }] },
+    options: {
+      responsive: true, cutout: '64%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const total = values.reduce((a, b) => a + b, 0) || 1;
+              const pct = Math.round(item.raw / total * 1000) / 10;
+              return ` ${item.label}: ${fmtNum(item.raw)} ${centerUnit} (${pct}%)`;
+            }
+          }
+        }
+      }
+    },
+    plugins: [centerText],
+  });
+}
+
 async function loadStats() {
   loadDashboard();
+  loadBrandStats();  // для сотрудника карточки нет — функция сама выйдет
   const res = await fetch('/api/stats');
   const s = await res.json();
   let profit = null;
@@ -4316,6 +4516,20 @@ def api_set_branch_purchase_price(branch_id, product_id):
     if not ok:
         return jsonify({"ok": False, "error": "товар не найден"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/stats/brands")
+@login_required
+@employee_blocked
+def api_stats_brands():
+    """Топ-10 брендов по каждой категории (масла, антифриз, фильтры...) за период."""
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_from) or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_to):
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+    result = db.get_brand_breakdown(g.shop_id, date_from, date_to, limit=10)
+    result["ok"] = True
+    return jsonify(result)
 
 
 @app.route("/api/stats/range")
