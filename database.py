@@ -942,6 +942,8 @@ def update_product(product_id: int, shop_id: int, name=None, sell_price=None, pu
     with get_conn() as conn:
         conn.execute(f"UPDATE products SET {set_clause} WHERE id=?", (*fields.values(), product_id))
         conn.commit()
+    if existing.get("purchase_price") is None and fields.get("purchase_price") is not None:
+        backfill_cost_price(shop_id, product_id, fields["purchase_price"])
     return True, None
 
 
@@ -998,6 +1000,8 @@ def restock_product(product_id: int, shop_id: int, quantity: float, purchase_pri
             VALUES (?, ?, ?, ?, ?)
         """, (product_id, shop_id, quantity, purchase_price, restock_date))
         conn.commit()
+    if existing.get("purchase_price") is None and purchase_price is not None:
+        backfill_cost_price(shop_id, product_id, purchase_price)
     return True
 
 
@@ -2066,12 +2070,14 @@ def get_net_profit_30d(shop_id: int) -> dict:
     только по продаже масла."""
     start_date = (datetime.now() - timedelta(days=29)).strftime("%Y-%m-%d")
     today = datetime.now().strftime("%Y-%m-%d")
-    oil_profit = get_profit_range(shop_id, start_date, today)
+    br = get_profit_breakdown(shop_id, start_date, today)
     expenses = get_expense_summary(shop_id, days=30)
     return {
-        "oil_profit": oil_profit,
+        "oil_profit": br["goods_profit"],
+        "services": br["services"],
+        "unpriced": br["unpriced"],
         "expenses_total": expenses["total"],
-        "net_profit": oil_profit - expenses["total"],
+        "net_profit": br["profit"] - expenses["total"],
     }
 
 
@@ -2375,27 +2381,49 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
         return result
 
 
-def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
-    """Прибыль = сумма (цена продажи - цена закупки на момент продажи) по
-    каждой позиции, СВЯЗАННОЙ с товаром со склада (item['cost_price'] задан).
-    Позиции без привязки к складу (введены вручную текстом, без выбора из
-    каталога) в расчёт прибыли не входят — их себестоимость неизвестна."""
+def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
+    """Из чего складывается прибыль за период:
+    • goods_profit — товары со склада: цена продажи − цена закупки на момент
+      продажи (cost_price в записи);
+    • services — работа и «Прочее» (мойка и т.п.): себестоимости товара у
+      них нет, поэтому вся сумма — доход (зарплату мастеров вычитают расходы);
+    • unpriced — выручка, по которой прибыль посчитать нельзя: товар со
+      склада без цены закупки или масло/фильтр, вписанные вручную не со
+      склада, и старые записи без разбивки. В прибыль НЕ входит — показываем
+      отдельно, чтобы было видно, что прибыль неполная и что исправить.
+    profit = goods_profit + services."""
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id=? AND oc.items_json IS NOT NULL
-              AND oc.change_date >= ? AND oc.change_date <= ?
+            SELECT oc.items_json, oc.cost FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchall()
-    profit = 0
+    goods = services = unpriced = 0
     for row in rows:
-        try:
-            items = json.loads(row["items_json"])
-        except (ValueError, TypeError):
+        items = None
+        if row["items_json"]:
+            try:
+                items = json.loads(row["items_json"])
+            except (ValueError, TypeError):
+                items = None
+        if not items:
+            unpriced += row["cost"] or 0
             continue
         for item in items:
+            total = item.get("total") or 0
             if item.get("cost_price") is not None and item.get("qty") is not None:
-                profit += (item.get("total") or 0) - item["qty"] * item["cost_price"]
-    return round(profit)
+                goods += total - item["qty"] * item["cost_price"]
+            elif item.get("product_id") or str(item.get("key") or "").startswith(("fluid_", "filter_")):
+                unpriced += total
+            else:
+                services += total
+    goods, services, unpriced = round(goods), round(services), round(unpriced)
+    return {"goods_profit": goods, "services": services, "unpriced": unpriced, "profit": goods + services}
+
+
+def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
+    """Прибыль за период = прибыль по товарам со склада + работа/услуги
+    (подробно — см. get_profit_breakdown)."""
+    return get_profit_breakdown(shop_id, date_from, date_to)["profit"]
 
 
 def get_profit_range(shop_id: int, date_from: str, date_to: str) -> int:
@@ -2591,17 +2619,53 @@ def get_branch_warehouse_summary(parent_shop_id: int):
     return result
 
 
+def backfill_cost_price(shop_id: int, product_id: int, purchase_price) -> int:
+    """Цена закупки появилась у товара, у которого её НЕ было (филиал сам
+    завёл товар, главный вписал цену позже). Проставляем её в прошлые
+    продажи этого товара, где цены закупки не было, — иначе эти продажи
+    навсегда выпали бы из прибыли. Продажи, где цена уже была, не трогаем:
+    это не переписывание истории, а заполнение пропуска."""
+    if purchase_price is None:
+        return 0
+    changed = 0
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.id, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.items_json LIKE ?
+        """, (shop_id, f'%"product_id": {int(product_id)}%')).fetchall()
+        for r in rows:
+            try:
+                items = json.loads(r["items_json"]) or []
+            except (ValueError, TypeError):
+                continue
+            touched = False
+            for it in items:
+                if it.get("product_id") == product_id and it.get("cost_price") is None:
+                    it["cost_price"] = purchase_price
+                    touched = True
+                    changed += 1
+            if touched:
+                conn.execute("UPDATE oil_changes SET items_json=? WHERE id=?",
+                             (json.dumps(items, ensure_ascii=False), r["id"]))
+        conn.commit()
+    return changed
+
+
 def set_product_purchase_price(product_id: int, shop_id: int, purchase_price):
     """Главный аккаунт вписывает цену закупки товара своего филиала — сам
     филиал этого не делает (см. create_product/restock_product ниже, где
     покупная цена от филиала игнорируется)."""
+    before = get_product(product_id, shop_id, active_only=False)
     with get_conn() as conn:
         cur = conn.execute(
             "UPDATE products SET purchase_price=? WHERE id=? AND shop_id=?",
             (purchase_price, product_id, shop_id)
         )
         conn.commit()
-        return cur.rowcount > 0
+        ok = cur.rowcount > 0
+    if ok and before and before.get("purchase_price") is None and purchase_price is not None:
+        backfill_cost_price(shop_id, product_id, purchase_price)
+    return ok
 
 
 def get_full_history_flat(shop_id: int):
@@ -2691,7 +2755,7 @@ def get_network_overview(shop_ids) -> dict:
             sum(c[p]["previous"] for c in cmp_parts), sum(c[p]["paid_previous"] for c in cmp_parts))
     profit = {p: sum(x[p] for x in prof) for p in periods}
 
-    net = {"oil_profit": 0, "expenses_total": 0, "net_profit": 0}
+    net = {"oil_profit": 0, "services": 0, "unpriced": 0, "expenses_total": 0, "net_profit": 0}
     for sid in shop_ids:
         n = get_net_profit_30d(sid)
         for k in net:
@@ -2744,13 +2808,15 @@ def get_network_compare(parent_shop_id: int, period: str) -> dict:
         sid = shop["id"]
         r = get_revenue_range(sid, date_from, today)
         cmp = get_revenue_comparison(sid)[period]
-        profit = get_profit_range(sid, date_from, today)
+        pb = get_profit_breakdown(sid, date_from, today)
+        profit = pb["profit"]
         expenses = sum(e["amount"] for e in get_expenses(sid, date_from, today))
         rows.append({
             **shop,
             "total": r["total"], "count": r["count"], "avg": r["avg"], "paid_count": r["paid_count"],
             "clients": r["clients"], "pct": cmp["pct"],
-            "profit": profit, "expenses": expenses, "net_profit": profit - expenses,
+            "profit": profit, "goods_profit": pb["goods_profit"], "services": pb["services"],
+            "unpriced": pb["unpriced"], "expenses": expenses, "net_profit": profit - expenses,
         })
     rows.sort(key=lambda x: x["total"], reverse=True)
     return {"period": period, "date_from": date_from, "date_to": today, "rows": rows}
@@ -2902,7 +2968,9 @@ def transfer_stock(parent_shop_id: int, from_shop_id: int, product_id: int, to_s
             dst_id = cur.lastrowid
         else:
             dst_id = dst["id"]
-            if dst.get("purchase_price") is None and src.get("purchase_price") is not None:
+            # как при пополнении: цена закупки товара = цена последней пришедшей
+            # партии, а партия от главного приходит со своей ценой закупки
+            if src.get("purchase_price") is not None:
                 conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (src["purchase_price"], dst_id))
         conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (quantity, src["id"]))
         conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (quantity, dst_id))
@@ -2911,6 +2979,8 @@ def transfer_stock(parent_shop_id: int, from_shop_id: int, product_id: int, to_s
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (parent_shop_id, from_shop_id, to_shop_id, src["id"], dst_id, quantity, today))
         conn.commit()
+    if dst and dst.get("purchase_price") is None and src.get("purchase_price") is not None:
+        backfill_cost_price(to_shop_id, dst_id, src["purchase_price"])
     return {"ok": True, "to_product_id": dst_id}
 
 

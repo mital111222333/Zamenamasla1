@@ -2926,22 +2926,34 @@ async function loadDashboard() {
 }
 
 function renderNetProfitHtml(np) {
+  // прибыль = товары со склада (продажа − закупка) + работа/услуги; минус расходы.
+  // Продажи без цены закупки в прибыль не входят — показываем их отдельно.
   const isNegative = np.net_profit < 0;
+  const services = np.services || 0;
+  const unpriced = np.unpriced || 0;
   return `
-    <div class="dash-summary-grid">
+    <div class="dash-summary-grid" style="grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px;">
       <div class="dash-summary-box">
-        <div class="dsb-num">${np.oil_profit.toLocaleString('ru-RU')} ${T.currency}</div>
-        <div class="dsb-label">${T.dash_oil_profit_label}</div>
+        <div class="dsb-num" style="font-size:15px; white-space:nowrap;" title="${np.oil_profit.toLocaleString('ru-RU')} ${T.currency}">${fmtShort(np.oil_profit)}</div>
+        <div class="dsb-label">${T.np_goods_label}</div>
       </div>
       <div class="dash-summary-box">
-        <div class="dsb-num warn">${np.expenses_total.toLocaleString('ru-RU')} ${T.currency}</div>
+        <div class="dsb-num" style="font-size:15px; white-space:nowrap;" title="${services.toLocaleString('ru-RU')} ${T.currency}">${fmtShort(services)}</div>
+        <div class="dsb-label">${T.np_services_label}</div>
+      </div>
+      <div class="dash-summary-box">
+        <div class="dsb-num warn" style="font-size:15px; white-space:nowrap;" title="${np.expenses_total.toLocaleString('ru-RU')} ${T.currency}">−${fmtShort(np.expenses_total)}</div>
         <div class="dsb-label">${T.dash_expenses_label}</div>
       </div>
     </div>
     <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
       <div style="font-size:24px; font-weight:700; font-family:var(--font-mono); color:${isNegative ? '#B3241C' : '#15803D'};">${np.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
       <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
-    </div>`;
+    </div>
+    ${unpriced > 0 ? `
+    <div style="margin-top:12px; padding:10px 12px; background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px; font-size:12.5px; color:#92400E;">
+      ⚠️ ${T.np_unpriced_1} <b>${unpriced.toLocaleString('ru-RU')} ${T.currency}</b> ${T.np_unpriced_2}
+    </div>` : ''}`;
 }
 
 function renderDebtHtml(ds) {
@@ -3310,7 +3322,7 @@ async function loadNetworkCompare() {
           <td class="${cls(r.count, best.count)}">${r.count}</td>
           <td class="${cls(r.avg, best.avg)}">${r.paid_count ? fmtNum(r.avg) : '—'}</td>
           <td class="${cls(r.clients.total, best.clients)}">${r.clients.total} <span class="hint-text">(${r.clients.new})</span></td>
-          <td class="${cls(r.profit, best.profit)}">${fmtNum(r.profit)}</td>
+          <td class="${cls(r.profit, best.profit)}">${r.unpriced > 0 ? `<span title="${T.np_row_unpriced} ${fmtNum(r.unpriced)} ${T.currency}" style="cursor:help;">⚠️</span> ` : ''}${fmtNum(r.profit)}</td>
           <td>${fmtNum(r.expenses)}</td>
           <td class="${r.net_profit < 0 ? 'neg' : cls(r.net_profit, best.net)}">${fmtNum(r.net_profit)}</td>
         </tr>`).join('')}
@@ -3503,20 +3515,7 @@ async function applyStatsRange() {
     ${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data, profit: hasProfit ? data.profit : null })}
     ${hasProfit ? `
     <div class="stats-card" style="margin-top:10px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
-      <div class="dash-summary-grid">
-        <div class="dash-summary-box">
-          <div class="dsb-num">${data.profit.toLocaleString('ru-RU')} ${T.currency}</div>
-          <div class="dsb-label">${T.dash_oil_profit_label}</div>
-        </div>
-        <div class="dash-summary-box">
-          <div class="dsb-num warn">${data.expenses.toLocaleString('ru-RU')} ${T.currency}</div>
-          <div class="dsb-label">${T.dash_expenses_label}</div>
-        </div>
-      </div>
-      <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
-        <div style="font-size:22px; font-weight:700; font-family:var(--font-mono); color:${data.net_profit < 0 ? '#B3241C' : '#15803D'};">${data.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
-        <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
-      </div>
+      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit })}
     </div>
     ` : ''}
     <div class="stats-card" style="margin-top:10px;">
@@ -5652,11 +5651,14 @@ def api_stats_range():
     result["daily_revenue"] = db.get_daily_revenue_range(g.shop_id, date_from, date_to) if 0 <= span_days <= 730 else []
     result["top_products"] = db.get_top_products_by_qty_range(g.shop_id, date_from, date_to, limit=5)
     if not g.is_branch:
-        profit = db.get_profit_range(g.shop_id, date_from, date_to)
+        pb = db.get_profit_breakdown(g.shop_id, date_from, date_to)
         expenses = sum(e["amount"] for e in db.get_expenses(g.shop_id, date_from, date_to))
-        result["profit"] = profit
+        result["profit"] = pb["profit"]
+        result["goods_profit"] = pb["goods_profit"]
+        result["services"] = pb["services"]
+        result["unpriced"] = pb["unpriced"]
         result["expenses"] = expenses
-        result["net_profit"] = profit - expenses
+        result["net_profit"] = pb["profit"] - expenses
     return jsonify(result)
 
 
