@@ -5917,6 +5917,42 @@ if ('serviceWorker' in navigator) {
   .msg.ok { background:var(--ok-bg); color:var(--ok); }
   .msg.err { background:var(--danger-bg); color:var(--danger); }
   .new-creds { background:var(--field-bg); border:1px dashed var(--blue); border-radius:10px; padding:10px; font-size:13px; margin-top:10px; font-family: var(--font-mono); }
+  .adm-stats { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-bottom:14px; }
+  .adm-stat { background:#fff; border:1px solid var(--border); border-radius:14px; padding:10px 12px; }
+  .adm-stat b { display:block; font-family:var(--font-display); font-size:22px; color:var(--darkblue); line-height:1.1; }
+  .adm-stat span { font-size:11.5px; color:#64748B; }
+  details.adm-sec { background:#fff; border:1px solid var(--border); border-radius:16px; margin-bottom:10px; overflow:hidden; }
+  details.adm-sec > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:12px; padding:14px 16px; font-weight:700; font-size:15px; color:var(--text); -webkit-tap-highlight-color:transparent; }
+  details.adm-sec > summary::-webkit-details-marker { display:none; }
+  details.adm-sec > summary .ic { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:15px; flex:none; }
+  details.adm-sec > summary .sub { display:block; font-size:12px; font-weight:500; color:#64748B; margin-top:1px; }
+  details.adm-sec > summary .chev { margin-left:auto; color:#94A3B8; transition:transform .2s; }
+  details.adm-sec[open] > summary .chev { transform:rotate(180deg); }
+  details.adm-sec[open] > summary { border-bottom:1px solid #F1F5F9; }
+  details.adm-sec .sec-body { padding:14px 16px 16px; }
+  details.adm-sec.danger { border-color:#FCA5A5; }
+  .list-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:22px 0 10px; }
+  .list-head h2 { font-family:var(--font-display); font-size:18px; margin:0; color:var(--darkblue); }
+  .adm-filters { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 12px; }
+  .adm-filters button { border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; }
+  .adm-filters button.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .grp-title { font-weight:800; color:var(--blue); font-size:13px; margin:16px 2px 8px; }
+  .shop-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:10px; }
+  .shop-card.off { background:#FAFAFA; border-style:dashed; }
+  .sc-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .sc-name { font-weight:800; font-size:16px; color:var(--text); }
+  .sc-login { font-family:var(--font-mono); font-size:12.5px; color:#64748B; }
+  .sc-meta { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12.5px; color:#475569; margin:8px 0 10px; }
+  .sc-meta .ok { color:#15803D; font-weight:700; }
+  .sc-meta .no { color:#B3241C; font-weight:700; }
+  .sc-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:6px; }
+  .sc-row .lbl { font-size:11.5px; color:#94A3B8; margin-right:2px; }
+  .sc-btn { border:1px solid var(--border); background:#fff; border-radius:10px; padding:6px 10px; font-size:12.5px; font-weight:600; color:#334155; cursor:pointer; font-family:inherit; }
+  .sc-btn:hover { background:#F8FAFC; }
+  .sc-panel { margin-top:10px; padding:12px; background:var(--field-bg); border-radius:12px; }
+  .sc-edit input { font-size:13px; padding:7px 9px; margin-top:4px; }
+  code { font-family:var(--font-mono); font-size:12px; background:#F1F5F9; padding:1px 5px; border-radius:5px; }
+  @media (max-width:560px) { .row2 { flex-direction:column; gap:0; } }
 </style>
 </head>
 <body>
@@ -5924,99 +5960,122 @@ if ('serviceWorker' in navigator) {
 <div class="container">
   <div class="topbar">
     <div style="display:flex; align-items:center; gap:10px;">
-      <div class="logo-badge"><i class="fa-solid fa-flag-checkered"></i></div>
+      <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
       <div>
-        <h1>Точки замены масла</h1>
-        <div class="logo-sub">MoyBook Platform</div>
+        <h1>MoyBook</h1>
+        <div class="logo-sub">Админ-панель платформы</div>
       </div>
     </div>
-    <a class="logout" href="/logout">Выйти</a>
+    <a class="logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти</a>
   </div>
 
   <div id="msg"></div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">📦 Резервная копия базы данных</h3>
-    <p class="hint-text" style="margin-top:0;">Автоматически отправляется каждую ночь. Если сомневаешься, что доходит — проверь прямо сейчас.<br>Если копия не находится в чате с ботом — напиши боту <code>/myid</code> и сверь число с ADMIN_TELEGRAM_ID на Railway.</p>
-    <button class="submit" style="width:auto; padding:10px 20px;" onclick="triggerBackupNow()">Отправить сейчас</button>
-    <div id="backupResult" style="margin-top:10px;"></div>
+  <div class="adm-stats" id="admStats">
+    <div class="adm-stat"><b>—</b><span>точек</span></div>
+    <div class="adm-stat"><b>—</b><span>активных</span></div>
+    <div class="adm-stat"><b>—</b><span>клиентов</span></div>
   </div>
 
-  <div class="card" style="border:1.5px solid #FCA5A5;">
-    <h3 style="margin-top:0; color:#B3241C;">⚠️ Восстановить базу из копии</h3>
-    <p class="hint-text" style="margin-top:0;">
-      <b>Внимание:</b> это заменит АБСОЛЮТНО ВСЕ текущие данные платформы (все точки, клиентов, историю) на содержимое загруженного файла.
-      Всё, что было добавлено после даты этой копии, будет потеряно безвозвратно.<br>
-      Перед заменой мы сами отправим тебе копию ТЕКУЩЕГО состояния — на случай, если восстановление окажется ошибкой.
-    </p>
-    <div class="field">
-      <label>Файл резервной копии (.db)</label>
-      <input type="file" id="restore_file" accept=".db">
+  <details class="adm-sec" id="secAdd">
+    <summary>
+      <span class="ic" style="background:#ECFDF5; color:#059669;"><i class="fa-solid fa-plus"></i></span>
+      <span>Добавить новую точку<span class="sub">логин, телефон, адрес, локация</span></span>
+      <i class="fa-solid fa-chevron-down chev"></i>
+    </summary>
+    <div class="sec-body">
+      <div class="field">
+        <label>Название точки</label>
+        <input id="new_shop_name" placeholder="Avto Servis Namangan">
+      </div>
+      <div class="field">
+        <label>Клиент / группа (необяз.) — для филиала укажи то же, что у других точек этого клиента</label>
+        <input id="new_client_group" list="clientGroupsList" placeholder="например: Sinov01">
+        <datalist id="clientGroupsList"></datalist>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Логин</label>
+          <input id="new_username" placeholder="namangan_point">
+        </div>
+        <div class="field">
+          <label>Пароль (пусто = сгенерировать)</label>
+          <input id="new_password" placeholder="необязательно">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Телефон точки</label>
+          <input id="new_phone" placeholder="+998901112233">
+        </div>
+        <div class="field">
+          <label>Telegram ID для уведомлений (необяз.)</label>
+          <input id="new_notify_id" placeholder="123456789">
+        </div>
+      </div>
+      <div class="field">
+        <label>Адрес</label>
+        <input id="new_address" placeholder="Наманган, ул. ...">
+      </div>
+      <div class="field">
+        <label>Локация (необяз.) — широта и долгота из Google Карт через запятую</label>
+        <input id="new_location" placeholder="40.782123, 72.344567">
+        <div class="hint-text">Открой точку на Google Картах, нажми и удержи на месте — внизу появятся два числа через запятую, скопируй их сюда целиком.</div>
+      </div>
+      <button class="submit" onclick="createShop()">Создать точку</button>
+      <div id="newCreds"></div>
     </div>
-    <div class="field">
-      <label>Чтобы подтвердить, впиши слово <code>ЗАМЕНИТЬ</code></label>
-      <input id="restore_confirm" placeholder="ЗАМЕНИТЬ">
-    </div>
-    <button class="submit" style="width:auto; padding:10px 20px; background:linear-gradient(135deg, #DC2626, #991B1B);" onclick="triggerRestore()">Восстановить из этого файла</button>
-    <div id="restoreResult" style="margin-top:10px;"></div>
-  </div>
+  </details>
 
-  <div class="card">
-    <h3 style="margin-top:0;">➕ Добавить новую точку</h3>
-    <div class="field">
-      <label>Название точки</label>
-      <input id="new_shop_name" placeholder="Avto Servis Namangan">
+  <details class="adm-sec" id="secBackup">
+    <summary>
+      <span class="ic" style="background:#EFF6FF; color:var(--blue);"><i class="fa-solid fa-box-archive"></i></span>
+      <span>Резервная копия<span class="sub">приходит в Telegram каждую ночь</span></span>
+      <i class="fa-solid fa-chevron-down chev"></i>
+    </summary>
+    <div class="sec-body">
+      <p class="hint-text" style="margin-top:0;">Если сомневаешься, что копия доходит, отправь её прямо сейчас. Если копии нет в чате с ботом, напиши боту <code>/myid</code> и сверь число с <code>ADMIN_TELEGRAM_ID</code> в настройках Render (Environment).</p>
+      <button class="submit" style="width:auto; padding:10px 20px;" onclick="triggerBackupNow()"><i class="fa-solid fa-paper-plane"></i> Отправить сейчас</button>
+      <div id="backupResult" style="margin-top:10px;"></div>
     </div>
-    <div class="field">
-      <label>Клиент / группа (необяз.) — для филиала укажи то же, что у других точек этого клиента</label>
-      <input id="new_client_group" list="clientGroupsList" placeholder="например: Sinov01">
-      <datalist id="clientGroupsList"></datalist>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Логин</label>
-        <input id="new_username" placeholder="namangan_point">
-      </div>
-      <div class="field">
-        <label>Пароль (пусто = сгенерировать)</label>
-        <input id="new_password" placeholder="необязательно">
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Телефон точки</label>
-        <input id="new_phone" placeholder="+998901112233">
-      </div>
-      <div class="field">
-        <label>Telegram ID для уведомлений (необяз.)</label>
-        <input id="new_notify_id" placeholder="123456789">
-      </div>
-    </div>
-    <div class="field">
-      <label>Адрес</label>
-      <input id="new_address" placeholder="Наманган, ул. ...">
-    </div>
-    <div class="field">
-      <label>Локация (необяз.) — вставь широту и долготу из Google Карт через запятую</label>
-      <input id="new_location" placeholder="40.782123, 72.344567">
-      <div class="hint-text">Открой точку на Google Картах, нажми и удержи на месте — внизу появятся два числа через запятую, скопируй их сюда целиком.</div>
-    </div>
-    <button class="submit" onclick="createShop()">Создать точку</button>
-    <div id="newCreds"></div>
-  </div>
+  </details>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Все точки</h3>
-    <div class="field">
-      <input id="shopSearch" placeholder="Поиск по названию, логину или телефону..." oninput="filterShops()">
+  <details class="adm-sec danger" id="secRestore">
+    <summary>
+      <span class="ic" style="background:#FEF2F2; color:#B3241C;"><i class="fa-solid fa-clock-rotate-left"></i></span>
+      <span style="color:#B3241C;">Восстановить базу из копии<span class="sub">заменяет все данные — только при необходимости</span></span>
+      <i class="fa-solid fa-chevron-down chev"></i>
+    </summary>
+    <div class="sec-body">
+      <p class="hint-text" style="margin-top:0;">
+        <b>Внимание:</b> это заменит АБСОЛЮТНО ВСЕ текущие данные платформы (все точки, клиентов, историю) на содержимое загруженного файла.
+        Всё, что было добавлено после даты этой копии, будет потеряно безвозвратно.<br>
+        Перед заменой мы сами отправим тебе копию ТЕКУЩЕГО состояния — на случай, если восстановление окажется ошибкой.
+      </p>
+      <div class="field">
+        <label>Файл резервной копии (.db)</label>
+        <input type="file" id="restore_file" accept=".db">
+      </div>
+      <div class="field">
+        <label>Чтобы подтвердить, впиши слово <code>ЗАМЕНИТЬ</code></label>
+        <input id="restore_confirm" placeholder="ЗАМЕНИТЬ">
+      </div>
+      <button class="submit" style="width:auto; padding:10px 20px; background:linear-gradient(135deg, #DC2626, #991B1B);" onclick="triggerRestore()">Восстановить из этого файла</button>
+      <div id="restoreResult" style="margin-top:10px;"></div>
     </div>
-    <div class="table-wrap" style="overflow-x:auto;">
-    <table>
-      <thead><tr><th>Название</th><th>Логин</th><th>Пароль</th><th>Телефон</th><th>Telegram</th><th>Клиентов</th><th>Статус</th><th>SMS</th><th>Склад</th><th>Сотрудники</th><th>Филиалы</th><th>Группа</th></tr></thead>
-      <tbody id="shops-body"></tbody>
-    </table>
-    </div>
+  </details>
+
+  <div class="list-head">
+    <h2>Все точки</h2>
   </div>
+  <input id="shopSearch" placeholder="🔍 Поиск по названию, логину или телефону..." oninput="filterShops()">
+  <div class="adm-filters" id="admFilters">
+    <button class="on" data-f="all" onclick="setShopFilter('all')">Все</button>
+    <button data-f="active" onclick="setShopFilter('active')">Активные</button>
+    <button data-f="off" onclick="setShopFilter('off')">Выключенные</button>
+    <button data-f="notg" onclick="setShopFilter('notg')">Без Telegram</button>
+  </div>
+  <div id="shops-body"></div>
 </div>
 
 <script>
@@ -6059,97 +6118,112 @@ async function loadShops() {
   const groupNames = [...new Set(allShopsCache.map(s => s.client_group).filter(Boolean))].sort();
   document.getElementById('clientGroupsList').innerHTML = groupNames.map(g => `<option value="${escapeHtml(g)}">`).join('');
 
-  renderShopsTable(allShopsCache);
+  const st = document.getElementById('admStats');
+  const active = allShopsCache.filter(s => s.is_active).length;
+  const clients = allShopsCache.reduce((a, s) => a + (s.client_count || 0), 0);
+  st.innerHTML = `
+    <div class="adm-stat"><b>${allShopsCache.length}</b><span>точек</span></div>
+    <div class="adm-stat"><b>${active}</b><span>активных</span></div>
+    <div class="adm-stat"><b>${clients.toLocaleString('ru-RU')}</b><span>клиентов</span></div>`;
+  filterShops();
+}
+
+let shopFilter = 'all';
+function setShopFilter(f) {
+  shopFilter = f;
+  document.querySelectorAll('#admFilters button').forEach(b => b.classList.toggle('on', b.dataset.f === f));
+  filterShops();
 }
 
 function filterShops() {
   const q = document.getElementById('shopSearch').value.trim().toLowerCase();
-  if (!q) { renderShopsTable(allShopsCache); return; }
   const filtered = allShopsCache.filter(s =>
-    (s.shop_name || '').toLowerCase().includes(q) ||
-    (s.username || '').toLowerCase().includes(q) ||
-    (s.phone || '').toLowerCase().includes(q)
+    (!q || (s.shop_name || '').toLowerCase().includes(q) ||
+      (s.username || '').toLowerCase().includes(q) ||
+      (s.phone || '').toLowerCase().includes(q)) &&
+    (shopFilter === 'all' ||
+      (shopFilter === 'active' && s.is_active) ||
+      (shopFilter === 'off' && !s.is_active) ||
+      (shopFilter === 'notg' && !s.notify_telegram_id))
   );
   renderShopsTable(filtered);
 }
 
 function renderShopsTable(shops) {
-  // группируем: сначала точки с группой (по алфавиту группы), потом без группы
+  // карточки вместо широкой таблицы: на телефоне всё видно без прокрутки вбок.
+  // id элементов прежние — на них опираются функции изменения/сотрудников/филиалов.
   const grouped = {};
   const standalone = [];
   shops.forEach(s => {
-    if (s.client_group) {
-      (grouped[s.client_group] = grouped[s.client_group] || []).push(s);
-    } else {
-      standalone.push(s);
-    }
+    if (s.client_group) (grouped[s.client_group] = grouped[s.client_group] || []).push(s);
+    else standalone.push(s);
   });
 
-  function renderShopRow(s) {
+  function renderShopCard(s) {
+    const name = escapeHtml(JSON.stringify(s.username));
     return `
-    <tr>
-      <td>
-        <span id="name_view_${s.id}">${escapeHtml(s.shop_name || '—')}</span>
-        <div id="name_edit_${s.id}" style="display:none; margin-top:4px;">
-          <input id="name_input_${s.id}" value="${escapeHtml(s.shop_name || '')}" style="width:120px; font-size:12px; padding:4px;">
+    <div class="shop-card ${s.is_active ? '' : 'off'}">
+      <div class="sc-head">
+        <div style="min-width:0;">
+          <div class="sc-name" id="name_view_${s.id}">${escapeHtml(s.shop_name || '—')}</div>
+          <div class="sc-login">@<span id="username_view_${s.id}">${escapeHtml(s.username)}</span></div>
+          <div class="sc-edit" id="name_edit_${s.id}" style="display:none;">
+            <input id="name_input_${s.id}" value="${escapeHtml(s.shop_name || '')}" placeholder="Название">
+          </div>
+          <div class="sc-edit" id="username_edit_${s.id}" style="display:none;">
+            <input id="username_input_${s.id}" value="${escapeHtml(s.username)}" placeholder="Логин">
+            <button class="badge active" style="margin-top:6px; padding:6px 12px;" onclick="saveIdentity(${s.id})">💾 сохранить</button>
+          </div>
         </div>
-        <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="toggleIdentityEdit(${s.id})">✏️ изменить</button>
-      </td>
-      <td>
-        <span id="username_view_${s.id}">${escapeHtml(s.username)}</span>
-        <div id="username_edit_${s.id}" style="display:none; margin-top:4px;">
-          <input id="username_input_${s.id}" value="${escapeHtml(s.username)}" style="width:120px; font-size:12px; padding:4px;">
-          <button class="badge active" style="margin-top:4px;" onclick="saveIdentity(${s.id})">сохранить</button>
-        </div>
-      </td>
-      <td><span class="hint-text">🔒 скрыт</span>
-          <br><button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="resetPassword(${s.id}, ${escapeHtml(JSON.stringify(s.username))})">сбросить</button></td>
-      <td>${s.phone || '—'}</td>
-      <td style="min-width:160px;">
-        ${s.notify_telegram_id
-          ? `<div style="font-size:11.5px; color:#1B8A5A; font-weight:600;">✅ привязан</div>`
-          : `<div style="font-size:11.5px; color:#B3241C; font-weight:600;">не привязан</div>`}
-        ${s.owner_link
-          ? `<button class="badge" style="background:#EFF6FF;color:var(--blue);margin-top:4px;" onclick="copyOwnerLink(${escapeHtml(JSON.stringify(s.owner_link))}, this)">🔗 ссылка для владельца</button>`
-          : ''}
-        <button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="testNotifyTelegram(${s.id})">проверить</button>
-        <details style="margin-top:4px;">
-          <summary style="font-size:11px; color:var(--hint); cursor:pointer;">вручную</summary>
-          <input id="notify_id_${s.id}" value="${escapeHtml(s.notify_telegram_id || '')}" placeholder="123456789" style="width:100px; font-size:11px; padding:4px; margin-top:4px;">
-          <button class="badge" style="background:var(--border);color:var(--hint);margin-top:4px;" onclick="saveNotifyTelegram(${s.id})">сохранить</button>
-        </details>
-      </td>
-      <td>${s.client_count}</td>
-      <td><button class="badge ${s.is_active ? 'active' : 'inactive'}" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">
-        ${s.is_active ? 'активна' : 'выключена'}
-      </button></td>
-      <td><button class="badge ${s.sms_enabled ? 'active' : 'inactive'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})">
-        ${s.sms_enabled ? 'включён' : 'выключен'}
-      </button></td>
-      <td><button class="badge ${s.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})">
-        ${s.warehouse_enabled ? 'включён' : 'выключен'}
-      </button></td>
-      <td><button class="badge" style="background:#EFF6FF;color:var(--blue);" onclick="toggleEmployees(${s.id})">👥 сотрудники</button></td>
-      <td><button class="badge" style="background:#FFF7ED;color:#9A3412;" onclick="toggleBranches(${s.id})">🏢 филиалы</button></td>
-      <td>
+        <button class="badge ${s.is_active ? 'active' : 'inactive'}" style="flex:none;" onclick="toggleShop(${s.id}, ${s.is_active ? 0 : 1})">${s.is_active ? '● активна' : '○ выключена'}</button>
+      </div>
+
+      <div class="sc-meta">
+        <span><i class="fa-solid fa-users"></i> ${s.client_count} клиентов</span>
+        <span><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone || '—')}</span>
+        <span>${s.notify_telegram_id ? '<span class="ok"><i class="fa-brands fa-telegram"></i> Telegram привязан</span>' : '<span class="no"><i class="fa-brands fa-telegram"></i> Telegram не привязан</span>'}</span>
+      </div>
+
+      <div class="sc-row">
+        <span class="lbl">SMS</span>
+        <button class="badge ${s.sms_enabled ? 'active' : 'inactive'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})">${s.sms_enabled ? 'включён' : 'выключен'}</button>
+        <span class="lbl" style="margin-left:8px;">Склад</span>
+        <button class="badge ${s.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})">${s.warehouse_enabled ? 'включён' : 'выключен'}</button>
+        <span class="lbl" style="margin-left:8px;">Группа</span>
         <input value="${escapeHtml(s.client_group || '')}" list="clientGroupsList" placeholder="без группы"
-               style="width:120px; padding:4px 6px; font-size:12px;"
-               onchange="setClientGroup(${s.id}, this.value)">
-      </td>
-    </tr>
-    <tr id="emp-row-${s.id}" style="display:none;"><td colspan="10"><div id="emp-panel-${s.id}" style="padding:10px; background:var(--field-bg); border-radius:10px;">…</div></td></tr>
-    <tr id="branch-row-${s.id}" style="display:none;"><td colspan="10"><div id="branch-panel-${s.id}" style="padding:10px; background:var(--field-bg); border-radius:10px;">…</div></td></tr>
-  `;
+               style="width:130px; padding:5px 8px; font-size:12.5px;" onchange="setClientGroup(${s.id}, this.value)">
+      </div>
+
+      <div class="sc-row" style="margin-top:10px;">
+        <button class="sc-btn" onclick="toggleBranches(${s.id})">🏢 Филиалы</button>
+        <button class="sc-btn" onclick="toggleEmployees(${s.id})">👥 Сотрудники</button>
+        <button class="sc-btn" onclick="toggleIdentityEdit(${s.id})">✏️ Изменить</button>
+        <button class="sc-btn" onclick="resetPassword(${s.id}, ${name})">🔑 Сбросить пароль</button>
+        ${s.owner_link ? `<button class="sc-btn" onclick="copyOwnerLink(${escapeHtml(JSON.stringify(s.owner_link))}, this)">🔗 Ссылка владельцу</button>` : ''}
+        <button class="sc-btn" onclick="testNotifyTelegram(${s.id})">📨 Проверить Telegram</button>
+      </div>
+      <details style="margin-top:8px;">
+        <summary style="font-size:12px; color:var(--hint); cursor:pointer;">Telegram ID вручную</summary>
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <input id="notify_id_${s.id}" value="${escapeHtml(s.notify_telegram_id || '')}" placeholder="123456789" style="max-width:180px; font-size:13px; padding:7px 9px;">
+          <button class="badge active" style="padding:6px 12px;" onclick="saveNotifyTelegram(${s.id})">сохранить</button>
+        </div>
+      </details>
+
+      <div id="branch-row-${s.id}" style="display:none;"><div class="sc-panel" id="branch-panel-${s.id}">…</div></div>
+      <div id="emp-row-${s.id}" style="display:none;"><div class="sc-panel" id="emp-panel-${s.id}">…</div></div>
+    </div>`;
   }
 
   let html = '';
   Object.keys(grouped).sort().forEach(group => {
-    html += `<tr><td colspan="10" style="background:#EFF6FF; font-weight:700; color:var(--blue); padding:8px 6px;">🏷️ ${escapeHtml(group)} (${grouped[group].length})</td></tr>`;
-    grouped[group].forEach(s => html += renderShopRow(s));
+    html += `<div class="grp-title">🏷️ ${escapeHtml(group)} · ${grouped[group].length}</div>`;
+    grouped[group].forEach(s => html += renderShopCard(s));
   });
-  standalone.forEach(s => html += renderShopRow(s));
+  if (standalone.length && Object.keys(grouped).length) html += `<div class="grp-title" style="color:#64748B;">Без группы · ${standalone.length}</div>`;
+  standalone.forEach(s => html += renderShopCard(s));
 
-  document.getElementById('shops-body').innerHTML = html || `<tr><td colspan="10" class="hint-text" style="padding:14px;">Ничего не найдено.</td></tr>`;
+  document.getElementById('shops-body').innerHTML = html || `<div class="hint-text" style="padding:14px;">Ничего не найдено.</div>`;
 }
 
 async function setClientGroup(shopId, value) {
@@ -6260,8 +6334,9 @@ async function loadBranches(shopId) {
   panel.innerHTML = `
     <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Филиалы (полноценные точки — свой склад, своя база, без цены закупки и без прибыли по отдельности)</div>
     ${list}
-    <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
-      <div class="field">
+    <details style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
+      <summary style="cursor:pointer; font-weight:700; color:#059669; font-size:13px; padding:4px 0;">+ Добавить филиал</summary>
+      <div class="field" style="margin-top:8px;">
         <label>Название филиала</label>
         <input id="new-branch-name-${shopId}" placeholder="название филиала">
       </div>
@@ -6294,7 +6369,7 @@ async function loadBranches(shopId) {
         <input id="new-branch-location-${shopId}" placeholder="40.782123, 72.344567">
       </div>
       <button class="badge active" style="padding:6px 14px; margin-top:6px;" onclick="createBranch(${shopId})">+ добавить филиал</button>
-    </div>
+    </details>
   `;
 }
 
