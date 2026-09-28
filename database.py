@@ -15,6 +15,18 @@
 """
 
 import os
+import time as _time
+
+# Серверы (Render, Railway) живут по UTC, а точки — по Ташкенту (UTC+5). Без
+# этого с 00:00 до 05:00 «сегодня» на сервере было бы ещё вчера: записи и
+# статистика «Сегодня/неделя» уезжали бы на предыдущий день. Переопределить
+# можно переменной окружения TZ.
+os.environ.setdefault("TZ", "Asia/Tashkent")
+try:
+    _time.tzset()
+except AttributeError:  # Windows — tzset нет; для локального запуска не критично
+    pass
+
 import json
 import math
 import sqlite3
@@ -1181,7 +1193,22 @@ def get_cross_network_history(plate: str, exclude_shop_id: int):
             WHERE c.plate_number = ? AND c.shop_id != ?
             ORDER BY oc.change_date DESC, oc.id DESC
         """, (plate, exclude_shop_id)).fetchall()
-        return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        d = dict(r)
+        # в items_json чужой точки лежат её цены продажи и закупки — наружу
+        # отдаём только ЧТО делали (позиция, марка, количество), без денег
+        if d.get("items_json"):
+            try:
+                items = json.loads(d["items_json"]) or []
+                d["items_json"] = json.dumps([
+                    {k: it.get(k) for k in ("key", "name", "brand", "qty", "unit") if it.get(k) is not None}
+                    for it in items
+                ], ensure_ascii=False)
+            except (TypeError, ValueError):
+                d["items_json"] = None
+        out.append(d)
+    return out
 
 
 def get_car_by_passport_token(token: str):

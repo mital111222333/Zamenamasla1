@@ -127,6 +127,12 @@ def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
     if notify_chat_id:
         _create_and_send_backup(notify_chat_id)  # снимок ТЕКУЩЕГО состояния перед заменой, для отката
     os.replace(same_dir_tmp, db.DB_PATH)
+    # копия могла быть сделана старой версией программы — докатываем схему
+    # (новые таблицы/колонки создаются, существующие данные не трогаются)
+    try:
+        db.init_db()
+    except Exception as e:
+        print(f"init_db после восстановления: {e}")
     return True, None
 
 
@@ -1520,7 +1526,7 @@ if ('serviceWorker' in navigator) {
       </div>
       {% endif %}
 
-      {% if not is_employee %}
+      {% if not is_employee and not is_branch %}
       <div class="card" style="margin-top:16px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_net_profit_title }}</label>
         <div id="dashNetProfit">{{ T.stats_loading }}</div>
@@ -3961,7 +3967,7 @@ async function lookupPlate() {
     document.getElementById('car_model').value = data.car.car_model || '';
 
     const name = data.car.owner_name || T.kc_no_name;
-    const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+    const initials = name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
     const carLine = [data.car.car_brand, data.car.car_model].filter(Boolean).join(' ');
     const metaParts = [data.car.owner_phone, carLine].filter(Boolean);
 
@@ -4482,7 +4488,7 @@ async function toggleHistory(plate) {
 
   const car = data.car || {};
   const name = car.owner_name || T.kc_no_name;
-  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+  const initials = name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
   const carLine = [car.car_brand, car.car_model].filter(Boolean).join(' ');
   const metaParts = [car.owner_phone, carLine].filter(Boolean);
 
@@ -5170,7 +5176,9 @@ def api_dashboard():
         "low_stock": [],
         "net_profit": None,
     }
-    if not g.is_employee:
+    # прибыль (и чистая прибыль) — только для самостоятельной точки или главного
+    # аккаунта; филиал и сотрудник её не видят, как и в остальной статистике
+    if not g.is_employee and not g.is_branch:
         result["net_profit"] = db.get_net_profit_30d(g.shop_id)
     shop = db.get_shop(g.shop_id)
     if shop and shop.get("warehouse_enabled") and not g.is_employee:
@@ -6003,7 +6011,7 @@ if ('serviceWorker' in navigator) {
         <input id="new_shop_name" placeholder="Avto Servis Namangan">
       </div>
       <div class="field">
-        <label>Клиент / группа (необяз.) — для филиала укажи то же, что у других точек этого клиента</label>
+        <label>Группа (необяз.) — только чтобы точки одного владельца стояли рядом в списке</label>
         <input id="new_client_group" list="clientGroupsList" placeholder="например: Sinov01">
         <datalist id="clientGroupsList"></datalist>
       </div>
@@ -6036,6 +6044,7 @@ if ('serviceWorker' in navigator) {
         <input id="new_location" placeholder="40.782123, 72.344567">
         <div class="hint-text">Открой точку на Google Картах, нажми и удержи на месте — внизу появятся два числа через запятую, скопируй их сюда целиком.</div>
       </div>
+      <div class="hint-text" style="margin:-2px 0 10px; color:#B45309;">⚠️ Это <b>самостоятельная</b> точка: она видит свою прибыль и закупочные цены. Если нужен <b>филиал</b> (без прибыли, с общим складом и статистикой у главного) — открой карточку главной точки → плитка «Филиалы» → «+ Добавить филиал».</div>
       <button class="submit" onclick="createShop()">Создать точку</button>
       <div id="newCreds"></div>
     </div>
