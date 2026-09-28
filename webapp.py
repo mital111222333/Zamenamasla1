@@ -5952,6 +5952,20 @@ if ('serviceWorker' in navigator) {
   .sc-panel { margin-top:10px; padding:12px; background:var(--field-bg); border-radius:12px; }
   .sc-edit input { font-size:13px; padding:7px 9px; margin-top:4px; }
   code { font-family:var(--font-mono); font-size:12px; background:#F1F5F9; padding:1px 5px; border-radius:5px; }
+  .sc-toggles { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; font-size:13px; font-weight:600; color:#334155; }
+  .sw { position:relative; width:40px; height:23px; border-radius:12px; border:none; background:#CBD5E1; cursor:pointer; vertical-align:middle; margin-left:6px; padding:0; transition:background .15s; }
+  .sw::after { content:''; position:absolute; top:3px; left:3px; width:17px; height:17px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:left .15s; }
+  .sw.on { background:#16A34A; }
+  .sw.on::after { left:20px; }
+  .grp-chip { display:inline-flex; align-items:center; gap:4px; background:#F1F5F9; border-radius:999px; padding:0 4px 0 10px; font-size:12.5px; color:#475569; }
+  .grp-chip input { border:none !important; background:transparent !important; box-shadow:none !important; padding:5px 6px !important; width:110px; font-size:12.5px; margin:0; }
+  .sc-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-top:12px; }
+  .sc-tile { border:1px solid var(--border); background:#fff; border-radius:12px; padding:10px 4px 8px; text-align:center; font-size:12px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; }
+  .sc-tile i { display:block; font-size:18px; color:var(--darkblue); margin-bottom:4px; }
+  .sc-tile:hover { background:#F8FAFC; }
+  .sc-tile.open { border-color:var(--blue); background:#EFF6FF; color:var(--blue); }
+  .sc-tile.open i { color:var(--blue); }
+  .sc-tile[disabled] { opacity:.4; cursor:default; }
   @media (max-width:560px) { .row2 { flex-direction:column; gap:0; } }
 </style>
 </head>
@@ -6161,6 +6175,7 @@ function renderShopsTable(shops) {
 
   function renderShopCard(s) {
     const name = escapeHtml(JSON.stringify(s.username));
+    const link = s.owner_link ? escapeHtml(JSON.stringify(s.owner_link)) : null;
     return `
     <div class="shop-card ${s.is_active ? '' : 'off'}">
       <div class="sc-head">
@@ -6180,29 +6195,26 @@ function renderShopsTable(shops) {
 
       <div class="sc-meta">
         <span><i class="fa-solid fa-users"></i> ${s.client_count} клиентов</span>
-        <span><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone || '—')}</span>
-        <span>${s.notify_telegram_id ? '<span class="ok"><i class="fa-brands fa-telegram"></i> Telegram привязан</span>' : '<span class="no"><i class="fa-brands fa-telegram"></i> Telegram не привязан</span>'}</span>
+        ${s.phone ? `<span><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone)}</span>` : ''}
+        ${s.notify_telegram_id ? '<span class="ok"><i class="fa-brands fa-telegram"></i> Telegram</span>' : '<span class="no"><i class="fa-brands fa-telegram"></i> нет Telegram</span>'}
       </div>
 
-      <div class="sc-row">
-        <span class="lbl">SMS</span>
-        <button class="badge ${s.sms_enabled ? 'active' : 'inactive'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})">${s.sms_enabled ? 'включён' : 'выключен'}</button>
-        <span class="lbl" style="margin-left:8px;">Склад</span>
-        <button class="badge ${s.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})">${s.warehouse_enabled ? 'включён' : 'выключен'}</button>
-        <span class="lbl" style="margin-left:8px;">Группа</span>
-        <input value="${escapeHtml(s.client_group || '')}" list="clientGroupsList" placeholder="без группы"
-               style="width:130px; padding:5px 8px; font-size:12.5px;" onchange="setClientGroup(${s.id}, this.value)">
+      <div class="sc-toggles">
+        <span>SMS<button class="sw ${s.sms_enabled ? 'on' : ''}" title="${s.sms_enabled ? 'выключить' : 'включить'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})"></button></span>
+        <span>Склад<button class="sw ${s.warehouse_enabled ? 'on' : ''}" title="${s.warehouse_enabled ? 'выключить' : 'включить'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})"></button></span>
+        <span class="grp-chip">🏷<input value="${escapeHtml(s.client_group || '')}" list="clientGroupsList" placeholder="без группы" onchange="setClientGroup(${s.id}, this.value)"></span>
       </div>
 
-      <div class="sc-row" style="margin-top:10px;">
-        <button class="sc-btn" onclick="toggleBranches(${s.id})">🏢 Филиалы</button>
-        <button class="sc-btn" onclick="toggleEmployees(${s.id})">👥 Сотрудники</button>
-        <button class="sc-btn" onclick="toggleIdentityEdit(${s.id})">✏️ Изменить</button>
-        <button class="sc-btn" onclick="resetPassword(${s.id}, ${name})">🔑 Сбросить пароль</button>
-        ${s.owner_link ? `<button class="sc-btn" onclick="copyOwnerLink(${escapeHtml(JSON.stringify(s.owner_link))}, this)">🔗 Ссылка владельцу</button>` : ''}
-        <button class="sc-btn" onclick="testNotifyTelegram(${s.id})">📨 Проверить Telegram</button>
+      <div class="sc-grid">
+        <button class="sc-tile" id="tile-br-${s.id}" onclick="toggleBranches(${s.id}); this.classList.toggle('open')"><i class="fa-solid fa-building"></i>Филиалы</button>
+        <button class="sc-tile" id="tile-emp-${s.id}" onclick="toggleEmployees(${s.id}); this.classList.toggle('open')"><i class="fa-solid fa-users"></i>Сотрудники</button>
+        <button class="sc-tile" onclick="toggleIdentityEdit(${s.id}); this.classList.toggle('open')"><i class="fa-solid fa-pen"></i>Изменить</button>
+        <button class="sc-tile" onclick="resetPassword(${s.id}, ${name})"><i class="fa-solid fa-key"></i>Пароль</button>
+        <button class="sc-tile" ${link ? `onclick="copyOwnerLink(${link}, this)"` : 'disabled title="ссылки пока нет"'}><i class="fa-solid fa-link"></i>Ссылка</button>
+        <button class="sc-tile" onclick="testNotifyTelegram(${s.id})"><i class="fa-solid fa-paper-plane"></i>Тест TG</button>
       </div>
-      <details style="margin-top:8px;">
+
+      <details style="margin-top:10px;">
         <summary style="font-size:12px; color:var(--hint); cursor:pointer;">Telegram ID вручную</summary>
         <div style="display:flex; gap:6px; margin-top:6px;">
           <input id="notify_id_${s.id}" value="${escapeHtml(s.notify_telegram_id || '')}" placeholder="123456789" style="max-width:180px; font-size:13px; padding:7px 9px;">
@@ -6624,9 +6636,9 @@ async function resetPassword(id, username) {
 
 function copyOwnerLink(link, btn) {
   const done = () => {
-    const original = btn.textContent;
-    btn.textContent = '✅ скопировано';
-    setTimeout(() => { btn.textContent = original; }, 1500);
+    const original = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-check" style="color:#16A34A;"></i>скопировано';
+    setTimeout(() => { btn.innerHTML = original; }, 1500);
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(done).catch(() => {
