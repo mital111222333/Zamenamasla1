@@ -735,6 +735,7 @@ if ('serviceWorker' in navigator) {
   .topbar { margin: 10px 0 12px; gap:10px; }
   .topbar h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .side-nav { display:none; }
+  .role-tag { color:#B45309; }
   .bottom-bar { position:fixed; left:0; right:0; bottom:0; z-index:50; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); background:rgba(255,255,255,0.97); border-top:1px solid var(--border); padding:6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -4px 16px rgba(15,23,42,0.06); }
   .bb-item { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; min-height:50px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
   .bb-item i { font-size:19px; }
@@ -1191,7 +1192,7 @@ if ('serviceWorker' in navigator) {
     <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
     <div style="min-width:0;">
       <div class="side-shop">{{ shop_name }}</div>
-      <div class="logo-sub">MoyBook</div>
+      <div class="logo-sub">MoyBook{% if is_employee %} · <span class="role-tag">{{ T.role_employee }}</span>{% elif is_branch %} · <span class="role-tag">{{ T.role_branch }}</span>{% endif %}</div>
     </div>
   </div>
   <nav class="side-list">
@@ -1254,7 +1255,7 @@ if ('serviceWorker' in navigator) {
       <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
       <div style="min-width:0;">
         <h1>{{ shop_name }}</h1>
-        <div class="logo-sub">MoyBook</div>
+        <div class="logo-sub">MoyBook{% if is_employee %} · <span class="role-tag">{{ T.role_employee }}</span>{% elif is_branch %} · <span class="role-tag">{{ T.role_branch }}</span>{% endif %}</div>
       </div>
     </div>
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch_short }}</button>
@@ -1813,6 +1814,44 @@ if ('serviceWorker' in navigator) {
           <button class="close-btn" onclick="closeWhModal('transferModal')">{{ T.modal_close }}</button>
         </div>
       </div>
+      <div class="modal-overlay" id="editProductModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.whe_title }}</h3>
+          <div class="hint-text" id="ep_category" style="text-align:center; margin:-6px 0 12px;"></div>
+          <div class="field">
+            <label>{{ T.wh_product_name }}</label>
+            <input id="ep_name">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.wh_sell_price }}</label>
+              <input id="ep_sell" type="number" min="0">
+            </div>
+            <div class="field" id="ep_buy_wrap">
+              <label>{{ T.wh_purchase_price }}</label>
+              <input id="ep_buy" type="number" min="0" oninput="onSumFieldEdited('ep_buy', 'ep_buy_usd')">
+            </div>
+          </div>
+          <div class="field" id="ep_usd_wrap">
+            <label>{{ T.usd_price_label }}</label>
+            <input id="ep_buy_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('ep_buy_usd', 'ep_buy')">
+          </div>
+          <div class="hint-text" id="ep_price_hint" style="margin:-4px 0 10px;">{{ T.whe_price_hint }}</div>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.whe_stock_label }} (<span id="ep_unit"></span>)</label>
+              <input id="ep_stock" type="number" min="0" step="0.5" oninput="onEditStockChanged()">
+            </div>
+            <div class="field" id="ep_reason_wrap" style="display:none;">
+              <label>{{ T.whe_reason_label }}</label>
+              <input id="ep_reason" placeholder="{{ T.whe_reason_ph }}">
+            </div>
+          </div>
+          <div class="hint-text" id="ep_stock_hint" style="margin:-4px 0 10px;">{{ T.whe_stock_hint }}</div>
+          <button class="submit" onclick="submitEditProduct()">{{ T.whe_save }}</button>
+          <button class="close-btn" onclick="closeWhModal('editProductModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
   </div>
   {% endif %}
 </div>
@@ -2191,7 +2230,7 @@ function renderWarehouseSummary(key) {
       <div class="wh-att">
         <i class="fa-solid fa-tag" style="color:#B3241C;"></i>
         <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${T.whb_no_price_hint}</span></div>
-        <button class="wh-tbtn wh-tbtn-sm" onclick="editBranchPrice(${p.id}, ${escapeHtml(JSON.stringify(p.name))}, null)">${T.whb_set_price}</button>
+        <button class="wh-tbtn wh-tbtn-sm" onclick="openEditProductModal('br', ${p.id})">${T.whb_set_price}</button>
       </div>`).join('');
   }
   if (dead.length) {
@@ -2280,7 +2319,7 @@ function renderProductCards(key) {
     const shopArg = ctx.shopId || 'null';
     const actions = [
       `<button class="wh-tbtn wh-tbtn-sm" onclick="openRestockModal(${p.id}, ${name}, ${shopArg})">+ ${T.wh_restock_action}</button>`,
-      key === 'br' ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.whb_set_price}" onclick="editBranchPrice(${p.id}, ${name}, ${p.purchase_price ?? 'null'})"><i class="fa-solid fa-tag"></i></button>` : '',
+      `<button class="wh-tbtn wh-tbtn-icon" title="${T.whe_title}" onclick="openEditProductModal('${key}', ${p.id})"><i class="fa-solid fa-pen"></i></button>`,
       canTransfer ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.whn_transfer}" onclick="openTransferModal({fromShop: ${shopArg}, productId: ${p.id}})"><i class="fa-solid fa-right-left"></i></button>` : '',
       key === 'own' ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.wh_delete_action}" onclick="deleteProduct(${p.id}, ${name})"><i class="fa-solid fa-trash-can"></i></button>` : '',
     ].join('');
@@ -2357,6 +2396,71 @@ async function sendPurchaseList(mode) {
 }
 
 // ---- склад выбранного филиала (главный) ----
+// ---- изменение товара ----
+let editingProduct = null;  // { key, shopId, p }
+
+function openEditProductModal(key, productId) {
+  const ctx = WHCTX[key];
+  const p = ctx.products.find(x => x.id === productId);
+  if (!p) return;
+  editingProduct = { key, shopId: ctx.shopId, p };
+  const canBuy = key === 'br' || !IS_BRANCH;
+  document.getElementById('ep_category').textContent = (p.category === 'other' ? T.wh_category_other : (T[p.category] || p.category)) + ' · ' + whUnit(p.unit);
+  document.getElementById('ep_name').value = p.name;
+  document.getElementById('ep_sell').value = p.sell_price ?? '';
+  document.getElementById('ep_buy').value = canBuy ? (p.purchase_price ?? '') : '';
+  document.getElementById('ep_buy_usd').value = '';
+  document.getElementById('ep_buy_wrap').style.display = canBuy ? '' : 'none';
+  document.getElementById('ep_usd_wrap').style.display = canBuy && key === 'own' ? '' : 'none';
+  document.getElementById('ep_price_hint').style.display = canBuy ? '' : 'none';
+  document.getElementById('ep_unit').textContent = whUnit(p.unit);
+  document.getElementById('ep_stock').value = Math.round((p.stock_qty || 0) * 100) / 100;
+  document.getElementById('ep_reason').value = '';
+  document.getElementById('ep_reason_wrap').style.display = 'none';
+  document.getElementById('editProductModal').classList.add('open');
+}
+
+function onEditStockChanged() {
+  if (!editingProduct) return;
+  const v = parseFloat(document.getElementById('ep_stock').value);
+  const changed = !isNaN(v) && Math.abs(v - (editingProduct.p.stock_qty || 0)) > 1e-9;
+  document.getElementById('ep_reason_wrap').style.display = changed ? '' : 'none';
+}
+
+async function submitEditProduct() {
+  if (!editingProduct) return;
+  const { key, shopId, p } = editingProduct;
+  const canBuy = key === 'br' || !IS_BRANCH;
+  const name = document.getElementById('ep_name').value.trim();
+  const sell = document.getElementById('ep_sell').value.trim();
+  const buy = document.getElementById('ep_buy').value.trim();
+  const stock = document.getElementById('ep_stock').value.trim();
+  if (!name) { showMsg(T.whe_err_name, false); return; }
+  if (stock === '' || parseFloat(stock) < 0) { showMsg(T.whe_err_stock, false); return; }
+  // отправляем только то, что действительно изменили
+  const payload = {};
+  if (name !== p.name) payload.name = name;
+  if (sell !== String(p.sell_price ?? '')) payload.sell_price = sell;
+  if (canBuy && buy !== String(p.purchase_price ?? '')) payload.purchase_price = buy;
+  if (Math.abs(parseFloat(stock) - (p.stock_qty || 0)) > 1e-9) {
+    payload.stock_qty = stock;
+    payload.stock_reason = document.getElementById('ep_reason').value.trim();
+  }
+  if (!Object.keys(payload).length) { closeWhModal('editProductModal'); return; }
+  if (payload.name && !confirm(T.whe_rename_confirm)) return;
+  const url = shopId ? `/api/branches/${shopId}/products/${p.id}` : `/api/products/${p.id}`;
+  const res = await fetch(url, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (data.ok) {
+    closeWhModal('editProductModal');
+    showMsg(T.whe_saved, true);
+    if (shopId) { selectWhBranch(shopId); WH.net = null; }
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
 async function selectWhBranch(branchId) {
   WH.branchId = branchId;
   document.querySelectorAll('#branchWarehouseSummary .whn-shop').forEach((el, i) => {
@@ -2657,11 +2761,13 @@ async function loadRestockHistory() {
 function renderMovements(el, moves, showPrice) {
   if (!el) return;
   if (!moves || !moves.length) { el.innerHTML = `<div class="hint-text">${T.wh_no_restocks}</div>`; return; }
-  const icon = { restock: ['fa-arrow-down', '#15803D'], transfer_in: ['fa-right-to-bracket', '#0F52BA'], transfer_out: ['fa-right-from-bracket', '#B45309'] };
+  const icon = { restock: ['fa-arrow-down', '#15803D'], transfer_in: ['fa-right-to-bracket', '#0F52BA'], transfer_out: ['fa-right-from-bracket', '#B45309'], adjust: ['fa-scale-balanced', '#7C3AED'] };
   el.innerHTML = moves.slice(0, 30).map(m => {
     const [ic, col] = icon[m.type] || icon.restock;
-    const sign = m.type === 'transfer_out' ? '−' : '+';
-    const what = m.type === 'restock' ? T.whs_mv_restock : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`);
+    const sign = m.type === 'transfer_out' || (m.type === 'adjust' && m.delta < 0) ? '−' : '+';
+    const what = m.type === 'restock' ? T.whs_mv_restock
+      : m.type === 'adjust' ? `${T.whe_mv_adjust}: ${whQty(m.old_qty)} → ${whQty(m.new_qty)}${m.reason ? ' · ' + escapeHtml(m.reason) : ''}`
+      : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`);
     return `
     <div class="wh-att">
       <i class="fa-solid ${ic}" style="color:${col};"></i>
@@ -5620,26 +5726,57 @@ def api_create_product():
     return jsonify({"ok": True, "product": product})
 
 
+PRODUCT_EDIT_ERRORS = {
+    "not_found": "товар не найден",
+    "empty_name": "укажите название",
+    "duplicate": "товар с таким названием и типом уже есть на складе",
+    "bad_price": "цена не может быть отрицательной",
+    "bad_qty": "остаток не может быть отрицательным",
+}
+
+
+def _apply_product_edit(shop_id: int, product_id: int, data: dict, allow_purchase: bool):
+    """Общая логика изменения товара — для своего склада и для склада филиала
+    (главным аккаунтом). Цена закупки меняется только если allow_purchase.
+    Остаток — отдельной корректировкой с записью в историю."""
+    def _int(v):
+        return int(round(float(v))) if v not in (None, "") else None
+    try:
+        name = data.get("name")
+        sell_price = _int(data.get("sell_price"))
+        purchase_price = _int(data.get("purchase_price")) if allow_purchase else None
+        clear_purchase = allow_purchase and "purchase_price" in data and data.get("purchase_price") in (None, "")
+        stock_qty = float(data["stock_qty"]) if data.get("stock_qty") not in (None, "") else None
+    except (ValueError, TypeError):
+        return jsonify({"ok": False, "error": "неверные данные"}), 400
+    ok, err = db.update_product(product_id, shop_id, name=name, sell_price=sell_price,
+                                purchase_price=purchase_price, clear_purchase_price=clear_purchase)
+    if not ok:
+        return jsonify({"ok": False, "error": PRODUCT_EDIT_ERRORS.get(err, err)}), (404 if err == "not_found" else 400)
+    if stock_qty is not None:
+        ok, err = db.set_stock_count(product_id, shop_id, stock_qty, data.get("stock_reason"))
+        if not ok:
+            return jsonify({"ok": False, "error": PRODUCT_EDIT_ERRORS.get(err, err)}), 400
+    return jsonify({"ok": True})
+
+
 @app.route("/api/products/<int:product_id>", methods=["PUT"])
 @login_required
 @employee_blocked
 def api_update_product(product_id):
-    data = request.get_json(force=True)
-    try:
-        purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
-        if g.is_branch:
-            purchase_price = None  # филиал не может менять цену закупки — только главный аккаунт
-        ok = db.update_product(
-            product_id, g.shop_id,
-            name=data.get("name"),
-            sell_price=int(data["sell_price"]) if data.get("sell_price") not in (None, "") else None,
-            purchase_price=purchase_price,
-        )
-    except (ValueError, TypeError) as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-    if not ok:
-        return jsonify({"ok": False, "error": "товар не найден"}), 404
-    return jsonify({"ok": True})
+    """Изменить товар своего склада. Филиал меняет название, цену продажи и
+    остаток; цену закупки — только главный или самостоятельная точка."""
+    return _apply_product_edit(g.shop_id, product_id, request.get_json(force=True), allow_purchase=not g.is_branch)
+
+
+@app.route("/api/branches/<int:branch_id>/products/<int:product_id>", methods=["PUT"])
+@login_required
+@profit_blocked
+def api_update_branch_product(branch_id, product_id):
+    """Главный аккаунт меняет товар на складе своего филиала (включая закупку)."""
+    if not db.is_branch_of(branch_id, g.shop_id):
+        return jsonify({"ok": False, "error": "это не ваш филиал"}), 403
+    return _apply_product_edit(branch_id, product_id, request.get_json(force=True), allow_purchase=True)
 
 
 @app.route("/api/products/<int:product_id>", methods=["DELETE"])

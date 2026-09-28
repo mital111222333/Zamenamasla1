@@ -380,6 +380,19 @@ def _migrate(conn):
         created_at TEXT DEFAULT (datetime('now'))
     )
     """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS stock_adjustments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        old_qty REAL NOT NULL,
+        new_qty REAL NOT NULL,
+        reason TEXT,
+        adjust_date TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_adjustments_shop ON stock_adjustments(shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_transfers_from ON stock_transfers(from_shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_transfers_to ON stock_transfers(to_shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id)")
@@ -892,24 +905,67 @@ def list_products(shop_id: int, category: str = None, active_only: bool = True):
         return [dict(r) for r in conn.execute(query, params).fetchall()]
 
 
-def update_product(product_id: int, shop_id: int, name=None, sell_price=None, purchase_price=None):
+def update_product(product_id: int, shop_id: int, name=None, sell_price=None, purchase_price=None,
+                   clear_purchase_price=False):
+    """Меняет название и цены товара. Возвращает (ok, error).
+    Важно: прошлые продажи НЕ пересчитываются — в каждой записи о замене
+    уже сохранена цена закупки на момент продажи (cost_price), поэтому
+    прибыль за прошлые дни остаётся честной. Новые цены действуют с этого
+    момента. Тип и единицу измерения не меняем — иначе поехала бы вся
+    статистика по литрам/штукам."""
     existing = get_product(product_id, shop_id)
     if not existing:
-        return False
+        return False, "not_found"
     fields = {}
     if name is not None:
+        name = " ".join(name.split())
+        if not name:
+            return False, "empty_name"
+        key = (existing["category"], name.upper())
+        for p in list_products(shop_id):
+            if p["id"] != product_id and (p["category"], " ".join((p["name"] or "").upper().split())) == key:
+                return False, "duplicate"
         fields["name"] = name
     if sell_price is not None:
+        if sell_price < 0:
+            return False, "bad_price"
         fields["sell_price"] = sell_price
     if purchase_price is not None:
+        if purchase_price < 0:
+            return False, "bad_price"
         fields["purchase_price"] = purchase_price
+    elif clear_purchase_price:
+        fields["purchase_price"] = None
     if not fields:
-        return True
+        return True, None
     set_clause = ", ".join(f"{k}=?" for k in fields)
     with get_conn() as conn:
         conn.execute(f"UPDATE products SET {set_clause} WHERE id=?", (*fields.values(), product_id))
         conn.commit()
-    return True
+    return True, None
+
+
+def set_stock_count(product_id: int, shop_id: int, new_qty: float, reason: str = None):
+    """Корректировка остатка по факту (после пересчёта на складе). Не молча
+    перезаписывает число, а пишет запись в историю движения: было → стало,
+    кто бы ни поменял — всегда видно, откуда взялась разница."""
+    existing = get_product(product_id, shop_id)
+    if not existing:
+        return False, "not_found"
+    if new_qty is None or new_qty < 0:
+        return False, "bad_qty"
+    old_qty = existing["stock_qty"] or 0
+    if abs(old_qty - new_qty) < 1e-9:
+        return True, None
+    with get_conn() as conn:
+        conn.execute("UPDATE products SET stock_qty=? WHERE id=?", (new_qty, product_id))
+        conn.execute("""
+            INSERT INTO stock_adjustments (shop_id, product_id, old_qty, new_qty, reason, adjust_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (shop_id, product_id, old_qty, new_qty, (reason or "").strip()[:200] or None,
+              datetime.now().strftime("%Y-%m-%d")))
+        conn.commit()
+    return True, None
 
 
 def delete_product(product_id: int, shop_id: int):
@@ -1297,7 +1353,8 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
             if pid and item_shop_id:
                 product = get_product(pid, item_shop_id)
                 if product:
-                    item.setdefault("cost_price", product.get("purchase_price"))
+                    # цена закупки — всегда со склада на момент продажи, не из запроса
+                    item["cost_price"] = product.get("purchase_price")
                     adjust_stock(pid, item.get("qty") or 0)
                 else:
                     item["product_id"] = None  # товар не принадлежит этой точке — не связываем со складом
@@ -1378,12 +1435,17 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
             pid = old_item.get("product_id")
             if pid and get_product(pid, shop_id, active_only=False):
                 adjust_stock(pid, -(old_item.get("qty") or 0))
+        # цена закупки уже проданного товара не должна меняться задним числом:
+        # если позиция была в записи раньше — оставляем её прежний cost_price,
+        # текущую цену склада берём только для новых позиций
+        old_cost = {o.get("product_id"): o.get("cost_price") for o in old_items
+                    if o.get("product_id") and "cost_price" in o}
         for item in items:
             pid = item.get("product_id")
             if pid:
                 product = get_product(pid, shop_id)
                 if product:
-                    item["cost_price"] = product.get("purchase_price")
+                    item["cost_price"] = old_cost[pid] if pid in old_cost else product.get("purchase_price")
                     adjust_stock(pid, item.get("qty") or 0)
                 else:
                     item["product_id"] = None
@@ -2877,6 +2939,17 @@ def get_stock_movements(shop_id: int, limit: int = 60) -> list:
                     "product_name": r["product_name"], "unit": r["unit"], "quantity": r["quantity"],
                     "other_shop": ((r["to_name"] or r["to_user"]) if outgoing else (r["from_name"] or r["from_user"])) or "—",
                     "sort": (r["transfer_date"], r["created_at"] or "")})
+    with get_conn() as conn:
+        adj = conn.execute("""
+            SELECT a.*, p.name as product_name, p.unit FROM stock_adjustments a
+            JOIN products p ON p.id = a.product_id
+            WHERE a.shop_id=? ORDER BY a.id DESC LIMIT ?
+        """, (shop_id, limit)).fetchall()
+    for r in adj:
+        out.append({"type": "adjust", "date": r["adjust_date"], "product_name": r["product_name"],
+                    "unit": r["unit"], "quantity": abs(r["new_qty"] - r["old_qty"]),
+                    "delta": r["new_qty"] - r["old_qty"], "old_qty": r["old_qty"], "new_qty": r["new_qty"],
+                    "reason": r["reason"], "sort": (r["adjust_date"], r["created_at"] or "")})
     out.sort(key=lambda x: x["sort"], reverse=True)
     for x in out:
         x.pop("sort", None)
@@ -2929,6 +3002,7 @@ def delete_branch_with_data(branch_id: int) -> bool:
             conn.execute("DELETE FROM cars WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM clients WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM stock_restocks WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM stock_adjustments WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM products WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM expense_entries WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM recurring_expenses WHERE shop_id=?", (branch_id,))
