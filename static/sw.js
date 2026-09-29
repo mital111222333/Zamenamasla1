@@ -10,7 +10,7 @@
 // fetch нужен браузеру, чтобы предложить "Установить приложение" —
 // это его единственная реальная роль здесь.
 
-const OFFLINE_CACHE = 'oilbot-offline-v2';
+const OFFLINE_CACHE = 'oilbook-offline-v3';
 const OFFLINE_URL = '/static/offline.html';
 
 self.addEventListener('install', (event) => {
