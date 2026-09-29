@@ -22,7 +22,7 @@ import requests
 from datetime import datetime
 from functools import wraps
 from urllib.parse import quote
-from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g
+from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g, send_file
 
 import database as db
 import i18n
@@ -1133,6 +1133,31 @@ if ('serviceWorker' in navigator) {
   .wh-mx .q-out { color:#B91C1C; font-weight:800; background:#FEF2F2; border-radius:6px; padding:2px 6px; }
   .wh-mx .q-low { color:#B45309; font-weight:800; background:#FEF3C7; border-radius:6px; padding:2px 6px; }
   .wh-mx .q-none { color:#CBD5E1; }
+  .ship-modal { max-width:640px; }
+  .net-actions { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:8px; margin:0 0 12px; }
+  .ship-list { max-height:48vh; overflow-y:auto; border:1px solid var(--border); border-radius:12px; margin-top:6px; }
+  .sh-row { display:flex; align-items:center; gap:8px; padding:9px 10px; border-bottom:1px solid #F1F5F9; }
+  .sh-row:last-child { border-bottom:none; }
+  .sh-row.sel { background:#EFF6FF; }
+  .sh-name { flex:1; min-width:0; }
+  .sh-name b { display:block; font-size:13.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sh-name span { font-size:11.5px; color:#64748B; }
+  .sh-name .need { color:#B45309; font-weight:700; }
+  .sh-row input { width:76px !important; padding:6px 8px !important; margin:0 !important; font-size:13px; text-align:right; }
+  .sh-row input.over { border-color:#DC2626 !important; background:#FEF2F2 !important; }
+  .sh-unit { font-size:12px; color:#64748B; width:22px; }
+  .ship-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .ship-foot span { font-size:13px; color:#475569; font-weight:600; }
+  .imp-steps { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#334155; background:#F8FAFC; border-radius:12px; padding:10px 12px; }
+  .imp-sum { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin:8px 0; }
+  .imp-sum div { background:#F8FAFC; border-radius:10px; padding:8px; text-align:center; font-size:11.5px; color:#64748B; }
+  .imp-sum b { display:block; font-size:18px; color:var(--text); }
+  .imp-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .imp-table td, .imp-table th { padding:6px; border-bottom:1px solid #F1F5F9; text-align:left; background:none; color:var(--text); text-transform:none; letter-spacing:0; font-size:12px; }
+  .imp-tag { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:6px; }
+  .imp-tag.new { background:#DCFCE7; color:#15803D; }
+  .imp-tag.upd { background:#DBEAFE; color:#1D4ED8; }
+  .imp-tag.err { background:#FEE2E2; color:#B91C1C; }
   .dash-row {
     display:flex; justify-content:space-between; align-items:center; padding:8px 0;
     border-bottom:1px dashed var(--border); font-size:13.5px;
@@ -1410,17 +1435,18 @@ if ('serviceWorker' in navigator) {
 
   {% if not is_employee %}
   <div id="view-expenses" style="display:none;">
-    {% if not is_branch %}
+    {% if true %}
     <div class="card" id="usdRateCardExp" style="margin-bottom:14px;">
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
       <div class="row2">
         <div class="field">
           <label>{{ T.usd_rate_label }}</label>
-          <input id="usd_rate_input_exp" type="number" step="0.01" placeholder="12700" value="{{ usd_rate or '' }}">
+          <input id="usd_rate_input_exp" type="number" step="0.01" placeholder="{{ '%g'|format(usd_rate_head) if usd_rate_head else 12700 }}" value="{{ '%g'|format(usd_rate_own) if usd_rate_own else '' }}">
         </div>
       </div>
       <button class="submit" onclick="saveUsdRate('usd_rate_input_exp', 'usdRateSaved_exp')">{{ T.usd_rate_save }}</button>
       <div id="usdRateSaved_exp" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
+      <div class="hint-text usd-inherit-hint" style="display:none; margin-top:8px; color:#0F52BA;"></div>
     </div>
     {% endif %}
 
@@ -1674,6 +1700,7 @@ if ('serviceWorker' in navigator) {
         <div class="wh-toolbar">
           <div class="wh-search"><i class="fa-solid fa-magnifying-glass"></i><input id="whSearch" placeholder="{{ T.whs_search }}" oninput="renderProductCards()" autocomplete="off"></div>
           <button class="wh-tbtn wh-tbtn-primary" onclick="openAddProductModal()"><i class="fa-solid fa-plus"></i> {{ T.whs_add_short }}</button>
+          <button class="wh-tbtn" title="{{ T.imp_title }}" onclick="openImportModal()"><i class="fa-solid fa-file-excel" style="color:#15803D;"></i> Excel</button>
         </div>
         <div class="brand-chips" id="whCatChips"></div>
         <div id="whCards"></div>
@@ -1685,17 +1712,18 @@ if ('serviceWorker' in navigator) {
         <div id="restockHistory"></div>
       </div>
 
-      {% if not is_branch %}
+      {% if true %}
       <div class="card" id="usdRateCard" style="margin-top:14px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
         <div class="row2">
           <div class="field">
             <label>{{ T.usd_rate_label }}</label>
-            <input id="usd_rate_input" type="number" step="0.01" placeholder="12700" value="{{ usd_rate or '' }}">
+            <input id="usd_rate_input" type="number" step="0.01" placeholder="{{ '%g'|format(usd_rate_head) if usd_rate_head else 12700 }}" value="{{ '%g'|format(usd_rate_own) if usd_rate_own else '' }}">
           </div>
         </div>
         <button class="submit" onclick="saveUsdRate()">{{ T.usd_rate_save }}</button>
         <div id="usdRateSaved" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
+        <div class="hint-text usd-inherit-hint" style="display:none; margin-top:8px; color:#0F52BA;"></div>
         <p class="hint-text" style="margin-top:10px; margin-bottom:0;">{{ T.usd_rate_hint }}</p>
       </div>
       {% endif %}
@@ -1707,7 +1735,11 @@ if ('serviceWorker' in navigator) {
       <div class="card">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.whn_title }}</label>
         <div class="hint-text" style="margin-bottom:12px;">{{ T.whn_hint }}</div>
-        <button class="wh-tbtn wh-tbtn-primary wh-tbtn-wide" onclick="openTransferModal({})" style="margin:0 0 12px;"><i class="fa-solid fa-right-left"></i> {{ T.whn_transfer }}</button>
+        <div class="net-actions">
+          <button class="wh-tbtn wh-tbtn-primary" onclick="openShipModal()"><i class="fa-solid fa-truck"></i> {{ T.shp_title }}</button>
+          <button class="wh-tbtn" onclick="openCatalogModal()"><i class="fa-solid fa-copy"></i> {{ T.cat_title }}</button>
+          <button class="wh-tbtn" onclick="openTransferModal({})"><i class="fa-solid fa-right-left"></i> {{ T.whn_transfer_one }}</button>
+        </div>
         <div id="whNetMatrix">{{ T.stats_loading }}</div>
       </div>
     </div>
@@ -1715,6 +1747,10 @@ if ('serviceWorker' in navigator) {
     <div id="whBranchesView" style="display:none;">
       <div id="branchWarehouseSummary" class="whn-summary" style="margin-bottom:12px;"></div>
       <div id="whbDetail" style="display:none;">
+        <div class="net-actions">
+          <button class="wh-tbtn wh-tbtn-primary" onclick="openShipModal(WH.branchId)"><i class="fa-solid fa-truck"></i> {{ T.shp_to_branch }}</button>
+          <button class="wh-tbtn" onclick="openCatalogModal(WH.branchId)"><i class="fa-solid fa-copy"></i> {{ T.cat_title }}</button>
+        </div>
         <div class="card">
           <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_title }} — <span id="whbTitle"></span></label>
           <div class="wh-kpis" id="whbKpis"></div>
@@ -1759,16 +1795,22 @@ if ('serviceWorker' in navigator) {
           <div class="row2">
             <div class="field">
               <label>{{ T.wh_sell_price }}</label>
-              <input id="wh_new_sell_price" type="number" placeholder="45000">
+              <input id="wh_new_sell_price" type="number" placeholder="45000" oninput="onSumFieldEdited('wh_new_sell_price', 'wh_new_sell_usd')">
             </div>
-            <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
+            <div class="field">
+              <label>{{ T.usd_sell_label }}</label>
+              <input id="wh_new_sell_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_sell_usd', 'wh_new_sell_price')">
+            </div>
+          </div>
+          <div class="row2" {% if is_branch %}style="display:none;"{% endif %}>
+            <div class="field">
               <label>{{ T.wh_purchase_price }}</label>
               <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd')">
             </div>
-          </div>
-          <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
-            <label>{{ T.usd_price_label }}</label>
-            <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
+            <div class="field">
+              <label>{{ T.usd_buy_label }}</label>
+              <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
+            </div>
           </div>
           <div class="field">
             <label>{{ T.wh_initial_stock }}</label>
@@ -1825,16 +1867,22 @@ if ('serviceWorker' in navigator) {
           <div class="row2">
             <div class="field">
               <label>{{ T.wh_sell_price }}</label>
-              <input id="ep_sell" type="number" min="0">
+              <input id="ep_sell" type="number" min="0" oninput="onSumFieldEdited('ep_sell', 'ep_sell_usd')">
             </div>
-            <div class="field" id="ep_buy_wrap">
+            <div class="field" id="ep_sell_usd_wrap">
+              <label>{{ T.usd_sell_label }}</label>
+              <input id="ep_sell_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('ep_sell_usd', 'ep_sell')">
+            </div>
+          </div>
+          <div class="row2" id="ep_buy_wrap">
+            <div class="field">
               <label>{{ T.wh_purchase_price }}</label>
               <input id="ep_buy" type="number" min="0" oninput="onSumFieldEdited('ep_buy', 'ep_buy_usd')">
             </div>
-          </div>
-          <div class="field" id="ep_usd_wrap">
-            <label>{{ T.usd_price_label }}</label>
-            <input id="ep_buy_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('ep_buy_usd', 'ep_buy')">
+            <div class="field" id="ep_usd_wrap">
+              <label>{{ T.usd_buy_label }}</label>
+              <input id="ep_buy_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('ep_buy_usd', 'ep_buy')">
+            </div>
           </div>
           <div class="hint-text" id="ep_price_hint" style="margin:-4px 0 10px;">{{ T.whe_price_hint }}</div>
           <div class="row2">
@@ -1850,6 +1898,57 @@ if ('serviceWorker' in navigator) {
           <div class="hint-text" id="ep_stock_hint" style="margin:-4px 0 10px;">{{ T.whe_stock_hint }}</div>
           <button class="submit" onclick="submitEditProduct()">{{ T.whe_save }}</button>
           <button class="close-btn" onclick="closeWhModal('editProductModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      <div class="modal-overlay" id="shipModal">
+        <div class="modal modal-wide ship-modal" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.shp_title }}</h3>
+          <div class="row2">
+            <div class="field"><label>{{ T.whn_from }}</label><select id="shp_from" onchange="loadShipPlan()"></select></div>
+            <div class="field"><label>{{ T.whn_to }}</label><select id="shp_to" onchange="loadShipPlan()"></select></div>
+          </div>
+          <div class="wh-toolbar" style="margin-bottom:8px;">
+            <div class="wh-search"><i class="fa-solid fa-magnifying-glass"></i><input id="shp_search" placeholder="{{ T.whs_search }}" oninput="renderShipRows()" autocomplete="off"></div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+            <button class="wh-tbtn wh-tbtn-sm" onclick="shipAutofill()"><i class="fa-solid fa-wand-magic-sparkles"></i> {{ T.shp_autofill }}</button>
+            <button class="wh-tbtn wh-tbtn-sm" onclick="shipClear()"><i class="fa-solid fa-eraser"></i> {{ T.shp_clear }}</button>
+            <label class="wh-tbtn wh-tbtn-sm" style="display:inline-flex; align-items:center; gap:6px; margin:0; text-transform:none; letter-spacing:0; color:var(--text);"><input type="checkbox" id="shp_only_selected" onchange="renderShipRows()" style="width:auto; margin:0;"> {{ T.shp_only_selected }}</label>
+          </div>
+          <div class="brand-chips" id="shp_cats"></div>
+          <div id="shp_list" class="ship-list">{{ T.stats_loading }}</div>
+          <div class="ship-foot">
+            <span id="shp_summary"></span>
+            <button class="submit" style="width:auto; padding:10px 18px; margin:0;" onclick="submitShip()"><i class="fa-solid fa-truck"></i> {{ T.shp_send }}</button>
+          </div>
+          <button class="close-btn" onclick="closeWhModal('shipModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="catalogModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.cat_title }}</h3>
+          <div class="hint-text" style="margin-bottom:12px;">{{ T.cat_hint }}</div>
+          <div class="field"><label>{{ T.cat_branch }}</label><select id="cat_branch"></select></div>
+          <label style="display:block; margin:6px 0;">{{ T.cat_types }}</label>
+          <div id="cat_types" style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;"></div>
+          <button class="submit" onclick="submitCatalog()"><i class="fa-solid fa-copy"></i> {{ T.cat_copy }}</button>
+          <button class="close-btn" onclick="closeWhModal('catalogModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="importModal">
+        <div class="modal modal-wide ship-modal" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.imp_title }}</h3>
+          <div class="imp-steps">
+            <div><b>1.</b> {{ T.imp_step1 }} <a class="wh-tbtn wh-tbtn-sm" href="/api/products/import_template" style="text-decoration:none; display:inline-block; margin-left:4px;"><i class="fa-solid fa-download"></i> {{ T.imp_template }}</a></div>
+            <div><b>2.</b> {{ T.imp_step2 }}</div>
+            <div><b>3.</b> {{ T.imp_step3 }}</div>
+          </div>
+          <input type="file" id="imp_file" accept=".xlsx" onchange="previewImport()" style="margin:10px 0;">
+          <div id="imp_preview"></div>
+          <button class="submit" id="imp_apply_btn" style="display:none;" onclick="applyImport()"></button>
+          <button class="close-btn" onclick="closeWhModal('importModal')">{{ T.modal_close }}</button>
         </div>
       </div>
   </div>
@@ -1983,6 +2082,7 @@ const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const IS_BRANCH = {{ is_branch|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
+const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -2396,6 +2496,247 @@ async function sendPurchaseList(mode) {
 }
 
 // ---- склад выбранного филиала (главный) ----
+// ---- накладная: отправка многих товаров сразу ----
+const SHIP = { rows: [], qty: {}, cat: 'all' };
+
+async function openShipModal(toShopId) {
+  if (!WH.net) await loadNetworkStock();
+  if (!WH.net) return;
+  const shops = WH.net.shops;
+  const opt = s => `<option value="${s.id}">${escapeHtml(s.name)}${s.is_head ? ' (' + T.branch_head_label + ')' : ''}</option>`;
+  const head = shops.find(s => s.is_head) || shops[0];
+  document.getElementById('shp_from').innerHTML = shops.map(opt).join('');
+  document.getElementById('shp_to').innerHTML = shops.map(opt).join('');
+  document.getElementById('shp_from').value = head.id;
+  const firstBranch = shops.find(s => !s.is_head);
+  document.getElementById('shp_to').value = toShopId || (firstBranch ? firstBranch.id : head.id);
+  document.getElementById('shp_search').value = '';
+  document.getElementById('shp_only_selected').checked = false;
+  SHIP.cat = 'all';
+  document.getElementById('shipModal').classList.add('open');
+  loadShipPlan();
+}
+
+async function loadShipPlan() {
+  const from = document.getElementById('shp_from').value;
+  const to = document.getElementById('shp_to').value;
+  SHIP.qty = {};
+  const list = document.getElementById('shp_list');
+  if (from === to) { SHIP.rows = []; list.innerHTML = `<div class="hint-text" style="padding:12px;">${T.whn_err_same}</div>`; updateShipSummary(); return; }
+  list.innerHTML = `<div class="hint-text" style="padding:12px;">${T.stats_loading}</div>`;
+  let data;
+  try { data = await (await fetch(`/api/warehouse/ship_plan?from=${from}&to=${to}`)).json(); } catch (e) { return; }
+  if (!data.ok) { list.innerHTML = `<div class="hint-text" style="padding:12px;">${escapeHtml(data.error || '')}</div>`; return; }
+  SHIP.rows = data.rows;
+  renderShipCats();
+  renderShipRows();
+}
+
+function renderShipCats() {
+  const counts = {};
+  SHIP.rows.forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });
+  const order = FLUID_KEYS.concat(FILTER_KEYS, ['other']).filter(k => counts[k]);
+  document.getElementById('shp_cats').innerHTML =
+    [`<div class="brand-chip ${SHIP.cat === 'all' ? 'active' : ''}" onclick="SHIP.cat='all'; renderShipCats(); renderShipRows();">${T.whs_all}<span class="bc-sub">${SHIP.rows.length}</span></div>`]
+      .concat(order.map(k => `<div class="brand-chip ${SHIP.cat === k ? 'active' : ''}" onclick="SHIP.cat='${k}'; renderShipCats(); renderShipRows();">${escapeHtml(k === 'other' ? T.wh_category_other : (T[k] || k))}<span class="bc-sub">${counts[k]}</span></div>`))
+      .join('');
+}
+
+function renderShipRows() {
+  const q = document.getElementById('shp_search').value.trim().toLowerCase();
+  const onlySel = document.getElementById('shp_only_selected').checked;
+  const toName = (document.getElementById('shp_to').selectedOptions[0] || {}).textContent || '';
+  const rows = SHIP.rows.filter(r =>
+    (SHIP.cat === 'all' || r.category === SHIP.cat) &&
+    (!q || r.name.toLowerCase().includes(q)) &&
+    (!onlySel || SHIP.qty[r.id] > 0));
+  const list = document.getElementById('shp_list');
+  if (!rows.length) { list.innerHTML = `<div class="hint-text" style="padding:12px;">${T.whs_nothing_found}</div>`; updateShipSummary(); return; }
+  // рисуем не больше 300 строк за раз — поиск и фильтр помогают сузить
+  list.innerHTML = rows.slice(0, 300).map(r => {
+    const v = SHIP.qty[r.id] || '';
+    const u = whUnit(r.unit);
+    const there = r.to_qty === null ? T.shp_not_there : `${whQty(r.to_qty)} ${u}${r.to_per_day ? ` · ~${whQty(r.to_per_day)}${T.whs_per_day}` : ''}`;
+    return `
+      <div class="sh-row ${v > 0 ? 'sel' : ''}" id="shr_${r.id}">
+        <div class="sh-name">
+          <b>${escapeHtml(r.name)}</b>
+          <span>${T.shp_have} ${whQty(r.stock)} ${u} · ${escapeHtml(toName.split(' (')[0])}: ${there}${r.suggested > 0 ? ` · <span class="need">${T.shp_need} ${whQty(r.suggested)}</span>` : ''}</span>
+        </div>
+        <input type="number" min="0" step="0.5" value="${v}" placeholder="0" oninput="onShipQty(${r.id}, this)" class="${v > r.stock ? 'over' : ''}">
+        <span class="sh-unit">${u}</span>
+      </div>`;
+  }).join('') + (rows.length > 300 ? `<div class="hint-text" style="padding:10px;">${T.shp_more_rows.replace('{n}', rows.length - 300)}</div>` : '');
+  updateShipSummary();
+}
+
+function onShipQty(id, input) {
+  const v = parseFloat(input.value);
+  const row = SHIP.rows.find(r => r.id === id);
+  if (v > 0) SHIP.qty[id] = v; else delete SHIP.qty[id];
+  input.classList.toggle('over', v > (row ? row.stock : 0));
+  const el = document.getElementById('shr_' + id);
+  if (el) el.classList.toggle('sel', v > 0);
+  updateShipSummary();
+}
+
+function updateShipSummary() {
+  const ids = Object.keys(SHIP.qty).filter(id => SHIP.qty[id] > 0);
+  const over = SHIP.rows.filter(r => SHIP.qty[r.id] > r.stock).length;
+  document.getElementById('shp_summary').innerHTML = `${T.shp_selected} ${ids.length}` + (over ? ` · <span style="color:#B91C1C;">${T.shp_over} ${over}</span>` : '');
+}
+
+function shipAutofill() {
+  let n = 0;
+  SHIP.rows.forEach(r => { if (r.suggested > 0) { SHIP.qty[r.id] = r.suggested; n++; } });
+  renderShipRows();
+  showMsg(n ? `${T.shp_autofilled} ${n}` : T.shp_nothing_needed, !!n);
+}
+
+function shipClear() {
+  SHIP.qty = {};
+  renderShipRows();
+}
+
+async function submitShip() {
+  const from = document.getElementById('shp_from').value;
+  const to = document.getElementById('shp_to').value;
+  const lines = Object.keys(SHIP.qty).filter(id => SHIP.qty[id] > 0).map(id => ({ product_id: parseInt(id), quantity: SHIP.qty[id] }));
+  if (!lines.length) { showMsg(T.shp_pick, false); return; }
+  if (SHIP.rows.some(r => SHIP.qty[r.id] > r.stock)) { showMsg(T.shp_fix_over, false); return; }
+  const toName = (document.getElementById('shp_to').selectedOptions[0] || {}).textContent || '';
+  if (!confirm(`${T.shp_confirm} ${lines.length} → ${toName}?`)) return;
+  const res = await fetch('/api/warehouse/bulk_transfer', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ from_shop_id: from, to_shop_id: to, lines })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    closeWhModal('shipModal');
+    showMsg(`${T.shp_done} ${data.lines} (№ ${data.batch})`, true);
+    WH.net = null;
+    loadNetworkStock();
+    loadWarehouse();
+    if (WH.branchId) selectWhBranch(WH.branchId);
+  } else if (data.error === 'problems') {
+    const names = data.problems.map(p => `${p.name || '#' + p.product_id}${p.available !== undefined ? ` (${T.whn_available} ${whQty(p.available)})` : ''}`).join(', ');
+    showMsg(`${T.whn_err_not_enough} ${names}`, false);
+  } else {
+    showMsg(T['whn_err_' + data.error] || data.error, false);
+  }
+}
+
+// ---- скопировать каталог в филиал ----
+function openCatalogModal(branchId) {
+  const sel = document.getElementById('cat_branch');
+  sel.innerHTML = WH.branches.map(b => `<option value="${b.id}">${escapeHtml(b.shop_name || b.username)}</option>`).join('');
+  if (branchId) sel.value = branchId;
+  const counts = {};
+  WHCTX.own.products.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+  const order = FLUID_KEYS.concat(FILTER_KEYS, ['other']).filter(k => counts[k]);
+  document.getElementById('cat_types').innerHTML = order.map(k => `
+    <label style="display:flex; align-items:center; gap:8px; font-size:14px; text-transform:none; letter-spacing:0; color:var(--text); margin:0;">
+      <input type="checkbox" class="cat-type" value="${k}" checked style="width:auto; margin:0;">
+      ${escapeHtml(k === 'other' ? T.wh_category_other : (T[k] || k))} <span class="hint-text" style="margin:0;">(${counts[k]})</span>
+    </label>`).join('') || `<div class="hint-text">${T.wh_no_products}</div>`;
+  document.getElementById('catalogModal').classList.add('open');
+}
+
+async function submitCatalog() {
+  const branchId = document.getElementById('cat_branch').value;
+  const cats = Array.from(document.querySelectorAll('.cat-type:checked')).map(c => c.value);
+  if (!cats.length) { showMsg(T.cat_pick, false); return; }
+  const res = await fetch('/api/warehouse/copy_catalog', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ branch_id: branchId, categories: cats })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    closeWhModal('catalogModal');
+    showMsg(`${T.cat_done} ${data.created}${data.skipped ? ` · ${T.cat_skipped} ${data.skipped}` : ''}`, true);
+    WH.net = null;
+    loadNetworkStock();
+    loadWarehouse();
+    if (WH.branchId) selectWhBranch(WH.branchId);
+  } else {
+    showMsg(T['whn_err_' + data.error] || data.error, false);
+  }
+}
+
+// ---- загрузка склада из Excel ----
+let IMPORT_ROWS = [];
+
+function openImportModal() {
+  document.getElementById('imp_file').value = '';
+  document.getElementById('imp_preview').innerHTML = '';
+  document.getElementById('imp_apply_btn').style.display = 'none';
+  IMPORT_ROWS = [];
+  document.getElementById('importModal').classList.add('open');
+}
+
+async function previewImport() {
+  const f = document.getElementById('imp_file').files[0];
+  const box = document.getElementById('imp_preview');
+  const btn = document.getElementById('imp_apply_btn');
+  btn.style.display = 'none';
+  if (!f) return;
+  box.innerHTML = `<div class="hint-text">${T.stats_loading}</div>`;
+  const fd = new FormData();
+  fd.append('file', f);
+  let data;
+  try { data = await (await fetch('/api/products/import_preview', { method: 'POST', body: fd })).json(); }
+  catch (e) { box.innerHTML = `<div class="hint-text" style="color:#B91C1C;">${T.imp_err_bad_file}</div>`; return; }
+  if (!data.ok) { box.innerHTML = `<div class="hint-text" style="color:#B91C1C;">${T['imp_err_' + data.error] || data.error}</div>`; return; }
+  IMPORT_ROWS = data.rows;
+  const errs = data.rows.filter(r => r.errors.length);
+  const ok = data.rows.filter(r => !r.errors.length);
+  const upd = ok.filter(r => r.exists).length;
+  const errText = e => e.map(x => T['imp_bad_' + x] || x).join(', ');
+  box.innerHTML = `
+    <div class="imp-sum">
+      <div><b style="color:#15803D;">${ok.length - upd}</b>${T.imp_new}</div>
+      <div><b style="color:#1D4ED8;">${upd}</b>${T.imp_update}</div>
+      <div><b style="color:#B91C1C;">${errs.length}</b>${T.imp_errors}</div>
+    </div>
+    ${errs.length ? `<div class="hint-text" style="color:#B91C1C; margin-bottom:6px;">${T.imp_errors_hint}</div>` : ''}
+    <div style="max-height:36vh; overflow:auto; border:1px solid var(--border); border-radius:12px;">
+      <table class="imp-table">
+        <tbody>${data.rows.slice(0, 200).map(r => `
+          <tr>
+            <td style="color:#94A3B8;">${r.row}</td>
+            <td><b>${escapeHtml(r.name || '—')}</b><br><span class="hint-text" style="margin:0;">${escapeHtml(r.category ? (r.category === 'other' ? T.wh_category_other : T[r.category]) : r.category_raw || '—')}</span></td>
+            <td style="white-space:nowrap;">${r.quantity ? whQty(r.quantity) + ' ' + whUnit(r.unit) : '—'}</td>
+            <td style="white-space:nowrap;">${r.sell_price != null ? fmtNum(r.sell_price) : '—'}${!IS_BRANCH && r.purchase_price != null ? `<br><span class="hint-text" style="margin:0;">${T.whs_buy} ${fmtNum(r.purchase_price)}</span>` : ''}</td>
+            <td>${r.errors.length ? `<span class="imp-tag err">${errText(r.errors)}</span>` : (r.exists ? `<span class="imp-tag upd">${T.imp_tag_upd}</span>` : `<span class="imp-tag new">${T.imp_tag_new}</span>`)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${data.rows.length > 200 ? `<div class="hint-text">${T.shp_more_rows.replace('{n}', data.rows.length - 200)}</div>` : ''}`;
+  if (ok.length) {
+    btn.style.display = '';
+    btn.innerHTML = `<i class="fa-solid fa-file-import"></i> ${T.imp_apply} ${ok.length}`;
+  }
+}
+
+async function applyImport() {
+  const ok = IMPORT_ROWS.filter(r => !r.errors.length);
+  if (!ok.length) return;
+  const payload = ok.map(r => ({ category: r.category, name: r.name, unit: r.unit, sell_price: r.sell_price, purchase_price: r.purchase_price, quantity: r.quantity }));
+  const btn = document.getElementById('imp_apply_btn');
+  btn.disabled = true;
+  const res = await fetch('/api/products/import_apply', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ rows: payload }) });
+  const data = await res.json();
+  btn.disabled = false;
+  if (data.ok) {
+    closeWhModal('importModal');
+    showMsg(`${T.imp_done}: ${T.imp_new} ${data.created}, ${T.imp_restocked} ${data.restocked}${data.updated ? `, ${T.imp_prices} ${data.updated}` : ''}`, true);
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + (data.error || ''), false);
+  }
+}
+
 // ---- изменение товара ----
 let editingProduct = null;  // { key, shopId, p }
 
@@ -2410,8 +2751,10 @@ function openEditProductModal(key, productId) {
   document.getElementById('ep_sell').value = p.sell_price ?? '';
   document.getElementById('ep_buy').value = canBuy ? (p.purchase_price ?? '') : '';
   document.getElementById('ep_buy_usd').value = '';
+  document.getElementById('ep_sell_usd').value = '';
+  document.getElementById('ep_sell_usd_wrap').style.display = USD_RATE ? '' : 'none';
   document.getElementById('ep_buy_wrap').style.display = canBuy ? '' : 'none';
-  document.getElementById('ep_usd_wrap').style.display = canBuy && key === 'own' ? '' : 'none';
+  document.getElementById('ep_usd_wrap').style.display = canBuy && USD_RATE ? '' : 'none';
   document.getElementById('ep_price_hint').style.display = canBuy ? '' : 'none';
   document.getElementById('ep_unit').textContent = whUnit(p.unit);
   document.getElementById('ep_stock').value = Math.round((p.stock_qty || 0) * 100) / 100;
@@ -2654,7 +2997,8 @@ async function saveUsdRate(inputId, savedId) {
   });
   const data = await res.json();
   if (data.ok) {
-    USD_RATE = data.rate;
+    USD_RATE = data.effective ?? data.rate;
+    renderUsdInheritHint(data.rate);
     // синхронизируем оба виджета курса, если на странице есть второй (Расходы)
     ['usd_rate_input', 'usd_rate_input_exp'].forEach(id => {
       const el = document.getElementById(id);
@@ -2667,6 +3011,22 @@ async function saveUsdRate(inputId, savedId) {
     showMsg(T.usd_rate_error || data.error, false);
   }
 }
+
+function renderUsdInheritHint(ownRate) {
+  // филиал без своего курса пересчитывает $ по курсу главной точки — пишем это явно
+  document.querySelectorAll('.usd-inherit-hint').forEach(el => {
+    if (IS_BRANCH && !ownRate && HEAD_USD_RATE) {
+      el.innerHTML = `${T.usd_head_used} <b>${Number(HEAD_USD_RATE).toLocaleString('ru-RU')}</b>. ${T.usd_head_own}`;
+      el.style.display = '';
+    } else if (IS_BRANCH && !ownRate) {
+      el.textContent = T.usd_none;
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+renderUsdInheritHint({{ usd_rate_own|tojson }});
 
 async function createProduct() {
   const catEl = document.getElementById('wh_new_category');
@@ -2767,7 +3127,7 @@ function renderMovements(el, moves, showPrice) {
     const sign = m.type === 'transfer_out' || (m.type === 'adjust' && m.delta < 0) ? '−' : '+';
     const what = m.type === 'restock' ? T.whs_mv_restock
       : m.type === 'adjust' ? `${T.whe_mv_adjust}: ${whQty(m.old_qty)} → ${whQty(m.new_qty)}${m.reason ? ' · ' + escapeHtml(m.reason) : ''}`
-      : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`);
+      : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`) + (m.batch ? ` · ${T.shp_batch} ${escapeHtml(m.batch)}` : '');
     return `
     <div class="wh-att">
       <i class="fa-solid ${ic}" style="color:${col};"></i>
@@ -5040,7 +5400,9 @@ def index():
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         is_employee=g.is_employee,
         is_branch=g.is_branch,
-        usd_rate=shop.get("usd_rate") if shop else None,
+        usd_rate=_effective_usd_rate(shop),
+        usd_rate_own=shop.get("usd_rate") if shop else None,
+        usd_rate_head=_head_usd_rate(shop),
     )
 
 
@@ -5055,12 +5417,27 @@ def api_set_language():
     return jsonify({"ok": True})
 
 
+def _head_usd_rate(shop):
+    """Курс доллара главной точки — для филиала, если он не задал свой."""
+    if shop and shop.get("role") == "branch" and shop.get("parent_shop_id"):
+        parent = db.get_shop(shop["parent_shop_id"])
+        return parent.get("usd_rate") if parent else None
+    return None
+
+
+def _effective_usd_rate(shop):
+    """Свой курс точки; у филиала без своего курса — курс главной точки."""
+    if not shop:
+        return None
+    return shop.get("usd_rate") or _head_usd_rate(shop)
+
+
 @app.route("/api/usd_rate", methods=["POST"])
 @login_required
-@profit_blocked
+@employee_blocked
 def api_set_usd_rate():
-    """Владелец точки/главный аккаунт сам выставляет свой курс доллара —
-    сотруднику и филиалу это не нужно (они не вписывают цену закупки)."""
+    """Курс доллара точки. Филиал тоже может задать свой (для цен продажи и
+    расходов в $); пустое значение у филиала = снова брать курс главной точки."""
     data = request.get_json(force=True)
     try:
         rate = float(data.get("rate")) if data.get("rate") not in (None, "") else None
@@ -5069,7 +5446,9 @@ def api_set_usd_rate():
     except (TypeError, ValueError):
         return jsonify({"ok": False, "error": "укажите положительное число"}), 400
     db.set_shop_usd_rate(g.shop_id, rate)
-    return jsonify({"ok": True, "rate": rate})
+    shop = db.get_shop(g.shop_id)
+    return jsonify({"ok": True, "rate": rate, "effective": _effective_usd_rate(shop),
+                    "head_rate": _head_usd_rate(shop)})
 
 
 
@@ -5877,6 +6256,211 @@ def api_branch_restock(branch_id, product_id):
     if not ok:
         return jsonify({"ok": False, "error": "товар не найден"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/warehouse/copy_catalog", methods=["POST"])
+@login_required
+@profit_blocked
+def api_copy_catalog():
+    """Скопировать товары главного в филиал (остаток 0, те же цены)."""
+    data = request.get_json(force=True)
+    try:
+        branch_id = int(data["branch_id"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    cats = [c for c in (data.get("categories") or []) if isinstance(c, str)] or None
+    result = db.copy_catalog_to_branch(g.shop_id, branch_id, cats)
+    return jsonify(result), (200 if result.get("ok") else 403)
+
+
+@app.route("/api/warehouse/ship_plan")
+@login_required
+@profit_blocked
+def api_ship_plan():
+    try:
+        from_id, to_id = int(request.args["from"]), int(request.args["to"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    result = db.get_ship_plan(g.shop_id, from_id, to_id)
+    return jsonify(result), (200 if result.get("ok") else 403)
+
+
+@app.route("/api/warehouse/bulk_transfer", methods=["POST"])
+@login_required
+@profit_blocked
+def api_bulk_transfer():
+    """Накладная: много товаров из одной точки сети в другую одним действием."""
+    data = request.get_json(force=True)
+    try:
+        result = db.bulk_transfer(g.shop_id, int(data["from_shop_id"]), int(data["to_shop_id"]), data.get("lines") or [])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
+IMPORT_CATEGORY_KEYS = ["fluid_0", "fluid_1", "fluid_2", "fluid_3", "fluid_4",
+                        "filter_0", "filter_1", "filter_2", "filter_3", "other"]
+
+
+def _import_category_names() -> dict:
+    """Название типа (как пишут люди, на русском или узбекском) → ключ."""
+    names = {}
+    for texts in i18n.TEXTS.values():
+        for k in IMPORT_CATEGORY_KEYS[:-1]:
+            if texts.get(k):
+                names[texts[k].strip().lower()] = k
+        other = (texts.get("wh_category_other") or "").replace("➕", "").strip().lower()
+        if other:
+            names[other] = "other"
+            names[other.split("(")[0].strip()] = "other"
+    for k in IMPORT_CATEGORY_KEYS:
+        names[k] = k
+    names.update({"прочее": "other", "другое": "other", "boshqa": "other"})
+    return names
+
+
+IMPORT_HEADER_HINTS = {
+    "category": ("тип", "tur", "type", "категор"),
+    "name": ("назв", "марк", "nom", "name", "tovar", "товар"),
+    "unit": ("един", "birlik", "unit", "ед."),
+    "sell_price": ("продаж", "sotish", "sell"),
+    "purchase_price": ("закуп", "xarid", "purchase", "приход"),
+    "quantity": ("колич", "остат", "miqdor", "qoldiq", "qty", "quantity"),
+}
+
+
+@app.route("/api/products/import_template")
+@login_required
+@employee_blocked
+def api_import_template():
+    """Шаблон Excel для загрузки склада: колонки, список типов в выпадающем
+    меню и лист с примером. Филиалу колонку цены закупки не даём."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.worksheet.datavalidation import DataValidation
+    T = g.T
+    headers = [T["imp_col_type"], T["imp_col_name"], T["imp_col_unit"], T["imp_col_sell"]]
+    if not g.is_branch:
+        headers.append(T["imp_col_buy"])
+    headers.append(T["imp_col_qty"])
+    type_names = [T[k] for k in IMPORT_CATEGORY_KEYS[:-1]] + [T["imp_type_other"]]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = T["imp_sheet_goods"]
+    fill = PatternFill(start_color="0F52BA", end_color="0F52BA", fill_type="solid")
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = fill
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    widths = [22, 34, 10, 16, 16, 12]
+    for i, w in enumerate(widths[:len(headers)], start=1):
+        ws.column_dimensions[chr(64 + i)].width = w
+    ws.freeze_panes = "A2"
+
+    lists = wb.create_sheet(T["imp_sheet_types"])
+    for i, n in enumerate(type_names, start=1):
+        lists.cell(row=i, column=1, value=n)
+    lists.cell(row=1, column=3, value="л")
+    lists.cell(row=2, column=3, value="шт")
+    lists.column_dimensions["A"].width = 26
+    dv = DataValidation(type="list", formula1=f"='{T['imp_sheet_types']}'!$A$1:$A${len(type_names)}", allow_blank=True)
+    dv_unit = DataValidation(type="list", formula1=f"='{T['imp_sheet_types']}'!$C$1:$C$2", allow_blank=True)
+    ws.add_data_validation(dv)
+    ws.add_data_validation(dv_unit)
+    dv.add("A2:A2000")
+    dv_unit.add("C2:C2000")
+
+    ex = wb.create_sheet(T["imp_sheet_example"])
+    for i, h in enumerate(headers, start=1):
+        ex.cell(row=1, column=i, value=h).font = Font(bold=True)
+    sample = [[T["fluid_0"], "MITANOL 5W-30 SL", "л", 100000, 80000, 200],
+              [T["filter_0"], "ECO FILTER Spark", "шт", 30000, 12000, 50],
+              [T["imp_type_other"], "Освежитель воздуха", "шт", 10000, 5000, 20]]
+    for r_i, row in enumerate(sample, start=2):
+        if g.is_branch:
+            row = row[:4] + row[5:]
+        for c_i, v in enumerate(row, start=1):
+            ex.cell(row=r_i, column=c_i, value=v)
+    for i, w in enumerate(widths[:len(headers)], start=1):
+        ex.column_dimensions[chr(64 + i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="moybook_sklad_shablon.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def _read_import_sheet(file_storage):
+    """Читает первый лист Excel: колонки узнаём по заголовкам (на русском или
+    узбекском), поэтому подойдёт и шаблон, и свой прайс с похожими колонками."""
+    from openpyxl import load_workbook
+    wb = load_workbook(file_storage, read_only=True, data_only=True)
+    ws = wb.worksheets[0]
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return None, "empty"
+    header = [str(h or "").strip().lower() for h in rows[0]]
+    colmap = {}
+    for field, hints in IMPORT_HEADER_HINTS.items():
+        for idx, h in enumerate(header):
+            if idx in colmap.values():
+                continue
+            if any(hint in h for hint in hints):
+                colmap[field] = idx
+                break
+    if "name" not in colmap or "category" not in colmap:
+        return None, "no_columns"
+    raw = []
+    for r in rows[1:5001]:
+        raw.append({f: (r[i] if i < len(r) else None) for f, i in colmap.items()})
+    return raw, None
+
+
+@app.route("/api/products/import_preview", methods=["POST"])
+@login_required
+@employee_blocked
+def api_import_preview():
+    denied = _warehouse_required()
+    if denied:
+        return denied
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "no_file"}), 400
+    try:
+        raw, err = _read_import_sheet(f)
+    except Exception:
+        return jsonify({"ok": False, "error": "bad_file"}), 400
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    rows = db.parse_import_rows(raw, _import_category_names())
+    existing = {(p["category"], " ".join(p["name"].upper().split())) for p in db.list_products(g.shop_id)}
+    for r in rows:
+        r["exists"] = bool(r.get("category")) and (r["category"], r["name"].upper()) in existing
+        if g.is_branch:
+            r["purchase_price"] = None
+    return jsonify({"ok": True, "rows": rows})
+
+
+@app.route("/api/products/import_apply", methods=["POST"])
+@login_required
+@employee_blocked
+def api_import_apply():
+    denied = _warehouse_required()
+    if denied:
+        return denied
+    data = request.get_json(force=True)
+    raw = data.get("rows") or []
+    if not isinstance(raw, list) or len(raw) > 5000:
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    # всё проверяем заново на сервере — не доверяем тому, что прислал браузер
+    rows = db.parse_import_rows(raw, _import_category_names())
+    result = db.apply_import(g.shop_id, rows, allow_purchase=not g.is_branch)
+    result["skipped_errors"] = sum(1 for r in rows if r["errors"])
+    return jsonify(result)
 
 
 @app.route("/api/warehouse/network")
