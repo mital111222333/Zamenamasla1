@@ -30,6 +30,18 @@ import i18n
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+
+@app.after_request
+def _no_stale_cache(resp):
+    """Данные и страницы не кешируем в браузере: иначе при возврате в
+    приложение/кнопке «назад» телефон показывает старые цифры, пока не
+    обновишь страницу вручную. Статика (иконки, шрифты) кешируется как обычно."""
+    path = request.path or ""
+    if path.startswith("/api/") or resp.mimetype == "text/html":
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
+
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
 
@@ -811,7 +823,7 @@ if ('serviceWorker' in navigator) {
   .wh-banner .stripe-pair span { width:8px; height:26px; border-radius:2px; transform:skewX(-12deg); }
   .wh-banner .wh-label { font-family:var(--font-display); font-weight:800; font-style:italic; font-size:18px; color:#fff; text-transform:uppercase; letter-spacing:0.5px; }
   .card {
-    background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 12px;
+    background: #fff; border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 12px;
     box-shadow: 0 10px 25px -5px rgba(15,82,186,.08); overflow:hidden;
   }
   .field { margin-bottom: 10px; }
@@ -2101,7 +2113,9 @@ function checkMileageVsDue() {
 let openHistoryRow = null;
 let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы кнопки не тащили сырые данные записи (с заметками, апострофами и т.п.) прямо в HTML-атрибут onclick, а брали их отсюда по id
 
-function showTab(t) {
+let CURRENT_TAB = 'add';
+function showTab(t, keepScroll) {
+  CURRENT_TAB = t;
   document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
   document.getElementById('view-debts').style.display = t === 'debts' ? 'block' : 'none';
@@ -2139,10 +2153,31 @@ function showTab(t) {
   const sheet = document.getElementById('moreSheet');
   const bbMore = document.getElementById('bbMore');
   if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(t));
-  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  if (!keepScroll) window.scrollTo(0, 0);
   if (t === 'stats') loadStats();
   if (t === 'warehouse') loadWarehouse();
 }
+
+// Данные на экране не должны «застревать»: если приложение было свёрнуто
+// дольше минуты или страница восстановлена из кеша браузера (кнопка «назад»,
+// возврат в приложение), тихо перезагружаем открытый раздел — без прокрутки вверх.
+function refreshCurrentView() {
+  if (CURRENT_TAB === 'add') return;  // форму ввода не трогаем — там могут быть несохранённые данные
+  showTab(CURRENT_TAB, true);
+  const vis = id => { const el = document.getElementById(id); return el && el.style.display !== 'none'; };
+  if (CURRENT_TAB === 'warehouse') {
+    if (vis('whBranchesView') && WH.branchId) selectWhBranch(WH.branchId);
+    if (vis('whNetworkView')) { WH.net = null; loadNetworkStock(); }
+  }
+  if (CURRENT_TAB === 'stats' && vis('statsBranchesView')) { loadNetworkCompare(); loadNetwork(); }
+}
+let HIDDEN_AT = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { HIDDEN_AT = Date.now(); return; }
+  if (HIDDEN_AT && Date.now() - HIDDEN_AT > 60 * 1000) refreshCurrentView();
+  HIDDEN_AT = 0;
+});
+window.addEventListener('pageshow', e => { if (e.persisted) refreshCurrentView(); });
 
 function openMore() {
   document.getElementById('moreSheet').classList.add('open');
@@ -2521,7 +2556,9 @@ async function loadShipPlan() {
   if (from === to) { SHIP.rows = []; list.innerHTML = `<div class="hint-text" style="padding:12px;">${T.whn_err_same}</div>`; updateShipSummary(); return; }
   list.innerHTML = `<div class="hint-text" style="padding:12px;">${T.stats_loading}</div>`;
   let data;
+  const seq = (SHIP.seq = (SHIP.seq || 0) + 1);
   try { data = await (await fetch(`/api/warehouse/ship_plan?from=${from}&to=${to}`)).json(); } catch (e) { return; }
+  if (seq !== SHIP.seq) return;
   if (!data.ok) { list.innerHTML = `<div class="hint-text" style="padding:12px;">${escapeHtml(data.error || '')}</div>`; return; }
   SHIP.rows = data.rows;
   renderShipCats();
@@ -2802,6 +2839,7 @@ async function submitEditProduct() {
 
 async function selectWhBranch(branchId) {
   WH.branchId = branchId;
+  const seq = (WH.brSeq = (WH.brSeq || 0) + 1);
   document.querySelectorAll('#branchWarehouseSummary .whn-shop').forEach((el, i) => {
     el.classList.toggle('active', WH.branches[i] && WH.branches[i].id === branchId);
   });
@@ -2812,6 +2850,7 @@ async function selectWhBranch(branchId) {
   wrap.style.display = 'block';
   let data;
   try { data = await (await fetch(`/api/branches/${branchId}/warehouse`)).json(); } catch (e) { return; }
+  if (seq !== WH.brSeq) return;  // пока грузилось, выбрали другой филиал
   if (!data.ok) { showMsg(T.msg_error + ' ' + data.error, false); return; }
   const ctx = WHCTX.br;
   ctx.shopId = branchId;
@@ -3377,9 +3416,12 @@ async function loadBrandStats(p) {
   from.setDate(to.getDate() - (bw(p).days - 1));
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   try {
+    var brandSeq = (bw(p).seq = (bw(p).seq || 0) + 1);
     const scopeQs = bw(p).scope ? `&scope=${bw(p).scope}` : '';
     const res = await fetch(`/api/stats/brands?from=${iso(from)}&to=${iso(to)}${scopeQs}`);
-    bw(p).data = await res.json();
+    const fresh = await res.json();
+    if (brandSeq !== bw(p).seq) return;  // пока грузилось, сменили период или точку
+    bw(p).data = fresh;
   } catch (e) { bw(p).data = null; }
   const cats = (bw(p).data && bw(p).data.categories) || [];
   const chips = document.getElementById(p + 'CategoryChips');
@@ -3596,8 +3638,10 @@ async function loadNetwork() {
   if (!grid) return;
   let data;
   try {
+    var netSeq = (NET.seq = (NET.seq || 0) + 1);
     data = await (await fetch(`/api/network/overview?scope=${encodeURIComponent(NET.scope)}`)).json();
   } catch (e) { return; }
+  if (netSeq !== NET.seq) return;  // пока грузилось, выбрали другую точку
   if (!data.ok) return;
   NET.shops = data.shops || [];
   const isAll = NET.scope === 'all';
@@ -3640,8 +3684,10 @@ async function loadNetworkCompare() {
       .map(([k, label]) => `<button class="${k === NET.period ? 'active' : ''}" onclick="setNetComparePeriod('${k}')">${label}</button>`).join('');
   let data;
   try {
+    var cmpSeq = (NET.cseq = (NET.cseq || 0) + 1);
     data = await (await fetch(`/api/network/compare?period=${NET.period}`)).json();
   } catch (e) { return; }
+  if (cmpSeq !== NET.cseq) return;
   if (!data.ok) return;
   const rows = data.rows || [];
   if (!rows.length) { body.innerHTML = `<div class="hint-text">${T.dash_no_data}</div>`; return; }
@@ -5374,6 +5420,29 @@ async function deleteEntry(id, plate) {
     showMsg(T.msg_error + ' ' + data.error, false);
   }
 }
+
+// Защита от двойного нажатия: пока действие выполняется (запрос на сервер),
+// повторные нажатия той же кнопки игнорируются — иначе на медленном
+// интернете можно случайно дважды внести замену, списать товар или оплату.
+function guardOnce(names) {
+  names.forEach(name => {
+    const fn = window[name];
+    if (typeof fn !== 'function' || fn.__guarded) return;
+    let busy = false;
+    const wrapped = async function (...args) {
+      if (busy) return;
+      busy = true;
+      try { return await fn.apply(this, args); } finally { busy = false; }
+    };
+    wrapped.__guarded = true;
+    window[name] = wrapped;
+  });
+}
+guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarCompletely',
+  'payDebt', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
+  'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveUsdRate',
+  'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
+  'submitCatalog', 'applyImport', 'editBranchPrice']);
 </script>
 </body>
 </html>
@@ -6625,7 +6694,7 @@ if ('serviceWorker' in navigator) {
   h1 { font-family: var(--font-display); font-weight:800; font-style:italic; letter-spacing:-0.3px; font-size: 20px; margin: 0; line-height:1.1; color:var(--darkblue); }
   .logo-sub { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--hint); }
   .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
-  .card { background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 16px; box-shadow: 0 10px 25px -5px rgba(15,82,186,.08); }
+  .card { background: #fff; border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 16px; box-shadow: 0 10px 25px -5px rgba(15,82,186,.08); }
   .field { margin-bottom: 10px; }
   .row2 { display:flex; gap:10px; }
   .row2 .field { flex:1; }
@@ -7440,6 +7509,27 @@ async function createShop() {
   }
 }
 
+
+// Защита от двойного нажатия: пока действие выполняется (запрос на сервер),
+// повторные нажатия той же кнопки игнорируются — иначе на медленном
+// интернете можно случайно дважды внести замену, списать товар или оплату.
+function guardOnce(names) {
+  names.forEach(name => {
+    const fn = window[name];
+    if (typeof fn !== 'function' || fn.__guarded) return;
+    let busy = false;
+    const wrapped = async function (...args) {
+      if (busy) return;
+      busy = true;
+      try { return await fn.apply(this, args); } finally { busy = false; }
+    };
+    wrapped.__guarded = true;
+    window[name] = wrapped;
+  });
+}
+guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'deleteBranch',
+  'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
+  'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField']);
 loadShops();
 </script>
 </body>
