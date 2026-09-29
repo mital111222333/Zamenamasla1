@@ -259,11 +259,14 @@ LOGIN_PAGE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ T.app_title }}</title>
 <link rel="manifest" href="/static/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="MoyBook">
+<meta name="apple-mobile-web-app-title" content="OilBook">
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
@@ -277,6 +280,14 @@ if ('serviceWorker' in navigator) {
   }
   .box { background:#1a1d24; border:1px solid #2a2e37; border-radius:14px; padding:28px; width:90%; max-width:340px; }
   h1 { font-size:20px; margin:0 0 20px; text-align:center; }
+  body { flex-direction:column; min-height:100vh; height:auto; padding:28px 16px; box-sizing:border-box; }
+  .login-brand { display:flex; flex-direction:column; align-items:center; gap:10px; margin:0 0 22px; }
+  .login-brand .drop { width:58px; height:58px; border-radius:18px; background:#0B1B3A; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px rgba(14,165,233,.25); transform:rotate(-8deg); }
+  .login-brand .drop svg { transform:rotate(8deg); }
+  .login-brand .wordmark { font-family:'Sora', -apple-system, sans-serif; font-weight:800; font-size:38px; letter-spacing:-1px; line-height:1; }
+  .login-brand .wm-oil { background:linear-gradient(135deg, #38BDF8 0%, #3B82F6 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .login-brand .wm-book { color:#fff; }
+  .login-brand .tagline { font-size:12.5px; color:#8b93a3; letter-spacing:.3px; }
   label { display:block; font-size:13px; color:#9a9a9a; margin-bottom:4px; }
   input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:15px; margin-bottom:14px; }
   button { width:100%; padding:12px; border:none; border-radius:10px; background:#3a86ff; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
@@ -288,8 +299,13 @@ if ('serviceWorker' in navigator) {
 </style>
 </head>
 <body>
+  <div class="login-brand">
+    <div class="drop"><svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1C13 1 2 13.5 2 19.5A11 11 0 0 0 24 19.5C24 13.5 13 1 13 1Z" fill="#0EA5E9"/><ellipse cx="8.5" cy="19" rx="2.2" ry="3.6" fill="#BAE6FD" opacity=".85"/></svg></div>
+    <div class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></div>
+    <div class="tagline">{{ T.app_tagline }}</div>
+  </div>
   <form class="box" method="POST" id="loginForm">
-    <h1>🔧 {{ T.login_title }}</h1>
+    <h1>{{ T.login_title }}</h1>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <input type="hidden" name="_lang" value="{{ lang }}">
     <label>{{ T.login_username }}</label>
@@ -681,13 +697,13 @@ PAGE = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>{{ shop_name }} — MoyBook</title>
+<title>{{ shop_name }} — OilBook</title>
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="MoyBook">
+<meta name="apple-mobile-web-app-title" content="OilBook">
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
@@ -696,7 +712,7 @@ if ('serviceWorker' in navigator) {
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
@@ -739,6 +755,11 @@ if ('serviceWorker' in navigator) {
   h1 { font-family: var(--font-display); font-weight:800; font-style:italic; letter-spacing:-0.3px; font-size: 22px; margin: 0; line-height:1.1; color:var(--darkblue); }
   h1 .accent { color:var(--btn); }
   .logo-sub { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--hint); }
+  .brand-line { text-transform:none; letter-spacing:0; font-size:12px; display:flex; align-items:baseline; gap:4px; flex-wrap:wrap; margin-top:2px; }
+  .brand-line .role-tag { font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; }
+  .wordmark { font-family:'Sora', var(--font-display), sans-serif; font-style:normal; font-weight:800; font-size:17px; letter-spacing:-0.4px; line-height:1; white-space:nowrap; }
+  .wordmark .wm-oil { background:linear-gradient(135deg, #0EA5E9 0%, #1D4ED8 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .wordmark .wm-book { color:#0B1B3A; }
   .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
   .lang-btn { background: #EFF6FF; border: 1px solid #BFDBFE; color: var(--blue); font-size: 12px; font-weight:700; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
   .tabs { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom: 10px; }
@@ -1234,7 +1255,7 @@ if ('serviceWorker' in navigator) {
     <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
     <div style="min-width:0;">
       <div class="side-shop">{{ shop_name }}</div>
-      <div class="logo-sub">MoyBook{% if is_employee %} · <span class="role-tag">{{ T.role_employee }}</span>{% elif is_branch %} · <span class="role-tag">{{ T.role_branch }}</span>{% endif %}</div>
+      <div class="logo-sub brand-line"><span class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></span>{% if is_employee %} · <span class="role-tag">{{ T.role_employee }}</span>{% elif is_branch %} · <span class="role-tag">{{ T.role_branch }}</span>{% endif %}</div>
     </div>
   </div>
   <nav class="side-list">
@@ -1297,7 +1318,7 @@ if ('serviceWorker' in navigator) {
       <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
       <div style="min-width:0;">
         <h1>{{ shop_name }}</h1>
-        <div class="logo-sub">MoyBook{% if is_employee %} · <span class="role-tag">{{ T.role_employee }}</span>{% elif is_branch %} · <span class="role-tag">{{ T.role_branch }}</span>{% endif %}</div>
+        <div class="logo-sub brand-line"><span class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></span>{% if is_employee %} · <span class="role-tag">{{ T.role_employee }}</span>{% elif is_branch %} · <span class="role-tag">{{ T.role_branch }}</span>{% endif %}</div>
       </div>
     </div>
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch_short }}</button>
@@ -6606,7 +6627,7 @@ def api_import_template():
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name="moybook_sklad_shablon.xlsx",
+    return send_file(buf, as_attachment=True, download_name="oilbook_sklad_shablon.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
@@ -6812,7 +6833,7 @@ ADMIN_PAGE = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MoyBook — админ-панель</title>
+<title>OilBook — админ-панель</title>
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -6824,7 +6845,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
   :root {
@@ -6844,6 +6865,11 @@ if ('serviceWorker' in navigator) {
   }
   h1 { font-family: var(--font-display); font-weight:800; font-style:italic; letter-spacing:-0.3px; font-size: 20px; margin: 0; line-height:1.1; color:var(--darkblue); }
   .logo-sub { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--hint); }
+  .brand-line { text-transform:none; letter-spacing:0; font-size:12px; display:flex; align-items:baseline; gap:4px; flex-wrap:wrap; margin-top:2px; }
+  .brand-line .role-tag { font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; }
+  .wordmark { font-family:'Sora', var(--font-display), sans-serif; font-style:normal; font-weight:800; font-size:17px; letter-spacing:-0.4px; line-height:1; white-space:nowrap; }
+  .wordmark .wm-oil { background:linear-gradient(135deg, #0EA5E9 0%, #1D4ED8 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .wordmark .wm-book { color:#0B1B3A; }
   .logout { color: var(--btn); font-size: 12px; font-weight:700; text-decoration:none; background:var(--danger-bg); padding:6px 10px; border-radius:10px; }
   .card { background: #fff; border:2px solid #DBEAFE; border-radius: 22px; padding: 16px; margin-bottom: 16px; box-shadow: 0 10px 25px -5px rgba(15,82,186,.08); }
   .field { margin-bottom: 10px; }
@@ -6923,7 +6949,7 @@ if ('serviceWorker' in navigator) {
     <div style="display:flex; align-items:center; gap:10px;">
       <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
       <div>
-        <h1>MoyBook</h1>
+        <h1 style="margin:0; line-height:1;"><span class="wordmark" style="font-size:28px;"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></span></h1>
         <div class="logo-sub">Админ-панель платформы</div>
       </div>
     </div>
