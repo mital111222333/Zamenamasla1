@@ -956,6 +956,11 @@ if ('serviceWorker' in navigator) {
   .mileage-compare.ok { background:#F0FDF4; color:#15803D; }
   .known-client .kc-last-visit .kc-lv-cost { font-size:16px; font-weight:700; color:var(--blue); flex:none; }
   .known-client .kc-lv-items { margin-top:9px; padding-top:9px; border-top:1px dashed var(--border); }
+  .kc-repeat { width:100%; margin-top:10px; padding:11px 12px; border:none; border-radius:12px; background:#16A34A; color:#fff; font-weight:800; font-size:14px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .kc-repeat:active { transform:scale(.98); }
+  .km-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .km-chip { border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 9px; font-size:12px; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
+  .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .known-client .kc-lv-item {
     display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
     padding:3px 0;
@@ -1306,7 +1311,7 @@ if ('serviceWorker' in navigator) {
       <label><i class="fa-solid fa-id-card"></i>{{ T.field_plate }}</label>
       <div class="plate-wrap">
         <span class="plate-chip">UZ</span>
-        <input id="plate" placeholder="01A123BC" oninput="onPlateInput()" onblur="onPlateBlur()" autocomplete="off">
+        <input id="plate" placeholder="01A123BC" oninput="onPlateInput()" onblur="onPlateBlur()" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next">
         <div id="plateSuggest" class="plate-suggest" style="display:none;"></div>
       </div>
       <div id="knownClientPanel"></div>
@@ -1317,7 +1322,7 @@ if ('serviceWorker' in navigator) {
     </div>
     <div class="field">
       <label><i class="fa-solid fa-phone"></i>{{ T.field_owner_phone }}</label>
-      <input id="owner_phone" placeholder="+998 90 123 45 67">
+      <input id="owner_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" enterkeyhint="next">
       <div class="hint-text">{{ T.hint_owner_phone }}</div>
     </div>
     <div class="row2">
@@ -1335,12 +1340,13 @@ if ('serviceWorker' in navigator) {
     <div class="row2">
       <div class="field">
         <label>{{ T.field_mileage }}</label>
-        <input id="mileage" type="number" placeholder="45000" oninput="checkMileageVsDue()">
+        <input id="mileage" type="number" inputmode="numeric" placeholder="45000" oninput="checkMileageVsDue(); applyKmStep()" enterkeyhint="next">
         <div id="mileageCompare"></div>
       </div>
       <div class="field">
         <label>{{ T.field_next_mileage }}</label>
-        <input id="next_mileage" type="number" placeholder="55000">
+        <input id="next_mileage" type="number" inputmode="numeric" placeholder="55000" oninput="KM.manual = true" enterkeyhint="next">
+        <div class="km-chips" id="kmChips"></div>
       </div>
     </div>
     <div class="field">
@@ -4394,13 +4400,147 @@ function toggleDebtSection() {
   }
 }
 
+// ---------- Быстрый ввод ----------
+let LAST_VISIT_ITEMS = [];
+
+function repeatLastVisit() {
+  // «Как в прошлый раз»: те же масло/фильтры/литры, цены — текущие со склада
+  // (если товар есть на складе), иначе цена прошлого визита.
+  const items = LAST_VISIT_ITEMS || [];
+  if (!items.length) return;
+  FLUID_KEYS.forEach((_, i) => {
+    ['fluid_brand_', 'fluid_price_', 'fluid_liters_'].forEach(pfx => { const el = document.getElementById(pfx + i); if (el) el.value = ''; });
+  });
+  FILTER_KEYS.forEach((_, i) => {
+    ['filter_brand_', 'filter_price_'].forEach(pfx => { const el = document.getElementById(pfx + i); if (el) el.value = ''; });
+  });
+  document.getElementById('other_name').value = '';
+  document.getElementById('other_price').value = '';
+  otherStockRows = [];
+  renderOtherStockRows('other');
+
+  const missing = [];
+  const pickBrand = (el, it) => {
+    if (!el) return null;
+    if (el.tagName !== 'SELECT') { el.value = it.brand || ''; return null; }
+    const opts = Array.from(el.options);
+    let opt = it.product_id ? opts.find(o => o.value === String(it.product_id)) : null;
+    if (!opt && it.brand) {
+      const want = it.brand.trim().toUpperCase();
+      opt = opts.find(o => (o.dataset.name || '').trim().toUpperCase() === want);
+    }
+    if (opt && opt.value) { el.value = opt.value; return opt; }
+    if (it.brand) missing.push(it.brand);
+    return null;
+  };
+  items.forEach(it => {
+    const fi = FLUID_KEYS.indexOf(it.key);
+    const fl = FILTER_KEYS.indexOf(it.key);
+    // если марки больше нет на складе — строку не заполняем: иначе сохранилась
+    // бы позиция без товара (не списалась бы со склада и выпала бы из прибыли)
+    const isSelect = id => { const el = document.getElementById(id); return el && el.tagName === 'SELECT'; };
+    if (fi >= 0) {
+      const opt = pickBrand(document.getElementById(`fluid_brand_${fi}`), it);
+      if (isSelect(`fluid_brand_${fi}`) && !opt) return;
+      document.getElementById(`fluid_price_${fi}`).value = (opt && opt.dataset.price) || it.unit_price || '';
+      document.getElementById(`fluid_liters_${fi}`).value = it.qty || '';
+    } else if (fl >= 0) {
+      const opt = pickBrand(document.getElementById(`filter_brand_${fl}`), it);
+      if (isSelect(`filter_brand_${fl}`) && !opt) return;
+      document.getElementById(`filter_price_${fl}`).value = (opt && opt.dataset.price) || it.unit_price || '';
+    } else if (it.key === 'other') {
+      document.getElementById('other_name').value = String(it.name || '').replace(/^[^:]+:\\s*/, '');
+      document.getElementById('other_price').value = it.unit_price || it.total || '';
+    }
+  });
+  const stockItems = items.filter(it => it.key === 'other_stock');
+  if (stockItems.length) fillOtherStockRowsFrom('other', stockItems);
+  paymentSplitTouched = false;
+  updateTotal();
+  if (missing.length) showMsg(`${T.kc_repeat_missing} ${missing.join(', ')}`, false);
+  else showMsg(T.kc_repeat_done, true);
+  const mileageEl = document.getElementById('mileage');
+  if (mileageEl) { mileageEl.focus(); mileageEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+
+// Следующая замена по пробегу: +5 тыс. / +8 тыс. / свой шаг. Выбор запоминается
+// на этом телефоне. Если мастер сам поправил поле — больше его не перезаписываем.
+const KM = { step: 0, custom: 0, manual: false };
+try {
+  KM.step = parseInt(localStorage.getItem('mb_km_step')) || 0;
+  KM.custom = parseInt(localStorage.getItem('mb_km_custom')) || 0;
+} catch (e) {}
+
+function renderKmChips() {
+  const el = document.getElementById('kmChips');
+  if (!el) return;
+  const opts = [5000, 8000];
+  if (KM.custom && !opts.includes(KM.custom)) opts.push(KM.custom);
+  el.innerHTML = opts.map(v => `<button type="button" class="km-chip ${KM.step === v ? 'on' : ''}" onclick="setKmStep(${v})">+${(v / 1000).toLocaleString('ru-RU')} ${T.km_thousand}</button>`).join('')
+    + `<button type="button" class="km-chip" onclick="askKmStep()">${T.km_custom}</button>`;
+}
+
+function setKmStep(v, force) {
+  KM.step = (KM.step === v && !force) ? 0 : v;
+  try { localStorage.setItem('mb_km_step', KM.step); } catch (e) {}
+  KM.manual = false;
+  applyKmStep();
+  renderKmChips();
+}
+
+function askKmStep() {
+  const raw = prompt(T.km_prompt, KM.custom || 10000);
+  if (raw === null) return;
+  const v = parseInt(String(raw).replace(/\\D/g, ''));
+  if (!(v > 0) || v > 100000) { showMsg(T.km_bad, false); return; }
+  KM.custom = v;
+  try { localStorage.setItem('mb_km_custom', v); } catch (e) {}
+  setKmStep(v, true);
+}
+
+renderKmChips();
+
+function applyKmStep() {
+  if (!KM.step || KM.manual) return;
+  const m = parseInt(document.getElementById('mileage').value);
+  const next = document.getElementById('next_mileage');
+  if (m > 0 && next) next.value = m + KM.step;
+}
+
+// Клавиатура телефона: цифровая для чисел, «Далее» переходит к следующему полю.
+function tuneNumberInputs(root) {
+  (root || document).querySelectorAll('input[type=number]:not([inputmode])').forEach(el => {
+    const step = el.getAttribute('step') || '';
+    el.setAttribute('inputmode', step.includes('.') ? 'decimal' : 'numeric');
+  });
+}
+tuneNumberInputs();
+new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) tuneNumberInputs(n); })))
+  .observe(document.body, { childList: true, subtree: true });
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  const el = e.target;
+  const form = document.getElementById('view-add');
+  if (!form || !form.contains(el) || !['INPUT', 'SELECT'].includes(el.tagName) || el.type === 'checkbox') return;
+  e.preventDefault();
+  const fields = Array.from(form.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([disabled]), select:not([disabled]), textarea'))
+    .filter(f => f.offsetParent !== null);
+  const next = fields[fields.indexOf(el) + 1];
+  if (next) next.focus(); else el.blur();
+});
+
 function resetItemInputs() {
   FLUID_KEYS.forEach((_, i) => {
     document.getElementById(`fluid_brand_${i}`).value = '';
     document.getElementById(`fluid_price_${i}`).value = '';
     document.getElementById(`fluid_liters_${i}`).value = '';
   });
-  FILTER_KEYS.forEach((_, i) => document.getElementById(`filter_price_${i}`).value = '');
+  FILTER_KEYS.forEach((_, i) => {
+    document.getElementById(`filter_price_${i}`).value = '';
+    const fb = document.getElementById(`filter_brand_${i}`);
+    if (fb) fb.value = '';
+  });
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
   document.getElementById('knownClientPanel').innerHTML = '';
@@ -4422,7 +4562,13 @@ async function ensureCarsCacheLoaded() {
 }
 
 async function onPlateInput() {
-  const val = document.getElementById('plate').value.trim().toUpperCase();
+  const plateEl = document.getElementById('plate');
+  if (plateEl.value !== plateEl.value.toUpperCase()) {
+    const pos = plateEl.selectionStart;
+    plateEl.value = plateEl.value.toUpperCase();
+    try { plateEl.setSelectionRange(pos, pos); } catch (e) {}
+  }
+  const val = plateEl.value.trim().toUpperCase();
   const dropdown = document.getElementById('plateSuggest');
   if (!val) { dropdown.style.display = 'none'; dropdown.innerHTML = ''; return; }
   await ensureCarsCacheLoaded();
@@ -4482,9 +4628,11 @@ async function lookupPlate() {
     const visitCount = data.history.length;
     lastKnownNextMileage = last ? last.next_mileage : null;
     let lastItemsHtml = '';
+    LAST_VISIT_ITEMS = [];
     if (last && last.items_json) {
       try {
         const items = JSON.parse(last.items_json);
+        LAST_VISIT_ITEMS = Array.isArray(items) ? items : [];
         lastItemsHtml = '<div class="kc-lv-items">' + items.map(it =>
           `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}</span><span>${it.total.toLocaleString('ru-RU')} ${T.currency}</span></div>`
         ).join('') + '</div>';
@@ -4504,6 +4652,7 @@ async function lookupPlate() {
         </div>
         ${mileageParts.length ? `<div class="kc-lv-mileage">${mileageParts.join(' · ')}</div>` : ''}
         ${lastItemsHtml}
+        ${LAST_VISIT_ITEMS.length ? `<button type="button" class="kc-repeat" onclick="repeatLastVisit()"><i class="fa-solid fa-rotate-right"></i> ${T.kc_repeat}</button>` : ''}
       </div>
     ` : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
 
@@ -4626,6 +4775,8 @@ async function submitCar() {
   if (data.ok) {
     showMsg(`✅ ${T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
+    KM.manual = false;
+    LAST_VISIT_ITEMS = [];
     resetItemInputs();
     document.getElementById('interval_value').value = 3;
     document.getElementById('interval_unit').value = 'months';
