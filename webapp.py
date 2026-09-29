@@ -1747,10 +1747,6 @@ if ('serviceWorker' in navigator) {
     <div id="whBranchesView" style="display:none;">
       <div id="branchWarehouseSummary" class="whn-summary" style="margin-bottom:12px;"></div>
       <div id="whbDetail" style="display:none;">
-        <div class="net-actions">
-          <button class="wh-tbtn wh-tbtn-primary" onclick="openShipModal(WH.branchId)"><i class="fa-solid fa-truck"></i> {{ T.shp_to_branch }}</button>
-          <button class="wh-tbtn" onclick="openCatalogModal(WH.branchId)"><i class="fa-solid fa-copy"></i> {{ T.cat_title }}</button>
-        </div>
         <div class="card">
           <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_title }} — <span id="whbTitle"></span></label>
           <div class="wh-kpis" id="whbKpis"></div>
