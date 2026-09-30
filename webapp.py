@@ -891,6 +891,20 @@ if ('serviceWorker' in navigator) {
   .other-stock-row input { flex:1; padding:8px; font-size:13px; min-width:0; }
   .other-stock-row button { flex:none; width:32px; height:32px; border-radius:8px; border:none; background:var(--danger-bg); color:var(--danger); font-size:14px; cursor:pointer; }
   .item-row .item-total { flex:0.9; font-size:12px; color:var(--hint); text-align:right; }
+  .pick-search { margin:2px 0 14px; }
+  .pick-search input { width:100%; }
+  .pick-results { margin-top:6px; }
+  .pick-item { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; margin-bottom:6px; background:var(--field-bg); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .pick-item:active { transform:scale(.99); border-color:var(--blue); }
+  .pick-item .pi-main { min-width:0; }
+  .pick-item .pi-name { font-size:14px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
+  .pick-item .pi-sub { font-size:12px; color:var(--hint); margin-top:2px; }
+  .pick-item .pi-sub .pi-out { color:var(--danger); font-weight:600; }
+  .pick-item .pi-price { flex:none; font-size:13px; font-family:var(--font-mono); color:var(--blue); font-weight:600; text-align:right; }
+  .pick-note { font-size:13px; color:var(--hint); padding:4px 2px; }
+  .pick-note.ok { color:var(--ok); font-weight:600; }
+  .pick-flash { animation:pickFlash 1.4s ease; border-radius:10px; }
+  @keyframes pickFlash { 0% { background:rgba(15,82,186,.20); } 60% { background:rgba(15,82,186,.12); } 100% { background:transparent; } }
   button.submit {
     width: 100%; padding: 14px; border: none; border-radius: 14px;
     background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 55%, #312E81 100%); color:#fff; font-size: 15px; font-weight: 700; font-family: var(--font-display);
@@ -1370,6 +1384,13 @@ if ('serviceWorker' in navigator) {
         <div class="km-chips" id="kmChips"></div>
       </div>
     </div>
+    {% if warehouse_enabled %}
+    <div class="field pick-search">
+      <label>{{ T.pick_search_label }}</label>
+      <input id="pickSearch" type="search" placeholder="{{ T.pick_search_ph }}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="renderPickResults('main')" onkeydown="onPickKey(event, 'main')">
+      <div id="pickResults" class="pick-results"></div>
+    </div>
+    {% endif %}
     <div class="field">
       <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_fluids }}</label>
     </div>
@@ -2041,6 +2062,13 @@ MODAL_AND_SCRIPT = """
       <input id="edit_next_mileage" type="number">
     </div>
 
+    {% if warehouse_enabled %}
+    <div class="field pick-search">
+      <label>{{ T.pick_search_label }}</label>
+      <input id="svcPickSearch" type="search" placeholder="{{ T.pick_search_ph }}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="renderPickResults('svc')" onkeydown="onPickKey(event, 'svc')">
+      <div id="svcPickResults" class="pick-results"></div>
+    </div>
+    {% endif %}
     <div class="field">
       <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_fluids }}</label>
     </div>
@@ -4295,6 +4323,125 @@ function fillOtherStockRowsFrom(prefix, items) {
   });
 }
 
+// ---- Быстрый поиск товара со склада при вводе замены ----
+// Пишешь 2–3 кусочка названия в любом порядке ("mit 5w30 sp", "spark") —
+// показываются подходящие товары; нажатие на товар ставит его в нужную
+// строку формы (моторное масло, фильтр и т.д.) ровно так же, как выбор из
+// выпадающего списка, и подставляет цену. Выпадающие списки остаются.
+// ctx: 'main' — форма "Внести замену", 'svc' — окно добавления/редактирования.
+const PICK_TR = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'j',з:'z',и:'i',й:'i',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'s',ч:'ch',ш:'sh',щ:'sh',ъ:'',ы:'i',ь:'',э:'e',ю:'yu',я:'ya',ў:'o',қ:'k',ғ:'g',ҳ:'h'};
+const PICK = { main: [], svc: [] };
+
+function pickNorm(s) {
+  // регистр, дефисы, пробелы, точки не важны; кириллица = латиница; w = v
+  return String(s || '').toLowerCase().split('').map(c => PICK_TR[c] ?? c).join('')
+    .replace(/w/g, 'v').replace(/[^a-z0-9]/g, '');
+}
+
+function pickCatLabel(k) { return k === 'other' ? T.other : (T[k] || k); }
+
+function pickEls(ctx) {
+  return ctx === 'svc'
+    ? { inp: document.getElementById('svcPickSearch'), box: document.getElementById('svcPickResults') }
+    : { inp: document.getElementById('pickSearch'), box: document.getElementById('pickResults') };
+}
+
+function renderPickResults(ctx) {
+  const { inp, box } = pickEls(ctx);
+  if (!inp || !box) return;
+  const words = inp.value.trim().split(' ').map(pickNorm).filter(Boolean);
+  if (!words.length) { box.innerHTML = ''; PICK[ctx] = []; return; }
+  const cats = FLUID_KEYS.concat(FILTER_KEYS, ['other']);
+  const found = productsCache
+    .filter(p => cats.includes(p.category))
+    .map(p => {
+      const n = pickNorm(p.name);
+      const hay = n + '|' + pickNorm(pickCatLabel(p.category));
+      if (!words.every(w => hay.includes(w))) return null;
+      let score = 0;
+      if (n.startsWith(words[0])) score -= 2;
+      if (!(p.stock_qty > 0)) score += 5;
+      return { p, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.score - b.score || String(a.p.name).localeCompare(String(b.p.name)))
+    .slice(0, 8)
+    .map(x => x.p);
+  PICK[ctx] = found;
+  if (!found.length) { box.innerHTML = `<div class="pick-note">${T.pick_nothing}</div>`; return; }
+  box.innerHTML = found.map(p => {
+    const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
+    const stock = p.stock_qty > 0
+      ? `${p.stock_qty} ${unitLabel}`
+      : `<span class="pi-out">${p.stock_qty} ${unitLabel} ⚠️</span>`;
+    const price = p.sell_price ? fmtNum(p.sell_price) : '—';
+    return `<div class="pick-item" role="button" tabindex="0" onclick="pickProduct('${ctx}', ${p.id})">
+      <div class="pi-main"><div class="pi-name">${escapeHtml(p.name)}</div>
+      <div class="pi-sub">${escapeHtml(pickCatLabel(p.category))} · ${stock}</div></div>
+      <div class="pi-price">${price}</div></div>`;
+  }).join('');
+}
+
+function onPickKey(e, ctx) {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (PICK[ctx] && PICK[ctx].length) pickProduct(ctx, PICK[ctx][0].id);
+}
+
+function pickProduct(ctx, id) {
+  const p = productsCache.find(x => x.id === id);
+  if (!p) return;
+  const pre = ctx === 'svc' ? 'svc_' : '';
+  const fi = FLUID_KEYS.indexOf(p.category);
+  const ti = FILTER_KEYS.indexOf(p.category);
+  let sel = null, focusEl = null;
+  if (fi >= 0) {
+    sel = document.getElementById(`${pre}fluid_brand_${fi}`);
+    focusEl = document.getElementById(`${pre}fluid_liters_${fi}`);
+  } else if (ti >= 0) {
+    sel = document.getElementById(`${pre}filter_brand_${ti}`);
+    focusEl = document.getElementById(`${pre}filter_price_${ti}`);
+  } else {
+    const prefix = ctx === 'svc' ? 'svcOther' : 'other';
+    const rows = () => (prefix === 'other' ? otherStockRows : svcOtherStockRows);
+    let rid = rows().find(r => {
+      const s = document.getElementById(`${prefix}_stock_product_${r}`);
+      return s && !s.value;
+    });
+    if (rid === undefined) { addOtherStockRow(prefix); rid = rows()[rows().length - 1]; }
+    sel = document.getElementById(`${prefix}_stock_product_${rid}`);
+    focusEl = document.getElementById(`${prefix}_stock_qty_${rid}`);
+  }
+  if (!sel || sel.tagName !== 'SELECT') return;
+  sel.value = String(p.id);
+  if (sel.value !== String(p.id)) return;
+  sel.dispatchEvent(new Event('change'));
+
+  const { inp, box } = pickEls(ctx);
+  if (inp) inp.value = '';
+  PICK[ctx] = [];
+  if (box) {
+    box.innerHTML = `<div class="pick-note ok">✓ ${escapeHtml(p.name)} → ${escapeHtml(pickCatLabel(p.category))}</div>`;
+    setTimeout(() => { if (inp && !inp.value) box.innerHTML = ''; }, 3500);
+  }
+  const row = sel.closest('.item-row, .other-stock-row');
+  if (row) {
+    row.classList.remove('pick-flash');
+    void row.offsetWidth;
+    row.classList.add('pick-flash');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (focusEl && !focusEl.value) setTimeout(() => focusEl.focus({ preventScroll: true }), 300);
+}
+
+function clearPick(ctx) {
+  const { inp, box } = pickEls(ctx);
+  if (inp) inp.value = '';
+  if (box) box.innerHTML = '';
+  PICK[ctx] = [];
+}
+
 function renderItemLists() {
   document.getElementById('fluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
     <div class="item-row">
@@ -4567,6 +4714,7 @@ function resetItemInputs() {
   document.getElementById('knownClientPanel').innerHTML = '';
   otherStockRows = [];
   renderOtherStockRows('other');
+  clearPick('main');
   updateTotal();
 }
 
@@ -5415,6 +5563,7 @@ function resetSvcItemInputs() {
   document.getElementById('svc_other_price').value = '';
   svcOtherStockRows = [];
   renderOtherStockRows('svcOther');
+  clearPick('svc');
   updateSvcTotal();
 }
 

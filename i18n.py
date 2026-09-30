@@ -432,6 +432,9 @@ RU = {
     "qty_ph": "Кол-во",
     "wh_other_stock_title": "📦 Прочие товары со склада",
     "wh_add_row": "➕ Добавить строку",
+    "pick_search_label": "🔍 Быстрый поиск товара со склада",
+    "pick_search_ph": "Например: mit 5w30 sp",
+    "pick_nothing": "Ничего не найдено. Проверьте написание или выберите из списка ниже.",
 
     "fluid_0": "Моторное масло",
     "fluid_1": "АКПП/МКПП масло",
@@ -1033,6 +1036,9 @@ UZ = {
     "qty_ph": "Miqdor",
     "wh_other_stock_title": "📦 Ombordagi boshqa mahsulotlar",
     "wh_add_row": "➕ Qator qo’shish",
+    "pick_search_label": "🔍 Ombordan tovarni tez qidirish",
+    "pick_search_ph": "Masalan: mit 5w30 sp",
+    "pick_nothing": "Hech narsa topilmadi. Yozilishini tekshiring yoki quyidagi ro’yxatdan tanlang.",
 
     "fluid_0": "Motor moyi",
     "fluid_1": "AKPP/MKPP moyi",
