@@ -485,6 +485,35 @@ def _migrate(conn):
     )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_supplier_payments_sup ON supplier_payments(supplier_id)")
+    # --- расчёты с поставщиком: курс доллара фиксируется в каждой операции,
+    # чтобы эквивалент в $ через годы оставался тем, что был в день операции ---
+    sp_cols = {r[1] for r in conn.execute("PRAGMA table_info(supplier_payments)").fetchall()}
+    if "usd_rate" not in sp_cols:
+        conn.execute("ALTER TABLE supplier_payments ADD COLUMN usd_rate REAL")
+        # старые записи (до этой версии) — курс точки на момент обновления
+        conn.execute("""UPDATE supplier_payments SET usd_rate =
+                        (SELECT usd_rate FROM shops WHERE shops.id = supplier_payments.shop_id)
+                        WHERE usd_rate IS NULL""")
+    for col, ddl in (("currency", "TEXT DEFAULT 'UZS'"), ("amount_usd_cents", "INTEGER"), ("method", "TEXT"),
+                     ("status", "TEXT DEFAULT 'active'"), ("cancel_reason", "TEXT"), ("cancelled_at", "TEXT"),
+                     ("client_token", "TEXT")):
+        if col not in sp_cols:
+            conn.execute(f"ALTER TABLE supplier_payments ADD COLUMN {col} {ddl}")
+    conn.execute("UPDATE supplier_payments SET status='active' WHERE status IS NULL")
+    conn.execute("UPDATE supplier_payments SET currency='UZS' WHERE currency IS NULL")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_payments_token "
+                 "ON supplier_payments(shop_id, client_token) WHERE client_token IS NOT NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_supplier_payments_shop_date ON supplier_payments(shop_id, supplier_id, pay_date)")
+    so_cols = {r[1] for r in conn.execute("PRAGMA table_info(supplier_orders)").fetchall()}
+    if "usd_rate" not in so_cols:
+        conn.execute("ALTER TABLE supplier_orders ADD COLUMN usd_rate REAL")
+        conn.execute("""UPDATE supplier_orders SET usd_rate =
+                        (SELECT usd_rate FROM shops WHERE shops.id = supplier_orders.shop_id)
+                        WHERE usd_rate IS NULL AND status IN ('received', 'done')""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_supplier_orders_sup ON supplier_orders(shop_id, supplier_id)")
+    sup_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(suppliers)").fetchall()}
+    if "archived_at" not in sup_cols2:
+        conn.execute("ALTER TABLE suppliers ADD COLUMN archived_at TEXT")
     rs_cols = {r[1] for r in conn.execute("PRAGMA table_info(stock_restocks)").fetchall()}
     if "order_id" not in rs_cols:
         conn.execute("ALTER TABLE stock_restocks ADD COLUMN order_id INTEGER")
@@ -3591,26 +3620,43 @@ def _clean_text(v, limit=200):
     return v[:limit] or None
 
 
-def list_suppliers(shop_id: int) -> list:
+def list_suppliers(shop_id: int, archived: bool = False) -> list:
+    """Поставщики точки с долгом. archived=True — поставщики из архива
+    (удалённые): их история не пропадает, их можно вернуть."""
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT s.*, (SELECT COUNT(*) FROM products p
                          WHERE p.shop_id=s.shop_id AND p.supplier_id=s.id AND p.is_active=1) AS product_count
-            FROM suppliers s WHERE s.shop_id=? AND s.is_active=1 ORDER BY s.name COLLATE NOCASE
-        """, (shop_id,)).fetchall()
+            FROM suppliers s WHERE s.shop_id=? AND s.is_active=? ORDER BY s.name COLLATE NOCASE
+        """, (shop_id, 0 if archived else 1)).fetchall()
         out = [dict(r) for r in rows]
         for sup in out:
             entries = _supplier_charges(conn, shop_id, sup["id"])
             d = supplier_debt(shop_id, sup["id"], sup.get("pay_days"), entries)
             sup["balance"], sup["overdue"] = d["balance"], d["overdue"]
+            sup["next_due"], sup["oldest_overdue"] = d["next_due"], d["oldest_overdue"]
         return out
 
 
-def get_supplier(shop_id: int, supplier_id: int):
+def get_supplier(shop_id: int, supplier_id: int, include_archived: bool = False):
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM suppliers WHERE id=? AND shop_id=? AND is_active=1",
+        row = conn.execute("SELECT * FROM suppliers WHERE id=? AND shop_id=?" + ("" if include_archived else " AND is_active=1"),
                            (supplier_id, shop_id)).fetchone()
         return dict(row) if row else None
+
+
+def shop_usd_rate(shop_id: int):
+    """Курс доллара точки (как на «Складе»); у филиала без своего — курс главной."""
+    with get_conn() as conn:
+        r = conn.execute("SELECT usd_rate, parent_shop_id FROM shops WHERE id=?", (shop_id,)).fetchone()
+        if not r:
+            return None
+        if r["usd_rate"]:
+            return r["usd_rate"]
+        if r["parent_shop_id"]:
+            p = conn.execute("SELECT usd_rate FROM shops WHERE id=?", (r["parent_shop_id"],)).fetchone()
+            return p["usd_rate"] if p and p["usd_rate"] else None
+        return None
 
 
 def _supplier_fields(data: dict) -> dict:
@@ -3703,13 +3749,28 @@ def unlink_supplier_telegram(shop_id: int, supplier_id: int) -> bool:
 
 @_serialized
 def delete_supplier(shop_id: int, supplier_id: int) -> bool:
-    """Мягкое удаление: прошлые заказы сохраняют имя поставщика, у товаров
-    поставщик просто снимается."""
+    """«Удалить» = убрать в архив. Заказы, оплаты и история цен остаются
+    навсегда; поставщика можно вернуть из архива."""
     with get_conn() as conn:
-        cur = conn.execute("UPDATE suppliers SET is_active=0 WHERE id=? AND shop_id=?", (supplier_id, shop_id))
+        cur = conn.execute("UPDATE suppliers SET is_active=0, archived_at=? WHERE id=? AND shop_id=? AND is_active=1",
+                           (_now_str(), supplier_id, shop_id))
         conn.execute("UPDATE products SET supplier_id=NULL WHERE shop_id=? AND supplier_id=?", (shop_id, supplier_id))
         conn.commit()
         return cur.rowcount > 0
+
+
+@_serialized
+def restore_supplier(shop_id: int, supplier_id: int) -> dict:
+    sup = get_supplier(shop_id, supplier_id, include_archived=True)
+    if not sup or sup["is_active"]:
+        return {"ok": False, "error": "not_found"}
+    for s in list_suppliers(shop_id):
+        if s["name"].upper() == sup["name"].upper():
+            return {"ok": False, "error": "duplicate"}
+    with get_conn() as conn:
+        conn.execute("UPDATE suppliers SET is_active=1, archived_at=NULL WHERE id=? AND shop_id=?", (supplier_id, shop_id))
+        conn.commit()
+    return {"ok": True}
 
 
 @_serialized
@@ -3879,7 +3940,12 @@ def get_order(shop_id: int, order_id: int):
     return o
 
 
-def list_orders(shop_id: int, limit: int = 40) -> list:
+def count_orders(shop_id: int) -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM supplier_orders WHERE shop_id=?", (shop_id,)).fetchone()[0]
+
+
+def list_orders(shop_id: int, limit: int = 40, offset: int = 0) -> list:
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT o.*, s.name AS supplier_name,
@@ -3891,8 +3957,8 @@ def list_orders(shop_id: int, limit: int = 40) -> list:
             WHERE o.shop_id=?
             ORDER BY CASE o.status WHEN 'draft' THEN 0 WHEN 'sent' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
                      o.id DESC
-            LIMIT ?
-        """, (shop_id, limit)).fetchall()
+            LIMIT ? OFFSET ?
+        """, (shop_id, limit, offset)).fetchall()
         return [dict(r) for r in rows]
 
 
@@ -3947,6 +4013,7 @@ def receive_order(shop_id: int, order_id: int, lines: list) -> dict:
             return {"ok": False, "error": "bad_request"}
         by_line[lid] = (q, price)
     today = datetime.now().strftime("%Y-%m-%d")
+    rate_now = shop_usd_rate(shop_id)  # курс дня приёмки — для эквивалента в $ навсегда
     backfills = []
     has_branch_share = False
     with get_conn() as conn:
@@ -3984,8 +4051,8 @@ def receive_order(shop_id: int, order_id: int, lines: list) -> dict:
                     has_branch_share = True
             branches = [s for s in order_network(shop_id) if not s["is_head"]]
             status = "received" if (has_branch_share and branches) else "done"
-            conn.execute("UPDATE supplier_orders SET status=?, received_at=?, done_at=? WHERE id=?",
-                         (status, _now_str(), _now_str() if status == "done" else None, order_id))
+            conn.execute("UPDATE supplier_orders SET status=?, received_at=?, done_at=?, usd_rate=? WHERE id=?",
+                         (status, _now_str(), _now_str() if status == "done" else None, rate_now, order_id))
             conn.commit()
         except Exception:
             conn.rollback()
@@ -4079,28 +4146,50 @@ def set_product_supplier(shop_id: int, product_id: int, supplier_id) -> bool:
 # оплаты. Оплаты гасят самые старые долги первыми; если у поставщика задан
 # срок оплаты (дней), видно, что уже просрочено.
 
+def _usd(amount, rate):
+    """Эквивалент в $ по курсу операции (None — курс в тот день не был задан)."""
+    return round(amount / rate, 2) if amount and rate else (0 if not amount else None)
+
+
 def _supplier_charges(conn, shop_id: int, supplier_id: int) -> list:
+    """Все операции с поставщиком за всё время: принятые заказы (+долг),
+    долги вручную (+) и оплаты (−). Отменённые оплаты тоже здесь (status
+    'cancelled') — в долг они не входят, но в истории видны."""
     rows = conn.execute("""
-        SELECT o.id, o.number, o.received_at,
+        SELECT o.id, o.number, o.received_at, o.usd_rate,
                COALESCE(SUM(COALESCE(l.qty_received, 0) * COALESCE(l.purchase_price, 0)), 0) AS amount,
-               SUM(CASE WHEN COALESCE(l.qty_received, 0) > 0 AND l.purchase_price IS NULL THEN 1 ELSE 0 END) AS unpriced
+               SUM(CASE WHEN COALESCE(l.qty_received, 0) > 0 AND l.purchase_price IS NULL THEN 1 ELSE 0 END) AS unpriced,
+               SUM(CASE WHEN COALESCE(l.qty_received, 0) > 0 THEN 1 ELSE 0 END) AS positions
         FROM supplier_orders o JOIN supplier_order_lines l ON l.order_id = o.id
         WHERE o.shop_id=? AND o.supplier_id=? AND o.status IN ('received', 'done')
         GROUP BY o.id
     """, (shop_id, supplier_id)).fetchall()
     out = [{"type": "order", "id": r["id"], "number": r["number"], "date": (r["received_at"] or "")[:10],
-            "amount": int(round(r["amount"] or 0)), "unpriced": r["unpriced"] or 0} for r in rows]
+            "created_at": r["received_at"], "amount": int(round(r["amount"] or 0)), "unpriced": r["unpriced"] or 0,
+            "positions": r["positions"] or 0, "usd_rate": r["usd_rate"], "status": "active"} for r in rows]
     for r in conn.execute("SELECT * FROM supplier_payments WHERE shop_id=? AND supplier_id=?",
                           (shop_id, supplier_id)).fetchall():
         out.append({"type": r["kind"], "id": r["id"], "date": r["pay_date"], "amount": r["amount"],
-                    "note": r["note"], "order_id": r["order_id"], "created_at": r["created_at"]})
+                    "note": r["note"], "order_id": r["order_id"], "created_at": r["created_at"],
+                    "usd_rate": r["usd_rate"], "currency": r["currency"] or "UZS",
+                    "amount_usd": (r["amount_usd_cents"] / 100) if r["amount_usd_cents"] is not None else None,
+                    "method": r["method"], "status": r["status"] or "active",
+                    "cancel_reason": r["cancel_reason"], "cancelled_at": r["cancelled_at"]})
+    for e in out:
+        # введено в $ — показываем ровно введённую сумму, иначе пересчёт по курсу дня
+        e["usd"] = e.get("amount_usd") if e.get("amount_usd") is not None else _usd(e["amount"], e.get("usd_rate"))
     return out
+
+
+def _live(entries):
+    return [e for e in entries if e.get("status", "active") != "cancelled"]
 
 
 def supplier_debt(shop_id: int, supplier_id: int, pay_days=None, entries=None) -> dict:
     if entries is None:
         with get_conn() as conn:
             entries = _supplier_charges(conn, shop_id, supplier_id)
+    entries = _live(entries)
     charges = sorted([e for e in entries if e["type"] in ("order", "charge") and e["amount"] > 0],
                      key=lambda e: (e["date"], e["id"]))
     paid = sum(e["amount"] for e in entries if e["type"] == "payment")
@@ -4144,12 +4233,29 @@ def supplier_debt(shop_id: int, supplier_id: int, pay_days=None, entries=None) -
             "unpriced_orders": sum(1 for e in entries if e["type"] == "order" and e.get("unpriced"))}
 
 
+def _period_totals(entries) -> dict:
+    """Итоги за период: сколько взяли товара и сколько оплатили — в сумах и в $
+    по курсу каждой операции."""
+    t = {"bought": 0, "bought_usd": 0.0, "paid": 0, "paid_usd": 0.0, "no_rate": 0}
+    for e in _live(entries):
+        k = "paid" if e["type"] == "payment" else "bought"
+        t[k] += e["amount"]
+        if e.get("usd") is None:
+            t["no_rate"] += 1
+        else:
+            t[k + "_usd"] += e["usd"]
+    t["bought_usd"] = round(t["bought_usd"], 2)
+    t["paid_usd"] = round(t["paid_usd"], 2)
+    return t
+
+
 def supplier_price_history(shop_id: int, supplier_id: int) -> list:
     """Цены закупки товаров у поставщика по принятым заказам: как менялась
-    цена и на сколько процентов по сравнению с прошлой и с первой."""
+    цена и на сколько процентов по сравнению с прошлой и с первой. Вся
+    история, без обрезки."""
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT l.product_id, l.name, l.unit, l.purchase_price, l.qty_received, o.number, o.received_at
+            SELECT l.product_id, l.name, l.unit, l.purchase_price, l.qty_received, o.number, o.received_at, o.usd_rate
             FROM supplier_order_lines l JOIN supplier_orders o ON o.id = l.order_id
             WHERE o.shop_id=? AND o.supplier_id=? AND o.status IN ('received', 'done')
               AND l.purchase_price IS NOT NULL AND COALESCE(l.qty_received, 0) > 0
@@ -4160,25 +4266,33 @@ def supplier_price_history(shop_id: int, supplier_id: int) -> list:
         e = by.setdefault(r["product_id"], {"product_id": r["product_id"], "name": r["name"], "unit": r["unit"], "history": []})
         e["name"] = r["name"]
         e["history"].append({"date": (r["received_at"] or "")[:10], "price": r["purchase_price"],
-                             "qty": r["qty_received"], "number": r["number"]})
+                             "qty": r["qty_received"], "number": r["number"],
+                             "usd": _usd(r["purchase_price"], r["usd_rate"])})
     out = []
     for e in by.values():
         h = e["history"]
         last = h[-1]["price"]
         prev = next((x["price"] for x in reversed(h[:-1]) if x["price"] != last), None)
         first = h[0]["price"]
-        e.update({"last": last, "last_date": h[-1]["date"], "prev": prev,
+        e.update({"last": last, "last_usd": h[-1]["usd"], "last_date": h[-1]["date"], "prev": prev,
                   "change_pct": round((last - prev) / prev * 100, 1) if prev else None,
                   "since_first_pct": round((last - first) / first * 100, 1) if first and len(h) > 2 and first not in (last, prev) else None,
                   "_sort": (h[-1]["date"], h[-1]["number"])})
-        e["history"] = list(reversed(h))[:12]
+        e["history"] = list(reversed(h))
         out.append(e)
     out.sort(key=lambda e: e.pop("_sort"), reverse=True)
     return out
 
 
-def supplier_card(shop_id: int, supplier_id: int):
-    sup = get_supplier(shop_id, supplier_id)
+def _entry_sort_key(e):
+    return (e["date"] or "", e.get("created_at") or "", e["id"])
+
+
+def supplier_card(shop_id: int, supplier_id: int, year=None, offset: int = 0, limit: int = 100):
+    """Карточка поставщика. Долг считается по ВСЕЙ истории; список операций —
+    за выбранный год (или за все годы) порциями по limit, чтобы и через 10
+    лет всё открывалось быстро и ничего не терялось."""
+    sup = get_supplier(shop_id, supplier_id, include_archived=True)
     if not sup:
         return None
     with get_conn() as conn:
@@ -4188,43 +4302,128 @@ def supplier_card(shop_id: int, supplier_id: int):
             WHERE shop_id=? AND supplier_id=? AND status != 'cancelled'
         """, (shop_id, supplier_id)).fetchone()
     debt = supplier_debt(shop_id, supplier_id, sup.get("pay_days"), entries)
-    ops = sorted(entries, key=lambda e: (e["date"], e.get("created_at") or "", e["id"]), reverse=True)
-    return {"supplier": sup, "debt": debt, "entries": ops[:60], "prices": supplier_price_history(shop_id, supplier_id),
+    years = sorted({e["date"][:4] for e in entries if e.get("date")}, reverse=True)
+    year = str(year) if year and str(year) in years else None
+    chosen = [e for e in entries if not year or (e.get("date") or "").startswith(year)]
+    ops = sorted(chosen, key=_entry_sort_key, reverse=True)
+    offset = max(0, int(offset or 0))
+    return {"supplier": sup, "debt": debt, "entries": ops[offset:offset + limit], "total_entries": len(ops),
+            "offset": offset, "years": years, "year": year, "period": _period_totals(chosen),
+            "all_time": _period_totals(entries), "prices": supplier_price_history(shop_id, supplier_id),
             "order_count": orders["n"], "last_order": orders["last"]}
 
 
+def supplier_statement(shop_id: int, supplier_id: int, date_from: str = None, date_to: str = None):
+    """Акт сверки: долг на начало периода, все операции периода с остатком
+    после каждой и долг на конец. Отменённые оплаты не входят."""
+    sup = get_supplier(shop_id, supplier_id, include_archived=True)
+    if not sup:
+        return None
+    with get_conn() as conn:
+        entries = _live(_supplier_charges(conn, shop_id, supplier_id))
+    entries.sort(key=_entry_sort_key)
+    sign = lambda e: -e["amount"] if e["type"] == "payment" else e["amount"]
+    opening = sum(sign(e) for e in entries if date_from and e["date"] < date_from)
+    rows, bal = [], opening
+    for e in entries:
+        if (date_from and e["date"] < date_from) or (date_to and e["date"] > date_to):
+            continue
+        bal += sign(e)
+        rows.append({**e, "balance": bal})
+    return {"supplier": sup, "opening": opening, "closing": bal, "rows": rows,
+            "date_from": date_from, "date_to": date_to}
+
+
+def supplier_totals(suppliers: list) -> dict:
+    return {"owe": sum(s["balance"] for s in suppliers if s["balance"] > 0),
+            "overpaid": sum(-s["balance"] for s in suppliers if s["balance"] < 0),
+            "overdue": sum(s["overdue"] for s in suppliers),
+            "overdue_count": sum(1 for s in suppliers if s["overdue"] > 0)}
+
+
+PAY_METHODS = ("cash", "card", "transfer")
+MAX_MONEY = 10 ** 13
+
+
 @_serialized
-def add_supplier_payment(shop_id: int, supplier_id: int, kind: str, amount, pay_date=None, note=None,
-                         order_id=None) -> dict:
+def add_supplier_payment(shop_id: int, supplier_id: int, kind: str, amount=None, pay_date=None, note=None,
+                         order_id=None, currency: str = "UZS", amount_usd=None, rate=None, method=None,
+                         client_token=None) -> dict:
+    """Оплата поставщику или долг вручную. Долг всегда ведётся в сумах; если
+    сумма введена в долларах — переводим по указанному курсу и сохраняем
+    и сумы, и доллары, и курс. Курс по умолчанию — курс точки (как на складе).
+    client_token защищает от двойной записи при повторной отправке."""
     if kind not in ("payment", "charge"):
         return {"ok": False, "error": "bad_request"}
     if not get_supplier(shop_id, supplier_id):
         return {"ok": False, "error": "not_found"}
+    currency = "USD" if str(currency or "").upper() == "USD" else "UZS"
     try:
-        amount = int(round(float(amount)))
+        rate = float(rate) if rate not in (None, "") else None
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad_rate"}
+    if rate is not None and not (0 < rate < 1_000_000):
+        return {"ok": False, "error": "bad_rate"}
+    cents = None
+    try:
+        if currency == "USD":
+            usd = float(amount_usd)
+            if not rate:
+                return {"ok": False, "error": "bad_rate"}
+            cents = int(round(usd * 100))
+            amount = int(round(cents * rate / 100))
+            if cents <= 0:
+                return {"ok": False, "error": "bad_amount"}
+        else:
+            amount = int(round(float(amount)))
     except (TypeError, ValueError):
         return {"ok": False, "error": "bad_amount"}
-    if amount <= 0:
+    if amount <= 0 or amount >= MAX_MONEY:
         return {"ok": False, "error": "bad_amount"}
+    if rate is None:
+        rate = shop_usd_rate(shop_id)
+    method = method if method in PAY_METHODS else None
     pay_date = (pay_date or datetime.now().strftime("%Y-%m-%d"))[:10]
     try:
-        datetime.strptime(pay_date, "%Y-%m-%d")
+        d = datetime.strptime(pay_date, "%Y-%m-%d").date()
     except ValueError:
-        return {"ok": False, "error": "bad_request"}
+        return {"ok": False, "error": "bad_date"}
+    if d.year < 2000 or d > datetime.now().date() + timedelta(days=1):
+        return {"ok": False, "error": "bad_date"}
+    token = _clean_text(client_token, 64)
     with get_conn() as conn:
-        cur = conn.execute("""
-            INSERT INTO supplier_payments (shop_id, supplier_id, kind, amount, pay_date, note, order_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (shop_id, supplier_id, kind, amount, pay_date, _clean_text(note, 200), order_id))
-        conn.commit()
-    return {"ok": True, "id": cur.lastrowid}
+        if token:
+            dup = conn.execute("SELECT id FROM supplier_payments WHERE shop_id=? AND client_token=?",
+                               (shop_id, token)).fetchone()
+            if dup:
+                return {"ok": True, "id": dup["id"], "duplicate": True}
+        try:
+            cur = conn.execute("""
+                INSERT INTO supplier_payments (shop_id, supplier_id, kind, amount, pay_date, note, order_id,
+                                               currency, amount_usd_cents, usd_rate, method, status, client_token, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+            """, (shop_id, supplier_id, kind, amount, pay_date, _clean_text(note, 200), order_id,
+                  currency, cents, rate, method, token, _now_str()))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            dup = conn.execute("SELECT id FROM supplier_payments WHERE shop_id=? AND client_token=?",
+                               (shop_id, token)).fetchone()
+            if dup:
+                return {"ok": True, "id": dup["id"], "duplicate": True}
+            raise
+    return {"ok": True, "id": cur.lastrowid, "amount": amount}
 
 
 @_serialized
-def delete_supplier_payment(shop_id: int, supplier_id: int, payment_id: int) -> bool:
+def cancel_supplier_payment(shop_id: int, supplier_id: int, payment_id: int, reason=None) -> bool:
+    """Оплату/долг не стираем: помечаем «отменено» с причиной — запись
+    остаётся в истории зачёркнутой и больше не влияет на долг."""
     with get_conn() as conn:
-        cur = conn.execute("DELETE FROM supplier_payments WHERE id=? AND shop_id=? AND supplier_id=?",
-                           (payment_id, shop_id, supplier_id))
+        cur = conn.execute("""
+            UPDATE supplier_payments SET status='cancelled', cancel_reason=?, cancelled_at=?
+            WHERE id=? AND shop_id=? AND supplier_id=? AND COALESCE(status, 'active') != 'cancelled'
+        """, (_clean_text(reason, 200), _now_str(), payment_id, shop_id, supplier_id))
         conn.commit()
         return cur.rowcount > 0
 

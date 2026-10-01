@@ -1028,19 +1028,6 @@ if ('serviceWorker' in navigator) {
   .stats-card .label { font-size:10px; color:#64748B; margin-bottom:4px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
   .stats-card .amount { font-size:22px; font-weight:800; color:var(--blue); font-family: var(--font-display); }
   .stats-card .count { font-size:11px; color:var(--hint); margin-top:4px; }
-  /* карточка клиента открывается поверх списка (а не над ним) — список
-     остаётся на месте, «Назад» возвращает ровно туда же */
-  #clientCardPanel.cc-open { position:fixed; inset:0; z-index:55; background:var(--bg, #F1F5F9); overflow-y:auto;
-    -webkit-overflow-scrolling:touch; overscroll-behavior:contain; margin:0 !important;
-    padding:0 12px calc(40px + env(safe-area-inset-bottom, 0px)); }
-  #clientCardPanel.cc-open > * { max-width:760px; margin-left:auto; margin-right:auto; }
-  body.cc-lock { overflow:hidden; }
-  .cc-sheet-bar { position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:10px;
-    padding:calc(10px + env(safe-area-inset-top, 0px)) 0 10px; background:var(--bg, #F1F5F9); }
-  .cc-sheet-bar button { border:1px solid var(--border); background:#fff; border-radius:12px; padding:9px 14px;
-    font-weight:700; font-size:14px; font-family:inherit; color:var(--text); cursor:pointer; display:flex; align-items:center; gap:8px; }
-  .cc-sheet-bar b { font-family:var(--font-mono, monospace); font-size:15px; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  @media (min-width: 900px) { #clientCardPanel.cc-open { left:240px; } }
   .known-client {
     margin-top:12px; background:var(--card); border:2px solid #BFDBFE; border-radius:18px;
     overflow:hidden; box-shadow: 0 6px 16px rgba(15,82,186,.08);
@@ -1322,6 +1309,115 @@ if ('serviceWorker' in navigator) {
   .pr-row.open .pr-hist { display:block; }
   .pr-h { display:flex; justify-content:space-between; gap:8px; font-size:12px; color:#475569; padding:3px 0; }
   .sup-debt { font-weight:700; color:#B91C1C; }
+  /* раздел «Поставщики» — вариант «Банк»: синий итог + список */
+  .sp-top { display:flex; align-items:center; gap:8px; margin:2px 0 12px; }
+  .sp-top h2 { flex:1; margin:0; font-family:var(--font-display); font-size:22px; font-weight:800; color:var(--darkblue); letter-spacing:-.01em; }
+  .sp-pill { border:1px solid #BFDBFE; background:#EFF6FF; color:#0F52BA; border-radius:999px; padding:7px 12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .sp-pill.warn { background:#FEF3C7; border-color:#FDE68A; color:#92400E; }
+  .sp-icon { width:38px; height:38px; border-radius:12px; border:1px solid var(--border); background:#fff; color:#334155; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .sp-menu-wrap { position:relative; }
+  .sp-menu { display:none; position:absolute; right:0; top:44px; z-index:30; background:#fff; border:1px solid var(--border); border-radius:14px; box-shadow:0 12px 30px rgba(15,23,42,.14); min-width:220px; padding:6px; }
+  .sp-menu.open { display:block; }
+  .sp-menu button { display:flex; align-items:center; gap:10px; width:100%; border:none; background:none; font:inherit; font-size:14px; font-weight:600; color:var(--text); padding:11px 12px; border-radius:10px; cursor:pointer; text-align:left; }
+  .sp-menu button:hover { background:#F1F5F9; }
+  .sp-menu button i { width:18px; color:#64748B; }
+  .sp-hero { background:linear-gradient(135deg, #0A2540 0%, #0F52BA 100%); color:#fff; border-radius:20px; padding:18px 18px 16px; margin-bottom:14px; }
+  .sp-hero .l { font-size:13px; color:#BFDBFE; font-weight:600; }
+  .sp-hero .x { font-family:var(--font-display); font-size:32px; font-weight:800; line-height:1.15; margin:4px 0 2px; letter-spacing:-.01em; }
+  .sp-hero .x small { font-size:16px; font-weight:700; color:#BFDBFE; margin-left:4px; }
+  .sp-hero .u { font-size:13px; color:#BFDBFE; }
+  .sp-bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.22); margin-top:14px; }
+  .sp-bar i { display:block; height:100%; }
+  .sp-bar .o { background:#FCA5A5; } .sp-bar .k { background:#93C5FD; }
+  .sp-leg { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; color:#DBEAFE; margin-top:8px; }
+  .sp-leg span::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:0; }
+  .sp-leg .o::before { background:#FCA5A5; } .sp-leg .k::before { background:#93C5FD; }
+  .sp-hero.zero { background:linear-gradient(135deg, #065F46 0%, #059669 100%); }
+  .sp-list { background:#fff; border:1px solid var(--border); border-radius:18px; padding:4px 14px; }
+  .sp-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #F1F5F9; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .sp-row:last-child { border-bottom:none; }
+  .sp-av { width:42px; height:42px; border-radius:13px; flex:none; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; font-family:var(--font-display); }
+  .sp-av.r { background:#FEE2E2; color:#B91C1C; } .sp-av.a { background:#FEF3C7; color:#92400E; }
+  .sp-av.b { background:#DBEAFE; color:#1D4ED8; } .sp-av.g { background:#DCFCE7; color:#15803D; }
+  .sp-mid { flex:1; min-width:0; }
+  .sp-nm { font-weight:700; font-size:15px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sp-chip { display:inline-block; white-space:nowrap; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:999px; margin-top:4px; }
+  .sp-chip.r { background:#FEE2E2; color:#B91C1C; } .sp-chip.a { background:#FEF3C7; color:#92400E; }
+  .sp-chip.b { background:#DBEAFE; color:#1D4ED8; } .sp-chip.g { background:#DCFCE7; color:#15803D; } .sp-chip.n { background:#F1F5F9; color:#475569; }
+  .sp-amt { text-align:right; flex:none; }
+  .sp-amt b { display:block; font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text); white-space:nowrap; }
+  .sp-amt span { font-size:12px; color:#64748B; white-space:nowrap; }
+  .sp-pay { flex:none; border:none; background:#0F52BA; color:#fff; font:inherit; font-size:13px; font-weight:700; padding:9px 12px; border-radius:11px; cursor:pointer; }
+  .sp-amt .sp-pay { display:inline-block; margin-top:6px; font-size:12px; padding:6px 12px; border-radius:999px; }
+  .sp-pay:active, .sp-row:active { transform:scale(.98); }
+  .sp-empty { text-align:center; padding:22px 8px; color:#64748B; font-size:14px; }
+  .sp-empty .sp-pay { margin-top:12px; padding:11px 18px; }
+  .sp-sec { display:flex; align-items:center; justify-content:space-between; margin:20px 2px 8px; }
+  .sp-sec b { font-size:13px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:.04em; }
+  .sp-link { border:none; background:none; color:#0F52BA; font:inherit; font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; }
+  .sp-strip { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
+  .sp-strip button { border:1px solid var(--border); background:#fff; border-radius:14px; padding:10px 6px; font:inherit; font-size:12px; font-weight:600; color:#64748B; cursor:pointer; }
+  .sp-strip button b { display:block; font-family:var(--font-display); font-size:20px; font-weight:800; color:var(--text); }
+  .sp-strip button.on { border-color:#0F52BA; color:#0F52BA; background:#EFF6FF; }
+  .sp-strip button.new { background:#0F52BA; border-color:#0F52BA; color:#DBEAFE; }
+  .sp-strip button.new b { color:#fff; }
+  .sp-orders { background:#fff; border:1px solid var(--border); border-radius:18px; padding:2px 14px; margin-top:10px; }
+  @media (min-width:900px) { .sp-hero .x { font-size:38px; } #view-suppliers { max-width:820px; } }
+  /* карточка поставщика — шторка снизу, «Оплатить» всегда под рукой */
+  .sp-sheet { position:relative; text-align:left; padding:0 !important; display:flex; flex-direction:column; overflow:hidden !important; max-width:560px !important; }
+  .sp-sheet-body { overflow-y:auto; padding:8px 18px 18px; -webkit-overflow-scrolling:touch; }
+  .sp-grab { width:42px; height:5px; border-radius:3px; background:#CBD5E1; margin:10px auto 2px; }
+  .sp-x { position:absolute; top:10px; right:12px; width:34px; height:34px; border-radius:50%; border:none; background:#F1F5F9; color:#475569; font-size:16px; cursor:pointer; z-index:2; }
+  .sp-foot { display:flex; gap:8px; padding:12px 18px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:#fff; }
+  .sp-foot:empty { display:none; }
+  .sp-foot .main { flex:1; border:none; background:#0F52BA; color:#fff; font:inherit; font-size:15px; font-weight:800; padding:14px; border-radius:14px; cursor:pointer; }
+  .sp-foot .sec { border:1px solid var(--border); background:#fff; color:#334155; font:inherit; font-size:13px; font-weight:700; padding:0 14px; border-radius:14px; cursor:pointer; }
+  @media (max-width:899px) {
+    .modal-overlay.sp-sheet-ov { align-items:flex-end; }
+    .sp-sheet { width:100% !important; max-width:100% !important; max-height:92vh !important; border-radius:22px 22px 0 0 !important; border:none !important; }
+  }
+  @media (min-width:900px) { .sp-grab { display:none; } .sp-sheet { max-height:88vh !important; } }
+  .sp-head { display:flex; align-items:center; gap:12px; padding:6px 40px 4px 0; }
+  .sp-head .sp-av { width:48px; height:48px; font-size:16px; }
+  .sp-head .t { font-family:var(--font-display); font-size:19px; font-weight:800; color:var(--text); line-height:1.2; }
+  .sp-head .c { font-size:12.5px; color:#64748B; margin-top:2px; }
+  .sp-acts { display:flex; gap:6px; overflow-x:auto; margin:12px 0 4px; padding-bottom:2px; }
+  .sp-acts button { flex:none; border:1px solid var(--border); background:#fff; border-radius:999px; padding:8px 13px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+  .sp-acts button i { color:#0F52BA; margin-right:5px; }
+  .sp-bal { border-radius:18px; padding:16px; margin-top:10px; background:#F8FAFC; border:1px solid var(--border); }
+  .sp-bal.r { background:#FEF2F2; border-color:#FECACA; } .sp-bal.g { background:#F0FDF4; border-color:#BBF7D0; } .sp-bal.b { background:#EFF6FF; border-color:#BFDBFE; }
+  .sp-bal .l { font-size:12.5px; font-weight:700; color:#64748B; }
+  .sp-bal .x { font-family:var(--font-display); font-size:30px; font-weight:800; line-height:1.15; margin:2px 0; }
+  .sp-bal.r .x { color:#B91C1C; } .sp-bal.g .x { color:#15803D; } .sp-bal.b .x { color:#1D4ED8; }
+  .sp-bal .f { font-size:12.5px; color:#475569; }
+  .sp-bal .chips { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+  .sp-bal .chips .sp-chip { margin-top:0; }
+  .sp-det { border:1px solid var(--border); border-radius:16px; margin-top:12px; background:#fff; }
+  .sp-det > summary { list-style:none; cursor:pointer; padding:14px; display:flex; align-items:center; justify-content:space-between; font-weight:800; font-size:14px; color:var(--text); }
+  .sp-det > summary::-webkit-details-marker { display:none; }
+  .sp-det > summary::after { content:"›"; font-size:20px; color:#94A3B8; transform:rotate(90deg); transition:transform .15s; }
+  .sp-det[open] > summary::after { transform:rotate(-90deg); }
+  .sp-det > summary span { font-weight:600; color:#64748B; font-size:12.5px; margin-left:auto; margin-right:10px; }
+  .sp-det-in { padding:0 14px 12px; }
+  .sp-form { border:2px solid #BFDBFE; background:#fff; border-radius:18px; padding:14px; margin-top:12px; }
+  .sp-form-t { font-weight:800; font-size:15px; margin-bottom:2px; }
+  .sp-form { scroll-margin-top:56px; }
+  .sp-form-now { font-size:12.5px; color:#64748B; margin-bottom:6px; }
+  #supCardBody .ord-x { color:#CBD5E1; background:none; }
+  #supCardBody .ord-x:hover { color:#B91C1C; }
+  .sp-seg { display:flex; gap:4px; background:#F1F5F9; border-radius:12px; padding:3px; margin:8px 0; }
+  .sp-seg button { flex:1; border:none; background:transparent; padding:8px 6px; border-radius:9px; font:inherit; font-size:13px; font-weight:600; color:#64748B; cursor:pointer; }
+  .sp-seg button.on { background:#fff; color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .sp-chips { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 8px; }
+  .sp-chips button { border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 12px; font:inherit; font-size:12px; font-weight:600; color:#475569; cursor:pointer; }
+  .sp-chips button.on { background:#0F52BA; border-color:#0F52BA; color:#fff; }
+  .sp-eq { background:#EFF6FF; color:#0F52BA; border-radius:10px; padding:8px 10px; font-size:13px; font-weight:600; margin-top:8px; }
+  .sp-after { font-size:13px; margin-top:6px; color:#334155; }
+  .sp-tot { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin:6px 0 10px; }
+  .sp-tot div { background:#F8FAFC; border-radius:10px; padding:8px 10px; font-size:12px; color:#64748B; }
+  .sp-tot b { display:block; font-size:14px; color:var(--text); }
+  .ord-line.cancelled .pl-name b, .ord-line.cancelled > b { text-decoration:line-through; color:#94A3B8 !important; }
+  .sp-sub { font-size:11px; color:#64748B; font-weight:600; text-align:right; }
   label.pl-row, label.ord-dist-row { text-transform:none; letter-spacing:normal; font-size:13px; color:var(--text); font-weight:400; margin:0; }
   label.pl-row .pl-name b, label.ord-dist-row span { color:var(--text); font-weight:600; }
   label.pl-row .pl-name span { text-transform:none; letter-spacing:normal; }
@@ -1439,6 +1535,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-stats" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
     {% if warehouse_enabled and not is_employee %}<div class="side-item" id="tab-warehouse" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>{% endif %}
+    {% if warehouse_enabled and not is_employee and not is_branch %}<div class="side-item" id="tab-suppliers" data-tab="suppliers" onclick="showTab('suppliers')"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     {% if not is_employee %}<div class="side-item" id="tab-expenses" data-tab="expenses" onclick="showTab('expenses')"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
@@ -1475,6 +1572,7 @@ if ('serviceWorker' in navigator) {
 <div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
   <div class="more-list">
+      {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
       <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
       {% if warehouse_enabled and not is_employee %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>{% endif %}
@@ -1907,7 +2005,6 @@ if ('serviceWorker' in navigator) {
   <div id="view-warehouse" style="display:none;">
     <div class="subtabs">
       <div class="subtab active" id="subwh-own" onclick="showWhSubTab('own')">{{ T.wh_sub_own }}</div>
-      {% if not is_branch and not is_employee %}<div class="subtab" id="subwh-orders" onclick="showWhSubTab('orders')">{{ T.wh_sub_orders }}</div>{% endif %}
       <div class="subtab" id="subwh-branches" onclick="showWhSubTab('branches')" style="display:none;">{{ T.wh_sub_branches }}</div>
       <div class="subtab" id="subwh-network" onclick="showWhSubTab('network')" style="display:none;">{{ T.wh_sub_network }}</div>
     </div>
@@ -1954,26 +2051,6 @@ if ('serviceWorker' in navigator) {
 
     </div>
 
-    {% if not is_branch and not is_employee %}
-    <div id="whOrdersView" style="display:none;">
-      <div class="card">
-        <div class="ord-head-row">
-          <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.ord_list_title }}</label>
-          <button class="wh-tbtn wh-tbtn-primary" onclick="openNewOrder()"><i class="fa-solid fa-plus"></i> {{ T.ord_new }}</button>
-        </div>
-        <div class="hint-text" style="margin-bottom:6px;">{{ T.ord_list_hint }}</div>
-        <div id="ordList">{{ T.stats_loading }}</div>
-      </div>
-      <div class="card" style="margin-top:14px;">
-        <div class="ord-head-row">
-          <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.sup_title }}</label>
-          <button class="wh-tbtn" onclick="openSupplierModal()"><i class="fa-solid fa-plus"></i> {{ T.sup_add_short }}</button>
-        </div>
-        <div id="supList">{{ T.stats_loading }}</div>
-      </div>
-    </div>
-    {% endif %}
-
     <div id="whNetworkView" style="display:none;">
       <div class="card">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.whn_title }}</label>
@@ -2011,6 +2088,35 @@ if ('serviceWorker' in navigator) {
 
     </div>
 
+  </div>
+
+  {% if warehouse_enabled and not is_employee and not is_branch %}
+  <div id="view-suppliers" style="display:none;">
+    <div class="sp-top">
+      <h2>{{ T.tab_suppliers }}</h2>
+      <button class="sp-pill" id="spRatePill" onclick="openSupRate()"></button>
+      <div class="sp-menu-wrap">
+        <button class="sp-icon" onclick="toggleSupMenu(event)" aria-label="{{ T.nav_more }}"><i class="fa-solid fa-ellipsis"></i></button>
+        <div class="sp-menu" id="spMenu">
+          <button onclick="closeSupMenu(); openSupplierModal();"><i class="fa-solid fa-plus"></i>{{ T.sp_menu_add }}</button>
+          <button onclick="closeSupMenu(); openNewOrder();"><i class="fa-solid fa-cart-plus"></i>{{ T.ord_new }}</button>
+          <button onclick="closeSupMenu(); openSupRate();"><i class="fa-solid fa-dollar-sign"></i>{{ T.usd_rate_title }}</button>
+          <button onclick="closeSupMenu(); openSupArchive();"><i class="fa-solid fa-box-archive"></i><span id="spMenuArchive">{{ T.sp_archive }}</span></button>
+        </div>
+      </div>
+    </div>
+    <div id="spHero"></div>
+    <div class="sp-list" id="supList"><div class="sp-empty">{{ T.stats_loading }}</div></div>
+    <div class="sp-sec"><b>{{ T.ord_list_title }}</b><button class="sp-link" id="ordToggle" onclick="toggleAllOrders()"></button></div>
+    <div class="sp-strip" id="ordStrip"></div>
+    <div class="sp-orders" id="ordWrap">
+      <div id="ordList">{{ T.stats_loading }}</div>
+      <button class="wh-tbtn wh-tbtn-wide" id="ordMoreBtn" style="display:none; margin:6px 0 10px;" onclick="loadMoreOrders()">{{ T.sp_show_more }}</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="whModals">
       <div class="modal-overlay" id="addProductModal">
         <div class="modal modal-wide" style="text-align:left;">
           <h3 style="text-align:center; margin-top:0;">{{ T.wh_add_product }}</h3>
@@ -2138,10 +2244,25 @@ if ('serviceWorker' in navigator) {
       </div>
       {% endif %}
       {% if not is_branch and not is_employee %}
-      <div class="modal-overlay" id="supCardModal">
-        <div class="modal modal-wide" style="text-align:left;">
-          <div id="supCardBody"></div>
-          <button class="close-btn" onclick="closeWhModal('supCardModal')">{{ T.modal_close }}</button>
+      <div class="modal-overlay sp-sheet-ov" id="supCardModal" onclick="if (event.target === this) closeWhModal('supCardModal')">
+        <div class="modal modal-wide sp-sheet">
+          <div class="sp-grab"></div>
+          <button class="sp-x" onclick="closeWhModal('supCardModal')" aria-label="{{ T.modal_close }}"><i class="fa-solid fa-xmark"></i></button>
+          <div class="sp-sheet-body" id="supCardScroll"><div id="supCardBody"></div></div>
+          <div class="sp-foot" id="supCardFoot"></div>
+        </div>
+      </div>
+      <div class="modal-overlay" id="supRateModal" onclick="if (event.target === this) closeWhModal('supRateModal')">
+        <div class="modal" style="text-align:left; max-width:380px;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.usd_rate_title }}</h3>
+          <div class="field">
+            <label>{{ T.usd_rate_label }}</label>
+            <input id="usd_rate_input_sup" type="number" inputmode="decimal" step="0.01" placeholder="12700" value="{{ '%g'|format(usd_rate_own) if usd_rate_own else '' }}">
+          </div>
+          <p class="hint-text" style="margin-top:0;">{{ T.sp_rate_hint }}</p>
+          <button class="submit" onclick="saveSupRate()">{{ T.usd_rate_save }}</button>
+          <div id="usdRateSaved_sup" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px; text-align:center;">✓ {{ T.usd_rate_saved }}</div>
+          <button class="close-btn" onclick="closeWhModal('supRateModal')">{{ T.modal_close }}</button>
         </div>
       </div>
       <div class="modal-overlay" id="orderNewProductModal">
@@ -2456,7 +2577,6 @@ let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы к�
 
 let CURRENT_TAB = 'add';
 function showTab(t, keepScroll) {
-  if (t !== 'table' && openHistoryRow !== null) closeClientCard();
   CURRENT_TAB = t;
   document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
@@ -2482,6 +2602,10 @@ function showTab(t, keepScroll) {
   const whTab = document.getElementById('tab-warehouse');
   if (whView) whView.style.display = t === 'warehouse' ? 'block' : 'none';
   if (whTab) whTab.classList.toggle('active', t === 'warehouse');
+  const supView = document.getElementById('view-suppliers');
+  const supTab = document.getElementById('tab-suppliers');
+  if (supView) supView.style.display = t === 'suppliers' ? 'block' : 'none';
+  if (supTab) supTab.classList.toggle('active', t === 'suppliers');
   const expView = document.getElementById('view-expenses');
   const expTab = document.getElementById('tab-expenses');
   if (expView) expView.style.display = t === 'expenses' ? 'block' : 'none';
@@ -2498,6 +2622,7 @@ function showTab(t, keepScroll) {
   if (!keepScroll) window.scrollTo(0, 0);
   if (t === 'stats') loadStats();
   if (t === 'warehouse') loadWarehouse();
+  if (t === 'suppliers') loadSuppliersTab();
 }
 
 // Данные на экране не должны «застревать»: если приложение было свёрнуто
@@ -2510,7 +2635,6 @@ function refreshCurrentView() {
   if (CURRENT_TAB === 'warehouse') {
     if (vis('whBranchesView') && WH.branchId) selectWhBranch(WH.branchId);
     if (vis('whNetworkView')) { WH.net = null; loadNetworkStock(); }
-    if (vis('whOrdersView')) loadOrdersTab();
   }
   if (CURRENT_TAB === 'stats' && vis('statsBranchesView')) { loadNetworkCompare(); loadNetwork(); }
 }
@@ -2558,14 +2682,29 @@ async function refreshNavBadges() {
       b.textContent = overdue;
       b.classList.toggle('show', overdue > 0);
     });
-    const sheet = document.getElementById('moreSheet');
-    const moreBadge = document.getElementById('moreBadge');
-    if (sheet && moreBadge) {
-      const debtsInMore = !sheet.dataset.bar.split(',').includes('debts');
-      moreBadge.textContent = overdue;
-      moreBadge.classList.toggle('show', debtsInMore && overdue > 0);
+    NAV_BADGES.debts = overdue;
+    if (document.getElementById('tab-suppliers')) {
+      const sd = await (await fetch('/api/suppliers')).json();
+      if (sd && sd.ok) NAV_BADGES.suppliers = sd.totals.overdue_count;
     }
   } catch (e) {}
+  renderNavBadges();
+}
+const NAV_BADGES = { debts: 0, suppliers: 0 };
+function renderNavBadges() {
+  // поставщики с просроченным долгом — красная цифра на «Поставщиках» и на «Ещё»
+  document.querySelectorAll('[data-badge="suppliers"]').forEach(b => {
+    b.textContent = NAV_BADGES.suppliers;
+    b.classList.toggle('show', NAV_BADGES.suppliers > 0);
+  });
+  const sheet = document.getElementById('moreSheet');
+  const moreBadge = document.getElementById('moreBadge');
+  if (sheet && moreBadge) {
+    const debtsInMore = !sheet.dataset.bar.split(',').includes('debts');
+    const n = (debtsInMore ? NAV_BADGES.debts : 0) + NAV_BADGES.suppliers;
+    moreBadge.textContent = n;
+    moreBadge.classList.toggle('show', n > 0);
+  }
 }
 refreshNavBadges();
 setInterval(refreshNavBadges, 5 * 60 * 1000);
@@ -2887,7 +3026,7 @@ async function sendPurchaseList(mode) {
 // закупки) → раздан по филиалам. Поставщик необязателен: заказ «Без
 // поставщика» — это просто список покупок (например, поездка на рынок).
 const SUP = { list: [], loaded: false, editId: null, assignId: null, checked: new Set() };
-const ORD = { list: [], cur: null, mode: 'view', dist: null, distFor: null };
+const ORD = { list: [], cur: null, mode: 'view', dist: null, distFor: null, limit: 40, total: 0, filter: 'active' };
 
 async function ordFetch(url, method, body) {
   try {
@@ -2910,31 +3049,153 @@ function supName(id) {
 }
 function whCatName(c) { return c === 'other' ? T.wh_category_other : (T[c] || c || ''); }
 
-async function loadOrdersTab() { await Promise.all([loadSuppliers(), loadOrders()]); }
+// ---- раздел «Поставщики» (главное меню) ----
+// Долг ведётся в сумах; $ — справочно: в каждой операции сохранён курс того
+// дня, а общий долг пересчитывается по текущему курсу (как на «Складе»).
+function fmtUsd(x) {
+  x = Number(x || 0);
+  const v = Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100;
+  return '$' + v.toLocaleString('ru-RU');
+}
+function usdTail(sum) { return USD_RATE && sum ? ' · ≈ ' + fmtUsd(sum / USD_RATE) : ''; }
+function supRateStr(r) { return r ? Number(r).toLocaleString('ru-RU') : ''; }
+
+async function ensureOwnProducts() {
+  // заказам нужны товары своего склада — подгружаем, если «Склад» ещё не открывали
+  if (WHCTX.own.products && WHCTX.own.products.length) return;
+  try {
+    const d = await (await fetch('/api/warehouse/overview')).json();
+    if (d && d.ok) { productsCache = d.products; WHCTX.own.products = d.products; WHCTX.own.summary = d.summary; }
+  } catch (e) {}
+}
+
+async function loadSuppliersTab() {
+  await ensureOwnProducts();
+  await Promise.all([loadSuppliers(), loadOrders()]);
+}
+const loadOrdersTab = loadSuppliersTab;
 
 async function loadSuppliers() {
   const d = await ordFetch('/api/suppliers');
-  if (d.ok) { SUP.list = d.suppliers; SUP.loaded = true; SUP.botReady = !!d.bot_ready; }
+  if (d.ok) {
+    SUP.list = d.suppliers; SUP.loaded = true; SUP.botReady = !!d.bot_ready;
+    SUP.totals = d.totals; SUP.archived = d.archived_count || 0;
+    NAV_BADGES.suppliers = (d.totals && d.totals.overdue_count) || 0;
+    renderNavBadges();
+  }
   renderSuppliers();
+}
+
+function supInitials(name) {
+  const w = String(name || '?').replace(/[«»"'()\\-]/g, ' ').trim().split(/\\s+/).filter(Boolean);
+  return ((w[0] || '?')[0] + (w[1] ? w[1][0] : (w[0] || '').slice(1, 2))).toUpperCase();
+}
+function supDaysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000); }
+function supToday() { return fmtDate(new Date()); }
+// цвет и подпись статуса: r — просрочка, a — скоро платить, b — долг без срока / переплата, g — долга нет
+function supStatus(s, d) {
+  const bal = d ? d.balance : s.balance, overdue = d ? d.overdue : s.overdue;
+  const oldest = d ? d.oldest_overdue : s.oldest_overdue, next = d ? d.next_due : s.next_due;
+  if (overdue > 0) {
+    const n = oldest ? supDaysBetween(oldest, supToday()) : 0;
+    return { c: 'r', t: n >= 60 ? T.sp_chip_overdue_months.replace('{n}', Math.floor(n / 30)) : n > 0 ? T.sp_chip_overdue_days.replace('{n}', n) : T.sp_st_overdue };
+  }
+  if (bal > 0 && next) {
+    const n = supDaysBetween(supToday(), next.date);
+    return { c: n <= 3 ? 'a' : 'b', t: n <= 0 ? T.sp_chip_today : T.sp_chip_due.replace('{date}', ordDate(next.date).slice(0, 5)).replace('{n}', n) };
+  }
+  if (bal > 0) return { c: 'b', t: T.sp_st_no_terms };
+  if (bal < 0) return { c: 'b', t: T.sp_st_overpaid };
+  return { c: 'g', t: T.sd_no_debt };
+}
+function supShort(n) { return fmtShort(Math.round(n || 0)); }
+
+function renderSupRatePill() {
+  const el = document.getElementById('spRatePill');
+  if (!el) return;
+  el.textContent = USD_RATE ? '$ ' + Number(USD_RATE).toLocaleString('ru-RU') : T.sp_rate_none;
+  el.classList.toggle('warn', !USD_RATE);
 }
 
 function renderSuppliers() {
   const el = document.getElementById('supList');
   if (!el) return;
-  if (!SUP.list.length) { el.innerHTML = `<div class="hint-text" style="padding:6px 0;">${T.sup_empty}</div>`; return; }
-  el.innerHTML = SUP.list.map(s => {
-    const contacts = [s.tg_connected ? `<span class="sup-bot">✓ ${T.sup_tg_badge}</span>` : '', s.phone ? escapeHtml(s.phone) : '',
-      s.telegram ? '@' + escapeHtml(s.telegram) : '', s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
-    return `
-      <div class="sup-row">
-        <div class="sup-main" onclick="openSupplierCard(${s.id})"><b>${escapeHtml(s.name)}</b><span>${contacts || T.sup_no_contacts}</span>
-          <span>${T.sup_products} ${s.product_count}${s.balance > 0 ? ` · <span class="sup-debt">${T.sd_debt_short} ${fmtSum(s.balance)}${s.overdue > 0 ? ' ⚠️' : ''}</span>` : ''}</span></div>
-        <div class="whc-actions">
-          <button class="wh-tbtn wh-tbtn-sm" onclick="openNewOrder(${s.id})">${T.sup_order_btn}</button>
-          <button class="wh-tbtn wh-tbtn-icon" title="${T.sup_assign_title}" onclick="openSupProducts(${s.id})"><i class="fa-solid fa-boxes-stacked"></i></button>
-        </div>
+  renderSupRatePill();
+  const t = SUP.totals || { owe: 0, overdue: 0, overpaid: 0, overdue_count: 0 };
+  const owing = SUP.list.filter(s => s.balance > 0).length;
+  const hero = document.getElementById('spHero');
+  if (hero) {
+    if (t.owe > 0) {
+      const op = Math.min(100, Math.round(t.overdue / t.owe * 100));
+      hero.innerHTML = `<div class="sp-hero">
+        <div class="l">${T.sp_hero_title}</div>
+        <div class="x">${supShort(t.owe)}<small>${T.currency}</small></div>
+        <div class="u">${USD_RATE ? '≈ ' + fmtUsd(t.owe / USD_RATE) + ' · ' : ''}${T.sp_hero_sup.replace('{n}', owing)}${t.overpaid > 0 ? ' · ' + T.sp_st_overpaid + ' ' + supShort(t.overpaid) : ''}</div>
+        <div class="sp-bar">${op ? `<i class="o" style="width:${op}%"></i>` : ''}<i class="k" style="width:${100 - op}%"></i></div>
+        <div class="sp-leg">${t.overdue > 0 ? `<span class="o">${T.sp_leg_overdue} ${supShort(t.overdue)}</span>` : ''}<span class="k">${T.sp_leg_ok} ${supShort(t.owe - t.overdue)}</span></div>
       </div>`;
-  }).join('');
+    } else {
+      hero.innerHTML = `<div class="sp-hero zero"><div class="l">${T.sp_hero_title}</div><div class="x">0<small>${T.currency}</small></div>
+        <div class="u">${SUP.list.length ? T.sp_hero_zero : T.sp_hero_empty}${t.overpaid > 0 ? ' · ' + T.sp_st_overpaid + ' ' + supShort(t.overpaid) : ''}</div></div>`;
+    }
+  }
+  const list = SUP.list.slice().sort((a, b) => (b.overdue > 0) - (a.overdue > 0) || b.balance - a.balance || a.name.localeCompare(b.name));
+  el.innerHTML = list.length ? list.map(s => {
+    const st = supStatus(s);
+    const amt = s.balance ? `<b>${supShort(Math.abs(s.balance))}</b><span>${USD_RATE ? '≈ ' + fmtUsd(Math.abs(s.balance) / USD_RATE) : T.currency}</span>` : `<b>0</b><span>${T.currency}</span>`;
+    return `<div class="sp-row" onclick="openSupplierCard(${s.id})">
+      <div class="sp-av ${st.c}">${escapeHtml(supInitials(s.name))}</div>
+      <div class="sp-mid"><div class="sp-nm">${escapeHtml(s.name)}${s.tg_connected ? ' <i class="fa-brands fa-telegram" style="color:#229ED9; font-size:13px;"></i>' : ''}</div><span class="sp-chip ${st.c}">${st.t}</span></div>
+      <div class="sp-amt">${amt}${s.balance > 0 ? `<br><button class="sp-pay" onclick="event.stopPropagation(); openSupplierCard(${s.id}, 'payment');">${T.sp_pay_btn}</button>` : ''}</div>
+    </div>`;
+  }).join('') : `<div class="sp-empty">${T.sup_empty}<br><button class="sp-pay" onclick="openSupplierModal()"><i class="fa-solid fa-plus"></i> ${T.sp_menu_add}</button></div>`;
+  const ma = document.getElementById('spMenuArchive');
+  if (ma) ma.textContent = T.sp_archive + (SUP.archived ? ` (${SUP.archived})` : '');
+}
+
+function toggleSupMenu(e) {
+  e.stopPropagation();
+  document.getElementById('spMenu').classList.toggle('open');
+}
+function closeSupMenu() { const m = document.getElementById('spMenu'); if (m) m.classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest || !e.target.closest('.sp-menu-wrap')) closeSupMenu(); });
+
+function openSupRate() {
+  const inp = document.getElementById('usd_rate_input_sup');
+  document.getElementById('supRateModal').classList.add('open');
+  setTimeout(() => { inp.focus(); inp.select && inp.select(); }, 50);
+}
+async function saveSupRate() {
+  await saveUsdRate('usd_rate_input_sup', 'usdRateSaved_sup');
+  renderSupRatePill();
+  setTimeout(() => closeWhModal('supRateModal'), 700);
+}
+
+async function openSupArchive() {
+  const m = document.getElementById('supCardModal');
+  const body = document.getElementById('supCardBody');
+  SUP.cardId = null;
+  document.getElementById('supCardFoot').innerHTML = '';
+  body.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.stats_loading}</div>`;
+  m.classList.add('open');
+  const d = await ordFetch('/api/suppliers?archived=1');
+  if (!d.ok) { showMsg(ordErr(d), false); closeWhModal('supCardModal'); return; }
+  body.innerHTML = `<div class="sp-head"><div class="t">${T.sp_archive}</div></div>
+    <div class="hint-text" style="margin-bottom:8px;">${T.sp_archive_hint}</div>
+    ${d.suppliers.length ? d.suppliers.map(s => `
+      <div class="ord-line">
+        <div class="pl-name" style="cursor:pointer;" onclick="openSupplierCard(${s.id})"><b>${escapeHtml(s.name)}</b>
+          <span>${s.archived_at ? T.sp_archived_on + ' ' + ordDate(s.archived_at) : ''}${s.balance ? ' · ' + (s.balance > 0 ? T.sd_debt_short + ' ' : T.sp_st_overpaid + ' ') + fmtSum(Math.abs(s.balance)) : ''}</span></div>
+        <button class="wh-tbtn wh-tbtn-sm" onclick="restoreSupplier(${s.id})">${T.sp_restore}</button>
+      </div>`).join('') : `<div class="hint-text">${T.sp_archive_empty}</div>`}`;
+}
+
+async function restoreSupplier(id) {
+  const d = await ordFetch(`/api/suppliers/${id}/restore`, 'POST');
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  showMsg(T.sp_restored, true);
+  await loadSuppliers();
+  openSupplierCard(id);
 }
 
 const SUP_FIELDS = ['name', 'phone', 'telegram', 'contact', 'delivery_days', 'note', 'pay_days'];
@@ -3007,7 +3268,9 @@ async function saveSupplier() {
 }
 
 async function deleteSupplierBtn() {
-  if (!SUP.editId || !confirm(T.sup_delete_confirm)) return;
+  const cur = SUP.list.find(x => x.id === SUP.editId);
+  const warn = cur && cur.balance ? '\\n\\n⚠️ ' + (cur.balance > 0 ? T.sp_archive_debt_warn : T.sp_archive_over_warn).replace('{sum}', fmtSum(Math.abs(cur.balance))) : '';
+  if (!SUP.editId || !confirm(T.sup_delete_confirm + warn)) return;
   const d = await ordFetch('/api/suppliers/' + SUP.editId, 'DELETE');
   if (!d.ok) { showMsg(ordErr(d), false); return; }
   WHCTX.own.products.forEach(p => { if (p.supplier_id === SUP.editId) p.supplier_id = null; });
@@ -3088,19 +3351,46 @@ function ordBadge(st) {
 }
 
 async function loadOrders() {
-  const d = await ordFetch('/api/orders');
-  if (d.ok) ORD.list = d.orders;
+  const d = await ordFetch('/api/orders?limit=' + ORD.limit);
+  if (d.ok) { ORD.list = d.orders; ORD.total = d.total || d.orders.length; }
   renderOrders();
 }
+function loadMoreOrders() { ORD.limit += 40; loadOrders(); }
+const ORD_ACTIVE = ['draft', 'sent', 'received'];
+function toggleAllOrders() { ORD.filter = ORD.filter === 'all' ? 'active' : 'all'; renderOrders(); }
+function setOrderFilter(f) { ORD.filter = ORD.filter === f ? 'active' : f; renderOrders(); }
 
 function renderOrders() {
   const el = document.getElementById('ordList');
   if (!el) return;
-  if (!ORD.list.length) { el.innerHTML = `<div class="hint-text" style="padding:6px 0;">${T.ord_empty}</div>`; return; }
-  el.innerHTML = ORD.list.map(o => `
-    <div class="ord-row" onclick="openOrder(${o.id})">
+  const f = ORD.filter || 'active';
+  const cnt = st => ORD.list.filter(o => st.includes(o.status)).length;
+  const drafts = cnt(['draft']), transit = cnt(['sent', 'received']);
+  const strip = document.getElementById('ordStrip');
+  if (strip) strip.innerHTML = `
+    <button class="${f === 'draft' ? 'on' : ''}" onclick="setOrderFilter('draft')"><b>${drafts}</b>${T.sp_ord_drafts}</button>
+    <button class="${f === 'transit' ? 'on' : ''}" onclick="setOrderFilter('transit')"><b>${transit}</b>${T.sp_ord_transit}</button>
+    <button class="new" onclick="openNewOrder()"><b>+</b>${T.sp_ord_new}</button>`;
+  const tg = document.getElementById('ordToggle');
+  if (tg) {
+    tg.textContent = f === 'all' ? T.sp_ord_active : T.sp_ord_all.replace('{n}', ORD.total || ORD.list.length);
+    tg.style.display = (ORD.total || ORD.list.length) ? '' : 'none';
+  }
+  const shown = ORD.list.filter(o => f === 'all' ? true : f === 'draft' ? o.status === 'draft'
+    : f === 'transit' ? ['sent', 'received'].includes(o.status) : ORD_ACTIVE.includes(o.status));
+  const more = document.getElementById('ordMoreBtn');
+  if (more) more.style.display = f === 'all' && ORD.total > ORD.list.length ? '' : 'none';
+  const wrap = document.getElementById('ordWrap');
+  if (!shown.length) {
+    el.innerHTML = `<div class="hint-text" style="padding:12px 0;">${ORD.list.length ? T.sp_ord_none_active : T.ord_empty}</div>`;
+    if (wrap) wrap.style.display = ORD.list.length || f !== 'active' ? '' : 'none';
+    return;
+  }
+  if (wrap) wrap.style.display = '';
+  el.innerHTML = shown.map(o => `
+    <div class="ord-row" onclick="openOrder(${o.id})" style="cursor:pointer;">
       <div class="sup-main"><b>${T.ord_title_n.replace('{n}', o.number)} · ${escapeHtml(o.supplier_name || T.ord_no_supplier)}</b>
-        <span>${ordDate(o.created_at)} · ${o.line_count} ${T.ord_positions}${o.received_sum ? ' · ' + fmtNum(Math.round(o.received_sum)) + ' ' + T.currency : ''}</span></div>
+        <span>${ordDate(o.created_at)} · ${o.line_count} ${T.ord_positions}${o.received_sum ? ' · ' + supShort(o.received_sum) + ' ' + T.currency : ''}</span></div>
       ${ordBadge(o.status)}
     </div>`).join('');
 }
@@ -3500,117 +3790,277 @@ async function keepAllOrder() {
 function purchaseToOrder() {
   const first = (WH.purchaseItems || []).find(p => p.supplier_id);
   closeWhModal('purchaseListModal');
-  showWhSubTab('orders');
+  showTab('suppliers');
   openNewOrder(first ? first.supplier_id : null);
 }
 
 // ---- карточка поставщика: долг, оплаты, история цен ----
 function fmtSum(n) { return fmtNum(Math.round(n || 0)) + ' ' + T.currency; }
 
-async function openSupplierCard(id) {
+async function openSupplierCard(id, then) {
   SUP.cardId = id;
+  SUP.cardYear = null;
+  SUP.pay = null;
+  SUP.cardThen = then || null;  // 'payment' — сразу открыть форму оплаты
   const m = document.getElementById('supCardModal');
-  document.getElementById('supCardBody').innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.stats_loading}</div>`;
+  document.getElementById('supCardFoot').innerHTML = '';
+  document.getElementById('supCardBody').innerHTML = `<div class="hint-text" style="padding:24px 0; text-align:center;">${T.stats_loading}</div>`;
   m.classList.add('open');
-  const d = await ordFetch(`/api/suppliers/${id}/card`);
-  if (SUP.cardId !== id) return;
+  await reloadSupplierCard();
+  if (SUP.cardThen && SUP.cardId === id && SUP.card && SUP.card.supplier.is_active) { const k = SUP.cardThen; SUP.cardThen = null; openSupPayForm(k); }
+}
+
+async function reloadSupplierCard(offset) {
+  const id = SUP.cardId, year = SUP.cardYear;
+  if (!id) return;
+  const d = await ordFetch(`/api/suppliers/${id}/card?year=${year || ''}&offset=${offset || 0}`);
+  if (SUP.cardId !== id || SUP.cardYear !== year) return;  // пока ждали ответ, открыли другое
   if (!d.ok) { showMsg(ordErr(d), false); closeWhModal('supCardModal'); return; }
-  SUP.card = d;
+  if (offset && SUP.card) { SUP.card.entries = SUP.card.entries.concat(d.entries); SUP.card.total_entries = d.total_entries; }
+  else SUP.card = d;
   renderSupplierCard();
+}
+
+function supCardYear(y) {
+  SUP.cardYear = y || null;
+  reloadSupplierCard();
+}
+
+function supCardMore() { reloadSupplierCard(SUP.card.entries.length); }
+
+const SUP_METHODS = ['cash', 'card', 'transfer'];
+function supMethodName(m) { return SUP_METHODS.includes(m) ? T['sp_m_' + m] : ''; }
+
+function supEntryLine(e) {
+  const pay = e.type === 'payment';
+  const off = e.status === 'cancelled';
+  const title = e.type === 'order' ? T.ord_title_n.replace('{n}', e.number) : pay ? T.sd_payment : T.sd_charge;
+  const click = e.type === 'order' ? `onclick="closeWhModal('supCardModal'); openOrder(${e.id});" style="cursor:pointer;"` : '';
+  const act = SUP.card.supplier.is_active;
+  const x = e.type !== 'order' && !off && act ? `<button class="ord-x" onclick="cancelSupPayment(${e.id})" aria-label="${T.sp_cancel}"><i class="fa-solid fa-xmark"></i></button>` : '';
+  const meta = [ordDate(e.date), e.type === 'order' && e.positions ? e.positions + ' ' + T.ord_positions : '', supMethodName(e.method),
+    e.note ? escapeHtml(e.note) : '', e.unpriced ? '⚠️ ' + T.sd_unpriced_short : '',
+    off ? `<span style="color:#B91C1C;">${T.sp_cancelled}${e.cancel_reason ? ': ' + escapeHtml(e.cancel_reason) : ''}</span>` : ''].filter(Boolean).join(' · ');
+  const usd = e.currency === 'USD' && e.amount_usd != null
+    ? `${fmtUsd(e.amount_usd)} · ${T.sp_rate_short} ${supRateStr(e.usd_rate)}`
+    : e.usd != null && e.amount ? `≈ ${fmtUsd(e.usd)} · ${T.sp_rate_short} ${supRateStr(e.usd_rate)}` : (e.amount ? T.sp_no_rate : '');
+  return `<div class="ord-line ${off ? 'cancelled' : ''}" ${click}>
+    <div class="pl-name"><b>${title}</b><span>${meta}</span></div>
+    <div><b style="white-space:nowrap; display:block; text-align:right; color:${off ? '#94A3B8' : pay ? '#15803D' : '#B91C1C'};">${pay ? '−' : '+'}${fmtNum(e.amount)}</b><div class="sp-sub">${usd}</div></div>${x}
+  </div>`;
 }
 
 function renderSupplierCard() {
   const c = SUP.card, s = c.supplier, d = c.debt;
-  const contacts = [s.tg_connected ? `<span class="sup-bot">✓ ${T.sup_tg_badge}</span>` : '', s.phone ? escapeHtml(s.phone) : '',
-    s.telegram ? '@' + escapeHtml(s.telegram) : '', s.contact ? escapeHtml(s.contact) : '', s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
-  const bal = d.balance > 0 ? `<div class="sd-big bad">${fmtSum(d.balance)}</div><div class="sd-cap">${T.sd_you_owe}</div>`
-    : d.balance < 0 ? `<div class="sd-big ok">${fmtSum(-d.balance)}</div><div class="sd-cap">${T.sd_overpaid}</div>`
-    : `<div class="sd-big ok">0</div><div class="sd-cap">${T.sd_no_debt}</div>`;
+  const act = !!s.is_active;
+  const listed = SUP.list.find(x => x.id === s.id) || {};
+  const st = supStatus(null, d);
+  const contacts = [s.phone ? `<a href="tel:${escapeHtml(s.phone.replace(/[^0-9+]/g, ''))}" style="color:inherit;">${escapeHtml(s.phone)}</a>` : '',
+    s.telegram ? `<a href="https://t.me/${escapeHtml(s.telegram)}" target="_blank" rel="noopener" style="color:inherit;">@${escapeHtml(s.telegram)}</a>` : '',
+    s.contact ? escapeHtml(s.contact) : '', s.delivery_days ? escapeHtml(s.delivery_days) : '',
+    s.tg_connected ? `<span class="sup-bot">✓ ${T.sup_tg_badge}</span>` : ''].filter(Boolean).join(' · ');
+  const balCls = d.balance > 0 ? (d.overdue > 0 ? 'r' : 'b') : d.balance < 0 ? 'b' : 'g';
+  const balLabel = d.balance > 0 ? T.sp_bal_owe : d.balance < 0 ? T.sd_overpaid : T.sd_no_debt;
+  const abs = Math.abs(d.balance);
+  const chips = [
+    d.balance !== 0 || d.overdue ? `<span class="sp-chip ${st.c}">${st.t}</span>` : '',
+    d.overdue > 0 && d.overdue < d.balance ? `<span class="sp-chip r">${T.sp_leg_overdue} ${supShort(d.overdue)}</span>` : '',
+    d.next_due && d.overdue > 0 ? `<span class="sp-chip b">${T.sd_next_due.replace('{sum}', supShort(d.next_due.amount)).replace('{date}', ordDate(d.next_due.date))}</span>` : '',
+    s.pay_days != null ? `<span class="sp-chip n">${T.sd_terms.replace('{n}', s.pay_days)}</span>` : '',
+  ].filter(Boolean).join('');
   const notes = [
-    d.overdue > 0 ? `<div class="sd-note bad">⚠️ ${T.sd_overdue} ${fmtSum(d.overdue)}${d.oldest_overdue ? ' · ' + T.sd_since + ' ' + ordDate(d.oldest_overdue) : ''}</div>` : '',
-    d.next_due ? `<div class="sd-note">${T.sd_next_due.replace('{sum}', fmtSum(d.next_due.amount)).replace('{date}', ordDate(d.next_due.date))}</div>` : '',
-    s.pay_days == null && d.balance > 0 ? `<div class="hint-text">${T.sd_no_terms}</div>` : '',
-    s.pay_days != null ? `<div class="hint-text">${T.sd_terms.replace('{n}', s.pay_days)}</div>` : '',
-    d.unpriced_orders ? `<div class="sd-note warn">${T.sd_unpriced}</div>` : '',
+    s.pay_days == null && d.balance > 0 ? `<div class="hint-text" style="margin-top:8px;">${T.sd_no_terms}</div>` : '',
+    d.unpriced_orders ? `<div class="sd-note warn" style="margin-top:8px;">${T.sd_unpriced}</div>` : '',
+    !act ? `<div class="sd-note warn" style="margin-top:8px;">${T.sp_in_archive}</div>` : '',
   ].join('');
-  const ops = c.entries.length ? c.entries.map(e => {
-    const plus = e.type !== 'payment';
-    const title = e.type === 'order' ? T.ord_title_n.replace('{n}', e.number) : e.type === 'payment' ? T.sd_payment : T.sd_charge;
-    const click = e.type === 'order' ? `onclick="closeWhModal('supCardModal'); openOrder(${e.id});" style="cursor:pointer;"` : '';
-    const del = e.type !== 'order' ? `<button class="ord-x" onclick="deleteSupPayment(${e.id})" aria-label="${T.wh_delete_action}"><i class="fa-solid fa-xmark"></i></button>` : '';
-    return `<div class="ord-line" ${click}>
-      <div class="pl-name"><b>${title}</b><span>${ordDate(e.date)}${e.note ? ' · ' + escapeHtml(e.note) : ''}${e.unpriced ? ' · ⚠️ ' + T.sd_unpriced_short : ''}</span></div>
-      <b style="white-space:nowrap; color:${plus ? '#B91C1C' : '#15803D'};">${plus ? '+' : '−'}${fmtNum(e.amount)}</b>${del}
-    </div>`;
-  }).join('') : `<div class="hint-text">${T.sd_no_ops}</div>`;
-  const prices = c.prices.length ? c.prices.map((p, i) => {
+  const tt = c.period;
+  const totals = `<div class="sp-tot" style="margin-top:12px;">
+      <div>${T.sp_tot_bought}<b>${supShort(tt.bought)} ${T.currency}</b>${tt.bought ? '≈ ' + fmtUsd(tt.bought_usd) : ''}</div>
+      <div>${T.sp_tot_paid}<b>${supShort(tt.paid)} ${T.currency}</b>${tt.paid ? '≈ ' + fmtUsd(tt.paid_usd) : ''}</div></div>
+      ${tt.no_rate ? `<div class="hint-text">${T.sp_tot_no_rate.replace('{n}', tt.no_rate)}</div>` : ''}`;
+  const yearChips = c.years.length > 1 ? `<div class="sp-chips"><button class="${!c.year ? 'on' : ''}" onclick="supCardYear(null)">${T.sp_all_years}</button>${c.years.map(y => `<button class="${c.year === y ? 'on' : ''}" onclick="supCardYear('${y}')">${y}</button>`).join('')}</div>` : '';
+  const ops = c.entries.length ? c.entries.map(supEntryLine).join('') : `<div class="hint-text">${T.sd_no_ops}</div>`;
+  const more = c.total_entries > c.entries.length ? `<button class="wh-tbtn wh-tbtn-wide" style="margin-top:8px;" onclick="supCardMore()">${T.sp_show_more} (${c.total_entries - c.entries.length})</button>` : '';
+  const prices = c.prices.length ? c.prices.map(p => {
     const ch = p.change_pct;
     const badge = ch == null ? '' : `<span class="pr-badge ${ch > 0 ? 'up' : 'down'}">${ch > 0 ? '↑ +' : '↓ '}${ch}%</span>`;
-    const hist = p.history.map(h => `<div class="pr-h"><span>${ordDate(h.date)} · №${h.number} · ${whQty(h.qty)} ${whUnit(p.unit)}</span><b>${fmtNum(h.price)}</b></div>`).join('');
+    const hist = p.history.map(h => `<div class="pr-h"><span>${ordDate(h.date)} · №${h.number} · ${whQty(h.qty)} ${whUnit(p.unit)}</span><b>${fmtNum(h.price)}${h.usd != null ? ' · ' + fmtUsd(h.usd) : ''}</b></div>`).join('');
     return `<div class="pr-row" onclick="this.classList.toggle('open')">
       <div class="ord-line" style="border:none; padding:6px 0;">
         <div class="pl-name"><b>${escapeHtml(p.name)}</b><span>${ordDate(p.last_date)}${p.prev ? ' · ' + T.pr_was + ' ' + fmtNum(p.prev) : ''}${p.since_first_pct != null ? ' · ' + T.pr_since_first + ' ' + (p.since_first_pct > 0 ? '+' : '') + p.since_first_pct + '%' : ''}</span></div>
-        <div style="text-align:right;"><b style="white-space:nowrap;">${fmtNum(p.last)}</b><div>${badge}</div></div>
+        <div style="text-align:right;"><b style="white-space:nowrap;">${fmtNum(p.last)}</b>${p.last_usd != null ? `<div class="sp-sub">${fmtUsd(p.last_usd)}</div>` : ''}<div>${badge}</div></div>
       </div>
       <div class="pr-hist">${hist}</div>
     </div>`;
   }).join('') : `<div class="hint-text">${T.pr_empty}</div>`;
+  const yStart = c.year ? c.year + '-01-01' : (c.years.length ? c.years[c.years.length - 1] + '-01-01' : '');
+  const yEnd = c.year && c.year !== String(new Date().getFullYear()) ? c.year + '-12-31' : fmtDate(new Date());
+  const acts = act ? `<div class="sp-acts">
+      <button onclick="closeWhModal('supCardModal'); openNewOrder(${s.id});"><i class="fa-solid fa-cart-plus"></i>${T.sup_order_btn}</button>
+      <button onclick="closeWhModal('supCardModal'); openSupProducts(${s.id});"><i class="fa-solid fa-boxes-stacked"></i>${T.sup_assign_short}${listed.product_count ? ' · ' + listed.product_count : ''}</button>
+      <button onclick="openSupPayForm('charge')"><i class="fa-solid fa-file-invoice"></i>${T.sp_charge_btn}</button>
+      <button onclick="closeWhModal('supCardModal'); openSupplierModal(${s.id});"><i class="fa-solid fa-pen"></i>${T.sup_edit_short}</button>
+    </div>` : '';
   document.getElementById('supCardBody').innerHTML = `
-    <div class="ord-title"><b>${escapeHtml(s.name)}</b></div>
-    ${contacts ? `<div class="ord-sub">${contacts}</div>` : ''}
-    <div class="sc-actions">
-      <button class="wh-tbtn wh-tbtn-primary" onclick="closeWhModal('supCardModal'); openNewOrder(${s.id});"><i class="fa-solid fa-plus"></i> ${T.sup_order_btn}</button>
-      <button class="wh-tbtn" onclick="closeWhModal('supCardModal'); openSupProducts(${s.id});"><i class="fa-solid fa-boxes-stacked"></i> ${T.sup_assign_short}${(SUP.list.find(x => x.id === s.id) || {}).product_count ? ' (' + SUP.list.find(x => x.id === s.id).product_count + ')' : ''}</button>
-      <button class="wh-tbtn" onclick="closeWhModal('supCardModal'); openSupplierModal(${s.id});"><i class="fa-solid fa-pen"></i> ${T.sup_edit_short}</button>
+    <div class="sp-head"><div class="sp-av ${st.c}">${escapeHtml(supInitials(s.name))}</div>
+      <div style="min-width:0;"><div class="t">${escapeHtml(s.name)}</div>${contacts ? `<div class="c">${contacts}</div>` : ''}</div></div>
+    ${acts}
+    <div class="sp-bal ${balCls}">
+      <div class="l">${balLabel}</div>
+      <div class="x">${abs ? supShort(abs) + ' ' + T.currency : '0'}</div>
+      ${abs ? `<div class="f">${fmtSum(abs)}${USD_RATE ? ' · ≈ ' + fmtUsd(abs / USD_RATE) + ' ' + T.sp_by_rate + ' ' + supRateStr(USD_RATE) : ''}</div>` : ''}
+      ${chips ? `<div class="chips">${chips}</div>` : ''}
+      ${notes}
     </div>
-    <div class="sd-box">
-      <div class="sd-head">${T.sd_title}</div>
-      ${bal}${notes}
-      <div class="sc-actions">
-        <button class="wh-tbtn wh-tbtn-primary" onclick="openSupPayForm('payment')"><i class="fa-solid fa-money-bill-wave"></i> ${T.sd_add_payment}</button>
-        <button class="wh-tbtn" onclick="openSupPayForm('charge')">${T.sd_add_charge}</button>
+    <div id="supPayForm" style="display:none;"></div>
+    <details class="sp-det" open>
+      <summary>${T.sd_ops}<span>${c.year ? T.sp_tot_year.replace('{y}', c.year) : T.sp_tot_all}</span></summary>
+      <div class="sp-det-in">${yearChips}${totals}${ops}${more}</div>
+    </details>
+    <details class="sp-det">
+      <summary>${T.pr_title}<span>${c.prices.length || ''}</span></summary>
+      <div class="sp-det-in"><div class="hint-text" style="margin-bottom:4px;">${T.pr_hint}</div>${prices}</div>
+    </details>
+    <details class="sp-det">
+      <summary>${T.ss_title}<span>Excel</span></summary>
+      <div class="sp-det-in">
+        <div class="hint-text" style="margin-bottom:6px;">${T.ss_hint}</div>
+        <div class="ord-recv-grid">
+          <label>${T.ss_from}<input type="date" id="ss_from" value="${yStart}"></label>
+          <label>${T.ss_to}<input type="date" id="ss_to" value="${yEnd}"></label>
+        </div>
+        <button class="wh-tbtn wh-tbtn-wide" style="margin-top:8px;" onclick="downloadSupStatement()"><i class="fa-solid fa-file-excel"></i> ${T.ss_download}</button>
       </div>
-      <div id="supPayForm" style="display:none;"></div>
-    </div>
-    <div class="sd-head" style="margin-top:14px;">${T.sd_ops}</div>
-    ${ops}
-    <div class="sd-head" style="margin-top:16px;">${T.pr_title}</div>
-    <div class="hint-text" style="margin-bottom:4px;">${T.pr_hint}</div>
-    ${prices}`;
+    </details>`;
+  renderSupCardFoot();
+}
+
+function renderSupCardFoot() {
+  const foot = document.getElementById('supCardFoot');
+  const c = SUP.card;
+  if (!foot || !c) return;
+  const s = c.supplier;
+  if (!s.is_active) { foot.innerHTML = `<button class="main" onclick="restoreSupplier(${s.id})">${T.sp_restore}</button>`; return; }
+  if (SUP.pay) {
+    foot.innerHTML = `<button class="sec" onclick="closeSupPayForm()">${T.sp_cancel_form}</button>
+      <button class="main" onclick="saveSupPayment('${SUP.pay.kind}')">${SUP.pay.kind === 'payment' ? T.sp_save_payment : T.sp_save_charge}</button>`;
+    return;
+  }
+  foot.innerHTML = `<button class="main" onclick="openSupPayForm('payment')"><i class="fa-solid fa-money-bill-wave"></i> ${T.sp_pay_btn}</button>`;
+}
+
+function closeSupPayForm() {
+  SUP.pay = null;
+  const el = document.getElementById('supPayForm');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  renderSupCardFoot();
+}
+
+function downloadSupStatement() {
+  const f = document.getElementById('ss_from').value, t = document.getElementById('ss_to').value;
+  if (f && t && f > t) { showMsg(T.ss_err_period, false); return; }
+  window.location.href = `/api/suppliers/${SUP.cardId}/statement.xlsx?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+}
+
+function supNewToken() {
+  try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
 }
 
 function openSupPayForm(kind) {
   const el = document.getElementById('supPayForm');
-  const today = fmtDate(new Date());
   const d = SUP.card.debt;
+  // один token на одну открытую форму: повторная отправка (плохая связь,
+  // двойное нажатие) не создаст вторую оплату
+  SUP.pay = { kind, cur: 'UZS', method: kind === 'payment' ? 'cash' : null, token: supNewToken() };
   el.style.display = '';
+  el.className = 'sp-form';
   el.innerHTML = `
-    <div class="ord-recv-grid" style="margin-top:10px;">
-      <label>${kind === 'payment' ? T.sd_pay_amount : T.sd_charge_amount}<input type="number" inputmode="numeric" min="0" id="sp_amount" value="${kind === 'payment' && d.balance > 0 ? Math.round(d.balance) : ''}"></label>
-      <label>${T.sd_date}<input type="date" id="sp_date" value="${today}"></label>
+    <div class="sp-form-t">${kind === 'payment' ? T.sp_pay_title : T.sp_charge_title}</div>
+    <div class="sp-form-now">${T.sp_debt_now}: <b>${d.balance < 0 ? T.sp_st_overpaid + ' ' : ''}${fmtSum(Math.abs(d.balance))}</b>${usdTail(Math.abs(d.balance))}</div>
+    <div class="sp-seg">
+      <button type="button" id="sp_cur_UZS" class="on" onclick="spSetCur('UZS')">${T.sp_cur_uzs}</button>
+      <button type="button" id="sp_cur_USD" onclick="spSetCur('USD')">${T.sp_cur_usd}</button>
     </div>
-    <div class="ord-recv-grid" style="grid-template-columns:1fr;"><label>${T.sd_note}<input id="sp_note" maxlength="200" placeholder="${kind === 'payment' ? T.sd_note_ph_pay : T.sd_note_ph_charge}"></label></div>
-    <button class="submit" onclick="saveSupPayment('${kind}')" style="margin-top:10px;">${T.sup_save}</button>`;
-  document.getElementById('sp_amount').focus();
+    <div class="ord-recv-grid">
+      <label><span id="sp_amount_lbl">${kind === 'payment' ? T.sd_pay_amount : T.sd_charge_amount}</span><input type="number" inputmode="decimal" min="0" step="any" id="sp_amount" oninput="spRecalc()" value="${kind === 'payment' && d.balance > 0 ? Math.round(d.balance) : ''}"></label>
+      <label>${T.sp_rate_label}<input type="number" inputmode="decimal" min="0" step="any" id="sp_rate" oninput="spRecalc()" value="${USD_RATE || ''}" placeholder="12700"></label>
+    </div>
+    <div class="sp-eq" id="sp_eq"></div>
+    ${kind === 'payment' ? `<div class="sp-chips" id="sp_methods">${SUP_METHODS.map(m => `<button type="button" class="${m === 'cash' ? 'on' : ''}" onclick="spSetMethod('${m}')" data-m="${m}">${T['sp_m_' + m]}</button>`).join('')}</div>` : ''}
+    <div class="ord-recv-grid">
+      <label>${T.sd_date}<input type="date" id="sp_date" value="${fmtDate(new Date())}" max="${fmtDate(new Date())}"></label>
+      <label>${T.sd_note}<input id="sp_note" maxlength="200" placeholder="${kind === 'payment' ? T.sp_note_ph_pay : T.sd_note_ph_charge}"></label>
+    </div>
+    <div class="sp-after" id="sp_after"></div>`;
+  spRecalc();
+  renderSupCardFoot();
+  el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  setTimeout(() => { const a = document.getElementById('sp_amount'); if (a) a.focus({ preventScroll: true }); }, 250);
+}
+
+function spAmounts() {
+  const v = parseFloat(document.getElementById('sp_amount').value);
+  const rate = parseFloat(document.getElementById('sp_rate').value);
+  const r = rate > 0 ? rate : null;
+  if (!(v > 0)) return { sum: 0, usd: 0, rate: r };
+  if (SUP.pay.cur === 'USD') return { sum: r ? Math.round(Math.round(v * 100) * r / 100) : 0, usd: Math.round(v * 100) / 100, rate: r };
+  return { sum: Math.round(v), usd: r ? v / r : null, rate: r };
+}
+
+function spRecalc() {
+  if (!SUP.pay) return;
+  const a = spAmounts();
+  const eq = document.getElementById('sp_eq');
+  if (SUP.pay.cur === 'USD') eq.textContent = a.rate ? (a.usd ? `= ${fmtSum(a.sum)}` : T.sp_eq_hint_usd) : T.sp_err_rate;
+  else eq.textContent = a.sum ? (a.rate ? `≈ ${fmtUsd(a.usd)}` : T.sp_no_rate_set) : T.sp_eq_hint_uzs;
+  const after = document.getElementById('sp_after');
+  const bal = SUP.card.debt.balance + (SUP.pay.kind === 'payment' ? -a.sum : a.sum);
+  after.innerHTML = a.sum ? `${T.sp_debt_after}: <b style="color:${bal > 0 ? '#B91C1C' : '#15803D'};">${bal < 0 ? T.sp_st_overpaid + ' ' : ''}${fmtSum(Math.abs(bal))}</b>${usdTail(Math.abs(bal))}` : '';
+}
+
+function spSetCur(c) {
+  if (!SUP.pay || SUP.pay.cur === c) return;
+  const a = spAmounts();
+  SUP.pay.cur = c;
+  ['UZS', 'USD'].forEach(k => document.getElementById('sp_cur_' + k).classList.toggle('on', k === c));
+  const inp = document.getElementById('sp_amount');
+  // переводим уже введённую сумму в новую валюту, чтобы не набирать заново
+  if (a.sum && a.rate) inp.value = c === 'USD' ? Math.round(a.sum / a.rate * 100) / 100 : a.sum;
+  document.getElementById('sp_amount_lbl').textContent = c === 'USD'
+    ? (SUP.pay.kind === 'payment' ? T.sp_pay_amount_usd : T.sp_charge_amount_usd)
+    : (SUP.pay.kind === 'payment' ? T.sd_pay_amount : T.sd_charge_amount);
+  spRecalc();
+}
+
+function spSetMethod(m) {
+  SUP.pay.method = m;
+  document.querySelectorAll('#sp_methods button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
 }
 
 async function saveSupPayment(kind) {
-  const amount = parseFloat(document.getElementById('sp_amount').value);
-  if (!(amount > 0)) { showMsg(T.sd_err_amount, false); return; }
-  const d = await ordFetch(`/api/suppliers/${SUP.cardId}/payments`, 'POST', {
-    kind, amount, date: document.getElementById('sp_date').value, note: document.getElementById('sp_note').value });
+  const a = spAmounts();
+  if (SUP.pay.cur === 'USD' && !a.rate) { showMsg(T.sp_err_rate, false); return; }
+  if (!(a.sum > 0)) { showMsg(T.sd_err_amount, false); return; }
+  const body = { kind, currency: SUP.pay.cur, rate: a.rate, method: SUP.pay.method, token: SUP.pay.token,
+    date: document.getElementById('sp_date').value, note: document.getElementById('sp_note').value };
+  if (SUP.pay.cur === 'USD') body.amount_usd = a.usd; else body.amount = a.sum;
+  const d = await ordFetch(`/api/suppliers/${SUP.cardId}/payments`, 'POST', body);
   if (!d.ok) { showMsg(ordErr(d), false); return; }
+  SUP.pay = null;
   showMsg(kind === 'payment' ? T.sd_payment_saved : T.sd_charge_saved, true);
   loadSuppliers();
-  openSupplierCard(SUP.cardId);
+  reloadSupplierCard();
 }
 
-async function deleteSupPayment(pid) {
-  if (!confirm(T.sd_delete_confirm)) return;
-  const d = await ordFetch(`/api/suppliers/${SUP.cardId}/payments/${pid}`, 'DELETE');
+async function cancelSupPayment(pid) {
+  const reason = prompt(T.sp_cancel_prompt, '');
+  if (reason === null) return;
+  const d = await ordFetch(`/api/suppliers/${SUP.cardId}/payments/${pid}/cancel`, 'POST', { reason });
   if (!d.ok) { showMsg(ordErr(d), false); return; }
+  showMsg(T.sp_cancel_done, true);
   loadSuppliers();
-  openSupplierCard(SUP.cardId);
+  reloadSupplierCard();
 }
 
 // ---- новый товар прямо из заказа ----
@@ -4124,14 +4574,13 @@ async function submitTransfer() {
 }
 
 function showWhSubTab(t) {
-  ['own', 'orders', 'branches', 'network'].forEach(k => {
-    const view = document.getElementById({ own: 'whOwnView', orders: 'whOrdersView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
+  ['own', 'branches', 'network'].forEach(k => {
+    const view = document.getElementById({ own: 'whOwnView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
     if (view) view.style.display = t === k ? 'block' : 'none';
     const tab = document.getElementById('subwh-' + k);
     if (tab) tab.classList.toggle('active', t === k);
   });
   if (t === 'network') { WH.net = null; loadNetworkStock(); }
-  if (t === 'orders') loadOrdersTab();
   if (t === 'branches') {
     if (!WH.branchId && WH.branches.length) selectWhBranch(WH.branches[0].id);
     else if (WH.branchId) selectWhBranch(WH.branchId);
@@ -4166,10 +4615,11 @@ async function saveUsdRate(inputId, savedId) {
     USD_RATE = data.effective ?? data.rate;
     renderUsdInheritHint(data.rate);
     // синхронизируем оба виджета курса, если на странице есть второй (Расходы)
-    ['usd_rate_input', 'usd_rate_input_exp'].forEach(id => {
+    ['usd_rate_input', 'usd_rate_input_exp', 'usd_rate_input_sup'].forEach(id => {
       const el = document.getElementById(id);
       if (el && id !== inputId) el.value = data.rate ?? '';
     });
+    if (SUP.loaded) { SUP.rate = USD_RATE; renderSuppliers(); }
     const saved = document.getElementById(savedId);
     saved.style.display = 'block';
     setTimeout(() => { saved.style.display = 'none'; }, 1500);
@@ -6373,10 +6823,12 @@ function clearSearch() {
 
 function renderTable() {
   const q = (document.getElementById('search').value || '').toLowerCase();
-  // открытая карточка клиента больше не закрывается при обновлении списка
-  // (раньше обновление списка, пришедшее во время загрузки карточки, прятало
-  // её — экран «пустел»); закрываем, только если машины больше нет
-  if (openHistoryRow !== null && !carsCache.some(c => c.plate_number === openHistoryRow)) closeClientCard();
+  if (openHistoryRow !== null) {
+    const panel = document.getElementById('clientCardPanel');
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    openHistoryRow = null;
+  }
   const countEl = document.getElementById('baseClientCount');
   if (countEl) {
     const uniqueClients = new Set(carsCache.map(c => c.client_id)).size;
@@ -6407,53 +6859,20 @@ function renderTable() {
   `).join('') : `<div class="hint-text" style="text-align:center; padding:20px;">${T.table_empty}</div>`;
 }
 
-let CC_SEQ = 0;
-
-function ccBar(plate) {
-  return `<div class="cc-sheet-bar"><button type="button" onclick="closeClientCard()"><i class="fa-solid fa-arrow-left"></i> ${T.cc_back}</button><b>${escapeHtml(plate)}</b></div>`;
-}
-
-function closeClientCard(fromPop) {
+async function toggleHistory(plate) {
   const panel = document.getElementById('clientCardPanel');
-  if (!panel) return;
-  CC_SEQ++;
-  panel.style.display = 'none';
-  panel.innerHTML = '';
-  panel.classList.remove('cc-open');
-  document.body.classList.remove('cc-lock');
-  openHistoryRow = null;
-  if (!fromPop && window.history.state && window.history.state.ccOpen) window.history.back();
-}
-
-// кнопка «Назад» телефона закрывает карточку, а не всё приложение
-window.addEventListener('popstate', () => { if (openHistoryRow !== null) closeClientCard(true); });
-
-// keep=true — обновить уже открытую карточку (после изменения/удаления записи)
-async function toggleHistory(plate, keep) {
-  const panel = document.getElementById('clientCardPanel');
-  if (openHistoryRow === plate && !keep) { closeClientCard(); return; }
-  const wasOpen = openHistoryRow !== null && panel.classList.contains('cc-open');
-  openHistoryRow = plate;
-  const seq = ++CC_SEQ;
-  panel.classList.add('cc-open');
-  document.body.classList.add('cc-lock');
-  panel.style.display = '';
-  if (!(window.history.state && window.history.state.ccOpen)) window.history.pushState({ ccOpen: 1 }, '');
-  if (!wasOpen) {
-    panel.innerHTML = ccBar(plate) + `<div class="hint-text" style="padding:24px 4px;">${T.history_loading}</div>`;
-    panel.scrollTop = 0;
-  }
-  let data;
-  try {
-    const res = await fetch('/api/history/' + encodeURIComponent(plate));
-    data = await res.json();
-  } catch (e) {
-    if (seq !== CC_SEQ) return;
-    panel.innerHTML = ccBar(plate) + `<div class="hint-text" style="padding:24px 4px;">${T.cc_load_error}</div>
-      <button class="submit" onclick="toggleHistory(${escapeHtml(JSON.stringify(plate))}, true)">${T.cc_retry}</button>`;
+  if (openHistoryRow === plate) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    openHistoryRow = null;
     return;
   }
-  if (seq !== CC_SEQ || openHistoryRow !== plate) return;  // карточку уже закрыли или открыли другую
+  openHistoryRow = plate;
+  panel.style.display = '';
+  panel.innerHTML = T.history_loading;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const res = await fetch('/api/history/' + encodeURIComponent(plate));
+  const data = await res.json();
   const history = data.history || [];
   historyDataCache[plate] = history;
   const body = panel;
@@ -6470,7 +6889,7 @@ async function toggleHistory(plate, keep) {
       try {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div class="kc-he-items">' + items.map(it =>
-          `${escapeHtml(it.name || it.brand || '—')}${it.brand && it.name ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${Number(it.total || 0).toLocaleString('ru-RU')} ${T.currency}`
+          `${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
         ).join('<br>') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
@@ -6495,8 +6914,8 @@ async function toggleHistory(plate, keep) {
   `;
   }).join('') : `<div class="kc-hist-entry" style="color:var(--hint); text-align:center;">${T.history_empty}</div>`;
 
-  body.innerHTML = ccBar(plate) + `
-    <div class="known-client" style="margin-top:0;">
+  body.innerHTML = `
+    <div class="known-client">
       <div class="kc-header"><i class="fa-solid fa-user"></i><span>${T.kc_history_card_title}</span></div>
       <div class="kc-body">
         <div class="kc-person">
@@ -6823,7 +7242,8 @@ async function saveEdit() {
   if (data.ok) {
     closeEditModal();
     showMsg(svcModal.mode === 'edit' ? T.entry_saved : T.service_added, true);
-    toggleHistory(svcModal.plate, true);  // обновить открытую карточку свежими данными
+    openHistoryRow = null;  // чтобы toggleHistory ниже заново открыл панель со свежими данными, а не закрыл её
+    toggleHistory(svcModal.plate);
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6854,7 +7274,8 @@ async function saveCarEdit(oldPlate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.kc_car_saved, true);
-    toggleHistory(data.plate, true);
+    openHistoryRow = null;
+    toggleHistory(data.plate);
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6867,7 +7288,9 @@ async function deleteCarCompletely(plate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.kc_car_deleted, true);
-    closeClientCard();
+    document.getElementById('clientCardPanel').style.display = 'none';
+    document.getElementById('clientCardPanel').innerHTML = '';
+    openHistoryRow = null;
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6880,7 +7303,8 @@ async function deleteEntry(id, plate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.entry_deleted, true);
-    toggleHistory(plate, true);
+    openHistoryRow = null;
+    toggleHistory(plate);
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6910,7 +7334,7 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
-  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'deleteSupPayment', 'saveOrderNewProduct']);
+  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct']);
 </script>
 </body>
 </html>
@@ -8078,8 +8502,26 @@ def api_list_suppliers():
     denied = _orders_allowed()
     if denied:
         return denied
-    return jsonify({"ok": True, "suppliers": [_public_supplier(x) for x in db.list_suppliers(g.shop_id)],
+    if request.args.get("archived"):
+        return jsonify({"ok": True, "suppliers": [_public_supplier(x) for x in db.list_suppliers(g.shop_id, archived=True)]})
+    sups = db.list_suppliers(g.shop_id)
+    with db.get_conn() as conn:
+        archived = conn.execute("SELECT COUNT(*) FROM suppliers WHERE shop_id=? AND is_active=0", (g.shop_id,)).fetchone()[0]
+    return jsonify({"ok": True, "suppliers": [_public_supplier(x) for x in sups],
+                    "totals": db.supplier_totals(sups), "archived_count": archived,
+                    "usd_rate": db.shop_usd_rate(g.shop_id),
                     "bot_ready": bool(BOT_TOKEN and BOT_USERNAME)})
+
+
+@app.route("/api/suppliers/<int:supplier_id>/restore", methods=["POST"])
+@login_required
+@profit_blocked
+def api_restore_supplier(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    result = db.restore_supplier(g.shop_id, supplier_id)
+    return jsonify(result), (200 if result.get("ok") else (404 if result.get("error") == "not_found" else 400))
 
 
 def _public_supplier(sup):
@@ -8171,7 +8613,11 @@ def api_list_orders():
     denied = _orders_allowed()
     if denied:
         return denied
-    return jsonify({"ok": True, "orders": db.list_orders(g.shop_id),
+    try:
+        limit = max(1, min(500, int(request.args.get("limit") or 40)))
+    except ValueError:
+        limit = 40
+    return jsonify({"ok": True, "orders": db.list_orders(g.shop_id, limit), "total": db.count_orders(g.shop_id),
                     "has_branches": len(db.order_network(g.shop_id)) > 1})
 
 
@@ -8325,10 +8771,15 @@ def api_supplier_card(supplier_id):
     denied = _orders_allowed()
     if denied:
         return denied
-    card = db.supplier_card(g.shop_id, supplier_id)
+    try:
+        offset = int(request.args.get("offset") or 0)
+    except ValueError:
+        offset = 0
+    card = db.supplier_card(g.shop_id, supplier_id, request.args.get("year"), offset)
     if not card:
         return jsonify({"ok": False, "error": "not_found"}), 404
     card["supplier"] = _public_supplier(card["supplier"])
+    card["usd_rate"] = db.shop_usd_rate(g.shop_id)
     card["ok"] = True
     return jsonify(card)
 
@@ -8342,20 +8793,105 @@ def api_supplier_payment(supplier_id):
         return denied
     data = request.get_json(force=True) or {}
     result = db.add_supplier_payment(g.shop_id, supplier_id, data.get("kind") or "payment", data.get("amount"),
-                                     data.get("date"), data.get("note"))
+                                     data.get("date"), data.get("note"), currency=data.get("currency") or "UZS",
+                                     amount_usd=data.get("amount_usd"), rate=data.get("rate"),
+                                     method=data.get("method"), client_token=data.get("token"))
     return jsonify(result), (200 if result.get("ok") else (404 if result.get("error") == "not_found" else 400))
 
 
+@app.route("/api/suppliers/<int:supplier_id>/payments/<int:payment_id>/cancel", methods=["POST"])
 @app.route("/api/suppliers/<int:supplier_id>/payments/<int:payment_id>", methods=["DELETE"])
 @login_required
 @profit_blocked
-def api_delete_supplier_payment(supplier_id, payment_id):
+def api_cancel_supplier_payment(supplier_id, payment_id):
+    """Оплату не удаляем, а отменяем с причиной — запись остаётся в истории."""
     denied = _orders_allowed()
     if denied:
         return denied
-    if not db.delete_supplier_payment(g.shop_id, supplier_id, payment_id):
+    data = request.get_json(silent=True) or {}
+    if not db.cancel_supplier_payment(g.shop_id, supplier_id, payment_id, data.get("reason")):
         return jsonify({"ok": False, "error": "not_found"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/suppliers/<int:supplier_id>/statement.xlsx")
+@login_required
+@profit_blocked
+def api_supplier_statement(supplier_id):
+    """Акт сверки с поставщиком за период — Excel."""
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    def _d(v):
+        v = (v or "")[:10]
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+            return v
+        except ValueError:
+            return None
+    st = db.supplier_statement(g.shop_id, supplier_id, _d(request.args.get("from")), _d(request.args.get("to")))
+    if not st:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    T = g.T
+    wb = Workbook()
+    ws = wb.active
+    ws.title = T["ss_sheet"]
+    shop = db.get_shop(g.shop_id) or {}
+    fmt_d = lambda d: f"{d[8:10]}.{d[5:7]}.{d[0:4]}" if d else ""
+    period = f"{fmt_d(st['date_from']) or '…'} — {fmt_d(st['date_to']) or fmt_d(datetime.now().strftime('%Y-%m-%d'))}"
+    ws.append([T["ss_title"]])
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.append([f"{shop.get('shop_name') or shop.get('username') or ''} — {st['supplier']['name']}"])
+    ws.append([f"{T['ss_period']}: {period}"])
+    ws.append([])
+    ws.append([T["ss_opening"], "", "", "", "", "", st["opening"]])
+    ws.cell(ws.max_row, 1).font = Font(bold=True)
+    head = [T["ss_date"], T["ss_op"], T["ss_debit"], T["ss_credit"], T["ss_rate"], T["ss_usd"], T["ss_balance"], T["ss_note"]]
+    ws.append(head)
+    hr = ws.max_row
+    for c in range(1, len(head) + 1):
+        ws.cell(hr, c).font = Font(bold=True, color="FFFFFF")
+        ws.cell(hr, c).fill = PatternFill("solid", fgColor="0F52BA")
+        ws.cell(hr, c).alignment = Alignment(wrap_text=True, vertical="center")
+    methods = {"cash": T["sp_m_cash"], "card": T["sp_m_card"], "transfer": T["sp_m_transfer"]}
+    for e in st["rows"]:
+        if e["type"] == "order":
+            op = T["ord_title_n"].replace("{n}", str(e["number"]))
+        elif e["type"] == "payment":
+            op = T["sd_payment"] + (f" ({methods[e['method']]})" if e.get("method") in methods else "")
+        else:
+            op = T["sd_charge"]
+        pay = e["type"] == "payment"
+        note = e.get("note") or ""
+        if e.get("currency") == "USD" and e.get("amount_usd") is not None:
+            note = (f"${e['amount_usd']:,.2f} " + note).strip()
+        ws.append([fmt_d(e["date"]), op, None if pay else e["amount"], e["amount"] if pay else None,
+                   e.get("usd_rate"), e.get("usd"), e["balance"], note])
+    ws.append([])
+    ws.append([T["ss_closing"], "", "", "", "", "", st["closing"]])
+    ws.cell(ws.max_row, 1).font = Font(bold=True)
+    ws.cell(ws.max_row, 7).font = Font(bold=True)
+    rate_now = db.shop_usd_rate(g.shop_id)
+    if rate_now:
+        ws.append([T["ss_closing_usd"].replace("{rate}", f"{rate_now:g}"), "", "", "", "", "", round(st["closing"] / rate_now, 2)])
+    for row in ws.iter_rows(min_row=hr + 1):
+        if len(row) >= 7 and row[2].value is not None or row[3].value is not None or row[6].value is not None:
+            for idx in (2, 3, 6):
+                row[idx].number_format = "#,##0"
+            row[5].number_format = "#,##0.00"
+            row[4].number_format = "#,##0.##"
+    ws.cell(5, 7).number_format = "#,##0"
+    for col, w in zip("ABCDEFGH", (12, 26, 16, 16, 10, 12, 16, 34)):
+        ws.column_dimensions[col].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe = "".join(ch for ch in st["supplier"]["name"] if ch.isalnum())[:30] or "supplier"
+    return send_file(buf, as_attachment=True, download_name=f"akt_sverki_{safe}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.route("/api/orders/<int:order_id>/distribute", methods=["POST"])
