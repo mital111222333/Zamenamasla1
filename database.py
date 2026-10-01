@@ -413,6 +413,59 @@ def _migrate(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_restocks_shop ON stock_restocks(shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_restocks_product ON stock_restocks(product_id)")
 
+    # --- поставщики и заказы поставщику ---
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT,
+        telegram TEXT,
+        contact TEXT,
+        delivery_days TEXT,
+        note TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS supplier_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        supplier_id INTEGER,
+        number INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        note TEXT,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        sent_at TEXT,
+        received_at TEXT,
+        done_at TEXT
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS supplier_order_lines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'l',
+        qty_ordered REAL NOT NULL DEFAULT 0,
+        qty_received REAL,
+        purchase_price INTEGER,
+        alloc_json TEXT,
+        dist_json TEXT
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_suppliers_shop ON suppliers(shop_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_supplier_orders_shop ON supplier_orders(shop_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_supplier_order_lines_order ON supplier_order_lines(order_id)")
+    pr_cols = {r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()}
+    if "supplier_id" not in pr_cols:
+        conn.execute("ALTER TABLE products ADD COLUMN supplier_id INTEGER")
+    rs_cols = {r[1] for r in conn.execute("PRAGMA table_info(stock_restocks)").fetchall()}
+    if "order_id" not in rs_cols:
+        conn.execute("ALTER TABLE stock_restocks ADD COLUMN order_id INTEGER")
+
     # --- oil_changes: добавляем недостающие колонки (из более ранних версий) ---
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
     to_add = {
@@ -1088,8 +1141,9 @@ def restock_product(product_id: int, shop_id: int, quantity: float, purchase_pri
 def get_restock_history(shop_id: int, limit: int = 50):
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT r.*, p.name as product_name, p.category, p.unit
+            SELECT r.*, p.name as product_name, p.category, p.unit, o.number as order_number
             FROM stock_restocks r JOIN products p ON p.id = r.product_id
+            LEFT JOIN supplier_orders o ON o.id = r.order_id
             WHERE r.shop_id=? ORDER BY r.restock_date DESC, r.id DESC LIMIT ?
         """, (shop_id, limit)).fetchall()
         return [dict(r) for r in rows]
@@ -3155,6 +3209,7 @@ def get_stock_movements(shop_id: int, limit: int = 60) -> list:
     for r in get_restock_history(shop_id, limit):
         out.append({"type": "restock", "date": r["restock_date"], "product_name": r["product_name"],
                     "unit": r["unit"], "quantity": r["quantity"], "purchase_price": r.get("purchase_price"),
+                    "order_number": r.get("order_number"),
                     "sort": (r["restock_date"], r["created_at"] or "")})
     with get_conn() as conn:
         rows = conn.execute("""
@@ -3346,35 +3401,12 @@ def bulk_transfer(parent_shop_id: int, from_shop_id: int, to_shop_id: int, lines
     if problems:
         return {"ok": False, "error": "problems", "problems": problems}
 
-    dst_by_key = {_norm_key(p["category"], p["name"]): p for p in list_products(to_shop_id)}
     today = datetime.now().strftime("%Y-%m-%d")
     batch = datetime.now().strftime("%y%m%d-%H%M%S")
-    backfills = []
     with get_conn() as conn:
         try:
-            for pid, q in qty_by_pid.items():
-                src = src_products[pid]
-                key = _norm_key(src["category"], src["name"])
-                dst = dst_by_key.get(key)
-                if not dst:
-                    cur = conn.execute("""
-                        INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
-                        VALUES (?, ?, ?, ?, 0, ?, ?, 1)
-                    """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
-                    dst = {"id": cur.lastrowid, "purchase_price": src["purchase_price"], "_new": True}
-                    dst_by_key[key] = dst
-                else:
-                    if dst.get("purchase_price") is None and src.get("purchase_price") is not None and not dst.get("_new"):
-                        backfills.append((dst["id"], src["purchase_price"]))
-                    if src.get("purchase_price") is not None:
-                        conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (src["purchase_price"], dst["id"]))
-                        dst["purchase_price"] = src["purchase_price"]
-                conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (q, pid))
-                conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (q, dst["id"]))
-                conn.execute("""
-                    INSERT INTO stock_transfers (parent_shop_id, from_shop_id, to_shop_id, from_product_id, to_product_id, quantity, transfer_date, batch)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (parent_shop_id, from_shop_id, to_shop_id, pid, dst["id"], q, today, batch))
+            backfills = _transfer_lines(conn, parent_shop_id, from_shop_id, to_shop_id,
+                                        qty_by_pid, src_products, today, batch)
             conn.commit()
         except Exception:
             conn.rollback()
@@ -3382,6 +3414,41 @@ def bulk_transfer(parent_shop_id: int, from_shop_id: int, to_shop_id: int, lines
     for dst_id, price in backfills:
         backfill_cost_price(to_shop_id, dst_id, price)
     return {"ok": True, "batch": batch, "lines": len(qty_by_pid)}
+
+
+def _transfer_lines(conn, parent_shop_id: int, from_shop_id: int, to_shop_id: int,
+                    qty_by_pid: dict, src_products: dict, today: str, batch: str) -> list:
+    """Внутри уже открытой транзакции: переносит товары {product_id: qty} со
+    склада from на склад to (на получателе товар ищется по типу+названию или
+    заводится). Остатки отправителя должны быть проверены заранее. Возвращает
+    список (товар получателя, цена) для дозаполнения прошлых продаж."""
+    dst_rows = conn.execute("SELECT * FROM products WHERE shop_id=? AND is_active=1", (to_shop_id,)).fetchall()
+    dst_by_key = {_norm_key(r["category"], r["name"]): dict(r) for r in dst_rows}
+    backfills = []
+    for pid, q in qty_by_pid.items():
+        src = src_products[pid]
+        key = _norm_key(src["category"], src["name"])
+        dst = dst_by_key.get(key)
+        if not dst:
+            cur = conn.execute("""
+                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 1)
+            """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
+            dst = {"id": cur.lastrowid, "purchase_price": src["purchase_price"], "_new": True}
+            dst_by_key[key] = dst
+        else:
+            if dst.get("purchase_price") is None and src.get("purchase_price") is not None and not dst.get("_new"):
+                backfills.append((dst["id"], src["purchase_price"]))
+            if src.get("purchase_price") is not None:
+                conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (src["purchase_price"], dst["id"]))
+                dst["purchase_price"] = src["purchase_price"]
+        conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (q, pid))
+        conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (q, dst["id"]))
+        conn.execute("""
+            INSERT INTO stock_transfers (parent_shop_id, from_shop_id, to_shop_id, from_product_id, to_product_id, quantity, transfer_date, batch)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (parent_shop_id, from_shop_id, to_shop_id, pid, dst["id"], q, today, batch))
+    return backfills
 
 
 # --- импорт склада из Excel ---
@@ -3480,3 +3547,435 @@ def apply_import(shop_id: int, rows: list, allow_purchase: bool) -> dict:
     for pid, price in backfills:
         backfill_cost_price(shop_id, pid, price)
     return {"ok": True, "created": created, "restocked": restocked, "updated": updated}
+
+
+# ---------- Поставщики и заказы поставщику ----------
+# Заказывает только главная (или самостоятельная) точка. Заказ проходит путь
+# черновик → отправлен → получен (товар лёг на склад главной с ценами закупки)
+# → раздан (по филиалам, перемещениями). У самостоятельной точки «получен»
+# сразу становится последним шагом. Поставщик необязателен: заказ без
+# поставщика — это просто список покупок (например, поездка на рынок).
+
+ORDER_OPEN_STATUSES = ("draft", "sent")
+
+
+def _now_str() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _clean_text(v, limit=200):
+    v = " ".join(str(v or "").split())
+    return v[:limit] or None
+
+
+def list_suppliers(shop_id: int) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT s.*, (SELECT COUNT(*) FROM products p
+                         WHERE p.shop_id=s.shop_id AND p.supplier_id=s.id AND p.is_active=1) AS product_count
+            FROM suppliers s WHERE s.shop_id=? AND s.is_active=1 ORDER BY s.name COLLATE NOCASE
+        """, (shop_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_supplier(shop_id: int, supplier_id: int):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM suppliers WHERE id=? AND shop_id=? AND is_active=1",
+                           (supplier_id, shop_id)).fetchone()
+        return dict(row) if row else None
+
+
+def _supplier_fields(data: dict) -> dict:
+    tg = _clean_text(data.get("telegram"), 64)
+    if tg:
+        tg = tg.replace("https://", "").replace("http://", "").replace("t.me/", "").lstrip("@").strip("/")
+    return {"name": _clean_text(data.get("name"), 80), "phone": _clean_text(data.get("phone"), 40),
+            "telegram": tg or None, "contact": _clean_text(data.get("contact"), 80),
+            "delivery_days": _clean_text(data.get("delivery_days"), 80), "note": _clean_text(data.get("note"), 300)}
+
+
+@_serialized
+def save_supplier(shop_id: int, data: dict, supplier_id: int = None):
+    """Создать (supplier_id=None) или изменить поставщика. Возвращает (ok, error, id)."""
+    f = _supplier_fields(data)
+    if not f["name"]:
+        return False, "empty_name", None
+    for s in list_suppliers(shop_id):
+        if s["id"] != supplier_id and s["name"].upper() == f["name"].upper():
+            return False, "duplicate", None
+    with get_conn() as conn:
+        if supplier_id:
+            cur = conn.execute("""
+                UPDATE suppliers SET name=?, phone=?, telegram=?, contact=?, delivery_days=?, note=?
+                WHERE id=? AND shop_id=? AND is_active=1
+            """, (*f.values(), supplier_id, shop_id))
+            if cur.rowcount == 0:
+                return False, "not_found", None
+        else:
+            cur = conn.execute("""
+                INSERT INTO suppliers (shop_id, name, phone, telegram, contact, delivery_days, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (shop_id, *f.values()))
+            supplier_id = cur.lastrowid
+        conn.commit()
+    return True, None, supplier_id
+
+
+@_serialized
+def delete_supplier(shop_id: int, supplier_id: int) -> bool:
+    """Мягкое удаление: прошлые заказы сохраняют имя поставщика, у товаров
+    поставщик просто снимается."""
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE suppliers SET is_active=0 WHERE id=? AND shop_id=?", (supplier_id, shop_id))
+        conn.execute("UPDATE products SET supplier_id=NULL WHERE shop_id=? AND supplier_id=?", (shop_id, supplier_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+@_serialized
+def assign_supplier_products(shop_id: int, supplier_id, product_ids: list) -> dict:
+    """Набор товаров поставщика: отмеченные товары получают этого поставщика,
+    снятые с отметки (были у него) — остаются без поставщика."""
+    if not get_supplier(shop_id, supplier_id):
+        return {"ok": False, "error": "not_found"}
+    ids = set()
+    for x in product_ids or []:
+        try:
+            ids.add(int(x))
+        except (TypeError, ValueError):
+            pass
+    own = {p["id"] for p in list_products(shop_id)}
+    ids &= own
+    with get_conn() as conn:
+        conn.execute("UPDATE products SET supplier_id=NULL WHERE shop_id=? AND supplier_id=?", (shop_id, supplier_id))
+        for pid in ids:
+            conn.execute("UPDATE products SET supplier_id=? WHERE id=? AND shop_id=?", (supplier_id, pid, shop_id))
+        conn.commit()
+    return {"ok": True, "count": len(ids)}
+
+
+def order_network(shop_id: int) -> list:
+    """Точки, на которые распределяется заказ: сама точка + филиалы со складом."""
+    out = []
+    for s in network_shops(shop_id):
+        if s["is_head"] or (get_shop(s["id"]) or {}).get("warehouse_enabled"):
+            out.append(s)
+    return out
+
+
+def suggest_order(shop_id: int, supplier_id=None) -> dict:
+    """Черновик заказа: товары поставщика (или без поставщика) и сколько
+    заказать — потребность самой точки + потребность её филиалов (по тем же
+    правилам, что «Список закупки»: чтобы хватило примерно на месяц)."""
+    shops = order_network(shop_id)
+    head = {p["id"]: p for p in get_warehouse_overview(shop_id)["products"]}
+    branch_maps = {}
+    for s in shops:
+        if not s["is_head"]:
+            branch_maps[s["id"]] = {_norm_key(p["category"], p["name"]): p
+                                    for p in get_warehouse_overview(s["id"])["products"]}
+    lines = []
+    for p in head.values():
+        if (p.get("supplier_id") or None) != (supplier_id or None):
+            continue
+        alloc = {}
+        if p["reorder_qty"] > 0:
+            alloc[str(shop_id)] = p["reorder_qty"]
+        key = _norm_key(p["category"], p["name"])
+        for bid, bmap in branch_maps.items():
+            bp = bmap.get(key)
+            if bp and bp["reorder_qty"] > 0:
+                alloc[str(bid)] = bp["reorder_qty"]
+        total = sum(alloc.values())
+        lines.append({"product_id": p["id"], "name": p["name"], "unit": p["unit"], "category": p["category"],
+                      "purchase_price": p.get("purchase_price"), "stock_qty": p["stock_qty"],
+                      "qty": total, "alloc": alloc})
+    # сначала то, что пора заказать; остальные товары поставщика — ниже, с нулём
+    lines.sort(key=lambda l: (l["qty"] <= 0, l["category"], l["name"].upper()))
+    return {"ok": True, "lines": lines, "shops": shops}
+
+
+def _clean_alloc(alloc, allowed_ids: set) -> dict:
+    out = {}
+    if isinstance(alloc, dict):
+        for k, v in alloc.items():
+            try:
+                sid, q = int(k), float(v)
+            except (TypeError, ValueError):
+                continue
+            if sid in allowed_ids and q > 0:
+                out[str(sid)] = round(q, 3)
+    return out
+
+
+def _parse_order_lines(shop_id: int, lines: list):
+    """Проверка строк заказа от клиента: товар своей точки, количество > 0.
+    Возвращает (rows, error)."""
+    products = {p["id"]: p for p in list_products(shop_id)}
+    allowed = {s["id"] for s in order_network(shop_id)}
+    rows, seen = [], set()
+    for ln in lines or []:
+        try:
+            pid, q = int(ln["product_id"]), float(ln["qty"])
+        except (KeyError, TypeError, ValueError):
+            return None, "bad_request"
+        if q <= 0 or pid in seen:
+            continue
+        p = products.get(pid)
+        if not p:
+            return None, "no_product"
+        seen.add(pid)
+        rows.append({"product_id": pid, "name": p["name"], "unit": p["unit"], "qty": round(q, 3),
+                     "alloc": _clean_alloc(ln.get("alloc"), allowed)})
+    if not rows:
+        return None, "empty"
+    return rows, None
+
+
+@_serialized
+def save_order(shop_id: int, supplier_id, lines: list, note=None, order_id: int = None) -> dict:
+    """Создать новый черновик или переписать строки черновика."""
+    if supplier_id and not get_supplier(shop_id, supplier_id):
+        return {"ok": False, "error": "no_supplier"}
+    rows, err = _parse_order_lines(shop_id, lines)
+    if err:
+        return {"ok": False, "error": err}
+    with get_conn() as conn:
+        try:
+            if order_id:
+                o = conn.execute("SELECT * FROM supplier_orders WHERE id=? AND shop_id=?", (order_id, shop_id)).fetchone()
+                if not o:
+                    return {"ok": False, "error": "not_found"}
+                if o["status"] != "draft":
+                    return {"ok": False, "error": "bad_status"}
+                conn.execute("UPDATE supplier_orders SET supplier_id=?, note=? WHERE id=?",
+                             (supplier_id or None, _clean_text(note, 300), order_id))
+                conn.execute("DELETE FROM supplier_order_lines WHERE order_id=?", (order_id,))
+            else:
+                num = conn.execute("SELECT COALESCE(MAX(number), 0) + 1 FROM supplier_orders WHERE shop_id=?",
+                                   (shop_id,)).fetchone()[0]
+                cur = conn.execute("""
+                    INSERT INTO supplier_orders (shop_id, supplier_id, number, status, note, created_at)
+                    VALUES (?, ?, ?, 'draft', ?, ?)
+                """, (shop_id, supplier_id or None, num, _clean_text(note, 300), _now_str()))
+                order_id = cur.lastrowid
+            for r in rows:
+                conn.execute("""
+                    INSERT INTO supplier_order_lines (order_id, product_id, name, unit, qty_ordered, alloc_json)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (order_id, r["product_id"], r["name"], r["unit"], r["qty"],
+                      json.dumps(r["alloc"]) if r["alloc"] else None))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {"ok": True, "id": order_id}
+
+
+def _order_row(conn, shop_id: int, order_id: int):
+    row = conn.execute("SELECT * FROM supplier_orders WHERE id=? AND shop_id=?", (order_id, shop_id)).fetchone()
+    return dict(row) if row else None
+
+
+def get_order(shop_id: int, order_id: int):
+    with get_conn() as conn:
+        o = _order_row(conn, shop_id, order_id)
+        if not o:
+            return None
+        sup = conn.execute("SELECT * FROM suppliers WHERE id=?", (o["supplier_id"],)).fetchone() if o["supplier_id"] else None
+        lines = [dict(r) for r in conn.execute(
+            "SELECT * FROM supplier_order_lines WHERE order_id=? ORDER BY id", (order_id,)).fetchall()]
+    products = {p["id"]: p for p in list_products(shop_id, active_only=False)}
+    for ln in lines:
+        p = products.get(ln["product_id"]) or {}
+        ln["alloc"] = json.loads(ln.pop("alloc_json") or "{}")
+        ln["dist"] = json.loads(ln.pop("dist_json") or "{}")
+        ln["category"] = p.get("category")
+        ln["current_price"] = p.get("purchase_price")
+        ln["stock_qty"] = p.get("stock_qty") if p.get("is_active") else None
+    o["supplier"] = dict(sup) if sup else None
+    o["lines"] = lines
+    o["shops"] = order_network(shop_id)
+    return o
+
+
+def list_orders(shop_id: int, limit: int = 40) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT o.*, s.name AS supplier_name,
+                   (SELECT COUNT(*) FROM supplier_order_lines l WHERE l.order_id=o.id) AS line_count,
+                   (SELECT COALESCE(SUM(l.qty_ordered), 0) FROM supplier_order_lines l WHERE l.order_id=o.id) AS qty_total,
+                   (SELECT COALESCE(SUM(COALESCE(l.qty_received, 0) * COALESCE(l.purchase_price, 0)), 0)
+                      FROM supplier_order_lines l WHERE l.order_id=o.id) AS received_sum
+            FROM supplier_orders o LEFT JOIN suppliers s ON s.id = o.supplier_id
+            WHERE o.shop_id=?
+            ORDER BY CASE o.status WHEN 'draft' THEN 0 WHEN 'sent' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
+                     o.id DESC
+            LIMIT ?
+        """, (shop_id, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+
+@_serialized
+def mark_order_sent(shop_id: int, order_id: int) -> dict:
+    with get_conn() as conn:
+        o = _order_row(conn, shop_id, order_id)
+        if not o:
+            return {"ok": False, "error": "not_found"}
+        if o["status"] == "sent":
+            return {"ok": True}
+        if o["status"] != "draft":
+            return {"ok": False, "error": "bad_status"}
+        conn.execute("UPDATE supplier_orders SET status='sent', sent_at=? WHERE id=?", (_now_str(), order_id))
+        conn.commit()
+    return {"ok": True}
+
+
+@_serialized
+def cancel_order(shop_id: int, order_id: int) -> dict:
+    """Черновик удаляется совсем, отправленный заказ — помечается отменённым."""
+    with get_conn() as conn:
+        o = _order_row(conn, shop_id, order_id)
+        if not o:
+            return {"ok": False, "error": "not_found"}
+        if o["status"] == "draft":
+            conn.execute("DELETE FROM supplier_order_lines WHERE order_id=?", (order_id,))
+            conn.execute("DELETE FROM supplier_orders WHERE id=?", (order_id,))
+        elif o["status"] == "sent":
+            conn.execute("UPDATE supplier_orders SET status='cancelled', done_at=? WHERE id=?", (_now_str(), order_id))
+        else:
+            return {"ok": False, "error": "bad_status"}
+        conn.commit()
+    return {"ok": True}
+
+
+@_serialized
+def receive_order(shop_id: int, order_id: int, lines: list) -> dict:
+    """Приёмка: сколько пришло на самом деле и по какой цене. Всё одной
+    транзакцией: остатки склада, история пополнений (с номером заказа), цена
+    закупки товара. Если в заказе была доля филиалов — дальше шаг «раздать»."""
+    by_line = {}
+    for ln in lines or []:
+        try:
+            lid = int(ln["line_id"])
+            q = float(ln.get("qty_received") or 0)
+            price = ln.get("purchase_price")
+            price = int(round(float(price))) if price not in (None, "") else None
+        except (KeyError, TypeError, ValueError):
+            return {"ok": False, "error": "bad_request"}
+        if q < 0 or (price is not None and price < 0):
+            return {"ok": False, "error": "bad_request"}
+        by_line[lid] = (q, price)
+    today = datetime.now().strftime("%Y-%m-%d")
+    backfills = []
+    has_branch_share = False
+    with get_conn() as conn:
+        try:
+            o = _order_row(conn, shop_id, order_id)
+            if not o:
+                return {"ok": False, "error": "not_found"}
+            if o["status"] not in ORDER_OPEN_STATUSES:
+                return {"ok": False, "error": "bad_status"}
+            order_lines = conn.execute("SELECT * FROM supplier_order_lines WHERE order_id=?", (order_id,)).fetchall()
+            if not any(by_line.get(l["id"], (0, None))[0] > 0 for l in order_lines):
+                return {"ok": False, "error": "empty"}
+            for l in order_lines:
+                q, price = by_line.get(l["id"], (0, None))
+                conn.execute("UPDATE supplier_order_lines SET qty_received=?, purchase_price=? WHERE id=?",
+                             (q, price, l["id"]))
+                if q <= 0:
+                    continue
+                p = conn.execute("SELECT * FROM products WHERE id=? AND shop_id=? AND is_active=1",
+                                 (l["product_id"], shop_id)).fetchone()
+                if not p:
+                    conn.rollback()
+                    return {"ok": False, "error": "no_product", "name": l["name"]}
+                conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (q, p["id"]))
+                if price is not None:
+                    if p["purchase_price"] is None:
+                        backfills.append((p["id"], price))
+                    conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (price, p["id"]))
+                conn.execute("""
+                    INSERT INTO stock_restocks (product_id, shop_id, quantity, purchase_price, restock_date, order_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (p["id"], shop_id, q, price, today, order_id))
+                alloc = json.loads(l["alloc_json"] or "{}")
+                if any(k != str(shop_id) and v > 0 for k, v in alloc.items()):
+                    has_branch_share = True
+            branches = [s for s in order_network(shop_id) if not s["is_head"]]
+            status = "received" if (has_branch_share and branches) else "done"
+            conn.execute("UPDATE supplier_orders SET status=?, received_at=?, done_at=? WHERE id=?",
+                         (status, _now_str(), _now_str() if status == "done" else None, order_id))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    for pid, price in backfills:
+        backfill_cost_price(shop_id, pid, price)
+    return {"ok": True, "status": status}
+
+
+@_serialized
+def distribute_order(shop_id: int, order_id: int, lines: list) -> dict:
+    """Раздать полученный товар по филиалам: перемещения со склада главной на
+    склады филиалов (как накладная), все филиалы — одной транзакцией. Пустое
+    распределение = «оставить всё на своём складе»."""
+    branch_ids = {s["id"] for s in order_network(shop_id) if not s["is_head"]}
+    with get_conn() as conn:
+        o = _order_row(conn, shop_id, order_id)
+        if not o:
+            return {"ok": False, "error": "not_found"}
+        if o["status"] != "received":
+            return {"ok": False, "error": "bad_status"}
+        order_lines = {l["id"]: dict(l) for l in conn.execute(
+            "SELECT * FROM supplier_order_lines WHERE order_id=?", (order_id,)).fetchall()}
+    per_branch = {}       # branch_id -> {product_id: qty}
+    dist_by_line = {}
+    for ln in lines or []:
+        try:
+            lid = int(ln["line_id"])
+        except (KeyError, TypeError, ValueError):
+            return {"ok": False, "error": "bad_request"}
+        l = order_lines.get(lid)
+        if not l:
+            return {"ok": False, "error": "bad_request"}
+        alloc = _clean_alloc(ln.get("alloc"), branch_ids)
+        if sum(alloc.values()) > (l["qty_received"] or 0) + 1e-9:
+            return {"ok": False, "error": "too_much", "name": l["name"]}
+        dist_by_line[lid] = alloc
+        for k, q in alloc.items():
+            per_branch.setdefault(int(k), {})
+            per_branch[int(k)][l["product_id"]] = per_branch[int(k)].get(l["product_id"], 0) + q
+    src_products = {p["id"]: p for p in list_products(shop_id)}
+    need = {}
+    for m in per_branch.values():
+        for pid, q in m.items():
+            need[pid] = need.get(pid, 0) + q
+    problems = []
+    for pid, q in need.items():
+        p = src_products.get(pid)
+        if not p:
+            problems.append({"product_id": pid, "error": "no_product"})
+        elif q > (p["stock_qty"] or 0) + 1e-9:
+            problems.append({"product_id": pid, "name": p["name"], "error": "not_enough", "available": p["stock_qty"]})
+    if problems:
+        return {"ok": False, "error": "problems", "problems": problems}
+    today = datetime.now().strftime("%Y-%m-%d")
+    batch = f"Z{o['number']}-" + datetime.now().strftime("%y%m%d")
+    backfills = []
+    with get_conn() as conn:
+        try:
+            for bid, qty_by_pid in per_branch.items():
+                for dst_id, price in _transfer_lines(conn, shop_id, shop_id, bid, qty_by_pid, src_products, today, batch):
+                    backfills.append((bid, dst_id, price))
+            for lid, alloc in dist_by_line.items():
+                conn.execute("UPDATE supplier_order_lines SET dist_json=? WHERE id=?",
+                             (json.dumps(alloc) if alloc else None, lid))
+            conn.execute("UPDATE supplier_orders SET status='done', done_at=? WHERE id=?", (_now_str(), order_id))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    for bid, dst_id, price in backfills:
+        backfill_cost_price(bid, dst_id, price)
+    return {"ok": True, "batch": batch if per_branch else None, "branches": len(per_branch)}

@@ -1252,6 +1252,42 @@ if ('serviceWorker' in navigator) {
   .whc-price { font-size:12px; color:#475569; }
   .whc-price .mg { color:#15803D; font-weight:700; }
   .whc-actions { display:flex; gap:6px; margin-left:auto; }
+  .ord-head-row { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+  .sup-row, .ord-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #F1F5F9; }
+  .sup-row:last-child, .ord-row:last-child { border-bottom:none; }
+  .ord-row { cursor:pointer; }
+  .sup-main { flex:1; min-width:0; cursor:pointer; }
+  .sup-main b { display:block; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sup-main span { display:block; font-size:12px; color:#64748B; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ord-badge { font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .ord-title { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .ord-title b { font-size:17px; }
+  .ord-sub { font-size:12px; color:#64748B; margin-top:2px; }
+  .ord-steps { display:flex; gap:4px; margin:10px 0 12px; }
+  .ord-step { flex:1; text-align:center; font-size:11px; padding:5px 2px; border-radius:8px; background:#F1F5F9; color:#64748B; font-weight:600; }
+  .ord-step.on { background:#DBEAFE; color:#0F52BA; }
+  .ord-line { display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #F1F5F9; font-size:13px; }
+  .ord-line .pl-name, .ord-recv .pl-name, .ord-dist .pl-name { flex:1; min-width:0; }
+  .ord-line .pl-name b, .ord-recv .pl-name b, .ord-dist .pl-name b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ord-line .pl-name span, .ord-recv .pl-name span, .ord-dist .pl-name span { font-size:11px; color:#64748B; }
+  .ord-line input[type=number] { width:74px !important; padding:6px 8px !important; margin:0 !important; font-size:14px; }
+  .ord-unit { font-size:12px; color:#64748B; min-width:18px; }
+  .ord-x { border:none; background:none; color:#94A3B8; font-size:15px; cursor:pointer; padding:4px; }
+  .ord-total { display:flex; justify-content:space-between; gap:8px; font-size:13px; color:#475569; margin:12px 0; font-weight:600; }
+  .ord-text { white-space:pre-wrap; background:#F8FAFC; border:1px solid var(--border); border-radius:12px; padding:12px; font-size:13px; font-family:inherit; margin:8px 0 12px; }
+  .ord-recv, .ord-dist { padding:10px 0; border-bottom:1px solid #F1F5F9; }
+  .ord-recv-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+  .ord-recv-grid label { font-size:11px; color:#64748B; display:block; }
+  .ord-recv-grid input { width:100% !important; margin:2px 0 0 !important; padding:7px 9px !important; }
+  .ord-dist-row { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; margin-top:6px; }
+  .ord-dist-row input { width:84px !important; margin:0 !important; padding:6px 8px !important; }
+  .ord-keep { font-size:12px; color:#15803D; margin-top:6px; font-weight:600; }
+  .ord-keep.bad { color:#B91C1C; }
+  .pl-group { font-size:12px; font-weight:700; color:#0F52BA; margin:12px 0 2px; }
+  #orderModal select { width:100%; }
+  label.pl-row, label.ord-dist-row { text-transform:none; letter-spacing:normal; font-size:13px; color:var(--text); font-weight:400; margin:0; }
+  label.pl-row .pl-name b, label.ord-dist-row span { color:var(--text); font-weight:600; }
+  label.pl-row .pl-name span { text-transform:none; letter-spacing:normal; }
   .pl-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #F1F5F9; font-size:13px; }
   .pl-row .pl-name { flex:1; min-width:0; }
   .pl-row .pl-name b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1834,6 +1870,7 @@ if ('serviceWorker' in navigator) {
   <div id="view-warehouse" style="display:none;">
     <div class="subtabs">
       <div class="subtab active" id="subwh-own" onclick="showWhSubTab('own')">{{ T.wh_sub_own }}</div>
+      {% if not is_branch and not is_employee %}<div class="subtab" id="subwh-orders" onclick="showWhSubTab('orders')">{{ T.wh_sub_orders }}</div>{% endif %}
       <div class="subtab" id="subwh-branches" onclick="showWhSubTab('branches')" style="display:none;">{{ T.wh_sub_branches }}</div>
       <div class="subtab" id="subwh-network" onclick="showWhSubTab('network')" style="display:none;">{{ T.wh_sub_network }}</div>
     </div>
@@ -1879,6 +1916,26 @@ if ('serviceWorker' in navigator) {
 
 
     </div>
+
+    {% if not is_branch and not is_employee %}
+    <div id="whOrdersView" style="display:none;">
+      <div class="card">
+        <div class="ord-head-row">
+          <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.ord_list_title }}</label>
+          <button class="wh-tbtn wh-tbtn-primary" onclick="openNewOrder()"><i class="fa-solid fa-plus"></i> {{ T.ord_new }}</button>
+        </div>
+        <div class="hint-text" style="margin-bottom:6px;">{{ T.ord_list_hint }}</div>
+        <div id="ordList">{{ T.stats_loading }}</div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ord-head-row">
+          <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.sup_title }}</label>
+          <button class="wh-tbtn" onclick="openSupplierModal()"><i class="fa-solid fa-plus"></i> {{ T.sup_add_short }}</button>
+        </div>
+        <div id="supList">{{ T.stats_loading }}</div>
+      </div>
+    </div>
+    {% endif %}
 
     <div id="whNetworkView" style="display:none;">
       <div class="card">
@@ -1972,9 +2029,70 @@ if ('serviceWorker' in navigator) {
           <div id="purchaseListBody"></div>
           <button class="submit" onclick="sendPurchaseList('tg')" style="background:#2AABEE;"><i class="fa-brands fa-telegram"></i> {{ T.whs_send_tg }}</button>
           <button class="submit" onclick="sendPurchaseList('copy')" style="background:var(--border); color:var(--text);"><i class="fa-regular fa-copy"></i> {{ T.whs_copy }}</button>
+          {% if not is_branch and not is_employee %}<button class="submit" id="plOrderBtn" onclick="purchaseToOrder()" style="background:#DBEAFE; color:#0F52BA; display:none;"><i class="fa-solid fa-truck-ramp-box"></i> {{ T.ord_from_purchase }}</button>{% endif %}
           <button class="close-btn" onclick="closeWhModal('purchaseListModal')">{{ T.modal_close }}</button>
         </div>
       </div>
+      {% if not is_branch and not is_employee %}
+      <div class="modal-overlay" id="orderModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <div id="ordHead"></div>
+          <div id="ordBody"></div>
+          <button class="close-btn" onclick="closeWhModal('orderModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      <div class="modal-overlay" id="supplierModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;" id="supModalTitle">{{ T.sup_add }}</h3>
+          <div class="field">
+            <label>{{ T.sup_name }}</label>
+            <input id="sup_name" placeholder="MITAL" maxlength="80" autocomplete="off">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.sup_phone }}</label>
+              <input id="sup_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" maxlength="40">
+            </div>
+            <div class="field">
+              <label>{{ T.sup_telegram }}</label>
+              <input id="sup_telegram" placeholder="@username" maxlength="64" autocomplete="off" autocapitalize="off">
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.sup_contact }}</label>
+              <input id="sup_contact" maxlength="80">
+            </div>
+            <div class="field">
+              <label>{{ T.sup_days }}</label>
+              <input id="sup_delivery_days" placeholder="{{ T.sup_days_ph }}" maxlength="80">
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ T.sup_note }}</label>
+            <input id="sup_note" maxlength="300">
+          </div>
+          <button class="submit" onclick="saveSupplier()">{{ T.sup_save }}</button>
+          <button class="submit" id="supDeleteBtn" onclick="deleteSupplierBtn()" style="background:#FEE2E2; color:#B91C1C;">{{ T.sup_delete }}</button>
+          <button class="close-btn" onclick="closeWhModal('supplierModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      <div class="modal-overlay" id="supProductsModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.sup_assign_title }}: <span id="supProdTitle"></span></h3>
+          <div class="hint-text" style="margin-bottom:10px;">{{ T.sup_assign_hint }}</div>
+          <div class="wh-search" style="margin-bottom:8px;"><i class="fa-solid fa-magnifying-glass"></i><input id="supProdSearch" placeholder="{{ T.whs_search }}" oninput="renderSupProducts()" autocomplete="off"></div>
+          <div style="display:flex; gap:8px; margin-bottom:6px;">
+            <button class="wh-tbtn wh-tbtn-sm" onclick="supSelectVisible(true)">{{ T.sup_all }}</button>
+            <button class="wh-tbtn wh-tbtn-sm" onclick="supSelectVisible(false)">{{ T.sup_none }}</button>
+            <span class="hint-text" id="supProdCount" style="margin:auto 0 auto auto;"></span>
+          </div>
+          <div id="supProdList"></div>
+          <button class="submit" onclick="saveSupplierProducts()">{{ T.sup_save }}</button>
+          <button class="close-btn" onclick="closeWhModal('supProductsModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      {% endif %}
       <div class="modal-overlay" id="transferModal">
         <div class="modal modal-wide" style="text-align:left;">
           <h3 style="text-align:center; margin-top:0;">{{ T.whn_transfer }}</h3>
@@ -2312,6 +2430,7 @@ function refreshCurrentView() {
   if (CURRENT_TAB === 'warehouse') {
     if (vis('whBranchesView') && WH.branchId) selectWhBranch(WH.branchId);
     if (vis('whNetworkView')) { WH.net = null; loadNetworkStock(); }
+    if (vis('whOrdersView')) loadOrdersTab();
   }
   if (CURRENT_TAB === 'stats' && vis('statsBranchesView')) { loadNetworkCompare(); loadNetwork(); }
 }
@@ -2437,6 +2556,7 @@ async function loadWarehouse() {
   renderSvcItemLists();
 
   if (!IS_BRANCH) {
+    if (document.getElementById('supList')) loadSuppliers();
     try {
       const branches = await (await fetch('/api/my_branches')).json();
       const branchBtn = document.getElementById('subwh-branches');
@@ -2629,10 +2749,22 @@ function closeWhModal(id) {
 function openPurchaseList(key) {
   key = key || 'own';
   const ctx = WHCTX[key];
-  const items = ctx.products
+  let items = ctx.products
     .filter(p => p.reorder_qty > 0 || p.status === 'out')
     .sort((a, b) => (a.days_left ?? -1) - (b.days_left ?? -1));
-  document.getElementById('purchaseListBody').innerHTML = items.length ? items.map(p => `
+  // свой склад и есть поставщики — группируем список по поставщикам
+  const grouped = key === 'own' && !IS_BRANCH && SUP.list.length > 0;
+  const supKey = p => p.supplier_id ? '0' + supName(p.supplier_id).toUpperCase() : '1';
+  if (grouped) items = items.slice().sort((a, b) => supKey(a).localeCompare(supKey(b)));
+  let lastSup = -1;
+  const groupHead = p => {
+    if (!grouped || (p.supplier_id || 0) === lastSup) return '';
+    lastSup = p.supplier_id || 0;
+    return `<div class="pl-group">${escapeHtml(supName(p.supplier_id))}</div>`;
+  };
+  const orderBtn = document.getElementById('plOrderBtn');
+  if (orderBtn) orderBtn.style.display = key === 'own' ? '' : 'none';
+  document.getElementById('purchaseListBody').innerHTML = items.length ? items.map(p => groupHead(p) + `
     <div class="pl-row">
       <input type="checkbox" id="pl_on_${p.id}" checked>
       <div class="pl-name"><b>${escapeHtml(p.name)}</b><span>${T.whs_now} ${whQty(p.stock_qty)} ${whUnit(p.unit)}${p.per_day ? ` · ~${whQty(p.per_day)}${T.whs_per_day}` : ''}</span></div>
@@ -2668,6 +2800,536 @@ async function sendPurchaseList(mode) {
   } catch (e) {
     prompt(T.whs_copy, text);
   }
+}
+
+// ---- Поставщики и заказы поставщику (главная / самостоятельная точка) ----
+// Путь заказа: черновик → отправлен → получен (товар лёг на склад с ценами
+// закупки) → раздан по филиалам. Поставщик необязателен: заказ «Без
+// поставщика» — это просто список покупок (например, поездка на рынок).
+const SUP = { list: [], loaded: false, editId: null, assignId: null, checked: new Set() };
+const ORD = { list: [], cur: null, mode: 'view', dist: null, distFor: null };
+
+async function ordFetch(url, method, body) {
+  try {
+    const opts = { method: method || 'GET', headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return await (await fetch(url, opts)).json();
+  } catch (e) { return { ok: false, error: 'network' }; }
+}
+function ordErr(d) {
+  const code = (d && d.error) || '';
+  let text = T['ord_err_' + code] || T['sup_err_' + code] || (T.msg_error + ' ' + code);
+  if (code === 'problems' && d.problems) text = T.ord_err_not_enough + ': ' + d.problems.map(p => escapeHtml(p.name || '')).join(', ');
+  else if (d && d.name) text += ': ' + escapeHtml(d.name);
+  return text;
+}
+function ordDate(s) { return s ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : ''; }
+function supName(id) {
+  const s = SUP.list.find(x => x.id === id);
+  return s ? s.name : T.ord_no_supplier;
+}
+function whCatName(c) { return c === 'other' ? T.wh_category_other : (T[c] || c || ''); }
+
+async function loadOrdersTab() { await Promise.all([loadSuppliers(), loadOrders()]); }
+
+async function loadSuppliers() {
+  const d = await ordFetch('/api/suppliers');
+  if (d.ok) { SUP.list = d.suppliers; SUP.loaded = true; }
+  renderSuppliers();
+}
+
+function renderSuppliers() {
+  const el = document.getElementById('supList');
+  if (!el) return;
+  if (!SUP.list.length) { el.innerHTML = `<div class="hint-text" style="padding:6px 0;">${T.sup_empty}</div>`; return; }
+  el.innerHTML = SUP.list.map(s => {
+    const contacts = [s.phone ? escapeHtml(s.phone) : '', s.telegram ? '@' + escapeHtml(s.telegram) : '',
+      s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
+    return `
+      <div class="sup-row">
+        <div class="sup-main" onclick="openSupplierModal(${s.id})"><b>${escapeHtml(s.name)}</b><span>${contacts || T.sup_no_contacts}</span><span>${T.sup_products} ${s.product_count}</span></div>
+        <div class="whc-actions">
+          <button class="wh-tbtn wh-tbtn-sm" onclick="openNewOrder(${s.id})">${T.sup_order_btn}</button>
+          <button class="wh-tbtn wh-tbtn-icon" title="${T.sup_assign_title}" onclick="openSupProducts(${s.id})"><i class="fa-solid fa-boxes-stacked"></i></button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+const SUP_FIELDS = ['name', 'phone', 'telegram', 'contact', 'delivery_days', 'note'];
+
+function openSupplierModal(id) {
+  const s = id ? SUP.list.find(x => x.id === id) : null;
+  SUP.editId = s ? s.id : null;
+  document.getElementById('supModalTitle').textContent = s ? T.sup_edit : T.sup_add;
+  SUP_FIELDS.forEach(k => { document.getElementById('sup_' + k).value = s && s[k] ? (k === 'telegram' ? '@' + s[k] : s[k]) : ''; });
+  document.getElementById('supDeleteBtn').style.display = s ? '' : 'none';
+  document.getElementById('supplierModal').classList.add('open');
+}
+
+async function saveSupplier() {
+  const body = {};
+  SUP_FIELDS.forEach(k => { body[k] = document.getElementById('sup_' + k).value; });
+  if (!body.name.trim()) { showMsg(T.sup_err_empty_name, false); return; }
+  const isNew = !SUP.editId;
+  const d = await ordFetch(isNew ? '/api/suppliers' : '/api/suppliers/' + SUP.editId, isNew ? 'POST' : 'PUT', body);
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  closeWhModal('supplierModal');
+  showMsg(T.sup_saved, true);
+  await loadSuppliers();
+  // новому поставщику сразу предлагаем отметить его товары
+  if (isNew && WHCTX.own.products.length) openSupProducts(d.id);
+}
+
+async function deleteSupplierBtn() {
+  if (!SUP.editId || !confirm(T.sup_delete_confirm)) return;
+  const d = await ordFetch('/api/suppliers/' + SUP.editId, 'DELETE');
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  WHCTX.own.products.forEach(p => { if (p.supplier_id === SUP.editId) p.supplier_id = null; });
+  closeWhModal('supplierModal');
+  showMsg(T.sup_deleted, true);
+  loadSuppliers();
+}
+
+function openSupProducts(id) {
+  const s = SUP.list.find(x => x.id === id);
+  if (!s) return;
+  SUP.assignId = id;
+  document.getElementById('supProdTitle').textContent = s.name;
+  document.getElementById('supProdSearch').value = '';
+  SUP.checked = new Set(WHCTX.own.products.filter(p => p.supplier_id === id).map(p => p.id));
+  renderSupProducts();
+  document.getElementById('supProductsModal').classList.add('open');
+}
+
+function supVisibleProducts() {
+  const q = (document.getElementById('supProdSearch').value || '').trim().toLowerCase();
+  return WHCTX.own.products
+    .filter(p => !q || p.name.toLowerCase().includes(q))
+    .sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
+}
+
+function renderSupProducts() {
+  const list = supVisibleProducts();
+  const el = document.getElementById('supProdList');
+  if (!WHCTX.own.products.length) el.innerHTML = `<div class="hint-text" style="padding:10px 0;">${T.wh_no_products}</div>`;
+  else if (!list.length) el.innerHTML = `<div class="hint-text" style="padding:10px 0;">${T.whs_nothing_found}</div>`;
+  else el.innerHTML = list.map(p => {
+    const other = p.supplier_id && p.supplier_id !== SUP.assignId ? ' · ' + T.sup_other_supplier.replace('{name}', escapeHtml(supName(p.supplier_id))) : '';
+    return `
+      <label class="pl-row" style="cursor:pointer;">
+        <input type="checkbox" ${SUP.checked.has(p.id) ? 'checked' : ''} onchange="toggleSupProduct(${p.id}, this.checked)">
+        <div class="pl-name"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(whCatName(p.category))}${other}</span></div>
+      </label>`;
+  }).join('');
+  document.getElementById('supProdCount').textContent = T.sup_selected.replace('{n}', SUP.checked.size);
+}
+
+function toggleSupProduct(id, on) {
+  if (on) SUP.checked.add(id); else SUP.checked.delete(id);
+  document.getElementById('supProdCount').textContent = T.sup_selected.replace('{n}', SUP.checked.size);
+}
+
+function supSelectVisible(on) {
+  supVisibleProducts().forEach(p => { if (on) SUP.checked.add(p.id); else SUP.checked.delete(p.id); });
+  renderSupProducts();
+}
+
+async function saveSupplierProducts() {
+  const id = SUP.assignId;
+  const d = await ordFetch(`/api/suppliers/${id}/products`, 'POST', { product_ids: Array.from(SUP.checked) });
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  WHCTX.own.products.forEach(p => {
+    if (SUP.checked.has(p.id)) p.supplier_id = id;
+    else if (p.supplier_id === id) p.supplier_id = null;
+  });
+  closeWhModal('supProductsModal');
+  showMsg(T.sup_assign_saved, true);
+  loadSuppliers();
+}
+
+// ---- список заказов ----
+const ORD_ST_COLORS = { draft: ['#B45309', '#FEF3C7'], sent: ['#0F52BA', '#DBEAFE'], received: ['#7C3AED', '#EDE9FE'],
+  done: ['#15803D', '#DCFCE7'], cancelled: ['#64748B', '#F1F5F9'] };
+function ordBadge(st) {
+  const c = ORD_ST_COLORS[st] || ORD_ST_COLORS.draft;
+  return `<span class="ord-badge" style="color:${c[0]}; background:${c[1]};">${T['ord_st_' + st] || st}</span>`;
+}
+
+async function loadOrders() {
+  const d = await ordFetch('/api/orders');
+  if (d.ok) ORD.list = d.orders;
+  renderOrders();
+}
+
+function renderOrders() {
+  const el = document.getElementById('ordList');
+  if (!el) return;
+  if (!ORD.list.length) { el.innerHTML = `<div class="hint-text" style="padding:6px 0;">${T.ord_empty}</div>`; return; }
+  el.innerHTML = ORD.list.map(o => `
+    <div class="ord-row" onclick="openOrder(${o.id})">
+      <div class="sup-main"><b>${T.ord_title_n.replace('{n}', o.number)} · ${escapeHtml(o.supplier_name || T.ord_no_supplier)}</b>
+        <span>${ordDate(o.created_at)} · ${o.line_count} ${T.ord_positions}${o.received_sum ? ' · ' + fmtNum(Math.round(o.received_sum)) + ' ' + T.currency : ''}</span></div>
+      ${ordBadge(o.status)}
+    </div>`).join('');
+}
+
+// ---- окно заказа ----
+function ordHasBranches() { return !!(ORD.cur && ORD.cur.shops && ORD.cur.shops.length > 1); }
+function ordShopName(id) { const s = ((ORD.cur && ORD.cur.shops) || []).find(x => x.id === +id); return s ? s.name : ''; }
+function ordProduct(id) { return WHCTX.own.products.find(p => p.id === id); }
+
+async function openNewOrder(supplierId) {
+  if (!SUP.loaded) await loadSuppliers();
+  if (supplierId === undefined) supplierId = SUP.list.length ? SUP.list[0].id : null;
+  ORD.cur = { id: null, status: 'draft', supplier_id: supplierId || null, lines: [], shops: [] };
+  ORD.mode = 'edit';
+  document.getElementById('orderModal').classList.add('open');
+  await loadOrderSuggestion();
+}
+
+async function loadOrderSuggestion() {
+  const o = ORD.cur;
+  document.getElementById('ordBody').innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.stats_loading}</div>`;
+  const d = await ordFetch('/api/orders/suggest?supplier_id=' + (o.supplier_id || ''));
+  if (ORD.cur !== o) return;  // окно уже переключили на другой заказ
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  o.shops = d.shops;
+  o.lines = d.lines.filter(l => l.qty > 0);
+  renderOrderModal();
+}
+
+function onOrderSupplierChanged(v) {
+  ORD.cur.supplier_id = v ? parseInt(v, 10) : null;
+  loadOrderSuggestion();
+}
+
+async function openOrder(id, mode) {
+  if (!SUP.loaded) await loadSuppliers();
+  const d = await ordFetch('/api/orders/' + id);
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  d.lines.forEach(l => { l.qty = l.qty_ordered; });
+  ORD.cur = d;
+  ORD.mode = mode || (d.status === 'draft' ? 'edit' : d.status === 'received' ? 'distribute' : 'view');
+  document.getElementById('orderModal').classList.add('open');
+  renderOrderModal();
+}
+
+function renderOrderModal() {
+  const o = ORD.cur;
+  const steps = ['draft', 'sent', 'received'].concat(ordHasBranches() ? ['done'] : []);
+  const idx = { draft: 0, sent: 1, received: 2, done: steps.length - 1 }[o.status];
+  const stepper = o.status === 'cancelled' ? '' : `<div class="ord-steps">${steps.map((st, i) =>
+    `<div class="ord-step ${i <= idx ? 'on' : ''}">${i + 1} ${T['ord_step_' + st]}</div>`).join('')}</div>`;
+  const dates = o.id ? [o.created_at ? `${T.ord_created} ${ordDate(o.created_at)}` : '', o.sent_at ? `${T.ord_sent_at} ${ordDate(o.sent_at)}` : '',
+    o.received_at ? `${T.ord_received_at} ${ordDate(o.received_at)}` : ''].filter(Boolean).join(' · ') : '';
+  const sup = o.supplier;
+  const supLine = o.id ? `<div class="ord-sub">${escapeHtml(sup ? sup.name : T.ord_no_supplier)}${sup && sup.contact ? ' · ' + escapeHtml(sup.contact) : ''}${sup && sup.delivery_days ? ' · ' + escapeHtml(sup.delivery_days) : ''}</div>` : '';
+  document.getElementById('ordHead').innerHTML = `
+    <div class="ord-title"><b>${o.id ? T.ord_title_n.replace('{n}', o.number) : T.ord_new}</b>${o.id ? ordBadge(o.status) : ''}</div>
+    ${supLine}${dates ? `<div class="ord-sub">${dates}</div>` : ''}${stepper}`;
+  const render = { edit: renderOrderEdit, send: renderOrderSend, receive: renderOrderReceive, distribute: renderOrderDistribute }[ORD.mode] || renderOrderView;
+  render();
+}
+
+function renderOrderEdit() {
+  const o = ORD.cur;
+  const supSel = o.id ? '' : `
+    <div class="field"><label>${T.ord_supplier}</label>
+      <select id="ord_supplier" onchange="onOrderSupplierChanged(this.value)">
+        ${SUP.list.map(s => `<option value="${s.id}" ${o.supplier_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+        <option value="" ${!o.supplier_id ? 'selected' : ''}>${T.ord_no_supplier}</option>
+      </select></div>`;
+  const rows = o.lines.map((l, i) => {
+    const parts = ordHasBranches() && l.alloc ? Object.entries(l.alloc).filter(e => e[1] > 0)
+      .map(e => `${escapeHtml(ordShopName(e[0]))} ${whQty(e[1])}`).join(' · ') : '';
+    const stock = l.stock_qty !== null && l.stock_qty !== undefined ? `${T.whs_now} ${whQty(l.stock_qty)} ${whUnit(l.unit)}` : '';
+    return `
+      <div class="ord-line">
+        <div class="pl-name"><b>${escapeHtml(l.name)}</b><span>${[stock, parts].filter(Boolean).join(' · ')}</span></div>
+        <input type="number" inputmode="decimal" min="0" step="any" value="${l.qty || ''}" oninput="setOrderQty(${i}, this.value)">
+        <span class="ord-unit">${whUnit(l.unit)}</span>
+        <button class="ord-x" onclick="removeOrderLine(${i})" aria-label="${T.wh_delete_action}"><i class="fa-solid fa-xmark"></i></button>
+      </div>`;
+  }).join('');
+  const inOrder = new Set(o.lines.map(l => l.product_id));
+  const mine = p => (p.supplier_id || null) === (o.supplier_id || null);
+  const free = WHCTX.own.products.filter(p => !inOrder.has(p.id));
+  const opt = p => `<option value="${p.id}">${escapeHtml(p.name)} (${whQty(p.stock_qty)} ${whUnit(p.unit)})</option>`;
+  const own = free.filter(mine), others = free.filter(p => !mine(p));
+  const addSel = free.length ? `
+    <select id="ord_add" onchange="addOrderLine(this.value)" style="margin-top:10px;">
+      <option value="">+ ${T.ord_add_product}</option>
+      ${own.length ? `<optgroup label="${o.supplier_id ? T.ord_grp_supplier : T.ord_no_supplier}">${own.map(opt).join('')}</optgroup>` : ''}
+      ${others.length ? `<optgroup label="${T.ord_grp_other}">${others.map(opt).join('')}</optgroup>` : ''}
+    </select>` : '';
+  const draft = !!o.id;
+  document.getElementById('ordBody').innerHTML = `
+    ${supSel}
+    <div class="hint-text" style="margin-bottom:4px;">${o.lines.length ? T.ord_auto_hint : T.ord_no_lines}</div>
+    ${rows}${addSel}
+    <div class="ord-total" id="ordTotal"></div>
+    <button class="submit" onclick="sendOrder()"><i class="fa-solid fa-paper-plane"></i> ${T.ord_send_btn}</button>
+    <button class="submit" onclick="saveOrderDraft()" style="background:var(--border); color:var(--text);">${T.ord_save_draft}</button>
+    <button class="submit" onclick="receiveFromDraft()" style="background:#DCFCE7; color:#15803D;"><i class="fa-solid fa-box-open"></i> ${T.ord_receive_now}</button>
+    ${draft ? `<button class="submit" onclick="cancelOrderBtn()" style="background:#FEE2E2; color:#B91C1C;">${T.ord_delete_draft}</button>` : ''}`;
+  updateOrderTotal();
+}
+
+function setOrderQty(i, v) { ORD.cur.lines[i].qty = Math.max(0, parseFloat(v) || 0); updateOrderTotal(); }
+function removeOrderLine(i) { ORD.cur.lines.splice(i, 1); renderOrderEdit(); }
+
+function addOrderLine(pid) {
+  const p = ordProduct(parseInt(pid, 10));
+  if (!p) return;
+  ORD.cur.lines.push({ product_id: p.id, name: p.name, unit: p.unit, stock_qty: p.stock_qty, qty: 0, alloc: {} });
+  renderOrderEdit();
+  const inputs = document.querySelectorAll('#ordBody .ord-line input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function updateOrderTotal() {
+  const el = document.getElementById('ordTotal');
+  if (!el) return;
+  const lines = ORD.cur.lines.filter(l => l.qty > 0);
+  let sum = 0;
+  lines.forEach(l => { const p = ordProduct(l.product_id); if (p && p.purchase_price) sum += p.purchase_price * l.qty; });
+  el.innerHTML = `<span>${lines.length} ${T.ord_positions}</span><span>${sum ? '≈ ' + fmtNum(Math.round(sum)) + ' ' + T.currency : ''}</span>`;
+}
+
+async function saveOrderLines(send) {
+  const o = ORD.cur;
+  const lines = o.lines.filter(l => l.qty > 0).map(l => ({ product_id: l.product_id, qty: l.qty, alloc: l.alloc || {} }));
+  if (!lines.length) { showMsg(T.ord_err_empty, false); return null; }
+  const d = await ordFetch(o.id ? '/api/orders/' + o.id : '/api/orders', o.id ? 'PUT' : 'POST',
+    { supplier_id: o.supplier_id, lines, send: !!send });
+  if (!d.ok) { showMsg(ordErr(d), false); return null; }
+  return d.id;
+}
+
+async function saveOrderDraft() {
+  const id = await saveOrderLines(false);
+  if (!id) return;
+  showMsg(T.ord_saved, true);
+  closeWhModal('orderModal');
+  loadOrders();
+}
+
+async function sendOrder() {
+  const id = await saveOrderLines(true);
+  if (!id) return;
+  loadOrders();
+  await openOrder(id, 'send');
+}
+
+async function receiveFromDraft() {
+  const id = await saveOrderLines(false);
+  if (!id) return;
+  loadOrders();
+  await openOrder(id, 'receive');
+}
+
+async function cancelOrderBtn() {
+  const o = ORD.cur;
+  if (!o.id) { closeWhModal('orderModal'); return; }
+  if (!confirm(o.status === 'draft' ? T.ord_delete_confirm : T.ord_cancel_confirm)) return;
+  const d = await ordFetch('/api/orders/' + o.id, 'DELETE');
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  closeWhModal('orderModal');
+  loadOrders();
+}
+
+// ---- отправка поставщику ----
+function orderText() {
+  const o = ORD.cur;
+  const shop = o.shop || {};
+  const lines = o.lines.filter(l => l.qty_ordered > 0)
+    .map((l, i) => `${i + 1}. ${l.name} — ${whQty(l.qty_ordered)} ${whUnit(l.unit)}`);
+  const tail = [shop.address ? `${T.ord_msg_address}: ${shop.address}` : '', shop.phone ? `${T.ord_msg_phone}: ${shop.phone}` : ''].filter(Boolean);
+  return [`${T.ord_title_n.replace('{n}', o.number)} — ${shop.name || ''}`, ordDate(o.sent_at || o.created_at), '']
+    .concat(lines, tail.length ? [''].concat(tail) : []).join('\\n');
+}
+
+function renderOrderSend() {
+  const s = ORD.cur.supplier || {};
+  document.getElementById('ordBody').innerHTML = `
+    <div class="hint-text">${T.ord_send_hint}</div>
+    <pre class="ord-text">${escapeHtml(orderText())}</pre>
+    <button class="submit" onclick="sendOrderVia('tg')" style="background:#2AABEE;"><i class="fa-brands fa-telegram"></i> ${T.whs_send_tg}${s.telegram ? ' · @' + escapeHtml(s.telegram) : ''}</button>
+    ${s.phone ? `<button class="submit" onclick="sendOrderVia('wa')" style="background:#25D366;"><i class="fa-brands fa-whatsapp"></i> WhatsApp · ${escapeHtml(s.phone)}</button>` : ''}
+    <button class="submit" onclick="sendOrderVia('copy')" style="background:var(--border); color:var(--text);"><i class="fa-regular fa-copy"></i> ${T.whs_copy}</button>
+    <button class="submit" onclick="ORD.mode='view'; renderOrderModal();" style="background:#DBEAFE; color:#0F52BA;">${T.ord_done_btn}</button>`;
+}
+
+async function sendOrderVia(ch) {
+  const text = orderText();
+  const s = ORD.cur.supplier || {};
+  if (ch === 'wa') {
+    window.open('https://wa.me/' + (s.phone || '').replace(/\\D/g, '') + '?text=' + encodeURIComponent(text), '_blank');
+  } else if (ch === 'tg' && s.telegram) {
+    // в личный чат Telegram нельзя передать текст ссылкой — копируем его, чат откроется сам
+    try { await navigator.clipboard.writeText(text); showMsg(T.ord_tg_pasted, true); } catch (e) {}
+    window.open('https://t.me/' + encodeURIComponent(s.telegram), '_blank');
+  } else if (ch === 'tg') {
+    window.open('https://t.me/share/url?url=' + encodeURIComponent(' ') + '&text=' + encodeURIComponent(text), '_blank');
+  } else {
+    try { await navigator.clipboard.writeText(text); showMsg(T.whs_copied, true); } catch (e) { prompt(T.whs_copy, text); }
+  }
+}
+
+// ---- просмотр (отправлен / завершён / отменён) ----
+function renderOrderView() {
+  const o = ORD.cur;
+  const st = o.status;
+  let total = 0;
+  const rows = o.lines.map(l => {
+    if (st !== 'done') {
+      return `<div class="ord-line"><div class="pl-name"><b>${escapeHtml(l.name)}</b></div><b>${whQty(l.qty_ordered)} ${whUnit(l.unit)}</b></div>`;
+    }
+    const sum = (l.qty_received || 0) * (l.purchase_price || 0);
+    total += sum;
+    const dist = Object.entries(l.dist || {}).filter(e => e[1] > 0).map(e => `${escapeHtml(ordShopName(e[0]))} ${whQty(e[1])}`).join(', ');
+    const info = [`${T.ord_ordered} ${whQty(l.qty_ordered)}`, `${T.ord_received} ${whQty(l.qty_received)} ${whUnit(l.unit)}`,
+      l.purchase_price ? `${fmtNum(l.purchase_price)} ${T.currency}/${T.whs_per_unit}` : '', dist ? '→ ' + dist : ''].filter(Boolean).join(' · ');
+    return `<div class="ord-line"><div class="pl-name"><b>${escapeHtml(l.name)}</b><span>${info}</span></div><b style="white-space:nowrap;">${sum ? fmtNum(Math.round(sum)) : '—'}</b></div>`;
+  }).join('');
+  const buttons = st === 'sent' ? `
+    <button class="submit" onclick="ORD.mode='receive'; renderOrderModal();"><i class="fa-solid fa-box-open"></i> ${T.ord_receive_btn}</button>
+    <button class="submit" onclick="ORD.mode='send'; renderOrderModal();" style="background:var(--border); color:var(--text);"><i class="fa-solid fa-paper-plane"></i> ${T.ord_resend}</button>
+    <button class="submit" onclick="cancelOrderBtn()" style="background:#FEE2E2; color:#B91C1C;">${T.ord_cancel_btn}</button>` : '';
+  document.getElementById('ordBody').innerHTML = `${rows}
+    ${st === 'done' && total ? `<div class="ord-total"><span>${T.ord_sum_total}</span><span>${fmtNum(Math.round(total))} ${T.currency}</span></div>` : '<div style="height:10px;"></div>'}
+    ${buttons}`;
+}
+
+// ---- приёмка ----
+function renderOrderReceive() {
+  const o = ORD.cur;
+  const rows = o.lines.map((l, i) => `
+    <div class="ord-recv">
+      <div class="pl-name"><b>${escapeHtml(l.name)}</b><span>${T.ord_ordered} ${whQty(l.qty_ordered)} ${whUnit(l.unit)}</span></div>
+      <div class="ord-recv-grid">
+        <label>${T.ord_received}, ${whUnit(l.unit)}<input type="number" inputmode="decimal" min="0" step="any" id="ordr_q_${i}" value="${l.qty_ordered}" oninput="updateRecvTotal()"></label>
+        <label>${T.ord_price_unit}<input type="number" inputmode="numeric" min="0" id="ordr_p_${i}" value="${l.current_price ?? ''}" oninput="updateRecvTotal()"></label>
+      </div>
+    </div>`).join('');
+  document.getElementById('ordBody').innerHTML = `
+    <div class="hint-text">${T.ord_receive_hint}</div>
+    ${rows}
+    <div class="ord-total" id="ordRecvTotal"></div>
+    <button class="submit" onclick="submitReceive()"><i class="fa-solid fa-check"></i> ${T.ord_accept_btn}</button>
+    <button class="submit" onclick="ORD.mode=ORD.cur.status==='draft'?'edit':'view'; renderOrderModal();" style="background:var(--border); color:var(--text);">${T.ord_back}</button>`;
+  updateRecvTotal();
+}
+
+function readReceiveLines() {
+  return ORD.cur.lines.map((l, i) => {
+    const pv = document.getElementById('ordr_p_' + i).value;
+    return { line_id: l.id, qty_received: Math.max(0, parseFloat(document.getElementById('ordr_q_' + i).value) || 0),
+      purchase_price: pv === '' ? null : Math.max(0, Math.round(parseFloat(pv) || 0)) };
+  });
+}
+
+function updateRecvTotal() {
+  const el = document.getElementById('ordRecvTotal');
+  if (!el) return;
+  let sum = 0;
+  readReceiveLines().forEach(r => { sum += r.qty_received * (r.purchase_price || 0); });
+  el.innerHTML = `<span>${T.ord_sum_total}</span><span>${fmtNum(Math.round(sum))} ${T.currency}</span>`;
+}
+
+async function submitReceive() {
+  const lines = readReceiveLines();
+  if (!lines.some(r => r.qty_received > 0)) { showMsg(T.ord_err_empty, false); return; }
+  if (lines.some(r => r.qty_received > 0 && r.purchase_price === null) && !confirm(T.ord_no_price_confirm)) return;
+  const id = ORD.cur.id;
+  const d = await ordFetch(`/api/orders/${id}/receive`, 'POST', { lines });
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  showMsg(T.ord_received_ok, true);
+  ORD.distFor = null;
+  loadWarehouse();
+  loadOrders();
+  await openOrder(id);
+}
+
+// ---- раздача по филиалам ----
+function renderOrderDistribute() {
+  const o = ORD.cur;
+  const branches = o.shops.filter(s => !s.is_head);
+  if (ORD.distFor !== o.id) {
+    // по умолчанию — доли филиалов из заказа; если пришло меньше, филиалы
+    // получают по очереди, сколько хватит
+    ORD.dist = o.lines.map(l => {
+      let rest = l.qty_received || 0;
+      const a = {};
+      branches.forEach(b => { const v = Math.min((l.alloc || {})[String(b.id)] || 0, rest); a[b.id] = v; rest -= v; });
+      return a;
+    });
+    ORD.distFor = o.id;
+  }
+  const rows = o.lines.map((l, i) => (l.qty_received > 0) ? `
+    <div class="ord-dist">
+      <div class="pl-name"><b>${escapeHtml(l.name)}</b><span>${T.ord_received} ${whQty(l.qty_received)} ${whUnit(l.unit)}</span></div>
+      ${branches.map(b => `<label class="ord-dist-row"><span>${escapeHtml(b.name)}</span>
+        <input type="number" inputmode="decimal" min="0" step="any" value="${ORD.dist[i][b.id] || ''}" placeholder="0" oninput="setDist(${i}, ${b.id}, this.value)"></label>`).join('')}
+      <div class="ord-keep" id="ordKeep_${i}"></div>
+    </div>` : '').join('');
+  document.getElementById('ordBody').innerHTML = `
+    <div class="hint-text">${T.ord_dist_hint}</div>
+    ${rows}
+    <div style="height:10px;"></div>
+    <button class="submit" onclick="submitDistribute()"><i class="fa-solid fa-truck"></i> ${T.ord_dist_btn}</button>
+    <button class="submit" onclick="keepAllOrder()" style="background:var(--border); color:var(--text);">${T.ord_keep_all}</button>`;
+  o.lines.forEach((l, i) => updateKeep(i));
+}
+
+function updateKeep(i) {
+  const el = document.getElementById('ordKeep_' + i);
+  if (!el) return;
+  const l = ORD.cur.lines[i];
+  const keep = (l.qty_received || 0) - Object.values(ORD.dist[i]).reduce((a, b) => a + b, 0);
+  el.textContent = keep < -1e-9 ? T.ord_err_too_much : `${T.ord_keep_head}: ${whQty(keep)} ${whUnit(l.unit)}`;
+  el.classList.toggle('bad', keep < -1e-9);
+}
+
+function setDist(i, bid, v) { ORD.dist[i][bid] = Math.max(0, parseFloat(v) || 0); updateKeep(i); }
+
+async function postDistribute(lines) {
+  const id = ORD.cur.id;
+  const d = await ordFetch(`/api/orders/${id}/distribute`, 'POST', { lines });
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  showMsg(d.branches ? T.ord_distributed_ok : T.ord_received_ok, true);
+  loadWarehouse();
+  loadOrders();
+  await openOrder(id);
+}
+
+async function submitDistribute() {
+  const o = ORD.cur;
+  const lines = [];
+  for (let i = 0; i < o.lines.length; i++) {
+    const l = o.lines[i];
+    const alloc = {};
+    let sum = 0;
+    Object.entries(ORD.dist[i] || {}).forEach(e => { if (e[1] > 0) { alloc[e[0]] = e[1]; sum += e[1]; } });
+    if (sum > (l.qty_received || 0) + 1e-9) { showMsg(T.ord_err_too_much + ': ' + escapeHtml(l.name), false); return; }
+    lines.push({ line_id: l.id, alloc });
+  }
+  if (!lines.some(x => Object.keys(x.alloc).length)) { keepAllOrder(); return; }
+  await postDistribute(lines);
+}
+
+async function keepAllOrder() {
+  if (!confirm(T.ord_keep_confirm)) return;
+  await postDistribute([]);
+}
+
+// из «Списка закупки» — сразу в новый заказ поставщику
+function purchaseToOrder() {
+  const first = (WH.purchaseItems || []).find(p => p.supplier_id);
+  closeWhModal('purchaseListModal');
+  showWhSubTab('orders');
+  openNewOrder(first ? first.supplier_id : null);
 }
 
 // ---- склад выбранного филиала (главный) ----
@@ -3138,13 +3800,14 @@ async function submitTransfer() {
 }
 
 function showWhSubTab(t) {
-  ['own', 'branches', 'network'].forEach(k => {
-    const view = document.getElementById({ own: 'whOwnView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
+  ['own', 'orders', 'branches', 'network'].forEach(k => {
+    const view = document.getElementById({ own: 'whOwnView', orders: 'whOrdersView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
     if (view) view.style.display = t === k ? 'block' : 'none';
     const tab = document.getElementById('subwh-' + k);
     if (tab) tab.classList.toggle('active', t === k);
   });
   if (t === 'network') { WH.net = null; loadNetworkStock(); }
+  if (t === 'orders') loadOrdersTab();
   if (t === 'branches') {
     if (!WH.branchId && WH.branches.length) selectWhBranch(WH.branches[0].id);
     else if (WH.branchId) selectWhBranch(WH.branchId);
@@ -3304,7 +3967,7 @@ function renderMovements(el, moves, showPrice) {
   el.innerHTML = moves.slice(0, 30).map(m => {
     const [ic, col] = icon[m.type] || icon.restock;
     const sign = m.type === 'transfer_out' || (m.type === 'adjust' && m.delta < 0) ? '−' : '+';
-    const what = m.type === 'restock' ? T.whs_mv_restock
+    const what = m.type === 'restock' ? T.whs_mv_restock + (m.order_number ? ' · ' + T.ord_title_n.replace('{n}', m.order_number) : '')
       : m.type === 'adjust' ? `${T.whe_mv_adjust}: ${whQty(m.old_qty)} → ${whQty(m.new_qty)}${m.reason ? ' · ' + escapeHtml(m.reason) : ''}`
       : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`) + (m.batch ? ` · ${T.shp_batch} ${escapeHtml(m.batch)}` : '');
     return `
@@ -5895,7 +6558,9 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
   'payDebt', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
   'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveUsdRate',
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
-  'submitCatalog', 'applyImport', 'editBranchPrice']);
+  'submitCatalog', 'applyImport', 'editBranchPrice',
+  'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
+  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder']);
 </script>
 </body>
 </html>
@@ -7039,6 +7704,170 @@ def api_restock_history():
         for r in history:
             r.pop("purchase_price", None)
     return jsonify(history)
+
+
+# ---------- Поставщики и заказы поставщику (главная / самостоятельная точка) ----------
+
+def _orders_allowed():
+    """Заказы ведёт только главная или самостоятельная точка со складом:
+    филиалу и сотруднику закрыто (profit_blocked), без склада — тоже."""
+    return _warehouse_required()
+
+
+@app.route("/api/suppliers")
+@login_required
+@profit_blocked
+def api_list_suppliers():
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    return jsonify({"ok": True, "suppliers": db.list_suppliers(g.shop_id)})
+
+
+@app.route("/api/suppliers", methods=["POST"])
+@app.route("/api/suppliers/<int:supplier_id>", methods=["PUT"])
+@login_required
+@profit_blocked
+def api_save_supplier(supplier_id=None):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    ok, err, sid = db.save_supplier(g.shop_id, request.get_json(force=True) or {}, supplier_id)
+    if not ok:
+        return jsonify({"ok": False, "error": err}), (404 if err == "not_found" else 400)
+    return jsonify({"ok": True, "id": sid})
+
+
+@app.route("/api/suppliers/<int:supplier_id>", methods=["DELETE"])
+@login_required
+@profit_blocked
+def api_delete_supplier(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    if not db.delete_supplier(g.shop_id, supplier_id):
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/suppliers/<int:supplier_id>/products", methods=["POST"])
+@login_required
+@profit_blocked
+def api_assign_supplier_products(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    data = request.get_json(force=True) or {}
+    result = db.assign_supplier_products(g.shop_id, supplier_id, data.get("product_ids") or [])
+    return jsonify(result), (200 if result.get("ok") else 404)
+
+
+def _supplier_arg(raw):
+    if raw in (None, "", "none", "null", "0", 0):
+        return None
+    return int(raw)
+
+
+@app.route("/api/orders")
+@login_required
+@profit_blocked
+def api_list_orders():
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    return jsonify({"ok": True, "orders": db.list_orders(g.shop_id),
+                    "has_branches": len(db.order_network(g.shop_id)) > 1})
+
+
+@app.route("/api/orders/suggest")
+@login_required
+@profit_blocked
+def api_suggest_order():
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    try:
+        supplier_id = _supplier_arg(request.args.get("supplier_id"))
+    except ValueError:
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    if supplier_id and not db.get_supplier(g.shop_id, supplier_id):
+        return jsonify({"ok": False, "error": "no_supplier"}), 404
+    return jsonify(db.suggest_order(g.shop_id, supplier_id))
+
+
+@app.route("/api/orders/<int:order_id>")
+@login_required
+@profit_blocked
+def api_get_order(order_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    order = db.get_order(g.shop_id, order_id)
+    if not order:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    shop = db.get_shop(g.shop_id) or {}
+    order["shop"] = {"name": shop.get("shop_name") or shop.get("username"),
+                     "address": shop.get("address"), "phone": shop.get("phone")}
+    order["ok"] = True
+    return jsonify(order)
+
+
+@app.route("/api/orders", methods=["POST"])
+@app.route("/api/orders/<int:order_id>", methods=["PUT"])
+@login_required
+@profit_blocked
+def api_save_order(order_id=None):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    data = request.get_json(force=True) or {}
+    try:
+        supplier_id = _supplier_arg(data.get("supplier_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    result = db.save_order(g.shop_id, supplier_id, data.get("lines") or [], data.get("note"), order_id)
+    if result.get("ok") and data.get("send"):
+        db.mark_order_sent(g.shop_id, result["id"])
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
+def _order_action(fn, order_id, *args):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    result = fn(g.shop_id, order_id, *args)
+    code = 200 if result.get("ok") else (404 if result.get("error") == "not_found" else 400)
+    return jsonify(result), code
+
+
+@app.route("/api/orders/<int:order_id>/sent", methods=["POST"])
+@login_required
+@profit_blocked
+def api_order_sent(order_id):
+    return _order_action(db.mark_order_sent, order_id)
+
+
+@app.route("/api/orders/<int:order_id>", methods=["DELETE"])
+@login_required
+@profit_blocked
+def api_cancel_order(order_id):
+    return _order_action(db.cancel_order, order_id)
+
+
+@app.route("/api/orders/<int:order_id>/receive", methods=["POST"])
+@login_required
+@profit_blocked
+def api_receive_order(order_id):
+    data = request.get_json(force=True) or {}
+    return _order_action(db.receive_order, order_id, data.get("lines") or [])
+
+
+@app.route("/api/orders/<int:order_id>/distribute", methods=["POST"])
+@login_required
+@profit_blocked
+def api_distribute_order(order_id):
+    data = request.get_json(force=True) or {}
+    return _order_action(db.distribute_order, order_id, data.get("lines") or [])
 
 
 @app.route("/api/profit_stats")
