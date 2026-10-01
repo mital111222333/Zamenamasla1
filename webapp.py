@@ -1028,6 +1028,19 @@ if ('serviceWorker' in navigator) {
   .stats-card .label { font-size:10px; color:#64748B; margin-bottom:4px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
   .stats-card .amount { font-size:22px; font-weight:800; color:var(--blue); font-family: var(--font-display); }
   .stats-card .count { font-size:11px; color:var(--hint); margin-top:4px; }
+  /* карточка клиента открывается поверх списка (а не над ним) — список
+     остаётся на месте, «Назад» возвращает ровно туда же */
+  #clientCardPanel.cc-open { position:fixed; inset:0; z-index:55; background:var(--bg, #F1F5F9); overflow-y:auto;
+    -webkit-overflow-scrolling:touch; overscroll-behavior:contain; margin:0 !important;
+    padding:0 12px calc(40px + env(safe-area-inset-bottom, 0px)); }
+  #clientCardPanel.cc-open > * { max-width:760px; margin-left:auto; margin-right:auto; }
+  body.cc-lock { overflow:hidden; }
+  .cc-sheet-bar { position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:10px;
+    padding:calc(10px + env(safe-area-inset-top, 0px)) 0 10px; background:var(--bg, #F1F5F9); }
+  .cc-sheet-bar button { border:1px solid var(--border); background:#fff; border-radius:12px; padding:9px 14px;
+    font-weight:700; font-size:14px; font-family:inherit; color:var(--text); cursor:pointer; display:flex; align-items:center; gap:8px; }
+  .cc-sheet-bar b { font-family:var(--font-mono, monospace); font-size:15px; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media (min-width: 900px) { #clientCardPanel.cc-open { left:240px; } }
   .known-client {
     margin-top:12px; background:var(--card); border:2px solid #BFDBFE; border-radius:18px;
     overflow:hidden; box-shadow: 0 6px 16px rgba(15,82,186,.08);
@@ -2443,6 +2456,7 @@ let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы к�
 
 let CURRENT_TAB = 'add';
 function showTab(t, keepScroll) {
+  if (t !== 'table' && openHistoryRow !== null) closeClientCard();
   CURRENT_TAB = t;
   document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
@@ -6359,12 +6373,10 @@ function clearSearch() {
 
 function renderTable() {
   const q = (document.getElementById('search').value || '').toLowerCase();
-  if (openHistoryRow !== null) {
-    const panel = document.getElementById('clientCardPanel');
-    panel.style.display = 'none';
-    panel.innerHTML = '';
-    openHistoryRow = null;
-  }
+  // открытая карточка клиента больше не закрывается при обновлении списка
+  // (раньше обновление списка, пришедшее во время загрузки карточки, прятало
+  // её — экран «пустел»); закрываем, только если машины больше нет
+  if (openHistoryRow !== null && !carsCache.some(c => c.plate_number === openHistoryRow)) closeClientCard();
   const countEl = document.getElementById('baseClientCount');
   if (countEl) {
     const uniqueClients = new Set(carsCache.map(c => c.client_id)).size;
@@ -6395,20 +6407,53 @@ function renderTable() {
   `).join('') : `<div class="hint-text" style="text-align:center; padding:20px;">${T.table_empty}</div>`;
 }
 
-async function toggleHistory(plate) {
+let CC_SEQ = 0;
+
+function ccBar(plate) {
+  return `<div class="cc-sheet-bar"><button type="button" onclick="closeClientCard()"><i class="fa-solid fa-arrow-left"></i> ${T.cc_back}</button><b>${escapeHtml(plate)}</b></div>`;
+}
+
+function closeClientCard(fromPop) {
   const panel = document.getElementById('clientCardPanel');
-  if (openHistoryRow === plate) {
-    panel.style.display = 'none';
-    panel.innerHTML = '';
-    openHistoryRow = null;
+  if (!panel) return;
+  CC_SEQ++;
+  panel.style.display = 'none';
+  panel.innerHTML = '';
+  panel.classList.remove('cc-open');
+  document.body.classList.remove('cc-lock');
+  openHistoryRow = null;
+  if (!fromPop && window.history.state && window.history.state.ccOpen) window.history.back();
+}
+
+// кнопка «Назад» телефона закрывает карточку, а не всё приложение
+window.addEventListener('popstate', () => { if (openHistoryRow !== null) closeClientCard(true); });
+
+// keep=true — обновить уже открытую карточку (после изменения/удаления записи)
+async function toggleHistory(plate, keep) {
+  const panel = document.getElementById('clientCardPanel');
+  if (openHistoryRow === plate && !keep) { closeClientCard(); return; }
+  const wasOpen = openHistoryRow !== null && panel.classList.contains('cc-open');
+  openHistoryRow = plate;
+  const seq = ++CC_SEQ;
+  panel.classList.add('cc-open');
+  document.body.classList.add('cc-lock');
+  panel.style.display = '';
+  if (!(window.history.state && window.history.state.ccOpen)) window.history.pushState({ ccOpen: 1 }, '');
+  if (!wasOpen) {
+    panel.innerHTML = ccBar(plate) + `<div class="hint-text" style="padding:24px 4px;">${T.history_loading}</div>`;
+    panel.scrollTop = 0;
+  }
+  let data;
+  try {
+    const res = await fetch('/api/history/' + encodeURIComponent(plate));
+    data = await res.json();
+  } catch (e) {
+    if (seq !== CC_SEQ) return;
+    panel.innerHTML = ccBar(plate) + `<div class="hint-text" style="padding:24px 4px;">${T.cc_load_error}</div>
+      <button class="submit" onclick="toggleHistory(${escapeHtml(JSON.stringify(plate))}, true)">${T.cc_retry}</button>`;
     return;
   }
-  openHistoryRow = plate;
-  panel.style.display = '';
-  panel.innerHTML = T.history_loading;
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const res = await fetch('/api/history/' + encodeURIComponent(plate));
-  const data = await res.json();
+  if (seq !== CC_SEQ || openHistoryRow !== plate) return;  // карточку уже закрыли или открыли другую
   const history = data.history || [];
   historyDataCache[plate] = history;
   const body = panel;
@@ -6425,7 +6470,7 @@ async function toggleHistory(plate) {
       try {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div class="kc-he-items">' + items.map(it =>
-          `${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
+          `${escapeHtml(it.name || it.brand || '—')}${it.brand && it.name ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${Number(it.total || 0).toLocaleString('ru-RU')} ${T.currency}`
         ).join('<br>') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
@@ -6450,8 +6495,8 @@ async function toggleHistory(plate) {
   `;
   }).join('') : `<div class="kc-hist-entry" style="color:var(--hint); text-align:center;">${T.history_empty}</div>`;
 
-  body.innerHTML = `
-    <div class="known-client">
+  body.innerHTML = ccBar(plate) + `
+    <div class="known-client" style="margin-top:0;">
       <div class="kc-header"><i class="fa-solid fa-user"></i><span>${T.kc_history_card_title}</span></div>
       <div class="kc-body">
         <div class="kc-person">
@@ -6778,8 +6823,7 @@ async function saveEdit() {
   if (data.ok) {
     closeEditModal();
     showMsg(svcModal.mode === 'edit' ? T.entry_saved : T.service_added, true);
-    openHistoryRow = null;  // чтобы toggleHistory ниже заново открыл панель со свежими данными, а не закрыл её
-    toggleHistory(svcModal.plate);
+    toggleHistory(svcModal.plate, true);  // обновить открытую карточку свежими данными
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6810,8 +6854,7 @@ async function saveCarEdit(oldPlate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.kc_car_saved, true);
-    openHistoryRow = null;
-    toggleHistory(data.plate);
+    toggleHistory(data.plate, true);
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6824,9 +6867,7 @@ async function deleteCarCompletely(plate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.kc_car_deleted, true);
-    document.getElementById('clientCardPanel').style.display = 'none';
-    document.getElementById('clientCardPanel').innerHTML = '';
-    openHistoryRow = null;
+    closeClientCard();
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -6839,8 +6880,7 @@ async function deleteEntry(id, plate) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.entry_deleted, true);
-    openHistoryRow = null;
-    toggleHistory(plate);
+    toggleHistory(plate, true);
     loadCars();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);

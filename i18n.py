@@ -1394,6 +1394,9 @@ RU.update({
     "onp_exists": "Такой товар уже есть на складе — добавлен в заказ",
     "ord_err_bad_amount": "Неверная сумма",
     "bot_supplier_debt": "💸 Просрочен долг поставщику «{supplier}»\n\nПросрочено: {overdue} сум\nВсего долг: {balance} сум\n\nЕсли уже оплатили — отметьте оплату в OilBook: Склад → Заказы → поставщик → «Оплата».",
+    "cc_back": "База",
+    "cc_load_error": "Не удалось загрузить карточку — проверьте интернет.",
+    "cc_retry": "Повторить",
     "ord_no_suppliers_hint": "Поставщиков пока нет — выберите в списке «+ Новый поставщик». Можно и без поставщика, как список покупок.",
 })
 UZ.update({
@@ -1561,6 +1564,9 @@ UZ.update({
     "onp_exists": "Bunday mahsulot omborda bor — buyurtmaga qo'shildi",
     "ord_err_bad_amount": "Noto'g'ri summa",
     "bot_supplier_debt": "💸 «{supplier}» yetkazib beruvchisiga qarz muddati o'tdi\n\nMuddati o'tgan: {overdue} so'm\nJami qarz: {balance} so'm\n\nAgar to'lagan bo'lsangiz — OilBookda belgilang: Ombor → Buyurtmalar → yetkazib beruvchi → «To'lov».",
+    "cc_back": "Baza",
+    "cc_load_error": "Kartani yuklab bo'lmadi — internetni tekshiring.",
+    "cc_retry": "Qayta urinish",
     "ord_no_suppliers_hint": "Hozircha yetkazib beruvchilar yo'q — ro'yxatdan «+ Yangi yetkazib beruvchi»ni tanlang. Yetkazib beruvchisiz ham bo'ladi, xarid ro'yxati sifatida.",
 })
 
