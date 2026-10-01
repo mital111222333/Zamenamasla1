@@ -462,6 +462,11 @@ def _migrate(conn):
     pr_cols = {r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()}
     if "supplier_id" not in pr_cols:
         conn.execute("ALTER TABLE products ADD COLUMN supplier_id INTEGER")
+    sup_cols = {r[1] for r in conn.execute("PRAGMA table_info(suppliers)").fetchall()}
+    if "tg_chat_id" not in sup_cols:
+        conn.execute("ALTER TABLE suppliers ADD COLUMN tg_chat_id TEXT")
+    if "link_token" not in sup_cols:
+        conn.execute("ALTER TABLE suppliers ADD COLUMN link_token TEXT")
     rs_cols = {r[1] for r in conn.execute("PRAGMA table_info(stock_restocks)").fetchall()}
     if "order_id" not in rs_cols:
         conn.execute("ALTER TABLE stock_restocks ADD COLUMN order_id INTEGER")
@@ -3619,6 +3624,51 @@ def save_supplier(shop_id: int, data: dict, supplier_id: int = None):
             supplier_id = cur.lastrowid
         conn.commit()
     return True, None, supplier_id
+
+
+@_serialized
+def supplier_link_token(shop_id: int, supplier_id: int):
+    """Персональная ссылка для поставщика: он один раз нажимает «Start» в
+    боте, и дальше заказы приходят ему от бота автоматически (Telegram не
+    даёт боту писать человеку первым, пока тот сам не начал чат)."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT link_token FROM suppliers WHERE id=? AND shop_id=? AND is_active=1",
+                           (supplier_id, shop_id)).fetchone()
+        if not row:
+            return None
+        if row["link_token"]:
+            return row["link_token"]
+        token = secrets.token_urlsafe(12)
+        conn.execute("UPDATE suppliers SET link_token=? WHERE id=?", (token, supplier_id))
+        conn.commit()
+        return token
+
+
+@_serialized
+def link_supplier_by_token(telegram_id, token: str):
+    """Поставщик перешёл по ссылке и нажал Start — запоминаем его чат."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM suppliers WHERE link_token=? AND is_active=1", (token,)).fetchone()
+        if not row:
+            return None
+        conn.execute("UPDATE suppliers SET tg_chat_id=? WHERE id=?", (str(telegram_id), row["id"]))
+        conn.commit()
+        sup = dict(row)
+    sup["tg_chat_id"] = str(telegram_id)
+    shop = get_shop(sup["shop_id"]) or {}
+    sup["shop_name"] = shop.get("shop_name") or shop.get("username")
+    sup["language"] = shop.get("language") or "ru"
+    return sup
+
+
+@_serialized
+def unlink_supplier_telegram(shop_id: int, supplier_id: int) -> bool:
+    """Отвязать чат и выдать новую ссылку (старая перестаёт работать)."""
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE suppliers SET tg_chat_id=NULL, link_token=NULL WHERE id=? AND shop_id=?",
+                           (supplier_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
 
 
 @_serialized

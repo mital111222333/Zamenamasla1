@@ -130,6 +130,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     token = context.args[0] if context.args else None
 
+    if token and token.startswith("sup_"):
+        sup = db.link_supplier_by_token(user.id, token[len("sup_"):])
+        if sup:
+            await update.message.reply_text(
+                i18n.t("bot_supplier_linked", sup["language"], shop=sup.get("shop_name") or "")
+            )
+        else:
+            await update.message.reply_text(i18n.t("bot_supplier_link_invalid", "ru"))
+        return ConversationHandler.END
+
     if token and token.startswith("owner_"):
         owner_token = token[len("owner_"):]
         shop = db.link_shop_owner_by_token(user.id, owner_token)

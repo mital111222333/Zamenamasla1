@@ -1285,6 +1285,12 @@ if ('serviceWorker' in navigator) {
   .ord-keep.bad { color:#B91C1C; }
   .pl-group { font-size:12px; font-weight:700; color:#0F52BA; margin:12px 0 2px; }
   #orderModal select { width:100%; }
+  .sup-tg { border:1px solid var(--border); border-radius:12px; padding:12px; margin:4px 0 12px; background:#F8FAFC; font-size:13px; }
+  .sup-tg b { display:block; margin-bottom:4px; }
+  .sup-tg .ok { color:#15803D; font-weight:700; }
+  .sup-tg .no { color:#B45309; font-weight:700; }
+  .sup-tg .wh-tbtn { margin:8px 6px 0 0; }
+  .sup-bot { color:#15803D; font-weight:700; }
   label.pl-row, label.ord-dist-row { text-transform:none; letter-spacing:normal; font-size:13px; color:var(--text); font-weight:400; margin:0; }
   label.pl-row .pl-name b, label.ord-dist-row span { color:var(--text); font-weight:600; }
   label.pl-row .pl-name span { text-transform:none; letter-spacing:normal; }
@@ -2072,6 +2078,7 @@ if ('serviceWorker' in navigator) {
             <label>{{ T.sup_note }}</label>
             <input id="sup_note" maxlength="300">
           </div>
+          <div id="supTgBlock" class="sup-tg" style="display:none;"></div>
           <button class="submit" onclick="saveSupplier()">{{ T.sup_save }}</button>
           <button class="submit" id="supDeleteBtn" onclick="deleteSupplierBtn()" style="background:#FEE2E2; color:#B91C1C;">{{ T.sup_delete }}</button>
           <button class="close-btn" onclick="closeWhModal('supplierModal')">{{ T.modal_close }}</button>
@@ -2834,7 +2841,7 @@ async function loadOrdersTab() { await Promise.all([loadSuppliers(), loadOrders(
 
 async function loadSuppliers() {
   const d = await ordFetch('/api/suppliers');
-  if (d.ok) { SUP.list = d.suppliers; SUP.loaded = true; }
+  if (d.ok) { SUP.list = d.suppliers; SUP.loaded = true; SUP.botReady = !!d.bot_ready; }
   renderSuppliers();
 }
 
@@ -2843,8 +2850,8 @@ function renderSuppliers() {
   if (!el) return;
   if (!SUP.list.length) { el.innerHTML = `<div class="hint-text" style="padding:6px 0;">${T.sup_empty}</div>`; return; }
   el.innerHTML = SUP.list.map(s => {
-    const contacts = [s.phone ? escapeHtml(s.phone) : '', s.telegram ? '@' + escapeHtml(s.telegram) : '',
-      s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
+    const contacts = [s.tg_connected ? `<span class="sup-bot">✓ ${T.sup_tg_badge}</span>` : '', s.phone ? escapeHtml(s.phone) : '',
+      s.telegram ? '@' + escapeHtml(s.telegram) : '', s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
     return `
       <div class="sup-row">
         <div class="sup-main" onclick="openSupplierModal(${s.id})"><b>${escapeHtml(s.name)}</b><span>${contacts || T.sup_no_contacts}</span><span>${T.sup_products} ${s.product_count}</span></div>
@@ -2864,7 +2871,49 @@ function openSupplierModal(id) {
   document.getElementById('supModalTitle').textContent = s ? T.sup_edit : T.sup_add;
   SUP_FIELDS.forEach(k => { document.getElementById('sup_' + k).value = s && s[k] ? (k === 'telegram' ? '@' + s[k] : s[k]) : ''; });
   document.getElementById('supDeleteBtn').style.display = s ? '' : 'none';
+  renderSupTgBlock(s);
   document.getElementById('supplierModal').classList.add('open');
+}
+
+function renderSupTgBlock(s) {
+  const el = document.getElementById('supTgBlock');
+  if (!el) return;
+  if (!s || !SUP.botReady) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `<b>${T.sup_tg_title}</b>
+    ${s.tg_connected ? `<span class="ok">✓ ${T.sup_tg_connected}</span>` : `<span class="no">${T.sup_tg_not_connected}</span><div class="hint-text" style="margin-top:4px;">${T.sup_tg_hint}</div>`}
+    <div>
+      ${s.tg_connected ? '' : `<button class="wh-tbtn wh-tbtn-primary" onclick="shareSupplierLink(${s.id}, 'tg')"><i class="fa-brands fa-telegram"></i> ${T.sup_tg_send_link}</button>`}
+      ${s.tg_connected ? '' : `<button class="wh-tbtn" onclick="shareSupplierLink(${s.id}, 'copy')"><i class="fa-regular fa-copy"></i> ${T.sup_tg_copy_link}</button>`}
+      ${s.tg_connected ? `<button class="wh-tbtn" onclick="unlinkSupplierTg(${s.id})">${T.sup_tg_unlink}</button>` : ''}
+    </div>`;
+}
+
+async function shareSupplierLink(id, how) {
+  const d = await ordFetch(`/api/suppliers/${id}/tg_link`);
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  const s = SUP.list.find(x => x.id === id) || {};
+  const shop = ((document.querySelector('.side-shop') || {}).textContent || '').trim();
+  const text = T.sup_tg_invite.replace('{shop}', shop) + '\\n' + d.link;
+  if (how === 'tg') {
+    if (s.telegram) {
+      try { await navigator.clipboard.writeText(text); } catch (e) {}
+      window.open('https://t.me/' + encodeURIComponent(s.telegram) + '?text=' + encodeURIComponent(text), '_blank');
+    } else {
+      window.open('https://t.me/share/url?url=' + encodeURIComponent(d.link) + '&text=' + encodeURIComponent(T.sup_tg_invite.replace('{shop}', shop)), '_blank');
+    }
+    showMsg(T.sup_tg_after_send, true);
+  } else {
+    try { await navigator.clipboard.writeText(text); showMsg(T.whs_copied, true); } catch (e) { prompt(T.whs_copy, text); }
+  }
+}
+
+async function unlinkSupplierTg(id) {
+  if (!confirm(T.sup_tg_unlink_confirm)) return;
+  const d = await ordFetch(`/api/suppliers/${id}/tg_unlink`, 'POST');
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  await loadSuppliers();
+  renderSupTgBlock(SUP.list.find(x => x.id === id));
 }
 
 async function saveSupplier() {
@@ -2877,6 +2926,7 @@ async function saveSupplier() {
   closeWhModal('supplierModal');
   showMsg(T.sup_saved, true);
   await loadSuppliers();
+  if (isNew && ordDraftOpen()) { ORD.cur.supplier_id = d.id; loadOrderSuggestion(); }
   // новому поставщику сразу предлагаем отметить его товары
   if (isNew && WHCTX.own.products.length) openSupProducts(d.id);
 }
@@ -2946,6 +2996,12 @@ async function saveSupplierProducts() {
   closeWhModal('supProductsModal');
   showMsg(T.sup_assign_saved, true);
   loadSuppliers();
+  if (ordDraftOpen() && ORD.cur.supplier_id === id) loadOrderSuggestion();
+}
+
+function ordDraftOpen() {
+  const m = document.getElementById('orderModal');
+  return !!(m && m.classList.contains('open') && ORD.cur && !ORD.cur.id && ORD.mode === 'edit');
 }
 
 // ---- список заказов ----
@@ -3000,6 +3056,12 @@ async function loadOrderSuggestion() {
 }
 
 function onOrderSupplierChanged(v) {
+  if (v === '__new') {
+    // поставщика можно завести прямо отсюда — после сохранения он выберется сам
+    document.getElementById('ord_supplier').value = ORD.cur.supplier_id || '';
+    openSupplierModal();
+    return;
+  }
   ORD.cur.supplier_id = v ? parseInt(v, 10) : null;
   loadOrderSuggestion();
 }
@@ -3039,7 +3101,9 @@ function renderOrderEdit() {
       <select id="ord_supplier" onchange="onOrderSupplierChanged(this.value)">
         ${SUP.list.map(s => `<option value="${s.id}" ${o.supplier_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
         <option value="" ${!o.supplier_id ? 'selected' : ''}>${T.ord_no_supplier}</option>
-      </select></div>`;
+        <option value="__new">+ ${T.sup_add}</option>
+      </select>
+      ${SUP.list.length ? '' : `<div class="hint-text" style="margin-top:6px;">${T.ord_no_suppliers_hint}</div>`}</div>`;
   const rows = o.lines.map((l, i) => {
     const parts = ordHasBranches() && l.alloc ? Object.entries(l.alloc).filter(e => e[1] > 0)
       .map(e => `${escapeHtml(ordShopName(e[0]))} ${whQty(e[1])}`).join(' · ') : '';
@@ -3116,10 +3180,30 @@ async function saveOrderDraft() {
 }
 
 async function sendOrder() {
-  const id = await saveOrderLines(true);
+  // поставщик подключён к боту — заказ сразу уходит ему в Telegram
+  const sup = SUP.list.find(x => x.id === ORD.cur.supplier_id);
+  const viaBot = !!(sup && sup.tg_connected);
+  const id = await saveOrderLines(!viaBot);
   if (!id) return;
+  if (viaBot) {
+    const d = await ordFetch(`/api/orders/${id}/send_tg`, 'POST');
+    loadOrders();
+    if (d.ok) { showMsg(T.ord_tg_sent, true); await openOrder(id, 'view'); return; }
+    showMsg(ordErr(d), false);
+    await openOrder(id, 'send');
+    return;
+  }
   loadOrders();
   await openOrder(id, 'send');
+}
+
+async function sendOrderBot() {
+  const id = ORD.cur.id;
+  const d = await ordFetch(`/api/orders/${id}/send_tg`, 'POST');
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  showMsg(T.ord_tg_sent, true);
+  loadOrders();
+  await openOrder(id, 'view');
 }
 
 async function receiveFromDraft() {
@@ -3152,13 +3236,19 @@ function orderText() {
 
 function renderOrderSend() {
   const s = ORD.cur.supplier || {};
+  const bot = s.tg_connected ? `<button class="submit" onclick="sendOrderBot()" style="background:#2AABEE;"><i class="fa-solid fa-robot"></i> ${T.ord_send_bot}</button>` : '';
+  const invite = !s.tg_connected && s.id && SUP.botReady ? `
+    <div class="sup-tg"><b>${T.sup_tg_title}</b><div class="hint-text">${T.ord_tg_connect_hint}</div>
+      <button class="wh-tbtn wh-tbtn-primary" onclick="shareSupplierLink(${s.id}, 'tg')"><i class="fa-brands fa-telegram"></i> ${T.sup_tg_send_link}</button></div>` : '';
   document.getElementById('ordBody').innerHTML = `
     <div class="hint-text">${T.ord_send_hint}</div>
     <pre class="ord-text">${escapeHtml(orderText())}</pre>
-    <button class="submit" onclick="sendOrderVia('tg')" style="background:#2AABEE;"><i class="fa-brands fa-telegram"></i> ${T.whs_send_tg}${s.telegram ? ' · @' + escapeHtml(s.telegram) : ''}</button>
+    ${bot}
+    <button class="submit" onclick="sendOrderVia('tg')" style="${s.tg_connected ? 'background:var(--border); color:var(--text);' : 'background:#2AABEE;'}"><i class="fa-brands fa-telegram"></i> ${T.whs_send_tg}${s.telegram ? ' · @' + escapeHtml(s.telegram) : ''}</button>
     ${s.phone ? `<button class="submit" onclick="sendOrderVia('wa')" style="background:#25D366;"><i class="fa-brands fa-whatsapp"></i> WhatsApp · ${escapeHtml(s.phone)}</button>` : ''}
     <button class="submit" onclick="sendOrderVia('copy')" style="background:var(--border); color:var(--text);"><i class="fa-regular fa-copy"></i> ${T.whs_copy}</button>
-    <button class="submit" onclick="ORD.mode='view'; renderOrderModal();" style="background:#DBEAFE; color:#0F52BA;">${T.ord_done_btn}</button>`;
+    <button class="submit" onclick="ORD.mode='view'; renderOrderModal();" style="background:#DBEAFE; color:#0F52BA;">${T.ord_done_btn}</button>
+    ${invite}`;
 }
 
 async function sendOrderVia(ch) {
@@ -3167,9 +3257,11 @@ async function sendOrderVia(ch) {
   if (ch === 'wa') {
     window.open('https://wa.me/' + (s.phone || '').replace(/\\D/g, '') + '?text=' + encodeURIComponent(text), '_blank');
   } else if (ch === 'tg' && s.telegram) {
-    // в личный чат Telegram нельзя передать текст ссылкой — копируем его, чат откроется сам
-    try { await navigator.clipboard.writeText(text); showMsg(T.ord_tg_pasted, true); } catch (e) {}
-    window.open('https://t.me/' + encodeURIComponent(s.telegram), '_blank');
+    // открываем чат поставщика с уже вписанным текстом (остаётся нажать «Отправить»);
+    // на всякий случай текст ещё и копируется — если приложение его не подставит
+    try { await navigator.clipboard.writeText(text); } catch (e) {}
+    window.open('https://t.me/' + encodeURIComponent(s.telegram) + '?text=' + encodeURIComponent(text), '_blank');
+    showMsg(T.ord_tg_pasted, true);
   } else if (ch === 'tg') {
     window.open('https://t.me/share/url?url=' + encodeURIComponent(' ') + '&text=' + encodeURIComponent(text), '_blank');
   } else {
@@ -6560,7 +6652,7 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
-  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder']);
+  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg']);
 </script>
 </body>
 </html>
@@ -7721,7 +7813,46 @@ def api_list_suppliers():
     denied = _orders_allowed()
     if denied:
         return denied
-    return jsonify({"ok": True, "suppliers": db.list_suppliers(g.shop_id)})
+    return jsonify({"ok": True, "suppliers": [_public_supplier(x) for x in db.list_suppliers(g.shop_id)],
+                    "bot_ready": bool(BOT_TOKEN and BOT_USERNAME)})
+
+
+def _public_supplier(sup):
+    """Поставщик для интерфейса: вместо chat_id и токена — признак «бот
+    подключён» и ссылка для подключения."""
+    if not sup:
+        return None
+    sup = dict(sup)
+    sup["tg_connected"] = bool(sup.pop("tg_chat_id", None))
+    sup.pop("link_token", None)
+    return sup
+
+
+@app.route("/api/suppliers/<int:supplier_id>/tg_link")
+@login_required
+@profit_blocked
+def api_supplier_tg_link(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    if not BOT_USERNAME:
+        return jsonify({"ok": False, "error": "no_bot"}), 400
+    token = db.supplier_link_token(g.shop_id, supplier_id)
+    if not token:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True, "link": f"https://t.me/{BOT_USERNAME}?start=sup_{token}"})
+
+
+@app.route("/api/suppliers/<int:supplier_id>/tg_unlink", methods=["POST"])
+@login_required
+@profit_blocked
+def api_supplier_tg_unlink(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    if not db.unlink_supplier_telegram(g.shop_id, supplier_id):
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/api/suppliers", methods=["POST"])
@@ -7808,8 +7939,60 @@ def api_get_order(order_id):
     shop = db.get_shop(g.shop_id) or {}
     order["shop"] = {"name": shop.get("shop_name") or shop.get("username"),
                      "address": shop.get("address"), "phone": shop.get("phone")}
+    order["supplier"] = _public_supplier(order.get("supplier"))
     order["ok"] = True
     return jsonify(order)
+
+
+def _order_message(order, shop) -> str:
+    """Текст заказа для поставщика (на языке точки): только товары и
+    количество — без цен и без разбивки по филиалам."""
+    T = i18n.get_texts(shop.get("language") or "ru")
+    def q(x):
+        x = round(float(x or 0), 2)
+        return f"{x:g}".replace(".", ",")
+    stamp = (order.get("sent_at") or order.get("created_at") or "")[:10]
+    date = f"{stamp[8:10]}.{stamp[5:7]}.{stamp[0:4]}" if len(stamp) == 10 else ""
+    lines = [f"📦 {T['ord_title_n'].replace('{n}', str(order['number']))} — {shop.get('shop_name') or shop.get('username')}", date, ""]
+    n = 0
+    for ln in order["lines"]:
+        if (ln.get("qty_ordered") or 0) > 0:
+            n += 1
+            unit = T["unit_pc"] if ln["unit"] == "pc" else T["unit_l"]
+            lines.append(f"{n}. {ln['name']} — {q(ln['qty_ordered'])} {unit}")
+    tail = []
+    if shop.get("address"):
+        tail.append(f"{T['ord_msg_address']}: {shop['address']}")
+    if shop.get("phone"):
+        tail.append(f"{T['ord_msg_phone']}: {shop['phone']}")
+    if tail:
+        lines += [""] + tail
+    return "\n".join(lines)
+
+
+@app.route("/api/orders/<int:order_id>/send_tg", methods=["POST"])
+@login_required
+@profit_blocked
+def api_order_send_tg(order_id):
+    """Заказ уходит поставщику в Telegram от бота — если поставщик подключён
+    (один раз нажал Start по своей ссылке). При успехе заказ = «отправлен»."""
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    order = db.get_order(g.shop_id, order_id)
+    if not order:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    if order["status"] not in ("draft", "sent"):
+        return jsonify({"ok": False, "error": "bad_status"}), 400
+    sup = order.get("supplier") or {}
+    if not sup.get("tg_chat_id"):
+        return jsonify({"ok": False, "error": "tg_not_connected"}), 400
+    if not order.get("sent_at"):
+        order["sent_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if not _send_telegram_message(sup["tg_chat_id"], _order_message(order, db.get_shop(g.shop_id) or {})):
+        return jsonify({"ok": False, "error": "tg_failed"}), 502
+    db.mark_order_sent(g.shop_id, order_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/orders", methods=["POST"])
