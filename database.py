@@ -30,6 +30,8 @@ except AttributeError:  # Windows — tzset нет; для локального 
 import json
 import math
 import sqlite3
+import threading
+import functools
 import secrets
 import hashlib
 import base64
@@ -85,6 +87,9 @@ BOOTSTRAP_NOTIFY_TELEGRAM_ID = os.environ.get("ADMIN_TELEGRAM_ID", "")
 
 def init_db():
     with get_conn() as conn:
+        # WAL: чтение (статистика, списки) больше не блокирует запись и наоборот
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         cur = conn.cursor()
 
         cur.execute("""
@@ -396,6 +401,11 @@ def _migrate(conn):
     tr_cols = [r[1] for r in conn.execute("PRAGMA table_info(stock_transfers)").fetchall()]
     if "batch" not in tr_cols:
         conn.execute("ALTER TABLE stock_transfers ADD COLUMN batch TEXT")
+
+    # --- коды восстановления пароля: счётчик неверных попыток ---
+    rc_cols = {r[1] for r in conn.execute("PRAGMA table_info(password_reset_codes)").fetchall()}
+    if "attempts" not in rc_cols:
+        conn.execute("ALTER TABLE password_reset_codes ADD COLUMN attempts INTEGER DEFAULT 0")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_transfers_from ON stock_transfers(from_shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_transfers_to ON stock_transfers(to_shop_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id)")
@@ -568,10 +578,31 @@ def _bootstrap_accounts(conn):
         print("=" * 60)
 
 
+# Один общий замок на все ЗАПИСИ в базу. Бот и веб-панель работают в одном
+# процессе (разными потоками), поэтому замок надёжно выстраивает в очередь
+# одновременные «прочитал — проверил — записал» с разных телефонов: без него
+# два одновременных удаления одной записи возвращали товар на склад дважды,
+# два платежа по долгу затирали друг друга, а склад мог уйти в минус.
+# RLock — можно вызывать одну защищённую функцию из другой.
+WRITE_LOCK = threading.RLock()
+
+
+def _serialized(fn):
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs):
+        with WRITE_LOCK:
+            return fn(*args, **kwargs)
+    return wrapped
+
+
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    # timeout/busy_timeout: если база на мгновение занята (резервная копия,
+    # фоновая задача бота) — подождать до 30 с, а не сразу падать с ошибкой
+    # «database is locked», как это было под нагрузкой.
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
     try:
         yield conn
     finally:
@@ -588,6 +619,7 @@ def generate_token() -> str:
 
 # ---------- Аккаунты точек (shops) ----------
 
+@_serialized
 def create_shop(username: str, password: str, shop_name: str = None, phone: str = None,
                  address: str = None, hours: str = None, lat: float = None, lon: float = None,
                  notify_telegram_id: str = None, role: str = "shop", client_group: str = None) -> dict:
@@ -603,6 +635,7 @@ def create_shop(username: str, password: str, shop_name: str = None, phone: str 
         return get_shop(cur.lastrowid)
 
 
+@_serialized
 def set_shop_client_group(shop_id: int, client_group: str):
     """Платформенный админ объединяет точку с остальными филиалами того же
     клиента — просто текстовая метка, по которой /admin группирует список.
@@ -612,6 +645,7 @@ def set_shop_client_group(shop_id: int, client_group: str):
         conn.commit()
 
 
+@_serialized
 def set_shop_usd_rate(shop_id: int, rate):
     """Владелец точки (или главный аккаунт) сам выставляет свой курс доллара
     — используется только для перевода при вводе цены закупки в $, ничего
@@ -621,6 +655,7 @@ def set_shop_usd_rate(shop_id: int, rate):
         conn.commit()
 
 
+@_serialized
 def reset_shop_password(shop_id: int, new_password: str):
     """Сбрасывает пароль точки — обновляет только хэш (для входа). Пароль
     нигде не сохраняется в расшифровываемом виде: платформенный админ видит
@@ -634,6 +669,7 @@ def reset_shop_password(shop_id: int, new_password: str):
         conn.commit()
 
 
+@_serialized
 def set_shop_notify_telegram_id(shop_id: int, notify_telegram_id):
     """Привязывает (или меняет) Telegram ID точки для уведомлений и
     восстановления пароля. Пустое значение снимает привязку."""
@@ -655,6 +691,7 @@ def find_shop_by_username(username: str):
         return dict(row) if row else None
 
 
+@_serialized
 def link_shop_owner_by_token(telegram_id: int, token: str):
     """Владелец точки (или филиала) сам привязывает свой Telegram, перейдя
     по персональной ссылке — вместо того чтобы платформенный админ вручную
@@ -671,6 +708,7 @@ def link_shop_owner_by_token(telegram_id: int, token: str):
         return get_shop(row["id"])
 
 
+@_serialized
 def create_password_reset_code(shop_id: int) -> str:
     """Генерирует 6-значный код для восстановления пароля через Telegram,
     действует 10 минут. Прошлые неиспользованные коды этой точки становятся
@@ -688,6 +726,7 @@ def create_password_reset_code(shop_id: int) -> str:
     return code
 
 
+@_serialized
 def reset_password_with_code(username: str, code: str, new_password: str) -> bool:
     """Проверяет код восстановления (не просрочен, не использован, совпадает)
     и, если всё верно, меняет пароль точки. Возвращает True при успехе,
@@ -704,6 +743,19 @@ def reset_password_with_code(username: str, code: str, new_password: str) -> boo
             (shop["id"], code, now)
         ).fetchone()
         if not row:
+            # неверный код — считаем попытку; после 5 ошибок все коды точки
+            # сгорают и нужно запрашивать новый (защита от подбора 6 цифр)
+            latest = conn.execute(
+                "SELECT id, attempts FROM password_reset_codes WHERE shop_id=? AND used=0 "
+                "ORDER BY id DESC LIMIT 1", (shop["id"],)
+            ).fetchone()
+            if latest:
+                if (latest["attempts"] or 0) + 1 >= 5:
+                    conn.execute("UPDATE password_reset_codes SET used=1 WHERE shop_id=? AND used=0", (shop["id"],))
+                else:
+                    conn.execute("UPDATE password_reset_codes SET attempts=COALESCE(attempts,0)+1 WHERE id=?",
+                                 (latest["id"],))
+                conn.commit()
             return False
         conn.execute("UPDATE password_reset_codes SET used=1 WHERE id=?", (row["id"],))
         conn.execute(
@@ -736,6 +788,7 @@ def authenticate_shop_employee(username: str, password: str):
         return dict(row)
 
 
+@_serialized
 def create_shop_employee(shop_id: int, username: str, password: str = None, full_name: str = None):
     """Платформенный админ создаёт логин сотрудника для точки — ограниченный
     доступ (без прибыли, цен закупки, статистики, экспорта). Пароль
@@ -755,6 +808,18 @@ def create_shop_employee(shop_id: int, username: str, password: str = None, full
         return {"username": username, "password": password}
 
 
+def get_active_employee(username: str, shop_id: int):
+    """Логин сотрудника, только если он ещё существует, включён и относится
+    к этой точке — проверяется при КАЖДОМ запросе, чтобы удалённый
+    сотрудник сразу терял доступ, а не через месяц, когда истечёт вход."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, shop_id, is_active FROM shop_users WHERE username=? AND shop_id=?",
+            (username, shop_id)
+        ).fetchone()
+        return dict(row) if row and row["is_active"] else None
+
+
 def list_shop_employees(shop_id: int):
     """Список сотрудников точки — без пароля: он нигде не хранится в
     расшифровываемом виде, только виден один раз сразу после создания/сброса."""
@@ -766,6 +831,7 @@ def list_shop_employees(shop_id: int):
         return [dict(r) for r in rows]
 
 
+@_serialized
 def delete_shop_employee(employee_id: int, shop_id: int) -> bool:
     """Удаляет логин сотрудника — только если он реально принадлежит этой точке."""
     with get_conn() as conn:
@@ -774,6 +840,7 @@ def delete_shop_employee(employee_id: int, shop_id: int) -> bool:
         return cur.rowcount > 0
 
 
+@_serialized
 def reset_shop_employee_password(employee_id: int, shop_id: int):
     new_password = secrets.token_urlsafe(9)
     with get_conn() as conn:
@@ -817,12 +884,14 @@ def list_shops():
         return result
 
 
+@_serialized
 def set_shop_active(shop_id: int, active: bool):
     with get_conn() as conn:
         conn.execute("UPDATE shops SET is_active=? WHERE id=?", (1 if active else 0, shop_id))
         conn.commit()
 
 
+@_serialized
 def set_shop_language(shop_id: int, language: str):
     if language not in ("ru", "uz"):
         language = "ru"
@@ -831,6 +900,7 @@ def set_shop_language(shop_id: int, language: str):
         conn.commit()
 
 
+@_serialized
 def set_shop_sms_enabled(shop_id: int, enabled: bool):
     """Платформенный админ включает/выключает саму ВОЗМОЖНОСТЬ SMS для точки.
     Даже при включении SMS не заработают, пока точка сама не впишет свои
@@ -840,6 +910,7 @@ def set_shop_sms_enabled(shop_id: int, enabled: bool):
         conn.commit()
 
 
+@_serialized
 def set_shop_eskiz_credentials(shop_id: int, email: str, password: str):
     """Точка сама вписывает свои логин/пароль от своего аккаунта Eskiz.uz.
     Пароль от Eskiz хранится так же, обратимо зашифрованным — он нужен боту,
@@ -860,6 +931,7 @@ def get_shop_eskiz_credentials(shop_id: int):
     return shop["eskiz_email"], _decrypt_password(shop["eskiz_password"])
 
 
+@_serialized
 def set_shop_warehouse_enabled(shop_id: int, enabled: bool):
     """Платформенный админ включает/выключает вкладку «Склад» для точки."""
     with get_conn() as conn:
@@ -869,6 +941,7 @@ def set_shop_warehouse_enabled(shop_id: int, enabled: bool):
 
 # ============ СКЛАД: товары и остатки ============
 
+@_serialized
 def create_product(shop_id: int, category: str, name: str, unit: str = "l",
                     sell_price=None, purchase_price=None, initial_stock: float = 0) -> dict:
     with get_conn() as conn:
@@ -908,6 +981,7 @@ def list_products(shop_id: int, category: str = None, active_only: bool = True):
         return [dict(r) for r in conn.execute(query, params).fetchall()]
 
 
+@_serialized
 def update_product(product_id: int, shop_id: int, name=None, sell_price=None, purchase_price=None,
                    clear_purchase_price=False):
     """Меняет название и цены товара. Возвращает (ok, error).
@@ -950,6 +1024,7 @@ def update_product(product_id: int, shop_id: int, name=None, sell_price=None, pu
     return True, None
 
 
+@_serialized
 def set_stock_count(product_id: int, shop_id: int, new_qty: float, reason: str = None):
     """Корректировка остатка по факту (после пересчёта на складе). Не молча
     перезаписывает число, а пишет запись в историю движения: было → стало,
@@ -973,6 +1048,7 @@ def set_stock_count(product_id: int, shop_id: int, new_qty: float, reason: str =
     return True, None
 
 
+@_serialized
 def delete_product(product_id: int, shop_id: int):
     """«Удаление» товара — мягкое (is_active=0), чтобы старые записи о заменах,
     которые уже на него ссылались, не потеряли название/историю."""
@@ -985,6 +1061,7 @@ def delete_product(product_id: int, shop_id: int):
     return True
 
 
+@_serialized
 def restock_product(product_id: int, shop_id: int, quantity: float, purchase_price=None, restock_date: str = None):
     """Пополнение склада — увеличивает остаток и пишет запись в историю
     пополнений (дата, количество, цена закупки на тот момент). Если указана
@@ -1018,6 +1095,7 @@ def get_restock_history(shop_id: int, limit: int = 50):
         return [dict(r) for r in rows]
 
 
+@_serialized
 def adjust_stock(product_id: int, delta: float):
     """Внутренняя функция — сдвигает остаток товара на delta (может быть
     отрицательным при продаже или положительным при отмене/удалении записи,
@@ -1034,6 +1112,7 @@ def username_taken(username: str) -> bool:
         return conn.execute("SELECT 1 FROM shops WHERE username=?", (username,)).fetchone() is not None
 
 
+@_serialized
 def update_shop_identity(shop_id: int, shop_name: str, username: str) -> bool:
     """Меняет название точки и логин — то, что нельзя было поправить после
     создания. Уникальность логина проверяется на уровне вызывающего кода
@@ -1049,6 +1128,7 @@ def update_shop_identity(shop_id: int, shop_name: str, username: str) -> bool:
 
 # ---------- Клиенты ----------
 
+@_serialized
 def get_or_create_client(shop_id: int, owner_name: str, phone: str = None):
     """Находит клиента ЭТОЙ ЖЕ точки по телефону (если указан) или создаёт
     нового с новым персональным токеном для ссылки/QR."""
@@ -1080,6 +1160,7 @@ def get_client_by_token(token: str):
         return dict(row) if row else None
 
 
+@_serialized
 def link_client_by_token(telegram_id: int, token: str, tg_full_name: str = None):
     """Привязывает Telegram-аккаунт клиента к его записи по персональному токену.
     Токен уникален глобально, поэтому сам определяет нужную точку (shop_id
@@ -1091,11 +1172,20 @@ def link_client_by_token(telegram_id: int, token: str, tg_full_name: str = None)
         if not client:
             return None
         full_name = client["full_name"] or tg_full_name
-        conn.execute(
-            "UPDATE clients SET telegram_id=?, full_name=?, linked_at=datetime('now') WHERE id=?",
-            (telegram_id, full_name, client["id"])
-        )
-        conn.commit()
+        try:
+            conn.execute(
+                "UPDATE clients SET telegram_id=?, full_name=?, linked_at=datetime('now') WHERE id=?",
+                (telegram_id, full_name, client["id"])
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            # этот Telegram уже привязан к другой карточке клиента этой же точки
+            # (две машины записаны на разные телефоны) — вторую привязку не
+            # делаем, но и бот не должен падать: возвращаем уже привязанную
+            conn.rollback()
+            row = conn.execute("SELECT * FROM clients WHERE shop_id=? AND telegram_id=?",
+                               (client["shop_id"], telegram_id)).fetchone()
+            return dict(row) if row else None
         return get_client_by_token(token)
 
 
@@ -1150,6 +1240,7 @@ def find_car(shop_id: int, plate_number: str):
         return dict(car) if car else None
 
 
+@_serialized
 def update_car_and_client(shop_id: int, plate: str, new_plate: str, owner_name: str, owner_phone: str,
                            car_brand: str, car_model: str):
     """Редактирование данных клиента и машины целиком — имя, телефон,
@@ -1177,6 +1268,7 @@ def update_car_and_client(shop_id: int, plate: str, new_plate: str, owner_name: 
     return True
 
 
+@_serialized
 def delete_car_completely(shop_id: int, plate: str) -> bool:
     """Полностью удаляет машину этой точки: саму машину, всю её историю
     замен, и связанные с ней планы рассрочки вместе с платежами по ним.
@@ -1197,6 +1289,7 @@ def delete_car_completely(shop_id: int, plate: str) -> bool:
     return True
 
 
+@_serialized
 def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_brand: str = None, car_model: str = None):
     plate_number = normalize_plate(plate_number)
     with get_conn() as conn:
@@ -1331,6 +1424,7 @@ def get_all_cars_overview(shop_id: int):
 
 # ---------- Замены масла / обслуживание ----------
 
+@_serialized
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
                     next_mileage=None, items=None, cash_amount=None, card_amount=None):
@@ -1351,6 +1445,7 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         next_date = None
 
     items_json = None
+    stock_moves = []  # (product_id, qty) — списываются ниже в ОДНОЙ транзакции с самой записью
     if items:
         with get_conn() as _conn:
             car_row = _conn.execute("SELECT shop_id FROM cars WHERE id=?", (car_id,)).fetchone()
@@ -1362,9 +1457,11 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
                 if product:
                     # цена закупки — всегда со склада на момент продажи, не из запроса
                     item["cost_price"] = product.get("purchase_price")
-                    adjust_stock(pid, item.get("qty") or 0)
+                    stock_moves.append((pid, item.get("qty") or 0))
                 else:
                     item["product_id"] = None  # товар не принадлежит этой точке — не связываем со складом
+            elif pid:
+                item["product_id"] = None
         items_json = json.dumps(items, ensure_ascii=False)
         cost = round(sum(i.get("total", 0) for i in items))
         names = [i["name"] for i in items]
@@ -1380,6 +1477,11 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         card_amount = card_amount or 0
 
     with get_conn() as conn:
+        # всё ниже — одна транзакция: либо сохранится и запись, и списание
+        # со склада, либо ничего (раньше склад списывался отдельно и при сбое
+        # сохранения записи товар «пропадал»)
+        for pid, qty in stock_moves:
+            conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (qty, pid))
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
@@ -1405,6 +1507,7 @@ def get_oil_change_for_shop(oc_id: int, shop_id: int):
         return dict(row) if row else None
 
 
+@_serialized
 def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, next_mileage=None,
                        cost=None, interval_value=None, interval_unit=None, notes=None, items=None,
                        cash_amount=None, card_amount=None):
@@ -1498,6 +1601,7 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
     return True
 
 
+@_serialized
 def delete_oil_change(oc_id: int, shop_id: int):
     """Удаляет запись (только если она принадлежит указанной точке). Товары,
     списанные со склада этой записью, возвращаются обратно на остаток. Если
@@ -1508,14 +1612,19 @@ def delete_oil_change(oc_id: int, shop_id: int):
     if not existing:
         return False
 
+    returns = []
     if existing.get("items_json"):
         for item in json.loads(existing["items_json"]):
             pid = item.get("product_id")
             if pid and get_product(pid, shop_id, active_only=False):
-                adjust_stock(pid, -(item.get("qty") or 0))
+                returns.append((pid, item.get("qty") or 0))
 
     with get_conn() as conn:
-        conn.execute("DELETE FROM oil_changes WHERE id=?", (oc_id,))
+        cur = conn.execute("DELETE FROM oil_changes WHERE id=?", (oc_id,))
+        if cur.rowcount == 0:
+            return False  # уже удалена (например, нажали «удалить» с двух телефонов)
+        for pid, qty in returns:
+            conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (qty, pid))
         if existing["status"] == "active":
             next_row = conn.execute(
                 "SELECT id FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC LIMIT 1",
@@ -1527,6 +1636,7 @@ def delete_oil_change(oc_id: int, shop_id: int):
     return True
 
 
+@_serialized
 def create_installment_plan(shop_id: int, car_id: int, total_amount: int, installment_amount: int,
                              interval_days: int, oil_change_id: int = None):
     """Оформляет остаток суммы в рассрочку — первый платёж ожидается через
@@ -1823,6 +1933,7 @@ def get_low_stock_products(shop_id: int, threshold: float = 50):
     return sorted(low, key=lambda p: p["stock_qty"])
 
 
+@_serialized
 def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None):
     """Отмечает поступивший платёж по долгу — увеличивает paid_amount,
     сдвигает следующую дату на interval_days вперёд, и закрывает план,
@@ -1841,8 +1952,8 @@ def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: 
             (plan_id, amount, paid_date)
         )
         conn.execute(
-            "UPDATE installment_plans SET paid_amount=?, next_due_date=?, status=? WHERE id=?",
-            (new_paid, next_due, new_status, plan_id)
+            "UPDATE installment_plans SET paid_amount=paid_amount+?, next_due_date=?, status=? WHERE id=? AND shop_id=?",
+            (amount, next_due, new_status, plan_id, shop_id)
         )
         conn.commit()
     return get_installment_plan(plan_id, shop_id)
@@ -1886,6 +1997,7 @@ def get_due_installment_reminders():
         return result
 
 
+@_serialized
 def mark_installment_reminded(plan_id: int):
     with get_conn() as conn:
         conn.execute(
@@ -1912,6 +2024,7 @@ def _compute_expense_due_date(day_of_month: int, from_date: datetime = None) -> 
     return candidate.strftime("%Y-%m-%d")
 
 
+@_serialized
 def create_recurring_expense(shop_id: int, category: str, name: str, amount: int, day_of_month: int):
     """Повторяющийся расход (аренда, зарплата и т.п.) — раз в месяц, в
     указанное число, с напоминанием через бота. Возвращает созданную запись."""
@@ -1944,6 +2057,7 @@ def get_recurring_expenses(shop_id: int):
         return [dict(r) for r in rows]
 
 
+@_serialized
 def delete_recurring_expense(expense_id: int, shop_id: int) -> bool:
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM recurring_expenses WHERE id=? AND shop_id=?", (expense_id, shop_id))
@@ -1951,6 +2065,7 @@ def delete_recurring_expense(expense_id: int, shop_id: int) -> bool:
         return cur.rowcount > 0
 
 
+@_serialized
 def log_expense(shop_id: int, category: str, name: str, amount: int, expense_date: str = None,
                  recurring_expense_id: int = None):
     """Записывает фактически понесённый расход — разовый или как отметку
@@ -1997,6 +2112,7 @@ def get_expense_entry(entry_id: int, shop_id: int):
         return dict(row) if row else None
 
 
+@_serialized
 def update_expense_entry(entry_id: int, shop_id: int, category: str, name: str, amount: int, expense_date: str) -> bool:
     """Редактирует уже внесённую запись расхода — сумму, категорию, название,
     дату. Не трогает связь с повторяющимся расходом (recurring_expense_id),
@@ -2010,6 +2126,7 @@ def update_expense_entry(entry_id: int, shop_id: int, category: str, name: str, 
         return cur.rowcount > 0
 
 
+@_serialized
 def delete_expense_entry(entry_id: int, shop_id: int) -> bool:
     """Удаляет запись из журнала — только если она принадлежит этой точке.
     Если запись была отметкой оплаты повторяющегося расхода, сам
@@ -2058,6 +2175,7 @@ def get_due_recurring_expenses():
         return [dict(r) for r in rows]
 
 
+@_serialized
 def mark_expense_reminded(expense_id: int):
     with get_conn() as conn:
         conn.execute(
@@ -2110,6 +2228,7 @@ def get_due_reminders():
         return [dict(r) for r in rows]
 
 
+@_serialized
 def mark_reminder_sent(oil_change_id: int):
     today = datetime.now().strftime("%Y-%m-%d")
     with get_conn() as conn:
@@ -2120,12 +2239,14 @@ def mark_reminder_sent(oil_change_id: int):
         conn.commit()
 
 
+@_serialized
 def mark_booked(oil_change_id: int):
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET status='booked' WHERE id=?", (oil_change_id,))
         conn.commit()
 
 
+@_serialized
 def mark_already_changed_elsewhere(oil_change_id: int):
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET status='changed_elsewhere' WHERE id=?", (oil_change_id,))
@@ -2138,7 +2259,7 @@ def get_oil_change_with_context(oil_change_id: int):
     with get_conn() as conn:
         row = conn.execute("""
             SELECT oc.*, c.plate_number, c.shop_id, cl.full_name as owner_name, cl.phone as owner_phone,
-                   s.shop_name, s.notify_telegram_id, s.language
+                   cl.telegram_id as client_telegram_id, s.shop_name, s.notify_telegram_id, s.language
             FROM oil_changes oc
             JOIN cars c ON c.id = oc.car_id
             JOIN clients cl ON cl.id = c.client_id
@@ -2159,6 +2280,7 @@ def get_all_linked_clients(shop_id: int):
         return [dict(r) for r in rows]
 
 
+@_serialized
 def create_broadcast(shop_id: int, message: str) -> int:
     with get_conn() as conn:
         cur = conn.execute(
@@ -2176,12 +2298,14 @@ def get_pending_broadcast():
         return dict(row) if row else None
 
 
+@_serialized
 def mark_broadcast_sending(broadcast_id: int):
     with get_conn() as conn:
         conn.execute("UPDATE broadcasts SET status='sending' WHERE id=?", (broadcast_id,))
         conn.commit()
 
 
+@_serialized
 def mark_broadcast_done(broadcast_id: int, sent: int, failed: int):
     with get_conn() as conn:
         conn.execute(
@@ -2452,6 +2576,7 @@ def get_profit_stats(shop_id: int) -> dict:
     }
 
 
+@_serialized
 def create_branch_shop(parent_shop_id: int, username: str, password: str, shop_name: str = None,
                         phone: str = None, address: str = None, hours: str = None,
                         lat: float = None, lon: float = None, notify_telegram_id: str = None) -> dict:
@@ -2622,6 +2747,7 @@ def get_branch_warehouse_summary(parent_shop_id: int):
     return result
 
 
+@_serialized
 def backfill_cost_price(shop_id: int, product_id: int, purchase_price) -> int:
     """Цена закупки появилась у товара, у которого её НЕ было (филиал сам
     завёл товар, главный вписал цену позже). Проставляем её в прошлые
@@ -2654,6 +2780,7 @@ def backfill_cost_price(shop_id: int, product_id: int, purchase_price) -> int:
     return changed
 
 
+@_serialized
 def set_product_purchase_price(product_id: int, shop_id: int, purchase_price):
     """Главный аккаунт вписывает цену закупки товара своего филиала — сам
     филиал этого не делает (см. create_product/restock_product ниже, где
@@ -2942,6 +3069,7 @@ def _in_network(parent_shop_id: int, shop_id: int) -> bool:
     return shop_id == parent_shop_id or is_branch_of(shop_id, parent_shop_id)
 
 
+@_serialized
 def transfer_stock(parent_shop_id: int, from_shop_id: int, product_id: int, to_shop_id: int,
                    quantity: float) -> dict:
     """Перемещение товара между складами сети (главный ↔ филиал, филиал ↔ филиал).
@@ -3033,6 +3161,7 @@ def get_stock_movements(shop_id: int, limit: int = 60) -> list:
 
 # ---------- Управление филиалами (изменение и удаление) ----------
 
+@_serialized
 def update_branch_details(branch_id: int, shop_name: str, username: str, phone=None, address=None,
                           hours=None, lat=None, lon=None, notify_telegram_id=None) -> bool:
     """Меняет всё, что задаётся при создании филиала: название, логин,
@@ -3060,6 +3189,7 @@ def branch_data_counts(branch_id: int) -> dict:
         }
 
 
+@_serialized
 def delete_branch_with_data(branch_id: int) -> bool:
     """Полностью удаляет филиал и все его данные одной транзакцией: либо
     удаляется всё, либо (при любой ошибке) ничего. Перемещения товара между
@@ -3098,6 +3228,7 @@ def _norm_key(category: str, name: str) -> tuple:
     return (category, " ".join((name or "").upper().split()))
 
 
+@_serialized
 def copy_catalog_to_branch(parent_shop_id: int, branch_id: int, categories=None) -> dict:
     """Все товары главного (или только выбранные типы) появляются на складе
     филиала с остатком 0 и теми же ценами. Товар физически не двигается.
@@ -3151,6 +3282,7 @@ def get_ship_plan(parent_shop_id: int, from_shop_id: int, to_shop_id: int) -> di
     return {"ok": True, "rows": rows}
 
 
+@_serialized
 def bulk_transfer(parent_shop_id: int, from_shop_id: int, to_shop_id: int, lines: list) -> dict:
     """Накладная: много товаров одним действием и ОДНОЙ транзакцией — либо
     уходит всё, либо (если чего-то не хватает) ничего, с понятным списком
@@ -3263,6 +3395,7 @@ def parse_import_rows(raw_rows: list, category_names: dict) -> list:
     return out
 
 
+@_serialized
 def apply_import(shop_id: int, rows: list, allow_purchase: bool) -> dict:
     """Новые товары — создаются с остатком из файла. Уже существующие (тот
     же тип + название) — количество приходит как пополнение (с ценой

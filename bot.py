@@ -235,6 +235,10 @@ async def reminder_button_callback(update: Update, context: ContextTypes.DEFAULT
 
     ctx = db.get_oil_change_with_context(oil_change_id)
     lang = (ctx.get("language") if ctx else None) or "ru"
+    # кнопку может нажать только сам клиент этой записи — иначе подделанным
+    # нажатием можно было бы «закрыть» напоминания чужих клиентов
+    if not ctx or str(ctx.get("client_telegram_id") or "") != str(query.from_user.id):
+        return
 
     if action == "changed":
         db.mark_already_changed_elsewhere(oil_change_id)

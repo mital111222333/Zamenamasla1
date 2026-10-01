@@ -43,7 +43,8 @@ def _no_stale_cache(resp):
     return resp
 
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  SESSION_COOKIE_SECURE=os.environ.get("PUBLIC_URL", "").startswith("https://"))
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "")
@@ -138,7 +139,20 @@ def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
         return False, err
     if notify_chat_id:
         _create_and_send_backup(notify_chat_id)  # снимок ТЕКУЩЕГО состояния перед заменой, для отката
-    os.replace(same_dir_tmp, db.DB_PATH)
+    # Копируем содержимое в ЖИВУЮ базу штатным механизмом SQLite (backup API),
+    # а не подменой файла: база работает в режиме WAL (рядом файлы -wal/-shm),
+    # и подмена одного файла могла бы смешать старый журнал с новой базой.
+    # Под общим замком — чтобы в этот момент никто ничего не записал.
+    import sqlite3
+    with db.WRITE_LOCK:
+        src = sqlite3.connect(same_dir_tmp)
+        dst = sqlite3.connect(db.DB_PATH, timeout=60)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+    os.remove(same_dir_tmp)
     # копия могла быть сделана старой версией программы — докатываем схему
     # (новые таблицы/колонки создаются, существующие данные не трогаются)
     try:
@@ -197,6 +211,10 @@ def login_required(view):
             return redirect(url_for("login_page"))
         shop = db.get_shop(session["shop_id"])
         if not shop or not shop["is_active"]:
+            session.clear()
+            return redirect(url_for("login_page"))
+        if session.get("is_employee") and not db.get_active_employee(session.get("username") or "", session["shop_id"]):
+            # сотрудника удалили/отключили — доступ закрывается сразу
             session.clear()
             return redirect(url_for("login_page"))
         g.shop_id = session["shop_id"]
@@ -611,6 +629,35 @@ def service_worker():
     return response
 
 
+# Защита от подбора пароля: не больше 10 неверных попыток за 15 минут для
+# одной пары «адрес + логин». Хранится в памяти процесса (после перезапуска
+# сервера счётчик обнуляется — это нормально).
+_login_fail_lock = threading.Lock()
+_login_fails = {}
+LOGIN_MAX_FAILS = 10
+LOGIN_WINDOW_SEC = 15 * 60
+
+
+def _client_ip():
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "?"
+
+
+def _login_blocked(key) -> bool:
+    now = time.time()
+    with _login_fail_lock:
+        fails = [t for t in _login_fails.get(key, []) if now - t < LOGIN_WINDOW_SEC]
+        _login_fails[key] = fails
+        return len(fails) >= LOGIN_MAX_FAILS
+
+
+def _login_failed(key):
+    with _login_fail_lock:
+        _login_fails.setdefault(key, []).append(time.time())
+        if len(_login_fails) > 5000:  # не даём словарю расти бесконечно
+            _login_fails.clear()
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     error = None
@@ -620,6 +667,11 @@ def login_page():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        fail_key = (_client_ip(), username.lower())
+        if _login_blocked(fail_key):
+            T = i18n.get_texts(lang)
+            return render_template_string(LOGIN_PAGE, error=i18n.t("login_too_many", lang), T=T, lang=lang,
+                                          other_lang="uz" if lang == "ru" else "ru"), 429
         shop = db.authenticate_shop(username, password)
         if shop:
             session.clear()
@@ -641,6 +693,7 @@ def login_page():
             session["is_employee"] = True
             session.permanent = True
             return redirect(url_for("index"))
+        _login_failed(fail_key)
         error = i18n.t("login_error", lang)
     T = i18n.get_texts(lang)
     return render_template_string(LOGIN_PAGE, error=error, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru")
@@ -5992,24 +6045,32 @@ def api_add():
         installment_amount = int(data["installment_amount"]) if data.get("installment_amount") not in (None, "") else None
         interval_days = int(data["interval_days"]) if data.get("interval_days") not in (None, "") else None
 
-        existing_car = db.find_car(g.shop_id, plate)
-        if existing_car:
-            client_id = existing_car["client_id"]
-            car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
-        else:
-            client = db.get_or_create_client(g.shop_id, owner_name, owner_phone)
-            client_id = client["id"]
-            car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
+        # проверка рассрочки — ДО сохранения: раньше запись и списание склада
+        # уже происходили, а потом приходила ошибка, человек нажимал ещё раз —
+        # и замена сохранялась дважды
+        if debt_amount > 0 and (not installment_amount or not interval_days):
+            return jsonify({"ok": False, "error": "укажите сумму платежа и период для рассрочки"}), 400
 
-        oc_id, next_date = db.add_oil_change(
-            car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
-            next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
-        )
+        # весь приём замены — под общим замком записи: два телефона одной точки,
+        # одновременно вносящие одну и ту же новую машину, больше не получают
+        # ошибку «UNIQUE constraint failed» и не плодят пустых клиентов
+        with db.WRITE_LOCK:
+            existing_car = db.find_car(g.shop_id, plate)
+            if existing_car:
+                client_id = existing_car["client_id"]
+                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
+            else:
+                client = db.get_or_create_client(g.shop_id, owner_name, owner_phone)
+                client_id = client["id"]
+                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
 
-        if debt_amount > 0:
-            if not installment_amount or not interval_days:
-                return jsonify({"ok": False, "error": "укажите сумму платежа и период для рассрочки"}), 400
-            db.create_installment_plan(g.shop_id, car_id, debt_amount, installment_amount, interval_days, oil_change_id=oc_id)
+            oc_id, next_date = db.add_oil_change(
+                car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
+                next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
+            )
+
+            if debt_amount > 0:
+                db.create_installment_plan(g.shop_id, car_id, debt_amount, installment_amount, interval_days, oil_change_id=oc_id)
 
         car_after, _ = db.get_car_history(g.shop_id, plate)
         link = None

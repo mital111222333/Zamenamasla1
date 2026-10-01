@@ -174,6 +174,7 @@ RU = {
     "login_password": "Пароль",
     "login_button": "Войти",
     "login_error": "Неверный логин или пароль.",
+    "login_too_many": "Слишком много неверных попыток. Подождите 15 минут и попробуйте снова.",
 
     # --- Вкладки ---
     "tab_add": "Внести замену",
@@ -780,6 +781,7 @@ UZ = {
     "login_password": "Parol",
     "login_button": "Kirish",
     "login_error": "Login yoki parol noto'g'ri.",
+    "login_too_many": "Noto'g'ri urinishlar juda ko'p. 15 daqiqa kuting va qayta urinib ko'ring.",
 
     "tab_add": "Almashtirishni kiritish",
     "tab_table": "Baza",
