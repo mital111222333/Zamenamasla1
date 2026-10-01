@@ -670,6 +670,21 @@ async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYP
         # пропускаем без отметки (попробуем снова завтра)
 
 
+async def check_supplier_debts(context: ContextTypes.DEFAULT_TYPE):
+    """Просроченный долг поставщику — напоминание владельцу точки (не чаще
+    раза в 3 дня по каждому поставщику)."""
+    fmt = lambda n: f"{int(n):,}".replace(",", " ")
+    for sup in db.get_overdue_supplier_debts():
+        lang = sup.get("language") or "ru"
+        text = i18n.t("bot_supplier_debt", lang, supplier=sup["name"], overdue=fmt(sup["debt"]["overdue"]),
+                      balance=fmt(sup["debt"]["balance"]))
+        try:
+            await context.bot.send_message(chat_id=sup["notify_telegram_id"], text=text)
+            db.mark_supplier_debt_reminded(sup["id"])
+        except Exception as e:
+            logger.error(f"Не удалось напомнить о долге поставщику {sup['id']}: {e}")
+
+
 async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
     """Ежедневная резервная копия базы данных — отправляется в Telegram
     владельцу платформы (ADMIN_TELEGRAM_ID). Копия делается через
@@ -759,6 +774,7 @@ def main():
     job_queue = app.job_queue
     job_queue.run_repeating(check_and_send_reminders, interval=6 * 3600, first=10)
     job_queue.run_repeating(check_and_send_installment_reminders, interval=6 * 3600, first=20)
+    job_queue.run_repeating(check_supplier_debts, interval=6 * 3600, first=40)
     # 1:00 по времени сервера (обычно UTC) — около 6 утра в Узбекистане, тихий час
     job_queue.run_daily(send_daily_backup, time=dtime(hour=1, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)

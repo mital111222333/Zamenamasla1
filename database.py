@@ -467,6 +467,24 @@ def _migrate(conn):
         conn.execute("ALTER TABLE suppliers ADD COLUMN tg_chat_id TEXT")
     if "link_token" not in sup_cols:
         conn.execute("ALTER TABLE suppliers ADD COLUMN link_token TEXT")
+    if "pay_days" not in sup_cols:
+        conn.execute("ALTER TABLE suppliers ADD COLUMN pay_days INTEGER")
+    if "debt_reminded_at" not in sup_cols:
+        conn.execute("ALTER TABLE suppliers ADD COLUMN debt_reminded_at TEXT")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS supplier_payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        supplier_id INTEGER NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'payment',
+        amount INTEGER NOT NULL,
+        pay_date TEXT NOT NULL,
+        note TEXT,
+        order_id INTEGER,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_supplier_payments_sup ON supplier_payments(supplier_id)")
     rs_cols = {r[1] for r in conn.execute("PRAGMA table_info(stock_restocks)").fetchall()}
     if "order_id" not in rs_cols:
         conn.execute("ALTER TABLE stock_restocks ADD COLUMN order_id INTEGER")
@@ -3580,7 +3598,12 @@ def list_suppliers(shop_id: int) -> list:
                          WHERE p.shop_id=s.shop_id AND p.supplier_id=s.id AND p.is_active=1) AS product_count
             FROM suppliers s WHERE s.shop_id=? AND s.is_active=1 ORDER BY s.name COLLATE NOCASE
         """, (shop_id,)).fetchall()
-        return [dict(r) for r in rows]
+        out = [dict(r) for r in rows]
+        for sup in out:
+            entries = _supplier_charges(conn, shop_id, sup["id"])
+            d = supplier_debt(shop_id, sup["id"], sup.get("pay_days"), entries)
+            sup["balance"], sup["overdue"] = d["balance"], d["overdue"]
+        return out
 
 
 def get_supplier(shop_id: int, supplier_id: int):
@@ -3594,9 +3617,16 @@ def _supplier_fields(data: dict) -> dict:
     tg = _clean_text(data.get("telegram"), 64)
     if tg:
         tg = tg.replace("https://", "").replace("http://", "").replace("t.me/", "").lstrip("@").strip("/")
+    try:
+        pay_days = int(float(data.get("pay_days"))) if data.get("pay_days") not in (None, "") else None
+    except (TypeError, ValueError):
+        pay_days = None
+    if pay_days is not None and not (0 <= pay_days <= 365):
+        pay_days = None
     return {"name": _clean_text(data.get("name"), 80), "phone": _clean_text(data.get("phone"), 40),
             "telegram": tg or None, "contact": _clean_text(data.get("contact"), 80),
-            "delivery_days": _clean_text(data.get("delivery_days"), 80), "note": _clean_text(data.get("note"), 300)}
+            "delivery_days": _clean_text(data.get("delivery_days"), 80), "note": _clean_text(data.get("note"), 300),
+            "pay_days": pay_days}
 
 
 @_serialized
@@ -3611,15 +3641,15 @@ def save_supplier(shop_id: int, data: dict, supplier_id: int = None):
     with get_conn() as conn:
         if supplier_id:
             cur = conn.execute("""
-                UPDATE suppliers SET name=?, phone=?, telegram=?, contact=?, delivery_days=?, note=?
+                UPDATE suppliers SET name=?, phone=?, telegram=?, contact=?, delivery_days=?, note=?, pay_days=?
                 WHERE id=? AND shop_id=? AND is_active=1
             """, (*f.values(), supplier_id, shop_id))
             if cur.rowcount == 0:
                 return False, "not_found", None
         else:
             cur = conn.execute("""
-                INSERT INTO suppliers (shop_id, name, phone, telegram, contact, delivery_days, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO suppliers (shop_id, name, phone, telegram, contact, delivery_days, note, pay_days)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (shop_id, *f.values()))
             supplier_id = cur.lastrowid
         conn.commit()
@@ -4029,3 +4059,207 @@ def distribute_order(shop_id: int, order_id: int, lines: list) -> dict:
     for bid, dst_id, price in backfills:
         backfill_cost_price(bid, dst_id, price)
     return {"ok": True, "batch": batch if per_branch else None, "branches": len(per_branch)}
+
+
+@_serialized
+def set_product_supplier(shop_id: int, product_id: int, supplier_id) -> bool:
+    """Закрепить один товар за поставщиком (None — снять)."""
+    if supplier_id and not get_supplier(shop_id, supplier_id):
+        return False
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE products SET supplier_id=? WHERE id=? AND shop_id=? AND is_active=1",
+                           (supplier_id or None, product_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+# ---------- Долг поставщику и история цен закупки ----------
+# Долг = сумма принятых заказов поставщика (пришло × цена закупки) + долги,
+# внесённые вручную (например, старый долг до начала работы в OilBook) −
+# оплаты. Оплаты гасят самые старые долги первыми; если у поставщика задан
+# срок оплаты (дней), видно, что уже просрочено.
+
+def _supplier_charges(conn, shop_id: int, supplier_id: int) -> list:
+    rows = conn.execute("""
+        SELECT o.id, o.number, o.received_at,
+               COALESCE(SUM(COALESCE(l.qty_received, 0) * COALESCE(l.purchase_price, 0)), 0) AS amount,
+               SUM(CASE WHEN COALESCE(l.qty_received, 0) > 0 AND l.purchase_price IS NULL THEN 1 ELSE 0 END) AS unpriced
+        FROM supplier_orders o JOIN supplier_order_lines l ON l.order_id = o.id
+        WHERE o.shop_id=? AND o.supplier_id=? AND o.status IN ('received', 'done')
+        GROUP BY o.id
+    """, (shop_id, supplier_id)).fetchall()
+    out = [{"type": "order", "id": r["id"], "number": r["number"], "date": (r["received_at"] or "")[:10],
+            "amount": int(round(r["amount"] or 0)), "unpriced": r["unpriced"] or 0} for r in rows]
+    for r in conn.execute("SELECT * FROM supplier_payments WHERE shop_id=? AND supplier_id=?",
+                          (shop_id, supplier_id)).fetchall():
+        out.append({"type": r["kind"], "id": r["id"], "date": r["pay_date"], "amount": r["amount"],
+                    "note": r["note"], "order_id": r["order_id"], "created_at": r["created_at"]})
+    return out
+
+
+def supplier_debt(shop_id: int, supplier_id: int, pay_days=None, entries=None) -> dict:
+    if entries is None:
+        with get_conn() as conn:
+            entries = _supplier_charges(conn, shop_id, supplier_id)
+    charges = sorted([e for e in entries if e["type"] in ("order", "charge") and e["amount"] > 0],
+                     key=lambda e: (e["date"], e["id"]))
+    paid = sum(e["amount"] for e in entries if e["type"] == "payment")
+    charged = sum(e["amount"] for e in charges)
+    today = datetime.now().date()
+    # оплата «сразу при приёмке» гасит именно свой заказ, остальные оплаты —
+    # самые старые долги первыми
+    rest_of = {(c["type"], c["id"]): c["amount"] for c in charges}
+    left = 0
+    for e in entries:
+        if e["type"] != "payment":
+            continue
+        key = ("order", e.get("order_id"))
+        if e.get("order_id") and key in rest_of:
+            cover = min(rest_of[key], e["amount"])
+            rest_of[key] -= cover
+            left += e["amount"] - cover
+        else:
+            left += e["amount"]
+    overdue = 0
+    next_due = None
+    oldest_overdue = None
+    for c in charges:
+        amount = rest_of[(c["type"], c["id"])]
+        cover = min(left, amount)
+        left -= cover
+        rest = amount - cover
+        if rest <= 0 or pay_days is None:
+            continue
+        try:
+            due = datetime.strptime(c["date"], "%Y-%m-%d").date() + timedelta(days=int(pay_days))
+        except ValueError:
+            continue
+        if due < today:
+            overdue += rest
+            oldest_overdue = oldest_overdue or due.isoformat()
+        elif next_due is None or due.isoformat() < next_due["date"]:
+            next_due = {"date": due.isoformat(), "amount": rest}
+    return {"charged": charged, "paid": paid, "balance": charged - paid, "overdue": overdue,
+            "oldest_overdue": oldest_overdue, "next_due": next_due,
+            "unpriced_orders": sum(1 for e in entries if e["type"] == "order" and e.get("unpriced"))}
+
+
+def supplier_price_history(shop_id: int, supplier_id: int) -> list:
+    """Цены закупки товаров у поставщика по принятым заказам: как менялась
+    цена и на сколько процентов по сравнению с прошлой и с первой."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT l.product_id, l.name, l.unit, l.purchase_price, l.qty_received, o.number, o.received_at
+            FROM supplier_order_lines l JOIN supplier_orders o ON o.id = l.order_id
+            WHERE o.shop_id=? AND o.supplier_id=? AND o.status IN ('received', 'done')
+              AND l.purchase_price IS NOT NULL AND COALESCE(l.qty_received, 0) > 0
+            ORDER BY o.received_at, o.id
+        """, (shop_id, supplier_id)).fetchall()
+    by = {}
+    for r in rows:
+        e = by.setdefault(r["product_id"], {"product_id": r["product_id"], "name": r["name"], "unit": r["unit"], "history": []})
+        e["name"] = r["name"]
+        e["history"].append({"date": (r["received_at"] or "")[:10], "price": r["purchase_price"],
+                             "qty": r["qty_received"], "number": r["number"]})
+    out = []
+    for e in by.values():
+        h = e["history"]
+        last = h[-1]["price"]
+        prev = next((x["price"] for x in reversed(h[:-1]) if x["price"] != last), None)
+        first = h[0]["price"]
+        e.update({"last": last, "last_date": h[-1]["date"], "prev": prev,
+                  "change_pct": round((last - prev) / prev * 100, 1) if prev else None,
+                  "since_first_pct": round((last - first) / first * 100, 1) if first and len(h) > 2 and first not in (last, prev) else None,
+                  "_sort": (h[-1]["date"], h[-1]["number"])})
+        e["history"] = list(reversed(h))[:12]
+        out.append(e)
+    out.sort(key=lambda e: e.pop("_sort"), reverse=True)
+    return out
+
+
+def supplier_card(shop_id: int, supplier_id: int):
+    sup = get_supplier(shop_id, supplier_id)
+    if not sup:
+        return None
+    with get_conn() as conn:
+        entries = _supplier_charges(conn, shop_id, supplier_id)
+        orders = conn.execute("""
+            SELECT COUNT(*) AS n, MAX(created_at) AS last FROM supplier_orders
+            WHERE shop_id=? AND supplier_id=? AND status != 'cancelled'
+        """, (shop_id, supplier_id)).fetchone()
+    debt = supplier_debt(shop_id, supplier_id, sup.get("pay_days"), entries)
+    ops = sorted(entries, key=lambda e: (e["date"], e.get("created_at") or "", e["id"]), reverse=True)
+    return {"supplier": sup, "debt": debt, "entries": ops[:60], "prices": supplier_price_history(shop_id, supplier_id),
+            "order_count": orders["n"], "last_order": orders["last"]}
+
+
+@_serialized
+def add_supplier_payment(shop_id: int, supplier_id: int, kind: str, amount, pay_date=None, note=None,
+                         order_id=None) -> dict:
+    if kind not in ("payment", "charge"):
+        return {"ok": False, "error": "bad_request"}
+    if not get_supplier(shop_id, supplier_id):
+        return {"ok": False, "error": "not_found"}
+    try:
+        amount = int(round(float(amount)))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad_amount"}
+    if amount <= 0:
+        return {"ok": False, "error": "bad_amount"}
+    pay_date = (pay_date or datetime.now().strftime("%Y-%m-%d"))[:10]
+    try:
+        datetime.strptime(pay_date, "%Y-%m-%d")
+    except ValueError:
+        return {"ok": False, "error": "bad_request"}
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO supplier_payments (shop_id, supplier_id, kind, amount, pay_date, note, order_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (shop_id, supplier_id, kind, amount, pay_date, _clean_text(note, 200), order_id))
+        conn.commit()
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@_serialized
+def delete_supplier_payment(shop_id: int, supplier_id: int, payment_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM supplier_payments WHERE id=? AND shop_id=? AND supplier_id=?",
+                           (payment_id, shop_id, supplier_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def order_amount(shop_id: int, order_id: int) -> int:
+    with get_conn() as conn:
+        r = conn.execute("""
+            SELECT COALESCE(SUM(COALESCE(l.qty_received, 0) * COALESCE(l.purchase_price, 0)), 0)
+            FROM supplier_order_lines l JOIN supplier_orders o ON o.id = l.order_id
+            WHERE o.id=? AND o.shop_id=?
+        """, (order_id, shop_id)).fetchone()
+        return int(round(r[0] or 0))
+
+
+def get_overdue_supplier_debts() -> list:
+    """Для бота: поставщики с просроченным долгом, о которых владельцу ещё
+    не напоминали последние 3 дня."""
+    since = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT s.*, sh.notify_telegram_id, sh.language, sh.shop_name, sh.username
+            FROM suppliers s JOIN shops sh ON sh.id = s.shop_id
+            WHERE s.is_active=1 AND s.pay_days IS NOT NULL AND sh.notify_telegram_id IS NOT NULL
+              AND sh.notify_telegram_id != '' AND (s.debt_reminded_at IS NULL OR s.debt_reminded_at < ?)
+        """, (since,)).fetchall()
+    out = []
+    for r in rows:
+        d = supplier_debt(r["shop_id"], r["id"], r["pay_days"])
+        if d["overdue"] > 0:
+            out.append({**dict(r), "debt": d})
+    return out
+
+
+@_serialized
+def mark_supplier_debt_reminded(supplier_id: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE suppliers SET debt_reminded_at=? WHERE id=?", (_now_str(), supplier_id))
+        conn.commit()

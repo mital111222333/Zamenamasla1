@@ -1291,6 +1291,24 @@ if ('serviceWorker' in navigator) {
   .sup-tg .no { color:#B45309; font-weight:700; }
   .sup-tg .wh-tbtn { margin:8px 6px 0 0; }
   .sup-bot { color:#15803D; font-weight:700; }
+  .sc-actions { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+  .sd-box { border:1px solid var(--border); border-radius:14px; padding:12px; margin-top:10px; background:#F8FAFC; }
+  .sd-head { font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
+  .sd-big { font-size:24px; font-weight:800; }
+  .sd-big.bad { color:#B91C1C; }
+  .sd-big.ok { color:#15803D; }
+  .sd-cap { font-size:12px; color:#64748B; margin-bottom:6px; }
+  .sd-note { font-size:13px; font-weight:600; margin:4px 0; color:#334155; }
+  .sd-note.bad { color:#B91C1C; }
+  .sd-note.warn { color:#B45309; }
+  .pr-row { border-bottom:1px solid #F1F5F9; cursor:pointer; }
+  .pr-badge { font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px; white-space:nowrap; }
+  .pr-badge.up { color:#B91C1C; background:#FEE2E2; }
+  .pr-badge.down { color:#15803D; background:#DCFCE7; }
+  .pr-hist { display:none; padding:0 0 8px; }
+  .pr-row.open .pr-hist { display:block; }
+  .pr-h { display:flex; justify-content:space-between; gap:8px; font-size:12px; color:#475569; padding:3px 0; }
+  .sup-debt { font-weight:700; color:#B91C1C; }
   label.pl-row, label.ord-dist-row { text-transform:none; letter-spacing:normal; font-size:13px; color:var(--text); font-weight:400; margin:0; }
   label.pl-row .pl-name b, label.ord-dist-row span { color:var(--text); font-weight:600; }
   label.pl-row .pl-name span { text-transform:none; letter-spacing:normal; }
@@ -2074,9 +2092,15 @@ if ('serviceWorker' in navigator) {
               <input id="sup_delivery_days" placeholder="{{ T.sup_days_ph }}" maxlength="80">
             </div>
           </div>
-          <div class="field">
-            <label>{{ T.sup_note }}</label>
-            <input id="sup_note" maxlength="300">
+          <div class="row2">
+            <div class="field">
+              <label>{{ T.sup_pay_days }}</label>
+              <input id="sup_pay_days" type="number" inputmode="numeric" min="0" max="365" placeholder="{{ T.sup_pay_days_ph }}">
+            </div>
+            <div class="field">
+              <label>{{ T.sup_note }}</label>
+              <input id="sup_note" maxlength="300">
+            </div>
           </div>
           <div id="supTgBlock" class="sup-tg" style="display:none;"></div>
           <button class="submit" onclick="saveSupplier()">{{ T.sup_save }}</button>
@@ -2097,6 +2121,41 @@ if ('serviceWorker' in navigator) {
           <div id="supProdList"></div>
           <button class="submit" onclick="saveSupplierProducts()">{{ T.sup_save }}</button>
           <button class="close-btn" onclick="closeWhModal('supProductsModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_branch and not is_employee %}
+      <div class="modal-overlay" id="supCardModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <div id="supCardBody"></div>
+          <button class="close-btn" onclick="closeWhModal('supCardModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
+      <div class="modal-overlay" id="orderNewProductModal">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;">{{ T.onp_title }}</h3>
+          <div class="hint-text" id="onp_hint" style="margin-bottom:10px;"></div>
+          <div class="field">
+            <label>{{ T.wh_category }}</label>
+            <select id="onp_category" onchange="onOnpCategoryChanged()"></select>
+          </div>
+          <div class="field">
+            <label>{{ T.wh_product_name }}</label>
+            <input id="onp_name" placeholder="MITANOL 5W-30" autocomplete="off">
+          </div>
+          <div class="field" id="onp_unit_row" style="display:none;">
+            <label>{{ T.wh_unit }}</label>
+            <select id="onp_unit">
+              <option value="pc">{{ T.unit_pc }}</option>
+              <option value="l">{{ T.unit_l }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>{{ T.onp_sell }}</label>
+            <input id="onp_sell" type="number" inputmode="numeric" placeholder="45000">
+          </div>
+          <button class="submit" onclick="saveOrderNewProduct()">{{ T.onp_save }}</button>
+          <button class="close-btn" onclick="closeWhModal('orderNewProductModal')">{{ T.modal_close }}</button>
         </div>
       </div>
       {% endif %}
@@ -2854,7 +2913,8 @@ function renderSuppliers() {
       s.telegram ? '@' + escapeHtml(s.telegram) : '', s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
     return `
       <div class="sup-row">
-        <div class="sup-main" onclick="openSupplierModal(${s.id})"><b>${escapeHtml(s.name)}</b><span>${contacts || T.sup_no_contacts}</span><span>${T.sup_products} ${s.product_count}</span></div>
+        <div class="sup-main" onclick="openSupplierCard(${s.id})"><b>${escapeHtml(s.name)}</b><span>${contacts || T.sup_no_contacts}</span>
+          <span>${T.sup_products} ${s.product_count}${s.balance > 0 ? ` · <span class="sup-debt">${T.sd_debt_short} ${fmtSum(s.balance)}${s.overdue > 0 ? ' ⚠️' : ''}</span>` : ''}</span></div>
         <div class="whc-actions">
           <button class="wh-tbtn wh-tbtn-sm" onclick="openNewOrder(${s.id})">${T.sup_order_btn}</button>
           <button class="wh-tbtn wh-tbtn-icon" title="${T.sup_assign_title}" onclick="openSupProducts(${s.id})"><i class="fa-solid fa-boxes-stacked"></i></button>
@@ -2863,13 +2923,13 @@ function renderSuppliers() {
   }).join('');
 }
 
-const SUP_FIELDS = ['name', 'phone', 'telegram', 'contact', 'delivery_days', 'note'];
+const SUP_FIELDS = ['name', 'phone', 'telegram', 'contact', 'delivery_days', 'note', 'pay_days'];
 
 function openSupplierModal(id) {
   const s = id ? SUP.list.find(x => x.id === id) : null;
   SUP.editId = s ? s.id : null;
   document.getElementById('supModalTitle').textContent = s ? T.sup_edit : T.sup_add;
-  SUP_FIELDS.forEach(k => { document.getElementById('sup_' + k).value = s && s[k] ? (k === 'telegram' ? '@' + s[k] : s[k]) : ''; });
+  SUP_FIELDS.forEach(k => { document.getElementById('sup_' + k).value = s && s[k] != null && s[k] !== '' ? (k === 'telegram' ? '@' + s[k] : s[k]) : ''; });
   document.getElementById('supDeleteBtn').style.display = s ? '' : 'none';
   renderSupTgBlock(s);
   document.getElementById('supplierModal').classList.add('open');
@@ -2926,6 +2986,7 @@ async function saveSupplier() {
   closeWhModal('supplierModal');
   showMsg(T.sup_saved, true);
   await loadSuppliers();
+  if (!isNew && SUP.cardId === SUP.editId) { openSupplierCard(SUP.editId); return; }
   if (isNew && ordDraftOpen()) { ORD.cur.supplier_id = d.id; loadOrderSuggestion(); }
   // новому поставщику сразу предлагаем отметить его товары
   if (isNew && WHCTX.own.products.length) openSupProducts(d.id);
@@ -3121,12 +3182,13 @@ function renderOrderEdit() {
   const free = WHCTX.own.products.filter(p => !inOrder.has(p.id));
   const opt = p => `<option value="${p.id}">${escapeHtml(p.name)} (${whQty(p.stock_qty)} ${whUnit(p.unit)})</option>`;
   const own = free.filter(mine), others = free.filter(p => !mine(p));
-  const addSel = free.length ? `
+  const addSel = `
     <select id="ord_add" onchange="addOrderLine(this.value)" style="margin-top:10px;">
       <option value="">+ ${T.ord_add_product}</option>
+      <option value="__new">✨ ${T.onp_option}</option>
       ${own.length ? `<optgroup label="${o.supplier_id ? T.ord_grp_supplier : T.ord_no_supplier}">${own.map(opt).join('')}</optgroup>` : ''}
       ${others.length ? `<optgroup label="${T.ord_grp_other}">${others.map(opt).join('')}</optgroup>` : ''}
-    </select>` : '';
+    </select>`;
   const draft = !!o.id;
   document.getElementById('ordBody').innerHTML = `
     ${supSel}
@@ -3144,6 +3206,7 @@ function setOrderQty(i, v) { ORD.cur.lines[i].qty = Math.max(0, parseFloat(v) ||
 function removeOrderLine(i) { ORD.cur.lines.splice(i, 1); renderOrderEdit(); }
 
 function addOrderLine(pid) {
+  if (pid === '__new') { document.getElementById('ord_add').value = ''; openOrderNewProduct(); return; }
   const p = ordProduct(parseInt(pid, 10));
   if (!p) return;
   ORD.cur.lines.push({ product_id: p.id, name: p.name, unit: p.unit, stock_qty: p.stock_qty, qty: 0, alloc: {} });
@@ -3309,6 +3372,7 @@ function renderOrderReceive() {
     <div class="hint-text">${T.ord_receive_hint}</div>
     ${rows}
     <div class="ord-total" id="ordRecvTotal"></div>
+    ${o.supplier_id ? `<label class="pl-row" style="cursor:pointer; border:none;"><input type="checkbox" id="ordr_paid"><div class="pl-name"><b>${T.ord_paid_now}</b><span>${T.ord_paid_now_hint}</span></div></label>` : ''}
     <button class="submit" onclick="submitReceive()"><i class="fa-solid fa-check"></i> ${T.ord_accept_btn}</button>
     <button class="submit" onclick="ORD.mode=ORD.cur.status==='draft'?'edit':'view'; renderOrderModal();" style="background:var(--border); color:var(--text);">${T.ord_back}</button>`;
   updateRecvTotal();
@@ -3335,12 +3399,14 @@ async function submitReceive() {
   if (!lines.some(r => r.qty_received > 0)) { showMsg(T.ord_err_empty, false); return; }
   if (lines.some(r => r.qty_received > 0 && r.purchase_price === null) && !confirm(T.ord_no_price_confirm)) return;
   const id = ORD.cur.id;
-  const d = await ordFetch(`/api/orders/${id}/receive`, 'POST', { lines });
+  const paidEl = document.getElementById('ordr_paid');
+  const d = await ordFetch(`/api/orders/${id}/receive`, 'POST', { lines, paid_now: !!(paidEl && paidEl.checked) });
   if (!d.ok) { showMsg(ordErr(d), false); return; }
   showMsg(T.ord_received_ok, true);
   ORD.distFor = null;
   loadWarehouse();
   loadOrders();
+  loadSuppliers();
   await openOrder(id);
 }
 
@@ -3422,6 +3488,158 @@ function purchaseToOrder() {
   closeWhModal('purchaseListModal');
   showWhSubTab('orders');
   openNewOrder(first ? first.supplier_id : null);
+}
+
+// ---- карточка поставщика: долг, оплаты, история цен ----
+function fmtSum(n) { return fmtNum(Math.round(n || 0)) + ' ' + T.currency; }
+
+async function openSupplierCard(id) {
+  SUP.cardId = id;
+  const m = document.getElementById('supCardModal');
+  document.getElementById('supCardBody').innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.stats_loading}</div>`;
+  m.classList.add('open');
+  const d = await ordFetch(`/api/suppliers/${id}/card`);
+  if (SUP.cardId !== id) return;
+  if (!d.ok) { showMsg(ordErr(d), false); closeWhModal('supCardModal'); return; }
+  SUP.card = d;
+  renderSupplierCard();
+}
+
+function renderSupplierCard() {
+  const c = SUP.card, s = c.supplier, d = c.debt;
+  const contacts = [s.tg_connected ? `<span class="sup-bot">✓ ${T.sup_tg_badge}</span>` : '', s.phone ? escapeHtml(s.phone) : '',
+    s.telegram ? '@' + escapeHtml(s.telegram) : '', s.contact ? escapeHtml(s.contact) : '', s.delivery_days ? escapeHtml(s.delivery_days) : ''].filter(Boolean).join(' · ');
+  const bal = d.balance > 0 ? `<div class="sd-big bad">${fmtSum(d.balance)}</div><div class="sd-cap">${T.sd_you_owe}</div>`
+    : d.balance < 0 ? `<div class="sd-big ok">${fmtSum(-d.balance)}</div><div class="sd-cap">${T.sd_overpaid}</div>`
+    : `<div class="sd-big ok">0</div><div class="sd-cap">${T.sd_no_debt}</div>`;
+  const notes = [
+    d.overdue > 0 ? `<div class="sd-note bad">⚠️ ${T.sd_overdue} ${fmtSum(d.overdue)}${d.oldest_overdue ? ' · ' + T.sd_since + ' ' + ordDate(d.oldest_overdue) : ''}</div>` : '',
+    d.next_due ? `<div class="sd-note">${T.sd_next_due.replace('{sum}', fmtSum(d.next_due.amount)).replace('{date}', ordDate(d.next_due.date))}</div>` : '',
+    s.pay_days == null && d.balance > 0 ? `<div class="hint-text">${T.sd_no_terms}</div>` : '',
+    s.pay_days != null ? `<div class="hint-text">${T.sd_terms.replace('{n}', s.pay_days)}</div>` : '',
+    d.unpriced_orders ? `<div class="sd-note warn">${T.sd_unpriced}</div>` : '',
+  ].join('');
+  const ops = c.entries.length ? c.entries.map(e => {
+    const plus = e.type !== 'payment';
+    const title = e.type === 'order' ? T.ord_title_n.replace('{n}', e.number) : e.type === 'payment' ? T.sd_payment : T.sd_charge;
+    const click = e.type === 'order' ? `onclick="closeWhModal('supCardModal'); openOrder(${e.id});" style="cursor:pointer;"` : '';
+    const del = e.type !== 'order' ? `<button class="ord-x" onclick="deleteSupPayment(${e.id})" aria-label="${T.wh_delete_action}"><i class="fa-solid fa-xmark"></i></button>` : '';
+    return `<div class="ord-line" ${click}>
+      <div class="pl-name"><b>${title}</b><span>${ordDate(e.date)}${e.note ? ' · ' + escapeHtml(e.note) : ''}${e.unpriced ? ' · ⚠️ ' + T.sd_unpriced_short : ''}</span></div>
+      <b style="white-space:nowrap; color:${plus ? '#B91C1C' : '#15803D'};">${plus ? '+' : '−'}${fmtNum(e.amount)}</b>${del}
+    </div>`;
+  }).join('') : `<div class="hint-text">${T.sd_no_ops}</div>`;
+  const prices = c.prices.length ? c.prices.map((p, i) => {
+    const ch = p.change_pct;
+    const badge = ch == null ? '' : `<span class="pr-badge ${ch > 0 ? 'up' : 'down'}">${ch > 0 ? '↑ +' : '↓ '}${ch}%</span>`;
+    const hist = p.history.map(h => `<div class="pr-h"><span>${ordDate(h.date)} · №${h.number} · ${whQty(h.qty)} ${whUnit(p.unit)}</span><b>${fmtNum(h.price)}</b></div>`).join('');
+    return `<div class="pr-row" onclick="this.classList.toggle('open')">
+      <div class="ord-line" style="border:none; padding:6px 0;">
+        <div class="pl-name"><b>${escapeHtml(p.name)}</b><span>${ordDate(p.last_date)}${p.prev ? ' · ' + T.pr_was + ' ' + fmtNum(p.prev) : ''}${p.since_first_pct != null ? ' · ' + T.pr_since_first + ' ' + (p.since_first_pct > 0 ? '+' : '') + p.since_first_pct + '%' : ''}</span></div>
+        <div style="text-align:right;"><b style="white-space:nowrap;">${fmtNum(p.last)}</b><div>${badge}</div></div>
+      </div>
+      <div class="pr-hist">${hist}</div>
+    </div>`;
+  }).join('') : `<div class="hint-text">${T.pr_empty}</div>`;
+  document.getElementById('supCardBody').innerHTML = `
+    <div class="ord-title"><b>${escapeHtml(s.name)}</b></div>
+    ${contacts ? `<div class="ord-sub">${contacts}</div>` : ''}
+    <div class="sc-actions">
+      <button class="wh-tbtn wh-tbtn-primary" onclick="closeWhModal('supCardModal'); openNewOrder(${s.id});"><i class="fa-solid fa-plus"></i> ${T.sup_order_btn}</button>
+      <button class="wh-tbtn" onclick="closeWhModal('supCardModal'); openSupProducts(${s.id});"><i class="fa-solid fa-boxes-stacked"></i> ${T.sup_assign_short}${(SUP.list.find(x => x.id === s.id) || {}).product_count ? ' (' + SUP.list.find(x => x.id === s.id).product_count + ')' : ''}</button>
+      <button class="wh-tbtn" onclick="closeWhModal('supCardModal'); openSupplierModal(${s.id});"><i class="fa-solid fa-pen"></i> ${T.sup_edit_short}</button>
+    </div>
+    <div class="sd-box">
+      <div class="sd-head">${T.sd_title}</div>
+      ${bal}${notes}
+      <div class="sc-actions">
+        <button class="wh-tbtn wh-tbtn-primary" onclick="openSupPayForm('payment')"><i class="fa-solid fa-money-bill-wave"></i> ${T.sd_add_payment}</button>
+        <button class="wh-tbtn" onclick="openSupPayForm('charge')">${T.sd_add_charge}</button>
+      </div>
+      <div id="supPayForm" style="display:none;"></div>
+    </div>
+    <div class="sd-head" style="margin-top:14px;">${T.sd_ops}</div>
+    ${ops}
+    <div class="sd-head" style="margin-top:16px;">${T.pr_title}</div>
+    <div class="hint-text" style="margin-bottom:4px;">${T.pr_hint}</div>
+    ${prices}`;
+}
+
+function openSupPayForm(kind) {
+  const el = document.getElementById('supPayForm');
+  const today = fmtDate(new Date());
+  const d = SUP.card.debt;
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="ord-recv-grid" style="margin-top:10px;">
+      <label>${kind === 'payment' ? T.sd_pay_amount : T.sd_charge_amount}<input type="number" inputmode="numeric" min="0" id="sp_amount" value="${kind === 'payment' && d.balance > 0 ? Math.round(d.balance) : ''}"></label>
+      <label>${T.sd_date}<input type="date" id="sp_date" value="${today}"></label>
+    </div>
+    <div class="ord-recv-grid" style="grid-template-columns:1fr;"><label>${T.sd_note}<input id="sp_note" maxlength="200" placeholder="${kind === 'payment' ? T.sd_note_ph_pay : T.sd_note_ph_charge}"></label></div>
+    <button class="submit" onclick="saveSupPayment('${kind}')" style="margin-top:10px;">${T.sup_save}</button>`;
+  document.getElementById('sp_amount').focus();
+}
+
+async function saveSupPayment(kind) {
+  const amount = parseFloat(document.getElementById('sp_amount').value);
+  if (!(amount > 0)) { showMsg(T.sd_err_amount, false); return; }
+  const d = await ordFetch(`/api/suppliers/${SUP.cardId}/payments`, 'POST', {
+    kind, amount, date: document.getElementById('sp_date').value, note: document.getElementById('sp_note').value });
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  showMsg(kind === 'payment' ? T.sd_payment_saved : T.sd_charge_saved, true);
+  loadSuppliers();
+  openSupplierCard(SUP.cardId);
+}
+
+async function deleteSupPayment(pid) {
+  if (!confirm(T.sd_delete_confirm)) return;
+  const d = await ordFetch(`/api/suppliers/${SUP.cardId}/payments/${pid}`, 'DELETE');
+  if (!d.ok) { showMsg(ordErr(d), false); return; }
+  loadSuppliers();
+  openSupplierCard(SUP.cardId);
+}
+
+// ---- новый товар прямо из заказа ----
+function openOrderNewProduct() {
+  renderWarehouseCategoryOptions();
+  const src = document.getElementById('wh_new_category');
+  const sel = document.getElementById('onp_category');
+  sel.innerHTML = src ? src.innerHTML : '';
+  ['onp_name', 'onp_sell'].forEach(id => { document.getElementById(id).value = ''; });
+  onOnpCategoryChanged();
+  const s = SUP.list.find(x => x.id === ORD.cur.supplier_id);
+  document.getElementById('onp_hint').textContent = s ? T.onp_hint_sup.replace('{name}', s.name) : T.onp_hint;
+  document.getElementById('orderNewProductModal').classList.add('open');
+  document.getElementById('onp_name').focus();
+}
+
+function onOnpCategoryChanged() {
+  document.getElementById('onp_unit_row').style.display = document.getElementById('onp_category').value === 'other' ? '' : 'none';
+}
+
+async function saveOrderNewProduct() {
+  const category = document.getElementById('onp_category').value;
+  const name = document.getElementById('onp_name').value.replace(/\\s+/g, ' ').trim();
+  if (!category || !name) { showMsg(T.wh_fill_required, false); return; }
+  // такой товар уже есть на складе — просто добавляем его в заказ
+  const same = WHCTX.own.products.find(p => p.category === category && p.name.replace(/\\s+/g, ' ').trim().toUpperCase() === name.toUpperCase());
+  let product = same;
+  if (!same) {
+    const d = await ordFetch('/api/products', 'POST', { category, name, unit: document.getElementById('onp_unit').value,
+      sell_price: document.getElementById('onp_sell').value || null, initial_stock: 0, supplier_id: ORD.cur.supplier_id || null });
+    if (!d.ok) { showMsg(ordErr(d), false); return; }
+    product = d.product;
+    WHCTX.own.products.push({ ...product, stock_qty: 0, reorder_qty: 0, status: 'out' });
+    loadSuppliers();
+  }
+  closeWhModal('orderNewProductModal');
+  if (!ORD.cur.lines.some(l => l.product_id === product.id)) {
+    ORD.cur.lines.push({ product_id: product.id, name: product.name, unit: product.unit, stock_qty: product.stock_qty || 0, qty: 0, alloc: {} });
+  }
+  renderOrderEdit();
+  const inputs = document.querySelectorAll('#ordBody .ord-line input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+  showMsg(same ? T.onp_exists : T.onp_created, true);
 }
 
 // ---- склад выбранного филиала (главный) ----
@@ -6652,7 +6870,7 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
-  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg']);
+  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'deleteSupPayment', 'saveOrderNewProduct']);
 </script>
 </body>
 </html>
@@ -7404,6 +7622,13 @@ def api_create_product():
     except (KeyError, ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     product = db.create_product(g.shop_id, category, name, unit, sell_price, purchase_price, initial_stock)
+    # новинка, заведённая прямо из заказа поставщику, сразу закрепляется за ним
+    if data.get("supplier_id") not in (None, "") and not g.is_branch:
+        try:
+            if db.set_product_supplier(g.shop_id, product["id"], int(data["supplier_id"])):
+                product["supplier_id"] = int(data["supplier_id"])
+        except (TypeError, ValueError):
+            pass
     return jsonify({"ok": True, "product": product})
 
 
@@ -8042,7 +8267,55 @@ def api_cancel_order(order_id):
 @profit_blocked
 def api_receive_order(order_id):
     data = request.get_json(force=True) or {}
-    return _order_action(db.receive_order, order_id, data.get("lines") or [])
+    resp, code = _order_action(db.receive_order, order_id, data.get("lines") or [])
+    if code == 200 and data.get("paid_now"):
+        # «Оплачено сразу» — долг по этому заказу сразу закрывается оплатой
+        order = db.get_order(g.shop_id, order_id)
+        amount = db.order_amount(g.shop_id, order_id)
+        if order and order.get("supplier_id") and amount > 0:
+            db.add_supplier_payment(g.shop_id, order["supplier_id"], "payment", amount,
+                                    note=g.T["ord_title_n"].replace("{n}", str(order["number"])), order_id=order_id)
+    return resp, code
+
+
+@app.route("/api/suppliers/<int:supplier_id>/card")
+@login_required
+@profit_blocked
+def api_supplier_card(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    card = db.supplier_card(g.shop_id, supplier_id)
+    if not card:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    card["supplier"] = _public_supplier(card["supplier"])
+    card["ok"] = True
+    return jsonify(card)
+
+
+@app.route("/api/suppliers/<int:supplier_id>/payments", methods=["POST"])
+@login_required
+@profit_blocked
+def api_supplier_payment(supplier_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    data = request.get_json(force=True) or {}
+    result = db.add_supplier_payment(g.shop_id, supplier_id, data.get("kind") or "payment", data.get("amount"),
+                                     data.get("date"), data.get("note"))
+    return jsonify(result), (200 if result.get("ok") else (404 if result.get("error") == "not_found" else 400))
+
+
+@app.route("/api/suppliers/<int:supplier_id>/payments/<int:payment_id>", methods=["DELETE"])
+@login_required
+@profit_blocked
+def api_delete_supplier_payment(supplier_id, payment_id):
+    denied = _orders_allowed()
+    if denied:
+        return denied
+    if not db.delete_supplier_payment(g.shop_id, supplier_id, payment_id):
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/api/orders/<int:order_id>/distribute", methods=["POST"])
