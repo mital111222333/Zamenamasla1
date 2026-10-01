@@ -814,7 +814,7 @@ def get_active_employee(username: str, shop_id: int):
     сотрудник сразу терял доступ, а не через месяц, когда истечёт вход."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, shop_id, is_active FROM shop_users WHERE username=? AND shop_id=?",
+            "SELECT id, shop_id, is_active, password_hash FROM shop_users WHERE username=? AND shop_id=?",
             (username, shop_id)
         ).fetchone()
         return dict(row) if row and row["is_active"] else None
@@ -1266,6 +1266,40 @@ def update_car_and_client(shop_id: int, plate: str, new_plate: str, owner_name: 
         )
         conn.commit()
     return True
+
+
+@_serialized
+def change_car_owner(shop_id: int, plate: str, owner_name: str, owner_phone: str = None) -> dict:
+    """Машину продали: переводит её на нового владельца. История обслуживания
+    остаётся у машины (она нужна и новому владельцу), а прежний владелец
+    остаётся в базе со своими другими машинами и своим Telegram — напоминания
+    по этой машине ему больше не приходят.
+    Возвращает {"ok": True} или {"ok": False, "error": код}:
+    not_found — машины нет у этой точки; same_owner — указан телефон
+    нынешнего владельца; has_debt — у машины непогашенный долг прежнего
+    владельца (напоминания о нём ушли бы новому — сначала закрыть долг)."""
+    car = find_car(shop_id, plate)
+    if not car:
+        return {"ok": False, "error": "not_found"}
+    owner_phone = (owner_phone or "").strip() or None
+    with get_conn() as conn:
+        old = conn.execute("SELECT phone FROM clients WHERE id=?", (car["client_id"],)).fetchone()
+        debt = conn.execute(
+            "SELECT 1 FROM installment_plans WHERE car_id=? AND shop_id=? AND status='active'",
+            (car["id"], shop_id)
+        ).fetchone()
+    if owner_phone and old and (old["phone"] or "").strip() == owner_phone:
+        return {"ok": False, "error": "same_owner"}
+    if debt:
+        return {"ok": False, "error": "has_debt"}
+    client = get_or_create_client(shop_id, owner_name, owner_phone)
+    with get_conn() as conn:
+        conn.execute("UPDATE cars SET client_id=? WHERE id=? AND shop_id=?", (client["id"], car["id"], shop_id))
+        # счётчик напоминаний начинаем заново — новому владельцу ещё ничего не слали
+        conn.execute("UPDATE oil_changes SET reminder_count=0, last_reminder_date=NULL "
+                     "WHERE car_id=? AND status='active'", (car["id"],))
+        conn.commit()
+    return {"ok": True}
 
 
 @_serialized

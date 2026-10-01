@@ -204,6 +204,23 @@ CAR_BRANDS = [
 SERVICE_TYPES = ["Замена масла", "Замена масла + фильтр", "Полное ТО", "Другое"]
 
 
+def _pw_fingerprint(password_hash) -> str:
+    """Короткий отпечаток текущего пароля (хвост его хэша — сам пароль из
+    него не восстановить). Хранится в сессии при входе; сменили пароль —
+    отпечаток перестаёт совпадать, и все старые входы закрываются."""
+    return (password_hash or "")[-16:]
+
+
+def _session_password_ok(current_fp) -> bool:
+    saved = session.get("pwf")
+    if saved is None:
+        # вход сделан до этого обновления — запоминаем текущий отпечаток,
+        # чтобы не выкидывать всех разом при выкатке
+        session["pwf"] = current_fp
+        return True
+    return saved == current_fp
+
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -213,8 +230,17 @@ def login_required(view):
         if not shop or not shop["is_active"]:
             session.clear()
             return redirect(url_for("login_page"))
-        if session.get("is_employee") and not db.get_active_employee(session.get("username") or "", session["shop_id"]):
-            # сотрудника удалили/отключили — доступ закрывается сразу
+        if session.get("is_employee"):
+            emp = db.get_active_employee(session.get("username") or "", session["shop_id"])
+            if not emp:
+                # сотрудника удалили/отключили — доступ закрывается сразу
+                session.clear()
+                return redirect(url_for("login_page"))
+            cur_pwf = _pw_fingerprint(emp.get("password_hash"))
+        else:
+            cur_pwf = _pw_fingerprint(shop.get("password_hash"))
+        if not _session_password_ok(cur_pwf):
+            # пароль сменили — все, кто вошёл со старым паролем, выходят
             session.clear()
             return redirect(url_for("login_page"))
         g.shop_id = session["shop_id"]
@@ -258,6 +284,10 @@ def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if session.get("role") != "admin":
+            return redirect(url_for("login_page"))
+        admin = db.get_shop(session.get("shop_id")) if session.get("shop_id") else None
+        if not admin or admin.get("role") != "admin" or not _session_password_ok(_pw_fingerprint(admin.get("password_hash"))):
+            session.clear()
             return redirect(url_for("login_page"))
         return view(*args, **kwargs)
     return wrapped
@@ -680,6 +710,7 @@ def login_page():
             session["username"] = shop["username"]
             session["shop_name"] = shop.get("shop_name") or shop["username"]
             session["is_employee"] = False
+            session["pwf"] = _pw_fingerprint(shop.get("password_hash"))
             session.permanent = True
             return redirect(url_for("admin_page") if shop["role"] == "admin" else url_for("index"))
         employee = db.authenticate_shop_employee(username, password)
@@ -691,6 +722,7 @@ def login_page():
             session["username"] = employee["username"]
             session["shop_name"] = (parent_shop.get("shop_name") or "") if parent_shop else ""
             session["is_employee"] = True
+            session["pwf"] = _pw_fingerprint(employee.get("password_hash"))
             session.permanent = True
             return redirect(url_for("index"))
         _login_failed(fail_key)
@@ -1046,6 +1078,10 @@ if ('serviceWorker' in navigator) {
   .known-client .kc-lv-items { margin-top:9px; padding-top:9px; border-top:1px dashed var(--border); }
   .kc-repeat { width:100%; margin-top:10px; padding:11px 12px; border:none; border-radius:12px; background:#16A34A; color:#fff; font-weight:800; font-size:14px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
   .kc-repeat:active { transform:scale(.98); }
+  .kc-new-owner { margin:8px 0 12px; padding:6px 0; border:none; background:none; color:var(--hint); font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; }
+  .kc-new-owner-box { margin-bottom:12px; padding:12px; border-radius:12px; background:#FEF3C7; color:#78350F; font-size:13px; line-height:1.4; }
+  .kc-new-owner-box b { display:block; font-size:14px; margin-bottom:4px; }
+  .kc-new-owner-box button { margin-top:8px; padding:7px 12px; border:1px solid #D97706; border-radius:10px; background:#fff; color:#92400E; font-weight:700; font-size:12.5px; font-family:inherit; cursor:pointer; }
   .km-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
   .km-chip { border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 9px; font-size:12px; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
@@ -4623,6 +4659,22 @@ function toggleDebtSection() {
 
 // ---------- Быстрый ввод ----------
 let LAST_VISIT_ITEMS = [];
+// смена владельца машины (машину продали): KNOWN_OWNER — кто записан сейчас,
+// NEW_OWNER — пользователь подтвердил, что вписывает нового владельца
+let KNOWN_OWNER = null;
+let NEW_OWNER = false;
+let LAST_LOOKED_PLATE = '';  // номер, для которого карточка уже показана — не перерисовываем её зря
+
+function startNewOwner() {
+  NEW_OWNER = true;
+  document.getElementById('owner_name').value = '';
+  document.getElementById('owner_phone').value = '';
+  const box = document.getElementById('kcPersonBox');
+  if (box) box.innerHTML = `<div class="kc-new-owner-box"><b><i class="fa-solid fa-user-pen"></i> ${T.kc_new_owner_title}</b>${T.kc_new_owner_hint}<br><button type="button" onclick="lookupPlate(true)">${T.kc_new_owner_cancel}</button></div>`;
+  const nameEl = document.getElementById('owner_name');
+  nameEl.scrollIntoView({behavior: 'smooth', block: 'center'});
+  setTimeout(() => nameEl.focus(), 300);
+}
 
 function repeatLastVisit() {
   // «Как в прошлый раз»: те же масло/фильтры/литры, цены — текущие со склада
@@ -4819,9 +4871,15 @@ function onPlateBlur() {
   lookupPlate();
 }
 
-async function lookupPlate() {
+async function lookupPlate(force) {
   const plate = document.getElementById('plate').value.trim();
   const panel = document.getElementById('knownClientPanel');
+  // тот же номер — карточка уже на экране; не перерисовываем (иначе уход
+  // курсора из поля номера сбрасывал бы, например, режим «новый владелец»)
+  if (!force && plate && plate === LAST_LOOKED_PLATE) return;
+  LAST_LOOKED_PLATE = plate;
+  KNOWN_OWNER = null;
+  NEW_OWNER = false;
   if (!plate) { panel.innerHTML = ''; lastKnownNextMileage = null; checkMileageVsDue(); return; }
   try {
     const res = await fetch('/api/history/' + encodeURIComponent(plate));
@@ -4838,6 +4896,7 @@ async function lookupPlate() {
 
     document.getElementById('owner_name').value = data.car.owner_name || '';
     document.getElementById('owner_phone').value = data.car.owner_phone || '';
+    KNOWN_OWNER = {name: (data.car.owner_name || '').trim(), phone: (data.car.owner_phone || '').trim()};
     if (data.car.car_brand) document.getElementById('car_brand').value = data.car.car_brand;
     document.getElementById('car_model').value = data.car.car_model || '';
 
@@ -4882,12 +4941,15 @@ async function lookupPlate() {
       <div class="known-client">
         <div class="kc-header"><i class="fa-solid fa-circle-check"></i><span>${T.kc_found_title}</span></div>
         <div class="kc-body">
-          <div class="kc-person">
-            <div class="kc-avatar">${escapeHtml(initials)}</div>
-            <div>
-              <div class="kc-name">${escapeHtml(name)}</div>
-              <div class="kc-meta">${escapeHtml(metaParts.join(' · '))}</div>
+          <div id="kcPersonBox">
+            <div class="kc-person">
+              <div class="kc-avatar">${escapeHtml(initials)}</div>
+              <div>
+                <div class="kc-name">${escapeHtml(name)}</div>
+                <div class="kc-meta">${escapeHtml(metaParts.join(' · '))}</div>
+              </div>
             </div>
+            <button type="button" class="kc-new-owner" onclick="startNewOwner()"><i class="fa-solid fa-user-pen"></i>${T.kc_new_owner_btn}</button>
           </div>
           <div class="kc-history-label">${T.kc_history_label}</div>
           ${lastVisitHtml}
@@ -4897,6 +4959,7 @@ async function lookupPlate() {
       </div>
     ` + crossHtml;
   } catch (e) {
+    LAST_LOOKED_PLATE = '';
     panel.innerHTML = '';
     lastKnownNextMileage = null;
     checkMileageVsDue();
@@ -4990,6 +5053,14 @@ async function submitCar() {
     showMsg(T.msg_fill_required, false);
     return;
   }
+  // имя/телефон известной машины изменили, но «Новый владелец» не нажали —
+  // спрашиваем, иначе изменения молча терялись, а замена шла старому владельцу
+  if (KNOWN_OWNER && !NEW_OWNER) {
+    const nameChanged = payload.owner_name && payload.owner_name !== KNOWN_OWNER.name;
+    const phoneChanged = payload.owner_phone && payload.owner_phone !== KNOWN_OWNER.phone;
+    if ((nameChanged || phoneChanged) && confirm(T.kc_owner_changed_confirm)) NEW_OWNER = true;
+  }
+  payload.new_owner = NEW_OWNER;
   const res = await fetch('/api/add', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
   });
@@ -4998,6 +5069,9 @@ async function submitCar() {
     showMsg(`✅ ${T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     KM.manual = false;
+    KNOWN_OWNER = null;
+    NEW_OWNER = false;
+    LAST_LOOKED_PLATE = '';
     LAST_VISIT_ITEMS = [];
     resetItemInputs();
     document.getElementById('interval_value').value = 3;
@@ -5445,6 +5519,10 @@ async function toggleHistory(plate) {
               <input id="edit_car_model" value="${escapeHtml(car.car_model || '')}">
             </div>
           </div>
+          <label style="display:flex; gap:8px; align-items:flex-start; font-size:12px; line-height:1.35; margin:2px 0 10px; color:var(--hint); cursor:pointer;">
+            <input type="checkbox" id="edit_car_new_owner" style="width:auto; margin-top:2px; flex:none;">
+            <span>${T.edit_new_owner_label}</span>
+          </label>
           <button type="button" class="submit" onclick="saveCarEdit(${escapeHtml(JSON.stringify(plate))})">${T.btn_save}</button>
         </div>
         <div class="kc-hist-list">
@@ -5747,6 +5825,7 @@ async function saveCarEdit(oldPlate) {
     owner_phone: document.getElementById('edit_car_owner_phone').value.trim(),
     car_brand: document.getElementById('edit_car_brand').value.trim(),
     car_model: document.getElementById('edit_car_model').value.trim(),
+    new_owner: !!(document.getElementById('edit_car_new_owner') && document.getElementById('edit_car_new_owner').checked),
   };
   if (!payload.plate || !payload.owner_name) {
     showMsg(T.msg_fill_required, false);
@@ -5976,10 +6055,20 @@ def api_update_car(plate):
     car_model = (data.get("car_model") or "").strip() or None
     if not new_plate or not owner_name:
         return jsonify({"ok": False, "error": "госномер и имя обязательны"}), 400
-    ok = db.update_car_and_client(g.shop_id, plate, new_plate, owner_name, owner_phone, car_brand, car_model)
+    with db.WRITE_LOCK:
+        if data.get("new_owner"):
+            # машину продали — переводим на нового владельца, история остаётся
+            res = db.change_car_owner(g.shop_id, plate, owner_name, owner_phone)
+            if not res["ok"]:
+                return jsonify({"ok": False, "error": _owner_change_error(res["error"])}), 400
+        ok = db.update_car_and_client(g.shop_id, plate, new_plate, owner_name, owner_phone, car_brand, car_model)
     if not ok:
         return jsonify({"ok": False, "error": "машина не найдена, или новый госномер уже занят другой машиной"}), 400
     return jsonify({"ok": True, "plate": db.normalize_plate(new_plate)})
+
+
+def _owner_change_error(code):
+    return {"has_debt": g.T["err_owner_has_debt"], "same_owner": g.T["err_owner_same"]}.get(code, "машина не найдена")
 
 
 @app.route("/api/car/<plate>", methods=["DELETE"])
@@ -6056,6 +6145,13 @@ def api_add():
         # ошибку «UNIQUE constraint failed» и не плодят пустых клиентов
         with db.WRITE_LOCK:
             existing_car = db.find_car(g.shop_id, plate)
+            if existing_car and data.get("new_owner"):
+                # машину продали: сначала переводим на нового владельца (если
+                # нельзя — ничего не сохраняем и объясняем почему)
+                res = db.change_car_owner(g.shop_id, plate, owner_name, owner_phone)
+                if not res["ok"]:
+                    return jsonify({"ok": False, "error": _owner_change_error(res["error"])}), 400
+                existing_car = db.find_car(g.shop_id, plate)
             if existing_car:
                 client_id = existing_car["client_id"]
                 car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
