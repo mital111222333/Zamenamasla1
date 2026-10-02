@@ -593,11 +593,25 @@ async def process_pending_broadcasts(context: ContextTypes.DEFAULT_TYPE):
             pass
 
 
-# ============ ПЛАНИРОВЩИК НАПОМИНАНИЙ (раз в 6 часов проверяет due) ============
+# ============ ПЛАНИРОВЩИК НАПОМИНАНИЙ ============
+# Проверка раз в час, но сообщения клиентам и владельцам уходят только
+# днём по Ташкенту (раньше проверка шла раз в 6 часов от момента запуска
+# сервера, и напоминание могло прийти клиенту в 2–3 часа ночи).
+SEND_FROM_HOUR = 9
+SEND_TO_HOUR = 20
+
+
+def _daytime() -> bool:
+    return SEND_FROM_HOUR <= datetime.now().hour < SEND_TO_HOUR
+
 
 async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
-    due = db.get_due_reminders()
+    if not _daytime():
+        return
+    due = await asyncio.to_thread(db.get_due_reminders)
+    sms_creds = {}  # пароль Eskiz хранится зашифрованным — расшифровываем один раз на точку
     for item in due:
+        await asyncio.sleep(0.05)  # не упираться в лимиты Telegram
         is_followup = item["reminder_count"] > 0
         lang = item.get("language") or "ru"
         shop_name = item.get('shop_name') or SHOP_NAME
@@ -623,9 +637,13 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
         elif item.get("sms_enabled") and item.get("owner_phone"):
             key = "sms_reminder_followup" if is_followup else "sms_reminder_first"
             text = i18n.t(key, lang, plate=item['plate_number'], shop=shop_name)
-            ok, err = sms.send_sms(
-                item["shop_id"], item.get("eskiz_email"), item.get("eskiz_password"),
-                item["owner_phone"], text
+            if item["shop_id"] not in sms_creds:
+                sms_creds[item["shop_id"]] = db.get_shop_eskiz_credentials(item["shop_id"])
+            eskiz_email, eskiz_password = sms_creds[item["shop_id"]]
+            # отправка SMS — обычный сетевой запрос; в отдельном потоке, чтобы бот
+            # в это время продолжал отвечать клиентам
+            ok, err = await asyncio.to_thread(
+                sms.send_sms, item["shop_id"], eskiz_email, eskiz_password, item["owner_phone"], text
             )
             if ok:
                 db.mark_reminder_sent(item["id"])
@@ -638,8 +656,11 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
 async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYPE):
     """Напоминания о платежах по рассрочке — клиенту, если он привязан к
     боту, иначе владельцу точки (в его уведомления), чтобы напомнил сам."""
+    if not _daytime():
+        return
     due = db.get_due_installment_reminders()
     for plan in due:
+        await asyncio.sleep(0.05)
         lang = plan.get("language") or "ru"
         shop_name = plan.get("shop_name") or SHOP_NAME
         amount = plan["installment_amount"]
@@ -673,6 +694,8 @@ async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYP
 async def check_supplier_debts(context: ContextTypes.DEFAULT_TYPE):
     """Просроченный долг поставщику — напоминание владельцу точки (не чаще
     раза в 3 дня по каждому поставщику)."""
+    if not _daytime():
+        return
     fmt = lambda n: f"{int(n):,}".replace(",", " ")
     for sup in db.get_overdue_supplier_debts():
         lang = sup.get("language") or "ru"
@@ -695,27 +718,38 @@ async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
         logger.warning("ADMIN_TELEGRAM_ID не задан — резервную копию некому отправить")
         return
     today_str = datetime.now().strftime("%Y-%m-%d")
-    backup_path = f"/tmp/oilbot_backup_{today_str}.db"
+    paths = ()
     try:
-        src = sqlite3.connect(db.DB_PATH)
-        dst = sqlite3.connect(backup_path)
-        src.backup(dst)
-        dst.close()
-        src.close()
-        size_mb = os.path.getsize(backup_path) / 1024 / 1024
-        with open(backup_path, "rb") as f:
+        # снимок и сжатие — в отдельном потоке, бот в это время не «замирает»
+        paths = await asyncio.to_thread(db.make_compressed_backup, today_str)
+        gz_path = paths[1]
+        size_mb = os.path.getsize(gz_path) / 1024 / 1024
+        if size_mb > 48:
+            raise RuntimeError(f"сжатая копия {size_mb:.1f} МБ — больше лимита Telegram (50 МБ)")
+        with open(gz_path, "rb") as f:
             await context.bot.send_document(
                 chat_id=ADMIN_TELEGRAM_ID,
                 document=f,
-                filename=f"oilbot_backup_{today_str}.db",
-                caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ)",
+                filename=f"oilbot_backup_{today_str}.db.gz",
+                caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая)",
+                read_timeout=120, write_timeout=120,
             )
         logger.info(f"Резервная копия базы отправлена ({size_mb:.1f} МБ)")
     except Exception as e:
         logger.error(f"Не удалось создать/отправить резервную копию базы: {e}")
+        # раньше ошибка была видна только в логах сервера — теперь сразу сообщаем
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_TELEGRAM_ID,
+                text=f"⚠️ Ночная резервная копия НЕ отправлена: {e}\n"
+                     f"Сделайте копию вручную: админка → Резервная копия → «Отправить сейчас».",
+            )
+        except Exception:
+            pass
     finally:
-        if os.path.exists(backup_path):
-            os.remove(backup_path)
+        for pth in paths:
+            if os.path.exists(pth):
+                os.remove(pth)
 
 
 def main():
@@ -772,9 +806,9 @@ def main():
     app.add_handler(CallbackQueryHandler(reminder_button_callback))
 
     job_queue = app.job_queue
-    job_queue.run_repeating(check_and_send_reminders, interval=6 * 3600, first=10)
-    job_queue.run_repeating(check_and_send_installment_reminders, interval=6 * 3600, first=20)
-    job_queue.run_repeating(check_supplier_debts, interval=6 * 3600, first=40)
+    job_queue.run_repeating(check_and_send_reminders, interval=3600, first=60)
+    job_queue.run_repeating(check_and_send_installment_reminders, interval=3600, first=90)
+    job_queue.run_repeating(check_supplier_debts, interval=3600, first=120)
     # 1:00 по времени сервера (обычно UTC) — около 6 утра в Узбекистане, тихий час
     job_queue.run_daily(send_daily_backup, time=dtime(hour=1, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)

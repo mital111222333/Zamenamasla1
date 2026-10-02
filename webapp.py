@@ -121,6 +121,7 @@ def _idem_teardown(exc):
 
 
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # самый большой законный файл — резервная копия базы
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=os.environ.get("PUBLIC_URL", "").startswith("https://"))
 
@@ -163,22 +164,18 @@ def _create_and_send_backup(chat_id, caption_note=""):
     дублировать её в двух местах."""
     import sqlite3
     today_str = datetime.now().strftime("%Y-%m-%d")
-    backup_path = f"/tmp/oilbot_backup_manual_{today_str}.db"
+    backup_path, gz_path = db.make_compressed_backup(f"manual_{today_str}")
     try:
-        src = sqlite3.connect(db.DB_PATH)
-        dst = sqlite3.connect(backup_path)
-        src.backup(dst)
-        dst.close()
-        src.close()
-        size_mb = os.path.getsize(backup_path) / 1024 / 1024
+        size_mb = os.path.getsize(gz_path) / 1024 / 1024
         ok, err = _send_telegram_document(
-            chat_id, backup_path, f"oilbot_backup_{today_str}.db",
-            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ){caption_note}",
+            chat_id, gz_path, f"oilbot_backup_{today_str}.db.gz",
+            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая){caption_note}",
         )
         return ok, err, size_mb
     finally:
-        if os.path.exists(backup_path):
-            os.remove(backup_path)
+        for pth in (backup_path, gz_path):
+            if os.path.exists(pth):
+                os.remove(pth)
 
 
 def _validate_sqlite_backup(file_path):
@@ -209,6 +206,13 @@ def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
     базу владельцу как safety-копию — чтобы даже ошибочное восстановление
     можно было откатить."""
     same_dir_tmp = os.path.join(os.path.dirname(os.path.abspath(db.DB_PATH)), ".restore_upload.db")
+    if uploaded_bytes[:2] == b"\x1f\x8b":
+        # сжатая копия (.db.gz) — распаковываем
+        import gzip
+        try:
+            uploaded_bytes = gzip.decompress(uploaded_bytes)
+        except Exception as e:
+            return False, f"Не удалось распаковать файл: {e}"
     with open(same_dir_tmp, "wb") as f:
         f.write(uploaded_bytes)
     valid, err = _validate_sqlite_backup(same_dir_tmp)
@@ -759,23 +763,37 @@ LOGIN_WINDOW_SEC = 15 * 60
 
 
 def _client_ip():
+    # Render дописывает настоящий адрес клиента В КОНЕЦ X-Forwarded-For;
+    # первые значения присылает сам клиент и может подделать (раньше так
+    # можно было обойти ограничение на подбор пароля, меняя заголовок)
     fwd = request.headers.get("X-Forwarded-For", "")
-    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "?"
+    return (fwd.split(",")[-1].strip() if fwd else request.remote_addr) or "?"
+
+
+LOGIN_MAX_FAILS_PER_USER = 30  # с любых адресов вместе — на случай перебора с разных IP
 
 
 def _login_blocked(key) -> bool:
     now = time.time()
+    user_key = ("*", key[1])
     with _login_fail_lock:
         fails = [t for t in _login_fails.get(key, []) if now - t < LOGIN_WINDOW_SEC]
         _login_fails[key] = fails
-        return len(fails) >= LOGIN_MAX_FAILS
+        user_fails = [t for t in _login_fails.get(user_key, []) if now - t < LOGIN_WINDOW_SEC]
+        _login_fails[user_key] = user_fails
+        return len(fails) >= LOGIN_MAX_FAILS or len(user_fails) >= LOGIN_MAX_FAILS_PER_USER
 
 
 def _login_failed(key):
+    now = time.time()
     with _login_fail_lock:
-        _login_fails.setdefault(key, []).append(time.time())
-        if len(_login_fails) > 5000:  # не даём словарю расти бесконечно
-            _login_fails.clear()
+        if len(_login_fails) > 5000:
+            # чистим только устаревшее (раньше очищалось всё — счётчики
+            # можно было «сбросить», засыпав сервер попытками)
+            for k in [k for k, v in _login_fails.items() if not v or now - v[-1] > LOGIN_WINDOW_SEC]:
+                _login_fails.pop(k, None)
+        _login_fails.setdefault(key, []).append(now)
+        _login_fails.setdefault(("*", key[1]), []).append(now)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -9559,7 +9577,7 @@ if ('serviceWorker' in navigator) {
       </p>
       <div class="field">
         <label>Файл резервной копии (.db)</label>
-        <input type="file" id="restore_file" accept=".db">
+        <input type="file" id="restore_file" accept=".db,.gz">
       </div>
       <div class="field">
         <label>Чтобы подтвердить, впиши слово <code>ЗАМЕНИТЬ</code></label>
@@ -10721,7 +10739,20 @@ def display_page(anpr_token):
 def run_webapp():
     port = int(os.environ.get("PORT", 8000))
     db.init_db()
-    app.run(host="0.0.0.0", port=port, use_reloader=False, threaded=True)
+    try:
+        # waitress — надёжный сервер для работы в интернете (встроенный
+        # сервер Flask рассчитан только на разработку)
+        from waitress import serve
+        # перед сайтом стоит прокси Render: он сообщает настоящий адрес
+        # клиента в X-Forwarded-For (последнее значение) и https в
+        # X-Forwarded-Proto — без этих настроек waitress их отбрасывает
+        serve(app, host="0.0.0.0", port=port, threads=16, channel_timeout=180,
+              connection_limit=200, ident="OilBook",
+              trusted_proxy="*", trusted_proxy_count=1,
+              trusted_proxy_headers="x-forwarded-for x-forwarded-proto",
+              clear_untrusted_proxy_headers=True)
+    except ImportError:
+        app.run(host="0.0.0.0", port=port, use_reloader=False, threaded=True)
 
 
 def run_webapp_in_thread():

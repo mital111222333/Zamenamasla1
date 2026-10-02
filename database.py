@@ -684,6 +684,27 @@ def _bootstrap_accounts(conn):
         print("=" * 60)
 
 
+def make_compressed_backup(tag: str):
+    """Снимок базы через backup API SQLite (безопасно во время работы) и
+    сжатие gzip — копия становится в 4–6 раз меньше, поэтому в лимит
+    Telegram (50 МБ на файл) база влезает намного дольше. Возвращает
+    (путь_к_снимку, путь_к_сжатому_файлу); удалить оба — забота вызывающего."""
+    import gzip
+    import shutil
+    raw = f"/tmp/oilbot_backup_{tag}.db"
+    gz = raw + ".gz"
+    src = sqlite3.connect(DB_PATH)
+    dst = sqlite3.connect(raw)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+    with open(raw, "rb") as fi, gzip.open(gz, "wb", compresslevel=6) as fo:
+        shutil.copyfileobj(fi, fo, 1024 * 1024)
+    return raw, gz
+
+
 # Один общий замок на все ЗАПИСИ в базу. Бот и веб-панель работают в одном
 # процессе (разными потоками), поэтому замок надёжно выстраивает в очередь
 # одновременные «прочитал — проверил — записал» с разных телефонов: без него
