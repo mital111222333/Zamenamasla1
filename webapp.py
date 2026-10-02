@@ -7825,6 +7825,7 @@ const PS_REGIONS = ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', 
 const PS_MIN_CONF = 0.55;     // кадр учитывается, если модель уверена хотя бы на столько
 const PS_NEED_HITS = 2;       // сколько раз подряд должен прочитаться один и тот же номер
 const PS_INSTANT_CONF = 0.97; // при такой уверенности хватает одного кадра
+const PS_BASE_CONF = 0.5;     // для номера, который уже есть в базе, достаточно такой
 
 function psLoadScript(src) {
   return new Promise((resolve, reject) => {
@@ -7841,8 +7842,11 @@ function psLoadModel() {
       if (!window.ort) await psLoadScript('/ocr/v1/ort.wasm.min.js');
       ort.env.wasm.wasmPaths = '/ocr/v1/';
       ort.env.wasm.numThreads = 1;
-      PS.session = await ort.InferenceSession.create('/ocr/v1/plate_ocr.onnx', { executionProviders: ['wasm'] });
-      return PS.session;
+      const sess = await ort.InferenceSession.create('/ocr/v1/plate_ocr.onnx', { executionProviders: ['wasm'] });
+      // «прогрев»: первый прогон всегда медленный — делаем его заранее
+      try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('uint8', new Uint8Array(64 * 128 * 3), [1, 64, 128, 3]) }); } catch (e) {}
+      PS.session = sess;
+      return sess;
     })().catch(e => { PS.loading = null; throw e; });
   }
   return PS.loading;
@@ -7877,7 +7881,8 @@ async function openPlateScanner() {
   document.getElementById('psFrame').classList.remove('ps-hit');
   document.getElementById('psHint').textContent = T.ps_hint;
   psLayout();
-  ensureCarsCacheLoaded();
+  ensureCarsCacheLoaded().then(psBuildPlateSet);
+  psBuildPlateSet();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     psSetStatus(T.ps_no_camera, true);
     return;
@@ -7911,7 +7916,9 @@ async function psStartCamera() {
   if (PS.stream) return;
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
-    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    // без жёсткого разрешения: камера включается быстрее, а модели хватает
+    // и обычного качества (номер всё равно ужимается до 128×64)
+    video: { facingMode: { ideal: 'environment' } }
   });
   if (!document.getElementById('psOverlay').classList.contains('open')) {
     stream.getTracks().forEach(t => t.stop());
@@ -7929,6 +7936,10 @@ async function psStartCamera() {
   let caps = {};
   try { caps = PS.track && PS.track.getCapabilities ? PS.track.getCapabilities() : {}; } catch (e) {}
   tb.hidden = !caps.torch;
+}
+
+function psBuildPlateSet() {
+  PS.plateSet = new Set((carsCache || []).map(c => psNorm(c.plate_number)));
 }
 
 function psStopCamera() {
@@ -8015,16 +8026,13 @@ function psDecode(probs) {
 
 async function psRecognize() {
   const sess = PS.session;
-  let best = null;
-  // две вырезки: вся рамка и чуть плотнее — номер не всегда ровно на всю рамку
-  for (const inset of [[0, 0], [0.06, 0.14]]) {
-    const t = psCropTensor(inset);
-    if (!t) return null;
-    const out = await sess.run({ [sess.inputNames[0]]: t });
-    const r = psDecode(out[sess.outputNames[0]].data);
-    if (!best || r.conf > best.conf) best = r;
-  }
-  return best;
+  // по очереди: вся рамка / чуть плотнее (номер не всегда ровно на всю рамку) —
+  // один прогон модели на кадр, чтобы кадры шли чаще
+  PS.tickN = (PS.tickN || 0) + 1;
+  const t = psCropTensor(PS.tickN % 2 ? [0, 0] : [0.06, 0.14]);
+  if (!t) return null;
+  const out = await sess.run({ [sess.inputNames[0]]: t });
+  return psDecode(out[sess.outputNames[0]].data);
 }
 
 async function psTick(gen) {
@@ -8035,7 +8043,9 @@ async function psTick(gen) {
   if (r && r.conf >= PS_MIN_CONF) {
     PS.hits[r.plate] = (PS.hits[r.plate] || 0) + 1;
     document.getElementById('psFrame').classList.add('ps-hit');
-    if (r.conf >= PS_INSTANT_CONF || PS.hits[r.plate] >= PS_NEED_HITS) {
+    // номер уже есть в базе этой точки — хватает одного уверенного кадра
+    const inBase = r.conf >= PS_BASE_CONF && PS.plateSet && PS.plateSet.has(r.plate);
+    if (inBase || r.conf >= PS_INSTANT_CONF || PS.hits[r.plate] >= PS_NEED_HITS) {
       if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
       psShowResult(r.plate);
       return;
@@ -8044,7 +8054,14 @@ async function psTick(gen) {
     document.getElementById('psFrame').classList.remove('ps-hit');
   }
   if (Date.now() - PS.startedAt > 8000) document.getElementById('psHint').textContent = T.ps_hint_slow;
-  PS.timer = setTimeout(() => psTick(gen), 120);
+  psNextFrame(gen);
+}
+
+// следующий кадр — сразу, как камера даст новый (без лишних пауз)
+function psNextFrame(gen) {
+  const v = document.getElementById('psVideo');
+  if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => psTick(gen));
+  else PS.timer = setTimeout(() => psTick(gen), 30);
 }
 
 // ---- результат ----
@@ -8165,6 +8182,14 @@ function psApply(plate) {
   if (dd) { dd.style.display = 'none'; dd.innerHTML = ''; }
   lookupPlate(true);
 }
+
+// заранее, в фоне, загружаем распознавание — к нажатию 📷 оно уже готово
+// (файлы берутся из кэша телефона, интернет тратится только первый раз)
+window.addEventListener('load', () => {
+  if (!document.getElementById('plate') || !navigator.mediaDevices) return;
+  const go = () => psLoadModel().catch(() => {});
+  setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(go, { timeout: 4000 }) : go()), 2500);
+});
 
 window.addEventListener('resize', () => { if (document.getElementById('psOverlay').classList.contains('open')) psLayout(); });
 document.addEventListener('visibilitychange', () => {
