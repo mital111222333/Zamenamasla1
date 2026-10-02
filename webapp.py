@@ -398,7 +398,8 @@ LOGIN_PAGE = """
 <link rel="manifest" href="/static/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap"></noscript>
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -883,12 +884,22 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 </script>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+// скрипт Telegram нужен, только если панель открыта внутри Telegram —
+// в обычном приложении/браузере его не грузим (раньше он держал белый экран)
+if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
+  const s = document.createElement('script');
+  s.src = 'https://telegram.org/js/telegram-web-app.js';
+  s.onload = () => { if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } };
+  document.head.appendChild(s);
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap"></noscript>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <style>
   :root {
     --bg: var(--tg-theme-bg-color, #F1F5F9);
@@ -2644,8 +2655,23 @@ let USD_RATE = {{ usd_rate|tojson }};
 const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
 const BOT_USERNAME = {{ bot_username|tojson }};
 function clientLink(token) { return token && BOT_USERNAME ? 'https://t.me/' + BOT_USERNAME + '?start=' + token : ''; }
-const tg = window.Telegram ? window.Telegram.WebApp : null;
-if (tg) { tg.ready(); tg.expand(); }
+// Графики (Chart.js, ~70 КБ) нужны только в «Статистике» — грузим их не при
+// старте, а когда раздел открыли (или тихо в фоне через несколько секунд).
+// Когда библиотека пришла, а статистика уже на экране — перерисовываем её.
+let CHART_LOADING = false;
+function ensureChartJs() {
+  if (typeof Chart !== 'undefined' || CHART_LOADING) return;
+  CHART_LOADING = true;
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = () => { if (CURRENT_TAB === 'stats') refreshCurrentView(); };
+  s.onerror = () => { CHART_LOADING = false; s.remove(); };
+  document.head.appendChild(s);
+}
+window.addEventListener('load', () => {
+  if (document.getElementById('view-stats')) setTimeout(ensureChartJs, 4000);
+});
 
 let carsCache = [];
 let lastKnownNextMileage = null;
@@ -2711,7 +2737,7 @@ function showTab(t, keepScroll) {
   const bbMore = document.getElementById('bbMore');
   if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(t));
   if (!keepScroll) window.scrollTo(0, 0);
-  if (t === 'stats') loadStats();
+  if (t === 'stats') { ensureChartJs(); loadStats(); }
   if (t === 'warehouse') loadWarehouse();
   if (t === 'suppliers') loadSuppliersTab();
 }
@@ -9334,8 +9360,10 @@ if ('serviceWorker' in navigator) {
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap"></noscript>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <style>
   :root {
     --bg:#F1F5F9; --text:#1E293B; --hint:#94A3B8; --btn:#E63946; --btn-text:#FFFFFF; --blue:#0F52BA; --darkblue:#0A2540; --cyan:#00A8E8;
