@@ -30,7 +30,10 @@ self.addEventListener('activate', (event) => {
 
 // версия в адресе (Chart.js/4.4.0, font-awesome/6.4.0, файлы шрифтов) —
 // содержимое никогда не меняется, можно сразу брать из кэша
+// /ocr/v1/ — сканер госномера (движок + модель, ~4,5 МБ): скачивается один
+// раз, дальше берётся из кэша телефона; при новой модели меняется v1 → v2
 function isImmutable(url) {
+  if (url.origin === self.location.origin && url.pathname.startsWith('/ocr/')) return true;
   return url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'fonts.gstatic.com';
 }
 // свои иконки/manifest и CSS шрифтов — показываем из кэша, а в фоне обновляем
