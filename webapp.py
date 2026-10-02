@@ -753,6 +753,47 @@ def service_worker():
     return response
 
 
+# Сканер госномера: файлы распознавания (движок ONNX + модель) лежат в
+# static/ocr/. Распознавание идёт на телефоне — сервер только один раз
+# отдаёт эти файлы, дальше телефон берёт их из своего кэша. Фото номера
+# на сервер не отправляются. Файлы сжимаем gzip один раз и держим в памяти
+# (≈ 4,5 МБ вместо 13 МБ трафика на телефон).
+_OCR_FILES = {
+    "ort.wasm.min.js": "text/javascript",
+    "ort-wasm-simd-threaded.mjs": "text/javascript",
+    "ort-wasm-simd-threaded.wasm": "application/wasm",
+    "plate_ocr.onnx": "application/octet-stream",
+}
+_ocr_gz_cache = {}
+_ocr_gz_lock = threading.Lock()
+
+
+@app.route("/ocr/v1/<name>")
+def ocr_file(name):
+    import gzip
+    mime = _OCR_FILES.get(name)
+    if not mime:
+        return Response(status=404)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "ocr", name)
+    if not os.path.exists(path):
+        return Response(status=404)
+    if "gzip" in (request.headers.get("Accept-Encoding") or ""):
+        with _ocr_gz_lock:
+            body = _ocr_gz_cache.get(name)
+            if body is None:
+                with open(path, "rb") as f:
+                    body = gzip.compress(f.read(), 6)
+                _ocr_gz_cache[name] = body
+        resp = Response(body, mimetype=mime)
+        resp.headers["Content-Encoding"] = "gzip"
+    else:
+        with open(path, "rb") as f:
+            resp = Response(f.read(), mimetype=mime)
+    resp.headers["Vary"] = "Accept-Encoding"
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
 # Защита от подбора пароля: не больше 10 неверных попыток за 15 минут для
 # одной пары «адрес + логин». Хранится в памяти процесса (после перезапуска
 # сервера счётчик обнуляется — это нормально).
@@ -1725,6 +1766,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="plate-wrap">
         <span class="plate-chip">UZ</span>
         <input id="plate" placeholder="01A123BC" oninput="onPlateInput()" onblur="onPlateBlur()" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next">
+        <button type="button" class="ps-cam-btn" onclick="openPlateScanner()" title="{{ T.ps_btn_title }}" aria-label="{{ T.ps_btn_title }}"><i class="fa-solid fa-camera"></i></button>
         <div id="plateSuggest" class="plate-suggest" style="display:none;"></div>
       </div>
       <div id="knownClientPanel"></div>
@@ -7687,7 +7729,457 @@ NET_GUARD_JS = """<style>
 _SW_SNIPPET = "<script>\nif ('serviceWorker' in navigator) {"
 
 
+
+# Сканер госномера камерой телефона (распознавание прямо в браузере)
+PLATE_SCAN_HTML = r"""<style>
+  .plate-wrap #plate { padding-right:58px; }
+  .ps-cam-btn {
+    position:absolute; right:5px; top:50%; transform:translateY(-50%); width:44px; height:36px; border:none; border-radius:10px;
+    background:var(--btn); color:#fff; font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 3px 8px rgba(230,57,70,.35); padding:0;
+  }
+  .ps-cam-btn:active { transform:translateY(-50%) scale(.94); }
+  #psOverlay { position:fixed; inset:0; z-index:9000; background:#0b0f16; display:none; overflow:hidden; touch-action:none; }
+  #psOverlay.open { display:block; }
+  #psVideo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#0b0f16; }
+  #psFrame { position:absolute; left:50%; transform:translateX(-50%); border-radius:12px; box-shadow:0 0 0 200vmax rgba(0,0,0,.5); }
+  #psFrame b { position:absolute; width:26px; height:26px; border:4px solid #22d3ee; }
+  #psFrame .a { left:-2px; top:-2px; border-right:0; border-bottom:0; border-radius:12px 0 0 0; }
+  #psFrame .b { right:-2px; top:-2px; border-left:0; border-bottom:0; border-radius:0 12px 0 0; }
+  #psFrame .c { left:-2px; bottom:-2px; border-right:0; border-top:0; border-radius:0 0 0 12px; }
+  #psFrame .d { right:-2px; bottom:-2px; border-left:0; border-top:0; border-radius:0 0 12px 0; }
+  #psFrame .ps-line { position:absolute; left:8px; right:8px; top:50%; height:2px; background:#22d3ee; box-shadow:0 0 12px #22d3ee; animation:psLine 1.6s ease-in-out infinite; }
+  @keyframes psLine { 0%,100% { top:15%; } 50% { top:85%; } }
+  #psFrame.ps-hit b { border-color:#34d399; }
+  .ps-top { position:absolute; top:0; left:0; right:0; padding:calc(14px + env(safe-area-inset-top, 0px)) 14px 14px; color:#fff; display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:15px; }
+  .ps-ib { width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.16); color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; }
+  .ps-ib.on { background:#facc15; color:#111; }
+  .ps-ib[hidden] { visibility:hidden; display:flex; }
+  #psHint { position:absolute; left:16px; right:16px; text-align:center; color:#fff; font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+  #psStatus { position:absolute; left:16px; right:16px; text-align:center; }
+  #psStatus span { display:inline-block; background:rgba(34,211,238,.18); color:#a5f3fc; border:1px solid rgba(34,211,238,.4); font-size:13px; padding:7px 14px; border-radius:20px; font-weight:600; max-width:100%; }
+  #psStatus.err span { background:rgba(239,68,68,.2); color:#fecaca; border-color:rgba(239,68,68,.5); }
+  .ps-bottom { position:absolute; left:0; right:0; bottom:calc(22px + env(safe-area-inset-bottom, 0px)); text-align:center; }
+  .ps-manual { background:none; border:none; color:#fff; font-size:14px; text-decoration:underline; opacity:.85; cursor:pointer; padding:8px; font-family:inherit; }
+  .ps-priv { color:#cbd5e1; font-size:12px; margin-top:8px; }
+  #psSheet { position:absolute; left:0; right:0; bottom:0; background:var(--card, #fff); color:var(--text); border-radius:22px 22px 0 0; padding:14px 16px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -8px 24px rgba(0,0,0,.3); display:none; max-width:560px; margin:0 auto; }
+  #psOverlay.result #psSheet { display:block; }
+  #psOverlay.result #psVideo { filter:blur(4px) brightness(.6); }
+  #psOverlay.result #psFrame, #psOverlay.result #psHint, #psOverlay.result #psStatus, #psOverlay.result .ps-bottom { display:none; }
+  .ps-grab { width:40px; height:4px; border-radius:2px; background:#cbd5e1; margin:0 auto 12px; }
+  .ps-lbl { font-size:11px; color:var(--hint); font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .ps-plate-row { display:flex; align-items:center; gap:8px; margin:4px 0 12px; }
+  .ps-plate { font-family:var(--font-mono); font-weight:700; font-size:24px; letter-spacing:1.5px; white-space:nowrap; }
+  .ps-plate-input { font-family:var(--font-mono); font-weight:700; font-size:20px; letter-spacing:1px; text-transform:uppercase; flex:1; min-width:0; }
+  .ps-edit { margin-left:auto; background:none; border:none; color:var(--blue); font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap; font-family:inherit; }
+  .ps-match { border-radius:14px; padding:11px 12px; display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+  .ps-match.ok { background:var(--ok-bg); border:1.5px solid #a7f3d0; }
+  .ps-match.w { background:#FFFBEB; border:1.5px solid #fde68a; }
+  .ps-match.n { background:var(--field-bg); border:1.5px solid var(--border); }
+  .ps-av { width:40px; height:40px; border-radius:50%; background:var(--blue); color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; flex:none; }
+  .ps-match.w .ps-av { background:#B45309; }
+  .ps-match.n .ps-av { background:#94A3B8; }
+  .ps-tag { font-size:10.5px; font-weight:800; margin-bottom:3px; }
+  .ps-match.ok .ps-tag { color:var(--ok); } .ps-match.w .ps-tag { color:#B45309; } .ps-match.n .ps-tag { color:var(--hint); }
+  .ps-mt { font-size:14px; font-weight:700; }
+  .ps-mt.mono { font-family:var(--font-mono); letter-spacing:1px; }
+  .ps-ms { font-size:12px; color:#64748b; margin-top:2px; }
+  .ps-alt { font-size:12.5px; color:#64748b; margin:-4px 0 12px; }
+  .ps-alt b { font-family:var(--font-mono); color:var(--text); }
+  .ps-btns { display:flex; gap:8px; }
+  .ps-bt { flex:1; border-radius:12px; padding:13px; text-align:center; font-weight:800; font-size:14px; border:none; cursor:pointer; font-family:inherit; }
+  .ps-bt.p { background:var(--btn); color:#fff; }
+  .ps-bt.s { background:var(--field-bg); color:var(--text); border:1.5px solid var(--border); }
+  .ps-lock { text-align:center; font-size:11px; color:var(--hint); margin-top:10px; }
+</style>
+
+<div id="psOverlay" role="dialog" aria-modal="true">
+  <video id="psVideo" playsinline muted autoplay></video>
+  <div id="psFrame"><b class="a"></b><b class="b"></b><b class="c"></b><b class="d"></b><div class="ps-line"></div></div>
+  <div class="ps-top">
+    <button type="button" class="ps-ib" onclick="closePlateScanner()" aria-label="close"><i class="fa-solid fa-xmark"></i></button>
+    <div>{{ T.ps_title }}</div>
+    <button type="button" class="ps-ib" id="psTorch" onclick="psToggleTorch()" hidden aria-label="{{ T.ps_torch }}"><i class="fa-solid fa-bolt"></i></button>
+  </div>
+  <div id="psHint">{{ T.ps_hint }}</div>
+  <div id="psStatus"><span></span></div>
+  <div class="ps-bottom">
+    <button type="button" class="ps-manual" onclick="psManual()">{{ T.ps_manual }}</button>
+    <div class="ps-priv"><i class="fa-solid fa-lock"></i> {{ T.ps_privacy }}</div>
+  </div>
+  <div id="psSheet"></div>
+  <canvas id="psCanvas" width="128" height="64" style="display:none;"></canvas>
+</div>
+
+<script>
+// ===== Сканер госномера =====
+// Распознавание идёт прямо на телефоне (ONNX-модель в браузере): кадры с
+// камеры никуда не отправляются и нигде не сохраняются, сервер только один
+// раз отдаёт файлы модели (/ocr/v1/…), дальше они берутся из кэша.
+// Формат узбекских номеров: 01 A 123 BC (физлица) и 01 123 ABC (юрлица).
+const PS = { stream: null, track: null, session: null, loading: null, running: false, timer: null,
+             hits: {}, startedAt: 0, result: null, torch: false, editing: false, gen: 0 };
+const PS_ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
+const PS_FORMATS = ['DDLDDDLL', 'DDDDDLLL'];
+const PS_REGIONS = ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '85', '90', '95'];
+const PS_MIN_CONF = 0.55;     // кадр учитывается, если модель уверена хотя бы на столько
+const PS_NEED_HITS = 2;       // сколько раз подряд должен прочитаться один и тот же номер
+const PS_INSTANT_CONF = 0.97; // при такой уверенности хватает одного кадра
+
+function psLoadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+function psLoadModel() {
+  if (PS.session) return Promise.resolve(PS.session);
+  if (!PS.loading) {
+    PS.loading = (async () => {
+      if (!window.ort) await psLoadScript('/ocr/v1/ort.wasm.min.js');
+      ort.env.wasm.wasmPaths = '/ocr/v1/';
+      ort.env.wasm.numThreads = 1;
+      PS.session = await ort.InferenceSession.create('/ocr/v1/plate_ocr.onnx', { executionProviders: ['wasm'] });
+      return PS.session;
+    })().catch(e => { PS.loading = null; throw e; });
+  }
+  return PS.loading;
+}
+
+function psSetStatus(text, isErr) {
+  const st = document.getElementById('psStatus');
+  st.classList.toggle('err', !!isErr);
+  st.style.display = text ? '' : 'none';
+  st.querySelector('span').textContent = text || '';
+}
+
+// рамка: ширина ~86% экрана (не больше 440px), пропорции как у номера с запасом
+function psLayout() {
+  const ov = document.getElementById('psOverlay');
+  const W = ov.clientWidth, H = ov.clientHeight;
+  const fw = Math.min(W * 0.86, 440), fh = Math.round(fw / 3.2);
+  const top = Math.round(H * 0.42 - fh / 2);
+  const fr = document.getElementById('psFrame');
+  fr.style.width = Math.round(fw) + 'px'; fr.style.height = fh + 'px'; fr.style.top = top + 'px';
+  document.getElementById('psHint').style.top = (top - 40) + 'px';
+  document.getElementById('psStatus').style.top = (top + fh + 22) + 'px';
+}
+
+async function openPlateScanner() {
+  const ov = document.getElementById('psOverlay');
+  PS.gen++;
+  PS.result = null; PS.editing = false; PS.hits = {};
+  ov.classList.remove('result');
+  ov.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('psFrame').classList.remove('ps-hit');
+  document.getElementById('psHint').textContent = T.ps_hint;
+  psLayout();
+  ensureCarsCacheLoaded();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    psSetStatus(T.ps_no_camera, true);
+    return;
+  }
+  psSetStatus(PS.session ? T.ps_scanning : T.ps_loading);
+  const gen = PS.gen;
+  const modelP = psLoadModel();
+  try {
+    await psStartCamera();
+  } catch (e) {
+    if (gen !== PS.gen) return;
+    const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+    psSetStatus(denied ? T.ps_denied : T.ps_no_camera, true);
+    return;
+  }
+  try {
+    await modelP;
+  } catch (e) {
+    if (gen !== PS.gen) return;
+    psSetStatus(T.ps_load_fail, true);
+    return;
+  }
+  if (gen !== PS.gen || !ov.classList.contains('open')) return;
+  psSetStatus(T.ps_scanning);
+  PS.running = true;
+  PS.startedAt = Date.now();
+  psTick(gen);
+}
+
+async function psStartCamera() {
+  if (PS.stream) return;
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+  });
+  if (!document.getElementById('psOverlay').classList.contains('open')) {
+    stream.getTracks().forEach(t => t.stop());
+    return;
+  }
+  PS.stream = stream;
+  PS.track = stream.getVideoTracks()[0] || null;
+  const v = document.getElementById('psVideo');
+  v.srcObject = stream;
+  try { await v.play(); } catch (e) {}
+  // фонарик — только если телефон умеет
+  PS.torch = false;
+  const tb = document.getElementById('psTorch');
+  tb.classList.remove('on');
+  let caps = {};
+  try { caps = PS.track && PS.track.getCapabilities ? PS.track.getCapabilities() : {}; } catch (e) {}
+  tb.hidden = !caps.torch;
+}
+
+function psStopCamera() {
+  PS.running = false;
+  if (PS.timer) { clearTimeout(PS.timer); PS.timer = null; }
+  if (PS.stream) PS.stream.getTracks().forEach(t => t.stop());
+  PS.stream = null; PS.track = null;
+  const v = document.getElementById('psVideo');
+  if (v) v.srcObject = null;
+}
+
+async function psToggleTorch() {
+  if (!PS.track) return;
+  PS.torch = !PS.torch;
+  try { await PS.track.applyConstraints({ advanced: [{ torch: PS.torch }] }); }
+  catch (e) { PS.torch = false; }
+  document.getElementById('psTorch').classList.toggle('on', PS.torch);
+}
+
+function closePlateScanner() {
+  PS.gen++;
+  psStopCamera();
+  const ov = document.getElementById('psOverlay');
+  ov.classList.remove('open', 'result');
+  document.getElementById('psSheet').innerHTML = '';
+  document.body.style.overflow = '';
+}
+
+function psManual() {
+  closePlateScanner();
+  const el = document.getElementById('plate');
+  if (el) el.focus();
+}
+
+// часть кадра под рамкой → тензор 1×64×128×3 (uint8, RGB)
+function psCropTensor(inset) {
+  const v = document.getElementById('psVideo');
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return null;
+  const ew = v.clientWidth, eh = v.clientHeight;
+  const scale = Math.max(ew / vw, eh / vh);
+  const offX = (vw * scale - ew) / 2, offY = (vh * scale - eh) / 2;
+  const fr = document.getElementById('psFrame').getBoundingClientRect();
+  const vr = v.getBoundingClientRect();
+  let fx = fr.left - vr.left, fy = fr.top - vr.top, fw = fr.width, fh = fr.height;
+  fx += fw * inset[0]; fw *= (1 - 2 * inset[0]);
+  fy += fh * inset[1]; fh *= (1 - 2 * inset[1]);
+  const sx = (fx + offX) / scale, sy = (fy + offY) / scale, sw = fw / scale, sh = fh / scale;
+  const c = document.getElementById('psCanvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(v, sx, sy, sw, sh, 0, 0, 128, 64);
+  const px = ctx.getImageData(0, 0, 128, 64).data;
+  const rgb = new Uint8Array(128 * 64 * 3);
+  for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { rgb[j] = px[i]; rgb[j + 1] = px[i + 1]; rgb[j + 2] = px[i + 2]; }
+  return new ort.Tensor('uint8', rgb, [1, 64, 128, 3]);
+}
+
+// ответ модели: 10 позиций × 37 символов (вероятности). Подбираем лучший
+// вариант, подходящий под узбекский формат номера.
+function psDecode(probs) {
+  const lp = (k, j) => Math.log(probs[k * 37 + j] + 1e-9);
+  // код региона: 01, 10, 20 … 95 — остальные пары цифр сильно маловероятны
+  let reg = null;
+  for (let a = 0; a < 10; a++) for (let b = 0; b < 10; b++) {
+    const code = String(a) + String(b);
+    const sc = lp(0, a) + lp(1, b) - (PS_REGIONS.includes(code) ? 0 : 3);
+    if (!reg || sc > reg.score) reg = { score: sc, code };
+  }
+  let best = null;
+  for (const f of PS_FORMATS) {
+    let score = reg.score, out = reg.code;
+    for (let k = 2; k < 10; k++) {
+      if (k >= f.length) { score += lp(k, 36); continue; }
+      const lo = f[k] === 'D' ? 0 : 10, hi = f[k] === 'D' ? 10 : 36;
+      let bj = lo;
+      for (let j = lo + 1; j < hi; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
+      score += lp(k, bj);
+      out += PS_ALPHA[bj];
+    }
+    if (!best || score > best.score) best = { score, plate: out };
+  }
+  return { plate: best.plate, conf: Math.exp(best.score / 10) };
+}
+
+async function psRecognize() {
+  const sess = PS.session;
+  let best = null;
+  // две вырезки: вся рамка и чуть плотнее — номер не всегда ровно на всю рамку
+  for (const inset of [[0, 0], [0.06, 0.14]]) {
+    const t = psCropTensor(inset);
+    if (!t) return null;
+    const out = await sess.run({ [sess.inputNames[0]]: t });
+    const r = psDecode(out[sess.outputNames[0]].data);
+    if (!best || r.conf > best.conf) best = r;
+  }
+  return best;
+}
+
+async function psTick(gen) {
+  if (gen !== PS.gen || !PS.running) return;
+  let r = null;
+  try { r = await psRecognize(); } catch (e) { r = null; }
+  if (gen !== PS.gen || !PS.running) return;
+  if (r && r.conf >= PS_MIN_CONF) {
+    PS.hits[r.plate] = (PS.hits[r.plate] || 0) + 1;
+    document.getElementById('psFrame').classList.add('ps-hit');
+    if (r.conf >= PS_INSTANT_CONF || PS.hits[r.plate] >= PS_NEED_HITS) {
+      if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+      psShowResult(r.plate);
+      return;
+    }
+  } else {
+    document.getElementById('psFrame').classList.remove('ps-hit');
+  }
+  if (Date.now() - PS.startedAt > 8000) document.getElementById('psHint').textContent = T.ps_hint_slow;
+  PS.timer = setTimeout(() => psTick(gen), 120);
+}
+
+// ---- результат ----
+function psNorm(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function psPretty(p) {
+  p = psNorm(p);
+  if (/^[0-9]{2}[A-Z][0-9]{3}[A-Z]{2}$/.test(p)) return p.slice(0, 2) + ' ' + p[2] + ' ' + p.slice(3, 6) + ' ' + p.slice(6);
+  if (/^[0-9]{5}[A-Z]{3}$/.test(p)) return p.slice(0, 2) + ' ' + p.slice(2, 5) + ' ' + p.slice(5);
+  return p;
+}
+function psDist(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return 9;
+  const d = [];
+  for (let i = 0; i <= a.length; i++) { d.push([i]); }
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function psFindCar(plate) {
+  const p = psNorm(plate);
+  if (!p) return { kind: 'none' };
+  let near = null;
+  for (const c of (carsCache || [])) {
+    const cp = psNorm(c.plate_number);
+    if (cp === p) return { kind: 'exact', car: c };
+    if (!near && cp.length >= 6 && psDist(cp, p) === 1) near = c;
+  }
+  return near ? { kind: 'near', car: near } : { kind: 'none' };
+}
+function psInitials(name) {
+  return String(name || '').trim().split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+}
+function psDate(s) {
+  const m = String(s || '').slice(0, 10).split('-');
+  return m.length === 3 ? m[2] + '.' + m[1] + '.' + m[0] : '';
+}
+function psCarLine(c) {
+  const parts = [[c.car_brand, c.car_model].filter(Boolean).join(' ')];
+  const d = psDate(c.change_date);
+  if (d) parts.push(T.ps_last + ' ' + d);
+  return parts.filter(Boolean).join(' · ');
+}
+
+function psShowResult(plate) {
+  psStopCamera();
+  PS.result = psNorm(plate);
+  PS.editing = false;
+  document.getElementById('psOverlay').classList.add('result');
+  psRenderSheet();
+}
+
+function psRenderSheet() {
+  const sheet = document.getElementById('psSheet');
+  const plate = PS.result;
+  const m = psFindCar(plate);
+  PS.match = m;
+  const plateHtml = PS.editing
+    ? `<input id="psPlateInput" class="ps-plate-input" value="${escapeHtml(plate)}" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="psOnEdit(this)">`
+    : `<span class="ps-plate">${escapeHtml(psPretty(plate))}</span><button type="button" class="ps-edit" onclick="psStartEdit()"><i class="fa-solid fa-pen"></i> ${escapeHtml(T.ps_edit)}</button>`;
+  sheet.innerHTML = `
+    <div class="ps-grab"></div>
+    <div class="ps-lbl">${escapeHtml(T.ps_recognized)}</div>
+    <div class="ps-plate-row">${plateHtml}</div>
+    <div id="psMatchBox">${psMatchHtml(m, plate)}</div>
+    <div class="ps-lock"><i class="fa-solid fa-lock"></i> ${escapeHtml(T.ps_on_phone)}</div>`;
+  if (PS.editing) {
+    const inp = document.getElementById('psPlateInput');
+    inp.focus();
+    try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {}
+  }
+}
+
+function psMatchHtml(m, plate) {
+  if (m.kind === 'exact') {
+    const c = m.car;
+    return `<div class="ps-match ok"><div class="ps-av">${escapeHtml(psInitials(c.owner_name))}</div><div style="min-width:0;">
+        <div class="ps-tag"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(T.ps_in_base)}</div>
+        <div class="ps-mt">${escapeHtml(c.owner_name || T.kc_no_name)}</div>
+        <div class="ps-ms">${escapeHtml(psCarLine(c))}</div></div></div>
+      <div class="ps-btns"><button type="button" class="ps-bt s" onclick="openPlateScanner()"><i class="fa-solid fa-rotate"></i> ${escapeHtml(T.ps_again)}</button>
+        <button type="button" class="ps-bt p" onclick="psApply(PS.match.car.plate_number)">${escapeHtml(T.ps_use)}</button></div>`;
+  }
+  if (m.kind === 'near') {
+    const c = m.car;
+    return `<div class="ps-match w"><div class="ps-av">${escapeHtml(psInitials(c.owner_name))}</div><div style="min-width:0;">
+        <div class="ps-tag"><i class="fa-solid fa-circle-question"></i> ${escapeHtml(T.ps_maybe)}</div>
+        <div class="ps-mt mono">${escapeHtml(psPretty(c.plate_number))}</div>
+        <div class="ps-ms">${escapeHtml([c.owner_name, [c.car_brand, c.car_model].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div></div></div>
+      <div class="ps-alt">${escapeHtml(T.ps_or_new)} <b>${escapeHtml(plate)}</b></div>
+      <div class="ps-btns"><button type="button" class="ps-bt s" onclick="psApply(PS.result)">${escapeHtml(T.ps_new_btn)}</button>
+        <button type="button" class="ps-bt p" onclick="psApply(PS.match.car.plate_number)">${escapeHtml(T.ps_its_him)}</button></div>`;
+  }
+  return `<div class="ps-match n"><div class="ps-av"><i class="fa-solid fa-plus"></i></div><div>
+        <div class="ps-tag">${escapeHtml(T.ps_new)}</div>
+        <div class="ps-ms">${escapeHtml(T.ps_new_hint)}</div></div></div>
+      <div class="ps-btns"><button type="button" class="ps-bt s" onclick="openPlateScanner()"><i class="fa-solid fa-rotate"></i> ${escapeHtml(T.ps_again)}</button>
+        <button type="button" class="ps-bt p" onclick="psApply(PS.result)">${escapeHtml(T.ps_use)}</button></div>`;
+}
+
+function psStartEdit() { PS.editing = true; psRenderSheet(); }
+function psOnEdit(inp) {
+  const v = psNorm(inp.value);
+  if (inp.value !== v) inp.value = v;
+  PS.result = v;
+  PS.match = psFindCar(v);
+  document.getElementById('psMatchBox').innerHTML = psMatchHtml(PS.match, v);
+}
+
+function psApply(plate) {
+  const p = psNorm(plate);
+  if (!p) return;
+  closePlateScanner();
+  const el = document.getElementById('plate');
+  el.value = p;
+  const dd = document.getElementById('plateSuggest');
+  if (dd) { dd.style.display = 'none'; dd.innerHTML = ''; }
+  lookupPlate(true);
+}
+
+window.addEventListener('resize', () => { if (document.getElementById('psOverlay').classList.contains('open')) psLayout(); });
+document.addEventListener('visibilitychange', () => {
+  // свернули приложение — камеру выключаем (батарея и приватность)
+  if (document.hidden && PS.stream) closePlateScanner();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('psOverlay').classList.contains('open')) closePlateScanner();
+});
+</script>
+"""
+
 PAGE = PAGE + MODAL_AND_SCRIPT
+_ps_i = PAGE.rfind("</body>")
+PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + PAGE[_ps_i:]
 assert PAGE.count(_SW_SNIPPET) == 1
 PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 

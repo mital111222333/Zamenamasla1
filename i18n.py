@@ -1810,6 +1810,63 @@ UZ.update({
 })
 
 
+# --- Сканер госномера камерой ---
+RU.update({
+    "ps_btn_title": "Сканировать номер",
+    "ps_title": "Сканирование номера",
+    "ps_hint": "Поместите номер в рамку",
+    "ps_hint_slow": "Подойдите ближе — номер на всю рамку",
+    "ps_loading": "Загружаю распознавание… (только первый раз)",
+    "ps_scanning": "Распознаю…",
+    "ps_manual": "Ввести вручную",
+    "ps_privacy": "Фото не сохраняется и не отправляется",
+    "ps_recognized": "Распознан номер",
+    "ps_edit": "Изменить",
+    "ps_in_base": "ЕСТЬ В БАЗЕ",
+    "ps_maybe": "ВОЗМОЖНО ЭТО",
+    "ps_new": "НОВЫЙ КЛИЕНТ",
+    "ps_new_hint": "Такого номера нет в базе",
+    "ps_or_new": "Или новый клиент:",
+    "ps_again": "Ещё раз",
+    "ps_use": "Подставить",
+    "ps_its_him": "Это он",
+    "ps_new_btn": "Новый",
+    "ps_on_phone": "Распознано на телефоне",
+    "ps_last": "последняя замена",
+    "ps_no_camera": "Камера недоступна. Откройте OilBook в браузере Chrome или Safari.",
+    "ps_denied": "Нет доступа к камере. Разрешите камеру для этого сайта в настройках браузера.",
+    "ps_load_fail": "Не удалось загрузить распознавание. Проверьте интернет и попробуйте ещё раз.",
+    "ps_torch": "Фонарик",
+})
+UZ.update({
+    "ps_btn_title": "Raqamni skanerlash",
+    "ps_title": "Raqamni skanerlash",
+    "ps_hint": "Raqamni ramkaga joylang",
+    "ps_hint_slow": "Yaqinroq keling — raqam butun ramkani egallasin",
+    "ps_loading": "Aniqlash yuklanmoqda… (faqat birinchi marta)",
+    "ps_scanning": "Aniqlanmoqda…",
+    "ps_manual": "Qo'lda kiritish",
+    "ps_privacy": "Surat saqlanmaydi va hech qayerga yuborilmaydi",
+    "ps_recognized": "Aniqlangan raqam",
+    "ps_edit": "O'zgartirish",
+    "ps_in_base": "BAZADA BOR",
+    "ps_maybe": "BALKI BU",
+    "ps_new": "YANGI MIJOZ",
+    "ps_new_hint": "Bunday raqam bazada yo'q",
+    "ps_or_new": "Yoki yangi mijoz:",
+    "ps_again": "Yana",
+    "ps_use": "Qo'yish",
+    "ps_its_him": "Ha, shu",
+    "ps_new_btn": "Yangi",
+    "ps_on_phone": "Telefonning o'zida aniqlandi",
+    "ps_last": "oxirgi almashtirish",
+    "ps_no_camera": "Kamera mavjud emas. OilBook'ni Chrome yoki Safari brauzerida oching.",
+    "ps_denied": "Kameraga ruxsat yo'q. Brauzer sozlamalarida ushbu sayt uchun kamerani yoqing.",
+    "ps_load_fail": "Aniqlashni yuklab bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.",
+    "ps_torch": "Chiroq",
+})
+
+
 def get_texts(lang: str) -> dict:
     return TEXTS.get(lang, RU)
 
