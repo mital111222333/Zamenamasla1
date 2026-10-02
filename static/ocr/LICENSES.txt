@@ -1,0 +1,4 @@
+Сканер госномера OilBook — сторонние компоненты (лицензия MIT):
+- ONNX Runtime Web 1.20.1 (ort.wasm.min.js, ort-wasm-simd-threaded.*) — Copyright (c) Microsoft Corporation. https://github.com/microsoft/onnxruntime
+- plate_ocr.onnx — модель cct_s_v2_global из fast-plate-ocr (квантована до int8) — Copyright (c) ankandrew. https://github.com/ankandrew/fast-plate-ocr
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction, subject to the following condition: the above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
