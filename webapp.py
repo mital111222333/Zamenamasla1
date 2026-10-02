@@ -1831,7 +1831,7 @@ if ('serviceWorker' in navigator) {
   <div id="view-table" style="display:none;">
     <div id="baseClientCount" style="font-size:13px; color:var(--hint); margin-bottom:8px;"></div>
     <div style="position:relative;">
-      <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="renderTable(); toggleSearchClearBtn();" style="padding-right:40px;">
+      <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="onBaseSearch(); toggleSearchClearBtn();" style="padding-right:40px;">
       <button type="button" id="searchClearBtn" onclick="clearSearch()" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--hint); font-size:18px; cursor:pointer; padding:4px 6px;">✕</button>
     </div>
     <div id="clientCardPanel" style="display:none; margin-bottom:12px;"></div>
@@ -2642,6 +2642,8 @@ const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const IS_BRANCH = {{ is_branch|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
 const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
+const BOT_USERNAME = {{ bot_username|tojson }};
+function clientLink(token) { return token && BOT_USERNAME ? 'https://t.me/' + BOT_USERNAME + '?start=' + token : ''; }
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -6355,8 +6357,7 @@ async function ensureCarsCacheLoaded() {
   if (carsCache.length || plateSuggestLoading) return;
   plateSuggestLoading = true;
   try {
-    const res = await fetch('/api/cars');
-    carsCache = await res.json();
+    await fetchCars();
   } catch (e) { /* тихо — просто не будет подсказок в этот раз */ }
   plateSuggestLoading = false;
 }
@@ -6625,10 +6626,30 @@ async function submitCar() {
   }
 }
 
+// «База»: сначала сразу показываем то, что уже есть на телефоне, потом
+// тихо сверяемся с сервером — если ничего не поменялось, он отвечает
+// пустым 204 и ничего не скачивается.
+let CARS_VER = '';
+let carsLoadSeq = 0;
+function setCarsData(data, ver) {
+  carsCache = data;
+  CARS_VER = ver || '';
+  CARS_CLIENTS = null;
+}
+async function fetchCars() {
+  const seq = ++carsLoadSeq;
+  const res = await fetch('/api/cars' + (CARS_VER && carsCache.length ? '?v=' + encodeURIComponent(CARS_VER) : ''));
+  if (seq !== carsLoadSeq) return false;
+  if (res.status === 204) return false;
+  const data = await res.json();
+  if (seq !== carsLoadSeq || !Array.isArray(data)) return false;
+  setCarsData(data, res.headers.get('X-Data-Version'));
+  return true;
+}
 async function loadCars() {
-  const res = await fetch('/api/cars');
-  carsCache = await res.json();
-  renderTable();
+  if (carsCache.length) renderTable(true);
+  else document.getElementById('table-body').innerHTML = `<div class="hint-text" style="text-align:center; padding:24px;">${T.history_loading}</div>`;
+  if (await fetchCars()) renderTable(true);
 }
 
 async function loadDebts() {
@@ -6907,32 +6928,53 @@ function toggleSearchClearBtn() {
 function clearSearch() {
   document.getElementById('search').value = '';
   toggleSearchClearBtn();
+  BASE_SHOWN = BASE_PAGE;
   renderTable();
 }
 
-function renderTable() {
-  const q = (document.getElementById('search').value || '').toLowerCase();
-  if (openHistoryRow !== null) {
+// Показываем по 50 карточек — раньше рисовались сразу все (2 500 карточек
+// на каждую букву поиска), и на простом телефоне поиск «тормозил».
+const BASE_PAGE = 50;
+let BASE_SHOWN = BASE_PAGE;
+let CARS_CLIENTS = null;
+let baseSearchTimer = null;
+function normSearch(v) { return String(v || '').toLowerCase().split(' ').join(''); }
+function carSearchKey(c) {
+  if (c._k === undefined) c._k = normSearch([c.plate_number, c.owner_name, c.owner_phone, c.car_brand, c.car_model].join(''));
+  return c._k;
+}
+function onBaseSearch() {
+  clearTimeout(baseSearchTimer);
+  baseSearchTimer = setTimeout(() => { BASE_SHOWN = BASE_PAGE; renderTable(); }, 200);
+}
+function showMoreCars() {
+  BASE_SHOWN += 100;
+  renderTable(true);
+}
+
+function renderTable(keepPanel) {
+  const q = normSearch(document.getElementById('search').value);
+  if (!keepPanel && openHistoryRow !== null) {
     const panel = document.getElementById('clientCardPanel');
     panel.style.display = 'none';
     panel.innerHTML = '';
     openHistoryRow = null;
   }
   const countEl = document.getElementById('baseClientCount');
+  if (CARS_CLIENTS === null) CARS_CLIENTS = new Set(carsCache.map(c => c.client_id)).size;
+  const rows = q ? carsCache.filter(c => carSearchKey(c).includes(q)) : carsCache;
   if (countEl) {
-    const uniqueClients = new Set(carsCache.map(c => c.client_id)).size;
-    countEl.textContent = `${T.base_total_clients} ${uniqueClients} · ${T.base_total_cars} ${carsCache.length}`;
+    countEl.textContent = `${T.base_total_clients} ${CARS_CLIENTS} · ${T.base_total_cars} ${carsCache.length}` + (q ? ` · ${T.base_found} ${rows.length}` : '');
   }
-  const rows = carsCache.filter(c =>
-    (c.plate_number || '').toLowerCase().includes(q) || (c.owner_name || '').toLowerCase().includes(q)
-  );
-  document.getElementById('table-body').innerHTML = rows.length ? rows.map((c, i) => `
+  const shown = rows.length > BASE_SHOWN ? rows.slice(0, BASE_SHOWN) : rows;
+  const more = rows.length - shown.length;
+  document.getElementById('table-body').innerHTML = shown.length ? shown.map((c, i) => `
     <div class="car-card" onclick="toggleHistory(${escapeHtml(JSON.stringify(c.plate_number))})">
       <div class="cc-top">
         <span class="cc-plate">${escapeHtml(c.plate_number)}</span>
         ${c.telegram_id
             ? `<span class="badge linked cc-linkbtn">${T.badge_linked}</span>`
-            : `<button class="badge unlinked cc-linkbtn" onclick="event.stopPropagation(); openModal(${escapeHtml(JSON.stringify(c.plate_number))}, ${escapeHtml(JSON.stringify(c.client_link || ''))}, ${escapeHtml(JSON.stringify(c.owner_phone || ''))})">${T.badge_unlinked_btn}</button>`}
+            : `<button class="badge unlinked cc-linkbtn" onclick="event.stopPropagation(); openModal(${escapeHtml(JSON.stringify(c.plate_number))}, ${escapeHtml(JSON.stringify(clientLink(c.link_token)))}, ${escapeHtml(JSON.stringify(c.owner_phone || ''))})">${T.badge_unlinked_btn}</button>`}
       </div>
       <div class="cc-owner">${escapeHtml(c.owner_name || T.kc_no_name)}</div>
       <div class="cc-meta">${escapeHtml([c.owner_phone, [c.car_brand, c.car_model].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div>
@@ -6945,7 +6987,8 @@ function renderTable() {
         <i class="fa-solid fa-chevron-right cc-chevron"></i>
       </div>
     </div>
-  `).join('') : `<div class="hint-text" style="text-align:center; padding:20px;">${T.table_empty}</div>`;
+  `).join('') + (more > 0 ? `<button type="button" class="base-more" onclick="showMoreCars()">${T.base_show_more} (${more})</button>` : '')
+    : `<div class="hint-text" style="text-align:center; padding:20px;">${T.table_empty}</div>`;
 }
 
 async function toggleHistory(plate) {
@@ -7453,6 +7496,8 @@ NET_GUARD_JS = """<style>
   #netToast.err { background: #B42318; }
   #netToast.ok { background: #1B8A5A; }
   button.net-busy { opacity: .55; cursor: wait !important; }
+  .base-more { display: block; width: 100%; margin: 6px 0 14px; padding: 13px; border-radius: 12px; border: 1.5px dashed #94A3B8;
+    background: transparent; color: #0F52BA; font-weight: 700; font-size: 14px; cursor: pointer; }
 </style>
 <script>
 (function () {
@@ -7611,7 +7656,7 @@ def index():
     return render_template_string(
         PAGE, brands=CAR_BRANDS, service_types=SERVICE_TYPES,
         shop_name=session.get("shop_name") or "Замена масла",
-        T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False),
+        T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False), bot_username=BOT_USERNAME,
         sms_enabled=bool(shop.get("sms_enabled")) if shop else False,
         eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
@@ -7673,10 +7718,27 @@ def api_set_usd_rate():
 @app.route("/api/cars")
 @login_required
 def api_cars():
+    """Список машин для «Базы» и подсказок госномера. Отдаём только поля,
+    которые нужны экрану (раньше шло всё подряд — 1,4 МБ на 2 500 машин).
+    Версия списка (X-Data-Version) — если у телефона уже есть такая же
+    версия (?v=…), отвечаем 204 без данных: при повторном открытии «Базы»
+    ничего заново не скачивается, пока в базе ничего не поменялось."""
+    import hashlib
     cars = db.get_all_cars_overview(g.shop_id)
-    for c in cars:
-        c["client_link"] = _client_link(c.get("link_token"))
-    return jsonify(cars)
+    slim = [{
+        "plate_number": c["plate_number"], "car_brand": c["car_brand"], "car_model": c["car_model"],
+        "owner_name": c["owner_name"], "owner_phone": c["owner_phone"], "client_id": c["client_id"],
+        "link_token": c["link_token"], "telegram_id": 1 if c["telegram_id"] else 0,
+        "change_date": c["change_date"], "next_change_date": c["next_change_date"], "cost": c["cost"],
+    } for c in cars]
+    body = json.dumps(slim, ensure_ascii=False, separators=(",", ":"))
+    version = hashlib.sha1(body.encode("utf-8")).hexdigest()[:16]
+    if request.args.get("v") == version:
+        resp = Response(status=204)
+    else:
+        resp = Response(body, mimetype="application/json")
+    resp.headers["X-Data-Version"] = version
+    return resp
 
 
 def _strip_cost_price(history):

@@ -1794,6 +1794,8 @@ RU.update({
     "net_session": "Время входа истекло — войдите заново.",
     "net_offline_bar": "Нет интернета",
     "net_back_online": "Связь восстановлена",
+    "base_show_more": "Показать ещё",
+    "base_found": "найдено:",
 })
 UZ.update({
     "net_offline": "Server bilan aloqa yo'q. Internetni tekshirib, qayta urinib ko'ring.",
@@ -1803,6 +1805,8 @@ UZ.update({
     "net_session": "Kirish muddati tugadi — qaytadan kiring.",
     "net_offline_bar": "Internet yo'q",
     "net_back_online": "Aloqa tiklandi",
+    "base_show_more": "Yana ko'rsatish",
+    "base_found": "topildi:",
 })
 
 

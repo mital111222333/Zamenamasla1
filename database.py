@@ -280,6 +280,7 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_plate_only ON cars(plate_number)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_cars_client ON cars(client_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_car ON oil_changes(car_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_car_date ON oil_changes(car_id, change_date, id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_status_next ON oil_changes(status, next_change_date)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_broadcasts_shop ON broadcasts(shop_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop ON shop_users(shop_id)")
@@ -1548,14 +1549,11 @@ def get_all_cars_overview(shop_id: int):
                 c.id as car_id, c.plate_number, c.car_brand, c.car_model,
                 cl.full_name as owner_name, cl.phone as owner_phone,
                 cl.link_token, cl.telegram_id, cl.id as client_id,
-                (SELECT change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as change_date,
-                (SELECT mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as mileage,
-                (SELECT service_type FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as service_type,
-                (SELECT oil_brand FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as oil_brand,
-                (SELECT next_change_date FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_change_date,
-                (SELECT next_mileage FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as next_mileage,
-                (SELECT cost FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1) as cost
+                oc.change_date, oc.mileage, oc.service_type, oc.oil_brand,
+                oc.next_change_date, oc.next_mileage, oc.cost
             FROM cars c JOIN clients cl ON cl.id = c.client_id
+            LEFT JOIN oil_changes oc ON oc.id = (
+                SELECT id FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1)
             WHERE c.shop_id=?
             ORDER BY c.created_at DESC
         """, (shop_id,)).fetchall()
