@@ -42,6 +42,84 @@ def _no_stale_cache(resp):
         resp.headers["Cache-Control"] = "no-store, max-age=0"
     return resp
 
+# ---------- Защита от дублей при плохом интернете ----------
+# Приложение отправляет каждое изменение (замена, оплата, склад…) с ключом
+# X-Request-Id. Если связь оборвалась уже ПОСЛЕ того, как сервер всё
+# сохранил, человек нажимает ещё раз — запрос приходит с тем же ключом, и
+# сервер возвращает прежний ответ, а не создаёт вторую запись/списание.
+_IDEM_LOCK = threading.Lock()
+_IDEM = {}
+_IDEM_TTL = 15 * 60
+_IDEM_LAST_CLEAN = [0.0]
+
+
+def _idem_key():
+    rid = request.headers.get("X-Request-Id") or ""
+    if not rid or len(rid) > 100 or request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    if not request.path.startswith("/api/"):
+        return None
+    return (session.get("role"), session.get("shop_id"), session.get("username"),
+            request.method, request.path, rid)
+
+
+@app.before_request
+def _idem_before():
+    key = _idem_key()
+    if key is None:
+        return None
+    now = time.time()
+    with _IDEM_LOCK:
+        if now - _IDEM_LAST_CLEAN[0] > 60:
+            _IDEM_LAST_CLEAN[0] = now
+            for k in [k for k, v in _IDEM.items() if now - v["ts"] > _IDEM_TTL and v["ev"].is_set()]:
+                _IDEM.pop(k, None)
+        ent = _IDEM.get(key)
+        if ent is None:
+            _IDEM[key] = {"ev": threading.Event(), "resp": None, "ts": now}
+            g._idem_key = key
+            return None
+    # тот же запрос уже был — ждём, пока первый закончится, и отдаём его ответ
+    ent["ev"].wait(90)
+    if ent["resp"] is None:
+        return jsonify({"ok": False, "error": "запрос ещё выполняется — подождите и обновите страницу"}), 409
+    body, status, mimetype = ent["resp"]
+    resp = Response(body, status=status, mimetype=mimetype)
+    resp.headers["X-Idempotent-Replay"] = "1"
+    return resp
+
+
+@app.after_request
+def _idem_after(resp):
+    key = getattr(g, "_idem_key", None)
+    if key is None:
+        return resp
+    g._idem_key = None
+    with _IDEM_LOCK:
+        ent = _IDEM.get(key)
+    if ent is None:
+        return resp
+    if resp.status_code < 500 and resp.mimetype == "application/json" and not resp.direct_passthrough:
+        ent["resp"] = (resp.get_data(), resp.status_code, resp.mimetype)
+        ent["ts"] = time.time()
+    else:
+        with _IDEM_LOCK:
+            _IDEM.pop(key, None)  # ошибка сервера/файл — повтор выполнится заново
+    ent["ev"].set()
+    return resp
+
+
+@app.teardown_request
+def _idem_teardown(exc):
+    key = getattr(g, "_idem_key", None)
+    if key is None:
+        return
+    with _IDEM_LOCK:
+        ent = _IDEM.pop(key, None)
+    if ent is not None:
+        ent["ev"].set()
+
+
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=os.environ.get("PUBLIC_URL", "").startswith("https://"))
@@ -221,28 +299,39 @@ def _session_password_ok(current_fp) -> bool:
     return saved == current_fp
 
 
+def _auth_fail():
+    """Нет входа (истёк, пароль сменили, точку выключили). Запросы данных из
+    приложения получают понятный ответ 401 — приложение само покажет
+    «войдите заново» и откроет страницу входа. Раньше они получали HTML
+    страницы входа, и разделы молча оставались пустыми. Обычный переход
+    по ссылке (скачать Excel и т.п.) по-прежнему ведёт на страницу входа."""
+    if request.path.startswith("/api/") and "text/html" not in (request.headers.get("Accept") or ""):
+        return jsonify({"ok": False, "error": "session", "login": True}), 401
+    return redirect(url_for("login_page"))
+
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if session.get("role") not in ("shop", "branch") or not session.get("shop_id"):
-            return redirect(url_for("login_page"))
+            return _auth_fail()
         shop = db.get_shop(session["shop_id"])
         if not shop or not shop["is_active"]:
             session.clear()
-            return redirect(url_for("login_page"))
+            return _auth_fail()
         if session.get("is_employee"):
             emp = db.get_active_employee(session.get("username") or "", session["shop_id"])
             if not emp:
                 # сотрудника удалили/отключили — доступ закрывается сразу
                 session.clear()
-                return redirect(url_for("login_page"))
+                return _auth_fail()
             cur_pwf = _pw_fingerprint(emp.get("password_hash"))
         else:
             cur_pwf = _pw_fingerprint(shop.get("password_hash"))
         if not _session_password_ok(cur_pwf):
             # пароль сменили — все, кто вошёл со старым паролем, выходят
             session.clear()
-            return redirect(url_for("login_page"))
+            return _auth_fail()
         g.shop_id = session["shop_id"]
         g.lang = shop.get("language") or "ru"
         g.T = i18n.get_texts(g.lang)
@@ -284,11 +373,11 @@ def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if session.get("role") != "admin":
-            return redirect(url_for("login_page"))
+            return _auth_fail()
         admin = db.get_shop(session.get("shop_id")) if session.get("shop_id") else None
         if not admin or admin.get("role") != "admin" or not _session_password_ok(_pw_fingerprint(admin.get("password_hash"))):
             session.clear()
-            return redirect(url_for("login_page"))
+            return _auth_fail()
         return view(*args, **kwargs)
     return wrapped
 
@@ -6873,6 +6962,8 @@ async function toggleHistory(plate) {
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const res = await fetch('/api/history/' + encodeURIComponent(plate));
   const data = await res.json();
+  // пока шёл ответ, могли открыть другого клиента — тогда этот ответ уже не нужен
+  if (openHistoryRow !== plate) return;
   const history = data.history || [];
   historyDataCache[plate] = history;
   const body = panel;
@@ -7322,7 +7413,16 @@ function guardOnce(names) {
     const wrapped = async function (...args) {
       if (busy) return;
       busy = true;
-      try { return await fn.apply(this, args); } finally { busy = false; }
+      // нажатая кнопка тускнеет, пока ждём сервер — на слабом интернете
+      // видно, что нажатие принято и запрос идёт
+      const ev = window.event;
+      const btn = ev && ev.currentTarget && ev.currentTarget.tagName === 'BUTTON' ? ev.currentTarget : null;
+      const wasDisabled = btn ? btn.disabled : false;
+      if (btn) { btn.disabled = true; btn.classList.add('net-busy'); }
+      try { return await fn.apply(this, args); } finally {
+        busy = false;
+        if (btn) { btn.disabled = wasDisabled; btn.classList.remove('net-busy'); }
+      }
     };
     wrapped.__guarded = true;
     window[name] = wrapped;
@@ -7340,7 +7440,167 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
 </html>
 """
 
+NET_GUARD_JS = """<style>
+  #netBar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 99999; pointer-events: none;
+    background: linear-gradient(90deg, #0F52BA, #00A8E8, #0F52BA); background-size: 200% 100%;
+    animation: netBarMove 1s linear infinite; display: none; }
+  @keyframes netBarMove { from { background-position: 200% 0; } to { background-position: 0 0; } }
+  #netOffline { position: fixed; top: 0; left: 0; right: 0; z-index: 99998; background: #B42318; color: #fff;
+    text-align: center; font: 600 13px/1.2 system-ui, sans-serif; padding: 7px 10px calc(7px + env(safe-area-inset-top, 0px)); display: none; }
+  #netToast { position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    max-width: min(92vw, 460px); box-sizing: border-box; z-index: 99999; background: #1E293B; color: #fff; border-radius: 12px;
+    padding: 12px 16px; font: 500 14px/1.35 system-ui, sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.25); display: none; }
+  #netToast.err { background: #B42318; }
+  #netToast.ok { background: #1B8A5A; }
+  button.net-busy { opacity: .55; cursor: wait !important; }
+</style>
+<script>
+(function () {
+  // Общий сетевой слой: таймаут, понятные сообщения при плохом интернете,
+  // защита от дублей при повторном нажатии, реакция на истёкший вход.
+  const NT = {
+    offline: {{ T.net_offline|tojson }},
+    timeout: {{ T.net_timeout|tojson }},
+    unsure: {{ T.net_unsure|tojson }},
+    server: {{ T.net_server|tojson }},
+    session: {{ T.net_session|tojson }},
+    bar: {{ T.net_offline_bar|tojson }},
+    back: {{ T.net_back_online|tojson }}
+  };
+  const origFetch = window.fetch.bind(window);
+  // ключ запроса хранится, только пока исход неизвестен (обрыв связи):
+  // повторное нажатие с теми же данными уйдёт с тем же ключом, и сервер
+  // вернёт прежний результат вместо второй записи
+  const pendingKeys = {};
+  let active = 0, barTimer = null, toastTimer = null, lastToast = '', lastToastAt = 0;
+
+  function el(id, make) {
+    let e = document.getElementById(id);
+    if (!e && make && document.body) { e = document.createElement('div'); e.id = id; document.body.appendChild(e); }
+    return e;
+  }
+  function setBusy(delta) {
+    active = Math.max(0, active + delta);
+    const bar = el('netBar', true);
+    if (!bar) return;
+    if (active > 0 && !barTimer && bar.style.display !== 'block') {
+      barTimer = setTimeout(() => { barTimer = null; if (active > 0) bar.style.display = 'block'; }, 350);
+    }
+    if (active === 0) { if (barTimer) { clearTimeout(barTimer); barTimer = null; } bar.style.display = 'none'; }
+  }
+  function toast(text, kind, ms) {
+    const now = Date.now();
+    if (text === lastToast && now - lastToastAt < 4000) return;  // не дублировать одно и то же
+    lastToast = text; lastToastAt = now;
+    const t = el('netToast', true);
+    if (!t) { alert(text); return; }
+    t.className = kind || '';
+    t.textContent = text;
+    t.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.style.display = 'none'; }, ms || 6000);
+  }
+  window.netToast = toast;
+  function rid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+  function netError(kind, msg, shown) {
+    const e = new Error(msg); e.oilNet = kind; e.oilShown = !!shown; return e;
+  }
+  function jsonResponse(obj, status) {
+    return new Response(JSON.stringify(obj), { status: status, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  window.fetch = async function (input, init) {
+    const url = typeof input === 'string' ? input : ((input && input.url) || '');
+    const isApi = url.indexOf('/api/') === 0 || url.indexOf(location.origin + '/api/') === 0;
+    if (!isApi) return origFetch(input, init);
+    init = Object.assign({}, init || {});
+    const method = (init.method || 'GET').toUpperCase();
+    const write = method !== 'GET' && method !== 'HEAD';
+    let key = null;
+    if (write) {
+      const headers = new Headers(init.headers || {});
+      let id;
+      if (typeof init.body === 'string' || init.body == null) {
+        key = method + ' ' + url + ' ' + (init.body || '');
+        id = pendingKeys[key] || rid();
+        pendingKeys[key] = id;
+      } else {
+        id = rid();  // файл/форма — каждый раз новый запрос
+      }
+      headers.set('X-Request-Id', id);
+      init.headers = headers;
+    }
+    const big = (typeof FormData !== 'undefined' && init.body instanceof FormData) || /backup|restore|import|export|statement/.test(url);
+    const ms = big ? 180000 : (write ? 45000 : 30000);
+    const ctrl = new AbortController();
+    let timedOut = false, callerAborted = false;
+    if (init.signal) {
+      if (init.signal.aborted) { callerAborted = true; ctrl.abort(); }
+      else init.signal.addEventListener('abort', () => { callerAborted = true; ctrl.abort(); });
+    }
+    init.signal = ctrl.signal;
+    const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+    setBusy(1);
+    let res;
+    try {
+      res = await origFetch(input, init);
+    } catch (e) {
+      if (callerAborted) throw e;
+      const kind = timedOut ? 'timeout' : 'offline';
+      if (write) {
+        toast(NT.unsure, 'err', 9000);
+        throw netError(kind, NT.unsure, true);
+      }
+      throw netError(kind, kind === 'timeout' ? NT.timeout : NT.offline, false);
+    } finally {
+      clearTimeout(timer);
+      setBusy(-1);
+    }
+    if (key) delete pendingKeys[key];  // ответ получен — исход известен
+    if (res.status === 401) {
+      toast(NT.session, 'err', 4000);
+      setTimeout(() => { location.href = '/login'; }, 1500);
+      throw netError('session', NT.session, true);
+    }
+    const ct = res.headers.get('Content-Type') || '';
+    if (!res.ok && ct.indexOf('json') === -1) {
+      // сервер ответил не данными, а страницей ошибки
+      if (write) return jsonResponse({ ok: false, error: NT.server + ' (' + res.status + ')' }, res.status);
+      throw netError('server', NT.server, false);
+    }
+    return res;
+  };
+
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    if (r && r.oilNet) {
+      if (!r.oilShown) toast(r.message, 'err');
+      e.preventDefault();
+    }
+  });
+
+  function showOffline(on) {
+    const b = el('netOffline', true);
+    if (!b) return;
+    b.textContent = NT.bar;
+    b.style.display = on ? 'block' : 'none';
+  }
+  window.addEventListener('offline', () => showOffline(true));
+  window.addEventListener('online', () => { showOffline(false); toast(NT.back, 'ok', 2500); });
+  document.addEventListener('DOMContentLoaded', () => { if (navigator.onLine === false) showOffline(true); });
+})();
+</script>
+"""
+
+_SW_SNIPPET = "<script>\nif ('serviceWorker' in navigator) {"
+
+
 PAGE = PAGE + MODAL_AND_SCRIPT
+assert PAGE.count(_SW_SNIPPET) == 1
+PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
 
 @app.route("/")
@@ -9865,7 +10125,16 @@ function guardOnce(names) {
     const wrapped = async function (...args) {
       if (busy) return;
       busy = true;
-      try { return await fn.apply(this, args); } finally { busy = false; }
+      // нажатая кнопка тускнеет, пока ждём сервер — на слабом интернете
+      // видно, что нажатие принято и запрос идёт
+      const ev = window.event;
+      const btn = ev && ev.currentTarget && ev.currentTarget.tagName === 'BUTTON' ? ev.currentTarget : null;
+      const wasDisabled = btn ? btn.disabled : false;
+      if (btn) { btn.disabled = true; btn.classList.add('net-busy'); }
+      try { return await fn.apply(this, args); } finally {
+        busy = false;
+        if (btn) { btn.disabled = wasDisabled; btn.classList.remove('net-busy'); }
+      }
     };
     wrapped.__guarded = true;
     window[name] = wrapped;
@@ -9879,12 +10148,14 @@ loadShops();
 </body>
 </html>
 """
+assert ADMIN_PAGE.count(_SW_SNIPPET) == 1
+ADMIN_PAGE = ADMIN_PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
 
 @app.route("/admin")
 @admin_required
 def admin_page():
-    return render_template_string(ADMIN_PAGE)
+    return render_template_string(ADMIN_PAGE, T=i18n.get_texts("ru"))
 
 
 @app.route("/api/admin/shops")

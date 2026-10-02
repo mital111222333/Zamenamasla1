@@ -1785,6 +1785,27 @@ UZ.update({"sp_debt_now": "Hozirgi qarz"})
 TEXTS = {"ru": RU, "uz": UZ}
 
 
+# ---- Сеть: плохой интернет, истёкший вход ----
+RU.update({
+    "net_offline": "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.",
+    "net_timeout": "Сервер долго не отвечает — слабый интернет. Попробуйте ещё раз.",
+    "net_unsure": "Связь прервалась — неизвестно, сохранилось ли. Нажмите ту же кнопку ещё раз, ничего не меняя: дубля не будет.",
+    "net_server": "Ошибка на сервере. Попробуйте ещё раз через минуту.",
+    "net_session": "Время входа истекло — войдите заново.",
+    "net_offline_bar": "Нет интернета",
+    "net_back_online": "Связь восстановлена",
+})
+UZ.update({
+    "net_offline": "Server bilan aloqa yo'q. Internetni tekshirib, qayta urinib ko'ring.",
+    "net_timeout": "Server uzoq javob bermayapti — internet sust. Qayta urinib ko'ring.",
+    "net_unsure": "Aloqa uzildi — saqlangani noma'lum. Hech narsani o'zgartirmasdan shu tugmani yana bosing: dublikat bo'lmaydi.",
+    "net_server": "Serverda xatolik. Bir daqiqadan so'ng qayta urinib ko'ring.",
+    "net_session": "Kirish muddati tugadi — qaytadan kiring.",
+    "net_offline_bar": "Internet yo'q",
+    "net_back_online": "Aloqa tiklandi",
+})
+
+
 def get_texts(lang: str) -> dict:
     return TEXTS.get(lang, RU)
 
