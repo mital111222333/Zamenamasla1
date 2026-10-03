@@ -10040,6 +10040,42 @@ if ('serviceWorker' in navigator) {
   .pay-item .pay-act { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; white-space:normal; }
   .pay-item .pay-act button, .pay-item .pay-act a { border:0; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; color:#fff; text-decoration:none; font-size:13px; }
   .pay-act .ok { background:#16A34A; } .pay-act .no { background:#DC2626; } .pay-act a { background:#0F52BA; }
+  .adm-tabs { display:flex; gap:6px; background:#E2E8F0; padding:4px; border-radius:12px; margin-bottom:14px; }
+  .adm-tabs button { flex:1; height:42px; border:0; border-radius:9px; background:transparent; font-weight:700; font-size:14px; color:#475569; cursor:pointer; font-family:inherit; }
+  .adm-tabs button.on { background:#fff; color:var(--blue); box-shadow:0 1px 3px rgba(15,23,42,.12); }
+  .inc-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+  @media (min-width:900px) { .inc-grid { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .inc-kpi { background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 14px; }
+  .inc-kpi .k-l { font-size:12px; color:var(--hint); font-weight:600; }
+  .inc-kpi .k-v { font-family:var(--font-mono, monospace); font-size:20px; font-weight:700; color:var(--darkblue); margin:4px 0 2px; white-space:nowrap; }
+  .inc-kpi .k-s { font-size:12px; color:var(--hint); }
+  .inc-kpi.main { background:#0B1F3A; border-color:#0B1F3A; }
+  .inc-kpi.main .k-l, .inc-kpi.main .k-s { color:#B9C6DA; } .inc-kpi.main .k-v { color:#fff; }
+  .inc-card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .inc-card h3 { margin:0 0 10px; font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .inc-seg { display:flex; background:#EEF2F7; border-radius:9px; padding:3px; gap:3px; }
+  .inc-seg button { border:0; background:transparent; border-radius:7px; padding:6px 10px; font-size:12px; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
+  .inc-seg button.on { background:#fff; color:var(--blue); }
+  .inc-bars { display:flex; align-items:flex-end; gap:4px; height:170px; padding-top:18px; }
+  .inc-bar { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .inc-bar .b { width:100%; max-width:34px; background:#93C5FD; border-radius:6px 6px 2px 2px; min-height:2px; }
+  .inc-bar.cur .b { background:#0F52BA; }
+  .inc-bar .v { font-size:10px; color:#334155; font-weight:700; margin-bottom:3px; white-space:nowrap; }
+  .inc-bar .m { font-size:10.5px; color:var(--hint); margin-top:4px; }
+  @media (max-width:600px) { .inc-bar .v { display:none; } .inc-bar.cur .v, .inc-bar.mx .v { display:block; } }
+  .inc-stack { display:flex; height:14px; border-radius:999px; overflow:hidden; background:#EEF2F7; margin-bottom:10px; }
+  .inc-leg { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px 12px; font-size:13px; }
+  .inc-leg span i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+  .inc-term { display:flex; align-items:center; gap:8px; font-size:13px; margin:6px 0; }
+  .inc-term .t-n { width:52px; font-weight:700; }
+  .inc-term .t-bar { flex:1; height:10px; background:#EEF2F7; border-radius:999px; overflow:hidden; }
+  .inc-term .t-bar div { height:100%; background:#0F52BA; border-radius:999px; }
+  .inc-term .t-c { width:64px; text-align:right; color:var(--hint); }
+  .inc-row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px solid #EEF2F7; font-size:13px; }
+  .inc-row:first-of-type { border-top:0; }
+  .inc-row .r-s { font-size:12px; color:var(--hint); margin-top:2px; }
+  .inc-row .r-v { font-family:var(--font-mono, monospace); font-weight:700; white-space:nowrap; }
+  .inc-alert { display:flex; align-items:center; gap:10px; background:#FEF3C7; border:1.5px solid #FCD34D; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:13.5px; font-weight:600; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -10057,6 +10093,12 @@ if ('serviceWorker' in navigator) {
   </div>
 
   <div id="msg"></div>
+
+  <div class="adm-tabs" id="admTabs">
+    <button class="on" data-t="main" onclick="admTab('main')"><i class="fa-solid fa-store"></i> Точки</button>
+    <button data-t="income" onclick="admTab('income')"><i class="fa-solid fa-sack-dollar"></i> Доходы</button>
+  </div>
+  <div id="admMain">
 
   <div class="adm-stats" id="admStats">
     <div class="adm-stat"><b>—</b><span>точек</span></div>
@@ -10200,6 +10242,8 @@ if ('serviceWorker' in navigator) {
     <button data-f="unset" onclick="setShopFilter('unset')">Без даты</button>
   </div>
   <div id="shops-body"></div>
+  </div>
+  <div id="admIncome" style="display:none;"><div class="hint-text">Загружаю…</div></div>
 </div>
 
 <script>
@@ -10328,6 +10372,112 @@ async function markBranchPaid(shopId, branchId, name) {
   const data = await res.json();
   if (data.ok) { showMsg('✅ Филиал включён', true); loadBranches(shopId); }
   else showMsg('Ошибка: ' + data.error, false);
+}
+
+function admTab(t) {
+  document.querySelectorAll('#admTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.getElementById('admMain').style.display = t === 'main' ? '' : 'none';
+  document.getElementById('admIncome').style.display = t === 'income' ? '' : 'none';
+  try { history.replaceState(null, '', t === 'income' ? '#income' : location.pathname); } catch (e) {}
+  if (t === 'income') loadIncome();
+  window.scrollTo(0, 0);
+}
+
+const MONTHS_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const MONTHS_FULL = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
+function fmtShort(n) {
+  n = Number(n) || 0;
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',').replace(',0', '') + ' млн';
+  if (n >= 1000) return Math.round(n / 1000) + ' тыс';
+  return String(n);
+}
+let INC = null, incMode = 'received';
+
+async function loadIncome() {
+  const box = document.getElementById('admIncome');
+  try {
+    const res = await fetch('/api/admin/income');
+    const data = await res.json();
+    if (!data.ok) { box.innerHTML = `<div class="msg err">${escapeHtml(data.error || 'Ошибка')}</div>`; return; }
+    INC = data.stats;
+    renderIncome();
+  } catch (e) {
+    box.innerHTML = '<div class="msg err">Не удалось загрузить — проверьте интернет</div>';
+  }
+}
+
+function setIncMode(m) { incMode = m; renderIncome(); }
+
+function openPendingChecks() {
+  admTab('main');
+  const sec = document.getElementById('secSub');
+  sec.open = true;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderIncome() {
+  const d = INC;
+  if (!d) return;
+  const c = d.counts;
+  const curM = Number(d.months[d.months.length - 1].slice(5)) - 1;
+  const diff = d.this_month - d.prev_month;
+  const kpis = `
+    <div class="inc-grid">
+      <div class="inc-kpi main"><div class="k-l">Подписки в месяц</div><div class="k-v">${fmtSum(d.mrr)}</div><div class="k-s">${c.paying} точек платят · ${fmtShort(d.arr)} в год</div></div>
+      <div class="inc-kpi"><div class="k-l">Получено в ${MONTHS_FULL[curM]}</div><div class="k-v">${fmtSum(d.this_month)}</div><div class="k-s">прошлый месяц ${fmtShort(d.prev_month)}${d.prev_month || d.this_month ? (diff >= 0 ? ' · ▲ ' : ' · ▼ ') + fmtShort(Math.abs(diff)) : ''}</div></div>
+      <div class="inc-kpi"><div class="k-l">За 12 месяцев</div><div class="k-v">${fmtSum(d.year_total)}</div><div class="k-s">деньгами, все оплаты</div></div>
+      <div class="inc-kpi"><div class="k-l">Ожидается за 30 дней</div><div class="k-v">${fmtSum(d.expected_30)}</div><div class="k-s">${d.expected.length} точек продлевают</div></div>
+    </div>`;
+  const pend = d.pending.count ? `<div class="inc-alert" onclick="openPendingChecks()">🧾 <span style="flex:1;">Чеков на проверке: ${d.pending.count} на ${fmtSum(d.pending.sum)} сум</span><i class="fa-solid fa-chevron-right"></i></div>` : '';
+  const series = incMode === 'received' ? d.received : d.spread;
+  const max = Math.max(1, ...series);
+  const bars = series.map((v, i) => {
+    const m = Number(d.months[i].slice(5)) - 1;
+    return `<div class="inc-bar ${i === series.length - 1 ? 'cur' : ''} ${v === max ? 'mx' : ''}" title="${MONTHS_RU[m]} ${d.months[i].slice(0, 4)}: ${fmtSum(v)} сум">
+      <span class="v">${v ? fmtShort(v) : ''}</span><div class="b" style="height:${Math.round(v / max * 100)}%;"></div><span class="m">${MONTHS_RU[m]}</span></div>`;
+  }).join('');
+  const chart = `
+    <div class="inc-card">
+      <h3>Оплаты по месяцам
+        <span class="inc-seg"><button class="${incMode === 'received' ? 'on' : ''}" onclick="setIncMode('received')">Получено</button><button class="${incMode === 'spread' ? 'on' : ''}" onclick="setIncMode('spread')">В пересчёте на месяц</button></span>
+      </h3>
+      <div class="inc-bars">${bars}</div>
+      <div class="hint-text" style="margin-top:8px;">${incMode === 'received' ? 'Деньги в месяц, когда оплата подтверждена. Оплата за год даёт один высокий столбик.' : 'Оплата за N месяцев разложена поровну на эти месяцы — так видно реальный доход в месяц.'}</div>
+    </div>`;
+  const parts = [
+    ['Платят', c.paying, '#16A34A'], ['∞ Бессрочные', c.lifetime, '#0F52BA'], ['Без даты', c.unset, '#94A3B8'],
+    ['Заблокированы', c.blocked, '#DC2626'], ['Выключены', c.off, '#CBD5E1']];
+  const totalPts = Math.max(1, parts.reduce((a, p) => a + p[1], 0));
+  const pts = `
+    <div class="inc-card">
+      <h3>Точки <span class="hint-text" style="font-weight:600;">всего ${c.total}${c.soon ? ' · скоро истекает: ' + c.soon : ''}</span></h3>
+      <div class="inc-stack">${parts.filter(p => p[1]).map(p => `<div style="width:${p[1] / totalPts * 100}%; background:${p[2]};"></div>`).join('')}</div>
+      <div class="inc-leg">${parts.map(p => `<span><i style="background:${p[2]};"></i>${p[0]}: <b>${p[1]}</b></span>`).join('')}</div>
+      <div class="hint-text" style="margin-top:10px;">Цена: главная ${fmtSum(d.price_main)} + филиал ${fmtSum(d.price_branch)} сум/мес${d.lifetime_sales ? ' · ∞ продано: ' + d.lifetime_sales : ''}${d.branch_cash ? ' · филиалов оплачено вручную: ' + d.branch_cash : ''}</div>
+    </div>`;
+  const tTotal = Math.max(1, Object.values(d.terms).reduce((a, b) => a + b, 0));
+  const terms = `
+    <div class="inc-card">
+      <h3>Какой срок выбирают</h3>
+      ${[1, 3, 6, 12].map(m => `<div class="inc-term"><span class="t-n">${m} мес</span><span class="t-bar"><div style="width:${d.terms[m] / tTotal * 100}%;"></div></span><span class="t-c">${d.terms[m]} · ${Math.round(d.terms[m] / tTotal * 100)}%</span></div>`).join('')}
+    </div>`;
+  const exp = `
+    <div class="inc-card">
+      <h3>Продлевают в ближайшие 30 дней</h3>
+      ${d.expected.length ? d.expected.map(x => `<div class="inc-row"><div><b>${escapeHtml(x.name)}</b><div class="r-s">до ${fmtDay(x.paid_until)} · ${x.days === 0 ? 'сегодня последний день' : 'через ' + x.days + ' дн.'}</div></div><span class="r-v">${fmtSum(x.monthly)}/мес</span></div>`).join('') : '<div class="hint-text">Никто — всё оплачено надолго вперёд.</div>'}
+    </div>`;
+  const blk = d.blocked.length ? `
+    <div class="inc-card">
+      <h3>Не продлили <span class="hint-text" style="font-weight:600;">теряем ${fmtSum(d.blocked.reduce((a, x) => a + x.monthly, 0))} сум/мес</span></h3>
+      ${d.blocked.map(x => `<div class="inc-row"><div><b>${escapeHtml(x.name)}</b><div class="r-s">заблокирована ${x.days} дн. · было оплачено до ${fmtDay(x.paid_until)}</div></div><span class="r-v" style="color:#B3241C;">${fmtSum(x.monthly)}/мес</span></div>`).join('')}
+    </div>` : '';
+  const kindTxt = j => j.kind === 'lifetime' ? '∞ бессрочная' : j.kind === 'branches' ? 'новые филиалы' : `${j.months} мес${j.kind === 'both' ? ' + филиалы' : ''}`;
+  const jr = `
+    <div class="inc-card">
+      <h3>Последние оплаты</h3>
+      ${d.journal.length ? d.journal.map(j => `<div class="inc-row"><div><b>${escapeHtml(j.name)}</b><div class="r-s">${fmtDay(j.date)} · ${kindTxt(j)} · ${j.method === 'cash' ? 'наличные' : 'перевод'}</div></div><span class="r-v">${j.amount ? fmtSum(j.amount) : '—'}</span></div>`).join('') : '<div class="hint-text">Оплат пока нет.</div>'}
+    </div>`;
+  document.getElementById('admIncome').innerHTML = kpis + pend + chart + pts + terms + exp + blk + jr;
 }
 
 async function loadSubPanel() {
@@ -10997,6 +11147,7 @@ guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'de
   'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings']);
 loadShops();
 loadSubPanel();
+if (location.hash === '#income') admTab('income');
 </script>
 </body>
 </html>
@@ -11577,26 +11728,31 @@ def _tg_api(method: str, data: dict = None, files: dict = None):
         return None
 
 
-def _send_receipt_to_admin(p: dict, path: str, mime: str):
-    """Чек — администратору платформы в Telegram с кнопками ✅/❌."""
+def _send_receipt_to_admin(p: dict, data_bytes: bytes, fname: str, mime: str):
+    """Чек — администратору платформы в Telegram с кнопками ✅/❌. На сервере
+    файл не сохраняется: хранится сам Telegram (бесплатно и бессрочно), в базе
+    — только file_id. Возвращает (message_id, file_id) или None."""
     if not ADMIN_TELEGRAM_ID:
-        return
+        return None
     markup = json.dumps({"inline_keyboard": [[
         {"text": "✅ Подтвердить", "callback_data": f"subpay:ok:{p['id']}"},
         {"text": "❌ Отклонить", "callback_data": f"subpay:no:{p['id']}"},
     ]]})
     caption = _sub_admin_caption(p)
     data = {"chat_id": ADMIN_TELEGRAM_ID, "caption": caption, "reply_markup": markup}
-    fname = os.path.basename(path)
     result = None
     if mime in ("image/jpeg", "image/png", "image/webp"):
-        with open(path, "rb") as f:
-            result = _tg_api("sendPhoto", data, {"photo": (fname, f, mime)})
+        result = _tg_api("sendPhoto", data, {"photo": (fname, data_bytes, mime)})
     if not result:
-        with open(path, "rb") as f:
-            result = _tg_api("sendDocument", data, {"document": (fname, f, mime or "application/octet-stream")})
-    if result and result.get("message_id"):
-        db.set_sub_payment_tg_message(p["id"], result["message_id"])
+        result = _tg_api("sendDocument", data, {"document": (fname, data_bytes, mime or "application/octet-stream")})
+    if not result or not result.get("message_id"):
+        return None
+    file_id = None
+    if result.get("photo"):
+        file_id = result["photo"][-1].get("file_id")  # самый крупный размер
+    elif result.get("document"):
+        file_id = result["document"].get("file_id")
+    return result["message_id"], file_id
 
 
 def _sub_owner_link() -> str:
@@ -11783,18 +11939,20 @@ def api_subscription_pay():
         return jsonify({"ok": False, "error": T["sub_file_big"]}), 400
     if not data:
         return jsonify({"ok": False, "error": T["sub_file_needed"]}), 400
+    if not ADMIN_TELEGRAM_ID or not BOT_TOKEN:
+        logger.error("Чек не принят: на сервере не заданы ADMIN_TELEGRAM_ID / BOT_TOKEN")
+        return jsonify({"ok": False, "error": T["sub_err"]}), 503
     pid = db.create_sub_payment(g.shop_id, kind, months, amount, discount, pending_ids,
                                 q["branch_count"], new_until)
-    os.makedirs(db.RECEIPTS_DIR, exist_ok=True)
-    fname = f"{pid}_{secrets.token_hex(4)}{ext}"
-    with open(os.path.join(db.RECEIPTS_DIR, fname), "wb") as out:
-        out.write(data)
-    db.set_sub_payment_receipt(pid, fname, mime)
-    p = db.get_sub_payment(pid)
+    sent = None
     try:
-        _send_receipt_to_admin(p, os.path.join(db.RECEIPTS_DIR, fname), mime)
+        sent = _send_receipt_to_admin(db.get_sub_payment(pid), data, f"check_{pid}{ext}", mime)
     except Exception as e:
         logger.error(f"Не удалось отправить чек {pid} администратору: {e}")
+    if not sent:
+        db.sub_payment_failed(pid)  # чек не дошёл — человек просто отправит ещё раз
+        return jsonify({"ok": False, "error": T["sub_err"]}), 502
+    db.sub_payment_sent(pid, sent[0], sent[1], mime)
     return jsonify({"ok": True, "id": pid})
 
 
@@ -11809,9 +11967,15 @@ def _admin_sub_summary(shop: dict) -> dict:
         "expired": st["expired"], "monthly": q["monthly"], "branch_count": q["branch_count"],
         "pending_branches": len(q["pending_branches"]),
         "pending_payment": {"id": pend["id"], "amount": pend["amount"], "kind": pend["kind"],
-                            "months": pend["months"], "has_receipt": bool(pend.get("receipt_file"))}
+                            "months": pend["months"], "has_receipt": bool(pend.get("tg_file_id"))}
         if pend else None,
     }
+
+
+@app.route("/api/admin/income")
+@admin_required
+def api_admin_income():
+    return jsonify({"ok": True, "stats": db.get_income_stats()})
 
 
 @app.route("/api/admin/sub/settings")
@@ -11838,8 +12002,8 @@ def api_admin_sub_payments():
     rows = db.list_sub_payments(status=status, limit=100)
     for r in rows:
         r["caption"] = _sub_admin_caption(r)
-        r["has_receipt"] = bool(r.get("receipt_file"))
-        r.pop("receipt_file", None)
+        r["has_receipt"] = bool(r.get("tg_file_id"))
+        r.pop("tg_file_id", None)
     return jsonify({"ok": True, "payments": rows})
 
 
@@ -11857,13 +12021,24 @@ def api_admin_sub_decide(payment_id, action):
 @app.route("/api/admin/sub/receipt/<int:payment_id>")
 @admin_required
 def api_admin_sub_receipt(payment_id):
+    """Показывает чек, который лежит в Telegram (на сервере его нет)."""
     p = db.get_sub_payment(payment_id)
-    if not p or not p.get("receipt_file"):
+    if not p or not p.get("tg_file_id"):
         return "Чек не найден", 404
-    path = os.path.join(db.RECEIPTS_DIR, os.path.basename(p["receipt_file"]))
-    if not os.path.exists(path):
-        return "Файл чека не найден на сервере (например, база восстановлена из копии)", 404
-    return send_file(path, mimetype=p.get("receipt_mime") or "application/octet-stream")
+    info = _tg_api("getFile", {"file_id": p["tg_file_id"]})
+    if not info or not info.get("file_path"):
+        return "Не удалось получить чек из Telegram — откройте его в чате с ботом", 502
+    try:
+        resp = requests.get(f"https://api.telegram.org/file/bot{BOT_TOKEN}/{info['file_path']}", timeout=30)
+    except Exception as e:
+        logger.error(f"Чек {payment_id} не скачан из Telegram: {e}")
+        return "Не удалось получить чек из Telegram — откройте его в чате с ботом", 502
+    if not resp.ok:
+        return "Не удалось получить чек из Telegram — откройте его в чате с ботом", 502
+    mime = p.get("receipt_mime") or resp.headers.get("Content-Type") or "application/octet-stream"
+    if info["file_path"].endswith(".jpg"):
+        mime = "image/jpeg"  # Telegram пересжимает фото в JPEG
+    return Response(resp.content, mimetype=mime, headers={"Cache-Control": "private, max-age=3600"})
 
 
 @app.route("/api/admin/shops/<int:shop_id>/sub", methods=["POST"])

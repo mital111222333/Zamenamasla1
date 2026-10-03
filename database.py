@@ -4511,7 +4511,8 @@ SUB_DEFAULTS = {
     "support_contact": "",
 }
 _SUB_INT_KEYS = ("price_main", "price_branch", "disc_1", "disc_3", "disc_6", "disc_12")
-RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(DB_PATH)), "receipts")
+# Чеки на сервере НЕ хранятся: файл сразу уходит администратору в Telegram,
+# в базе остаётся только его file_id (по нему админка показывает чек).
 
 
 def _migrate_subscription(conn):
@@ -4540,12 +4541,16 @@ def _migrate_subscription(conn):
         receipt_file TEXT,
         receipt_mime TEXT,
         tg_message_id INTEGER,
+        tg_file_id TEXT,
         new_until TEXT,
         note TEXT,
         created_at TEXT DEFAULT (datetime('now', 'localtime')),
         decided_at TEXT
     )
     """)
+    pay_cols = {row["name"] for row in conn.execute("PRAGMA table_info(sub_payments)").fetchall()}
+    if "tg_file_id" not in pay_cols:
+        conn.execute("ALTER TABLE sub_payments ADD COLUMN tg_file_id TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_payments_shop ON sub_payments(shop_id, status)")
     conn.execute("""
     CREATE TABLE IF NOT EXISTS platform_settings (
@@ -4722,32 +4727,39 @@ def list_sub_payments(head_id: int = None, status: str = None, limit: int = 50) 
 @_serialized
 def create_sub_payment(head_id: int, kind: str, months, amount: int, discount: int,
                        branch_ids: list, branch_count: int, new_until: str = None) -> int:
-    """Заявка на оплату по чеку. Прежняя непроверенная заявка этой точки
-    заменяется новой (человек мог ошибиться и отправить чек ещё раз)."""
+    """Заявка на оплату по чеку (статус 'sending' — пока чек не дошёл до
+    Telegram администратора; после этого — 'pending', см. sub_payment_sent)."""
     with get_conn() as conn:
-        conn.execute("UPDATE sub_payments SET status='replaced', decided_at=datetime('now','localtime') "
-                     "WHERE shop_id=? AND status='pending'", (head_id,))
         cur = conn.execute("""
             INSERT INTO sub_payments (shop_id, kind, months, discount, amount, branch_count, branch_ids,
                                       method, status, new_until)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'card', 'pending', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'card', 'sending', ?)
         """, (head_id, kind, months, discount, amount, branch_count, json.dumps(branch_ids or []), new_until))
         conn.commit()
         return cur.lastrowid
 
 
 @_serialized
-def set_sub_payment_receipt(payment_id: int, file_name: str, mime: str):
+def sub_payment_sent(payment_id: int, message_id, file_id: str, mime: str):
+    """Чек дошёл до Telegram: заявка становится «на проверке», а прежняя
+    непроверенная заявка этой точки заменяется (человек мог ошибиться и
+    отправить чек ещё раз)."""
     with get_conn() as conn:
-        conn.execute("UPDATE sub_payments SET receipt_file=?, receipt_mime=? WHERE id=?",
-                     (file_name, mime, payment_id))
+        row = conn.execute("SELECT shop_id FROM sub_payments WHERE id=?", (payment_id,)).fetchone()
+        if not row:
+            return
+        conn.execute("UPDATE sub_payments SET status='replaced', decided_at=datetime('now','localtime') "
+                     "WHERE shop_id=? AND status='pending' AND id!=?", (row["shop_id"], payment_id))
+        conn.execute("UPDATE sub_payments SET status='pending', tg_message_id=?, tg_file_id=?, receipt_mime=? "
+                     "WHERE id=?", (message_id, file_id, mime, payment_id))
         conn.commit()
 
 
 @_serialized
-def set_sub_payment_tg_message(payment_id: int, message_id):
+def sub_payment_failed(payment_id: int):
     with get_conn() as conn:
-        conn.execute("UPDATE sub_payments SET tg_message_id=? WHERE id=?", (message_id, payment_id))
+        conn.execute("UPDATE sub_payments SET status='failed', decided_at=datetime('now','localtime') WHERE id=?",
+                     (payment_id,))
         conn.commit()
 
 
@@ -4919,3 +4931,124 @@ def mark_sub_notice(head_id: int, key: str):
     with get_conn() as conn:
         conn.execute("UPDATE shops SET sub_notice=? WHERE id=?", (key, head_id))
         conn.commit()
+
+
+def get_income_stats() -> dict:
+    """Для вкладки «Доходы» в админке: сколько точек на подписке, сколько
+    денег приходит, кто скоро платит, кто не продлил."""
+    today = _today()
+    settings = get_platform_settings()
+    with get_conn() as conn:
+        heads = [dict(r) for r in conn.execute(
+            "SELECT * FROM shops WHERE role='shop' ORDER BY shop_name COLLATE NOCASE").fetchall()]
+        branches = [dict(r) for r in conn.execute(
+            "SELECT id, parent_shop_id, is_active FROM shops WHERE role='branch'").fetchall()]
+        pays = [dict(r) for r in conn.execute("""
+            SELECT p.*, s.shop_name, s.username FROM sub_payments p LEFT JOIN shops s ON s.id = p.shop_id
+            WHERE p.status IN ('confirmed', 'pending') ORDER BY COALESCE(p.decided_at, p.created_at) DESC, p.id DESC
+        """).fetchall()]
+    br_count = {}
+    for b in branches:
+        if b["is_active"]:
+            br_count[b["parent_shop_id"]] = br_count.get(b["parent_shop_id"], 0) + 1
+
+    counts = {"total": 0, "paying": 0, "lifetime": 0, "unset": 0, "blocked": 0, "soon": 0, "off": 0}
+    mrr = 0
+    expected, blocked = [], []
+    for h in heads:
+        counts["total"] += 1
+        if not h.get("is_active"):
+            counts["off"] += 1
+            continue
+        monthly = settings["price_main"] + settings["price_branch"] * br_count.get(h["id"], 0)
+        name = h.get("shop_name") or h["username"]
+        if (h.get("license_type") or "sub") == "lifetime":
+            counts["lifetime"] += 1
+            continue
+        until = _parse_day(h.get("paid_until"))
+        if not until:
+            counts["unset"] += 1
+            continue
+        left = (until - today).days
+        if left < 0:
+            counts["blocked"] += 1
+            blocked.append({"id": h["id"], "name": name, "paid_until": until.strftime("%Y-%m-%d"),
+                            "days": -left, "monthly": monthly})
+            continue
+        counts["paying"] += 1
+        mrr += monthly
+        if left <= 5:
+            counts["soon"] += 1
+        if left <= 30:
+            expected.append({"id": h["id"], "name": name, "paid_until": until.strftime("%Y-%m-%d"),
+                             "days": left, "monthly": monthly})
+    expected.sort(key=lambda x: x["days"])
+    blocked.sort(key=lambda x: x["days"])
+
+    # деньги по месяцам (последние 12): «получено» — в месяц оплаты;
+    # «в пересчёте» — оплата за N месяцев делится поровну на эти месяцы
+    months = []
+    d = today.replace(day=1)
+    for i in range(11, -1, -1):
+        months.append((d - relativedelta(months=i)).strftime("%Y-%m"))
+    received = {m: 0 for m in months}
+    spread = {m: 0 for m in months}
+    terms = {1: 0, 3: 0, 6: 0, 12: 0}
+    lifetime_sales = 0
+    branch_cash = 0
+    pending_sum, pending_n = 0, 0
+    journal = []
+    for p in pays:
+        if p["status"] == "pending":
+            pending_sum += int(p.get("amount") or 0)
+            pending_n += 1
+            continue
+        if p["kind"] == "lifetime":
+            lifetime_sales += 1
+        if p["kind"] == "branches" and not p.get("amount"):
+            branch_cash += 1
+        amount = int(p.get("amount") or 0)
+        day = (p.get("decided_at") or p.get("created_at") or "")[:10]
+        ym = day[:7]
+        if ym in received:
+            received[ym] += amount
+        if p["kind"] in ("extend", "both") and p.get("months"):
+            if int(p["months"]) in terms:
+                terms[int(p["months"])] += 1
+            start = _parse_day(day)
+            if start and amount:
+                m = int(p["months"])
+                part = amount / m
+                for k in range(m):
+                    key = (start.replace(day=1) + relativedelta(months=k)).strftime("%Y-%m")
+                    if key in spread:
+                        spread[key] += part
+        elif ym in spread:
+            spread[ym] += amount
+        if len(journal) < 15:
+            journal.append({"date": day, "name": p.get("shop_name") or p.get("username") or "—",
+                            "kind": p["kind"], "months": p.get("months"), "amount": amount or None,
+                            "method": p.get("method") or "card"})
+    this_m = months[-1]
+    prev_m = months[-2]
+    return {
+        "counts": counts,
+        "mrr": mrr,
+        "arr": mrr * 12,
+        "this_month": received[this_m],
+        "prev_month": received[prev_m],
+        "year_total": sum(received.values()),
+        "expected_30": sum(x["monthly"] for x in expected),
+        "expected": expected,
+        "blocked": blocked,
+        "months": months,
+        "received": [received[m] for m in months],
+        "spread": [int(round(spread[m])) for m in months],
+        "terms": terms,
+        "lifetime_sales": lifetime_sales,
+        "branch_cash": branch_cash,
+        "pending": {"count": pending_n, "sum": pending_sum},
+        "journal": journal,
+        "price_main": settings["price_main"],
+        "price_branch": settings["price_branch"],
+    }
