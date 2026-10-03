@@ -4523,6 +4523,7 @@ def _migrate_subscription(conn):
         "branch_pending": "INTEGER DEFAULT 0",
         "last_period_months": "INTEGER",
         "sub_notice": "TEXT",
+        "custom_price": "INTEGER",
     }.items():
         if col not in cols:
             conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
@@ -4552,6 +4553,14 @@ def _migrate_subscription(conn):
     if "tg_file_id" not in pay_cols:
         conn.execute("ALTER TABLE sub_payments ADD COLUMN tg_file_id TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_payments_shop ON sub_payments(shop_id, status)")
+    # раньше каждое включение «∞» добавляло новую запись о продаже (и выключение
+    # её не убирало) — оставляем по одной действующей на бессрочную точку
+    for sh in conn.execute("SELECT id, COALESCE(license_type, 'sub') AS lt FROM shops WHERE role='shop'").fetchall():
+        rows = conn.execute("SELECT id FROM sub_payments WHERE shop_id=? AND kind='lifetime' AND status='confirmed' "
+                            "ORDER BY id DESC", (sh["id"],)).fetchall()
+        extra = rows[1:] if sh["lt"] == "lifetime" else rows
+        for r in extra:
+            conn.execute("UPDATE sub_payments SET status='cancelled' WHERE id=?", (r["id"],))
     conn.execute("""
     CREATE TABLE IF NOT EXISTS platform_settings (
         key TEXT PRIMARY KEY,
@@ -4646,6 +4655,12 @@ def _sub_discount(settings: dict, months) -> int:
         return 0
 
 
+def head_main_price(head: dict, settings: dict) -> int:
+    """Цена главной точки в месяц: индивидуальная (если админ задал) или общая."""
+    cp = head.get("custom_price") if head else None
+    return int(cp) if cp else settings["price_main"]
+
+
 def sub_quote(head_id: int) -> dict:
     """Всё, что нужно экрану «Подписка»: статус, цена сети в месяц, варианты
     сроков с суммами и, если есть, оплата новых филиалов."""
@@ -4654,7 +4669,8 @@ def sub_quote(head_id: int) -> dict:
     branches = [b for b in get_branches(head_id) if b.get("is_active")]
     pending = [b for b in branches if b.get("branch_pending")]
     n = len(branches)
-    monthly = settings["price_main"] + settings["price_branch"] * n
+    custom = bool(head.get("custom_price"))
+    monthly = head_main_price(head, settings) + settings["price_branch"] * n
     state = subscription_state(head)
     today = _today()
     until = _parse_day(head.get("paid_until"))
@@ -4663,7 +4679,7 @@ def sub_quote(head_id: int) -> dict:
     branch_part = None
     if pending and not state["lifetime"] and active_period:
         days = max(1, (until - today).days)
-        disc = _sub_discount(settings, head.get("last_period_months") or 1)
+        disc = 0 if custom else _sub_discount(settings, head.get("last_period_months") or 1)
         amount = _round_k(settings["price_branch"] * len(pending) * days / 30.0 * (100 - disc) / 100.0)
         branch_part = {"amount": amount, "days": days, "discount": disc,
                        "until": until.strftime("%Y-%m-%d")}
@@ -4671,7 +4687,8 @@ def sub_quote(head_id: int) -> dict:
     base = until if active_period else today
     options = []
     for m in SUB_TERMS:
-        disc = _sub_discount(settings, m)
+        # индивидуальная цена — уже особые условия, скидки за срок к ней не применяются
+        disc = 0 if custom else _sub_discount(settings, m)
         full = monthly * m
         amount = _round_k(full * (100 - disc) / 100.0)
         if branch_part:
@@ -4689,6 +4706,7 @@ def sub_quote(head_id: int) -> dict:
         "settings": settings,
         "branch_count": n,
         "monthly": monthly,
+        "custom_price": head.get("custom_price"),
         "pending_branches": [{"id": b["id"], "name": b.get("shop_name") or b["username"]} for b in pending],
         "branch_part": branch_part,
         "options": options,
@@ -4850,15 +4868,47 @@ def admin_set_paid_until(head_id: int, day: str = None):
 
 
 @_serialized
-def admin_set_lifetime(head_id: int, on: bool):
+def admin_set_lifetime(head_id: int, on: bool, amount=None):
+    """Разовая покупка (∞). Сумму в сумах вписывает админ — она идёт в
+    статистику доходов. Снятие ∞ отменяет запись о продаже."""
     with get_conn() as conn:
         conn.execute("UPDATE shops SET license_type=? WHERE id=?", ("lifetime" if on else "sub", head_id))
+        conn.execute("UPDATE sub_payments SET status='cancelled' WHERE shop_id=? AND kind='lifetime' "
+                     "AND status='confirmed'", (head_id,))
         if on:
             conn.execute("""
-                INSERT INTO sub_payments (shop_id, kind, method, status, note, decided_at)
-                VALUES (?, 'lifetime', 'cash', 'confirmed', 'бессрочная лицензия', datetime('now','localtime'))
-            """, (head_id,))
+                INSERT INTO sub_payments (shop_id, kind, amount, method, status, note, decided_at)
+                VALUES (?, 'lifetime', ?, 'cash', 'confirmed', 'разовая покупка', datetime('now','localtime'))
+            """, (head_id, amount))
         conn.commit()
+
+
+@_serialized
+def admin_set_custom_price(head_id: int, price=None):
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET custom_price=? WHERE id=? AND role='shop'",
+                     (int(price) if price else None, head_id))
+        conn.commit()
+
+
+@_serialized
+def admin_set_payment_amount(payment_id: int, amount) -> bool:
+    """Исправить сумму оплаты, внесённой вручную (наличные, разовая покупка)."""
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE sub_payments SET amount=? WHERE id=? AND status='confirmed' AND method='cash'",
+                           (int(amount) if amount else None, payment_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+@_serialized
+def admin_cancel_payment(payment_id: int) -> bool:
+    """Убрать ошибочную запись об оплате из статистики (дату оплаты не
+    трогает — её админ при необходимости правит кнопкой «Дата»)."""
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE sub_payments SET status='cancelled' WHERE id=? AND status='confirmed'", (payment_id,))
+        conn.commit()
+        return cur.rowcount > 0
 
 
 @_serialized
@@ -4869,17 +4919,18 @@ def set_branch_pending(branch_id: int, pending: bool):
 
 
 @_serialized
-def admin_mark_branch_paid(branch_id: int) -> bool:
-    """Филиал оплачен вручную (наличные или 100 $ разово у бессрочной сети)."""
+def admin_mark_branch_paid(branch_id: int, amount=None) -> bool:
+    """Филиал оплачен вручную (наличные или разово у бессрочной сети);
+    сумму в сумах вписывает админ."""
     with get_conn() as conn:
         b = conn.execute("SELECT id, parent_shop_id FROM shops WHERE id=? AND role='branch'", (branch_id,)).fetchone()
         if not b:
             return False
         conn.execute("UPDATE shops SET branch_pending=0 WHERE id=?", (branch_id,))
         conn.execute("""
-            INSERT INTO sub_payments (shop_id, kind, branch_count, branch_ids, method, status, note, decided_at)
-            VALUES (?, 'branches', 1, ?, 'cash', 'confirmed', 'филиал оплачен вручную', datetime('now','localtime'))
-        """, (b["parent_shop_id"], json.dumps([branch_id])))
+            INSERT INTO sub_payments (shop_id, kind, amount, branch_count, branch_ids, method, status, note, decided_at)
+            VALUES (?, 'branches', ?, 1, ?, 'cash', 'confirmed', 'филиал оплачен вручную', datetime('now','localtime'))
+        """, (b["parent_shop_id"], int(amount) if amount else None, json.dumps([branch_id])))
         conn.commit()
         return True
 
@@ -4960,7 +5011,7 @@ def get_income_stats() -> dict:
         if not h.get("is_active"):
             counts["off"] += 1
             continue
-        monthly = settings["price_main"] + settings["price_branch"] * br_count.get(h["id"], 0)
+        monthly = head_main_price(h, settings) + settings["price_branch"] * br_count.get(h["id"], 0)
         name = h.get("shop_name") or h["username"]
         if (h.get("license_type") or "sub") == "lifetime":
             counts["lifetime"] += 1
@@ -4994,8 +5045,8 @@ def get_income_stats() -> dict:
     received = {m: 0 for m in months}
     spread = {m: 0 for m in months}
     terms = {1: 0, 3: 0, 6: 0, 12: 0}
-    lifetime_sales = 0
-    branch_cash = 0
+    lifetime_sales = lifetime_sum = 0
+    branch_cash = branch_cash_sum = 0
     pending_sum, pending_n = 0, 0
     journal = []
     for p in pays:
@@ -5005,8 +5056,10 @@ def get_income_stats() -> dict:
             continue
         if p["kind"] == "lifetime":
             lifetime_sales += 1
-        if p["kind"] == "branches" and not p.get("amount"):
+            lifetime_sum += int(p.get("amount") or 0)
+        if p["kind"] == "branches" and p.get("method") == "cash":
             branch_cash += 1
+            branch_cash_sum += int(p.get("amount") or 0)
         amount = int(p.get("amount") or 0)
         day = (p.get("decided_at") or p.get("created_at") or "")[:10]
         ym = day[:7]
@@ -5026,7 +5079,7 @@ def get_income_stats() -> dict:
         elif ym in spread:
             spread[ym] += amount
         if len(journal) < 15:
-            journal.append({"date": day, "name": p.get("shop_name") or p.get("username") or "—",
+            journal.append({"id": p["id"], "date": day, "name": p.get("shop_name") or p.get("username") or "—",
                             "kind": p["kind"], "months": p.get("months"), "amount": amount or None,
                             "method": p.get("method") or "card"})
     this_m = months[-1]
@@ -5046,7 +5099,9 @@ def get_income_stats() -> dict:
         "spread": [int(round(spread[m])) for m in months],
         "terms": terms,
         "lifetime_sales": lifetime_sales,
+        "lifetime_sum": lifetime_sum,
         "branch_cash": branch_cash,
+        "branch_cash_sum": branch_cash_sum,
         "pending": {"count": pending_n, "sum": pending_sum},
         "journal": journal,
         "price_main": settings["price_main"],

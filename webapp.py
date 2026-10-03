@@ -10075,6 +10075,8 @@ if ('serviceWorker' in navigator) {
   .inc-row:first-of-type { border-top:0; }
   .inc-row .r-s { font-size:12px; color:var(--hint); margin-top:2px; }
   .inc-row .r-v { font-family:var(--font-mono, monospace); font-weight:700; white-space:nowrap; }
+  .inc-jact { display:flex; gap:6px; margin-top:6px; }
+  .inc-jact button { border:1px solid #CBD5E1; background:#fff; border-radius:7px; padding:4px 8px; font-size:11.5px; font-weight:700; color:#334155; cursor:pointer; }
   .inc-alert { display:flex; align-items:center; gap:10px; background:#FEF3C7; border:1.5px solid #FCD34D; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:13.5px; font-weight:600; cursor:pointer; }
 </style>
 </head>
@@ -10302,18 +10304,22 @@ function renderSubBlock(s) {
       <button class="no" onclick="decideSub(${u.pending_payment.id}, 0)">❌ Отклонить</button>
     </div>` : '';
   const br = u.pending_branches ? `<div style="margin-top:6px; color:#9A3412;">⏳ Филиалов ждут оплаты: <b>${u.pending_branches}</b> — открой «Филиалы»</div>` : '';
+  const lp = u.lifetime_payment;
   const btns = u.lifetime ? `
+      ${lp ? `<button onclick="editPayAmount(${lp.id}, ${lp.amount || 0})">✏️ Сумма покупки</button>` : ''}
       <button class="grey" onclick="subLifetime(${s.id}, 0, ${name})">Снять ∞ (вернуть подписку)</button>` : `
       <button onclick="subExtend(${s.id}, 1, ${name})">+1 мес</button>
       <button onclick="subExtend(${s.id}, 3, ${name})">+3</button>
       <button onclick="subExtend(${s.id}, 6, ${name})">+6</button>
       <button onclick="subExtend(${s.id}, 12, ${name})">+12</button>
       <button class="grey" onclick="subSetDate(${s.id}, ${escapeHtml(JSON.stringify(u.paid_until || ''))})">📅 Дата</button>
-      <button class="grey" onclick="subLifetime(${s.id}, 1, ${name})">∞ Бессрочно</button>`;
+      <button class="grey" onclick="subPrice(${s.id}, ${u.custom_price || 0}, ${name})">💲 Цена</button>
+      <button class="grey" onclick="subLifetime(${s.id}, 1, ${name})">∞ Разовая покупка</button>`;
   return `
     <div class="sc-sub ${cls}">
       <div class="sc-sub-top">${pill}
-        ${!u.lifetime ? `${u.paid_until ? `<span>до <b>${fmtDay(u.paid_until)}</b></span>` : ''}<span>${fmtSum(u.monthly)} сум/мес${u.branch_count ? ' · ' + u.branch_count + ' фил.' : ''}</span>` : ''}
+        ${!u.lifetime ? `${u.paid_until ? `<span>до <b>${fmtDay(u.paid_until)}</b></span>` : ''}<span>${fmtSum(u.monthly)} сум/мес${u.branch_count ? ' · ' + u.branch_count + ' фил.' : ''}</span>${u.custom_price ? `<span class="sub-pill unset">индив. цена ${fmtSum(u.custom_price)}</span>` : ''}`
+          : `<span>${lp && lp.amount ? 'куплено за <b>' + fmtSum(lp.amount) + ' сум</b>' : '<span style="color:#B45309;">сумма покупки не указана</span>'}</span>`}
       </div>
       ${chk}${br}
       <div class="sc-sub-btns">${btns}</div>
@@ -10349,12 +10355,47 @@ async function subSetDate(shopId, current) {
   else showMsg('Ошибка: ' + data.error, false);
 }
 
+function askSum(text, current) {
+  // null — нажали «Отмена»; '' — оставили пустым
+  const v = prompt(text, current ? String(current) : '');
+  if (v === null) return null;
+  return v.replace(/[^0-9]/g, '');
+}
+
 async function subLifetime(shopId, on, name) {
-  const q = on ? `Сделать «${name}» бессрочной (оплачено 100 $ разово)? Блокировки и напоминаний больше не будет.`
-               : `Вернуть «${name}» на ежемесячную подписку?`;
-  if (!confirm(q)) return;
-  const data = await subAction(shopId, {action: 'lifetime', on: !!on});
+  let amount = '';
+  if (on) {
+    amount = askSum(`«${name}» — разовая покупка (∞, без ежемесячной оплаты).\\nСумма, которую заплатили, в сумах (для статистики доходов):`, '');
+    if (amount === null) return;
+  } else if (!confirm(`Вернуть «${name}» на ежемесячную подписку? Запись о разовой покупке уберётся из статистики.`)) return;
+  const data = await subAction(shopId, {action: 'lifetime', on: !!on, amount});
   if (data.ok) { showMsg('✅ Готово', true); loadShops(); } else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function subPrice(shopId, current, name) {
+  const v = askSum(`Индивидуальная цена главной точки «${name}», сум в месяц.\\nСкидки за срок к ней не применяются. Пусто — обычная цена.`, current || '');
+  if (v === null) return;
+  const data = await subAction(shopId, {action: 'price', price: v});
+  if (data.ok) { showMsg(v ? `✅ Цена ${fmtSum(v)} сум/мес` : '✅ Обычная цена', true); loadShops(); }
+  else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function editPayAmount(paymentId, current) {
+  const v = askSum('Сумма оплаты в сумах:', current || '');
+  if (v === null) return;
+  const res = await fetch(`/api/admin/sub/payments/${paymentId}/amount`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({amount: v})
+  });
+  const data = await res.json();
+  if (data.ok) { showMsg('✅ Сумма сохранена', true); loadShops(); if (INC) loadIncome(); }
+  else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function cancelPayment(paymentId) {
+  if (!confirm('Убрать эту оплату из статистики? Дата «оплачено до» не изменится — если нужно, поправьте её кнопкой «📅 Дата».')) return;
+  const res = await fetch(`/api/admin/sub/payments/${paymentId}/cancel`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) { showMsg('✅ Убрано', true); loadIncome(); loadShops(); } else showMsg('Ошибка: ' + data.error, false);
 }
 
 async function decideSub(paymentId, ok) {
@@ -10367,8 +10408,11 @@ async function decideSub(paymentId, ok) {
 }
 
 async function markBranchPaid(shopId, branchId, name) {
-  if (!confirm(`Отметить филиал «${name}» оплаченным? Он сразу заработает.`)) return;
-  const res = await fetch(`/api/admin/branches/${branchId}/sub_paid`, { method: 'POST' });
+  const amount = askSum(`Филиал «${name}» оплачен — он сразу заработает.\\nСумма, которую заплатили, в сумах (для статистики):`, '');
+  if (amount === null) return;
+  const res = await fetch(`/api/admin/branches/${branchId}/sub_paid`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({amount})
+  });
   const data = await res.json();
   if (data.ok) { showMsg('✅ Филиал включён', true); loadBranches(shopId); }
   else showMsg('Ошибка: ' + data.error, false);
@@ -10453,7 +10497,8 @@ function renderIncome() {
       <h3>Точки <span class="hint-text" style="font-weight:600;">всего ${c.total}${c.soon ? ' · скоро истекает: ' + c.soon : ''}</span></h3>
       <div class="inc-stack">${parts.filter(p => p[1]).map(p => `<div style="width:${p[1] / totalPts * 100}%; background:${p[2]};"></div>`).join('')}</div>
       <div class="inc-leg">${parts.map(p => `<span><i style="background:${p[2]};"></i>${p[0]}: <b>${p[1]}</b></span>`).join('')}</div>
-      <div class="hint-text" style="margin-top:10px;">Цена: главная ${fmtSum(d.price_main)} + филиал ${fmtSum(d.price_branch)} сум/мес${d.lifetime_sales ? ' · ∞ продано: ' + d.lifetime_sales : ''}${d.branch_cash ? ' · филиалов оплачено вручную: ' + d.branch_cash : ''}</div>
+      <div class="hint-text" style="margin-top:10px;">Цена: главная ${fmtSum(d.price_main)} + филиал ${fmtSum(d.price_branch)} сум/мес</div>
+      ${d.lifetime_sales || d.branch_cash ? `<div class="inc-row" style="margin-top:6px;"><div><b>Разовые продажи</b><div class="r-s">∞ точек: ${d.lifetime_sales}${d.branch_cash ? ' · филиалов вручную: ' + d.branch_cash : ''}</div></div><span class="r-v">${fmtSum(d.lifetime_sum + d.branch_cash_sum)}</span></div>` : ''}
     </div>`;
   const tTotal = Math.max(1, Object.values(d.terms).reduce((a, b) => a + b, 0));
   const terms = `
@@ -10475,7 +10520,9 @@ function renderIncome() {
   const jr = `
     <div class="inc-card">
       <h3>Последние оплаты</h3>
-      ${d.journal.length ? d.journal.map(j => `<div class="inc-row"><div><b>${escapeHtml(j.name)}</b><div class="r-s">${fmtDay(j.date)} · ${kindTxt(j)} · ${j.method === 'cash' ? 'наличные' : 'перевод'}</div></div><span class="r-v">${j.amount ? fmtSum(j.amount) : '—'}</span></div>`).join('') : '<div class="hint-text">Оплат пока нет.</div>'}
+      ${d.journal.length ? d.journal.map(j => `<div class="inc-row"><div><b>${escapeHtml(j.name)}</b><div class="r-s">${fmtDay(j.date)} · ${kindTxt(j)} · ${j.method === 'cash' ? 'наличные' : 'перевод'}</div>
+        <div class="inc-jact">${j.method === 'cash' ? `<button onclick="editPayAmount(${j.id}, ${j.amount || 0})">✏️ сумма</button>` : ''}<button onclick="cancelPayment(${j.id})">🗑 убрать</button></div></div>
+        <span class="r-v">${j.amount ? fmtSum(j.amount) : `<span style="color:#B45309; font-family:inherit; font-size:12px;">сумма не указана</span>`}</span></div>`).join('') : '<div class="hint-text">Оплат пока нет.</div>'}
     </div>`;
   document.getElementById('admIncome').innerHTML = kpis + pend + chart + pts + terms + exp + blk + jr;
 }
@@ -11144,7 +11191,8 @@ function guardOnce(names) {
 guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'deleteBranch',
   'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
   'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField',
-  'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings']);
+  'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings',
+  'subPrice', 'editPayAmount', 'cancelPayment']);
 loadShops();
 loadSubPanel();
 if (location.hash === '#income') admTab('income');
@@ -11962,7 +12010,14 @@ def _admin_sub_summary(shop: dict) -> dict:
     q = db.sub_quote(shop["id"])
     pend = db.get_pending_sub_payment(shop["id"])
     st = q["state"]
+    life = None
+    if st["lifetime"]:
+        rows = [r for r in db.list_sub_payments(head_id=shop["id"], status="confirmed", limit=50) if r["kind"] == "lifetime"]
+        if rows:
+            life = {"id": rows[0]["id"], "amount": rows[0].get("amount")}
     return {
+        "custom_price": q.get("custom_price"),
+        "lifetime_payment": life,
         "lifetime": st["lifetime"], "paid_until": st["paid_until"], "days_left": st["days_left"],
         "expired": st["expired"], "monthly": q["monthly"], "branch_count": q["branch_count"],
         "pending_branches": len(q["pending_branches"]),
@@ -11970,6 +12025,18 @@ def _admin_sub_summary(shop: dict) -> dict:
                             "months": pend["months"], "has_receipt": bool(pend.get("tg_file_id"))}
         if pend else None,
     }
+
+
+def _parse_admin_sum(raw):
+    """Сумма из формы админа: «1 270 000» → 1270000; пусто → None; мусор → False."""
+    if raw is None:
+        return None
+    txt = re.sub(r"[\s\u00a0]", "", str(raw))
+    if not txt:
+        return None
+    if not txt.isdigit():
+        return False
+    return int(txt) or None
 
 
 @app.route("/api/admin/income")
@@ -12010,6 +12077,17 @@ def api_admin_sub_payments():
 @app.route("/api/admin/sub/payments/<int:payment_id>/<action>", methods=["POST"])
 @admin_required
 def api_admin_sub_decide(payment_id, action):
+    if action == "amount":
+        amount = _parse_admin_sum((request.get_json(force=True) or {}).get("amount"))
+        if amount is False:
+            return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
+        if not db.admin_set_payment_amount(payment_id, amount):
+            return jsonify({"ok": False, "error": "сумму можно менять только у оплат, внесённых вручную"}), 400
+        return jsonify({"ok": True})
+    if action == "cancel":
+        if not db.admin_cancel_payment(payment_id):
+            return jsonify({"ok": False, "error": "оплата не найдена"}), 404
+        return jsonify({"ok": True})
     if action not in ("confirm", "reject"):
         return jsonify({"ok": False, "error": "неизвестное действие"}), 400
     p = sub_decide(payment_id, action == "confirm")
@@ -12075,7 +12153,16 @@ def api_admin_shop_sub(shop_id):
         db.admin_set_paid_until(shop_id, day)
         return jsonify({"ok": True, "paid_until": day})
     if action == "lifetime":
-        db.admin_set_lifetime(shop_id, bool(data.get("on")))
+        amount = _parse_admin_sum(data.get("amount"))
+        if amount is False:
+            return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
+        db.admin_set_lifetime(shop_id, bool(data.get("on")), amount)
+        return jsonify({"ok": True})
+    if action == "price":
+        price = _parse_admin_sum(data.get("price"))
+        if price is False:
+            return jsonify({"ok": False, "error": "цена — только цифры"}), 400
+        db.admin_set_custom_price(shop_id, price)
         return jsonify({"ok": True})
     return jsonify({"ok": False, "error": "неизвестное действие"}), 400
 
@@ -12083,7 +12170,10 @@ def api_admin_shop_sub(shop_id):
 @app.route("/api/admin/branches/<int:branch_id>/sub_paid", methods=["POST"])
 @admin_required
 def api_admin_branch_sub_paid(branch_id):
-    if not db.admin_mark_branch_paid(branch_id):
+    amount = _parse_admin_sum((request.get_json(silent=True) or {}).get("amount"))
+    if amount is False:
+        return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
+    if not db.admin_mark_branch_paid(branch_id, amount):
         return jsonify({"ok": False, "error": "филиал не найден"}), 404
     return jsonify({"ok": True})
 
