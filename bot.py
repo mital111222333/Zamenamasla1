@@ -708,6 +708,64 @@ async def check_supplier_debts(context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Не удалось напомнить о долге поставщику {sup['id']}: {e}")
 
 
+async def sub_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Кнопки ✅/❌ под чеком об оплате подписки — нажимать может только
+    администратор платформы (ADMIN_TELEGRAM_ID)."""
+    query = update.callback_query
+    if not ADMIN_TELEGRAM_ID or query.from_user.id != ADMIN_TELEGRAM_ID:
+        await query.answer("Недоступно", show_alert=True)
+        return
+    try:
+        _, action, pid = query.data.split(":")
+        pid = int(pid)
+    except ValueError:
+        await query.answer()
+        return
+    p = await asyncio.to_thread(webapp.sub_decide, pid, action == "ok")
+    if not p:
+        await query.answer("Этот чек уже обработан", show_alert=True)
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        return
+    if action == "ok":
+        await query.answer(f"Подтверждено — до {webapp._fmt_day(p.get('new_until'))}")
+    else:
+        await query.answer("Чек отклонён")
+
+
+async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
+    """Напоминания владельцам: подписка заканчивается через 5, 3, 1 день;
+    сообщение о блокировке (и копия администратору платформы)."""
+    if not _daytime():
+        return
+    link = webapp._sub_owner_link()
+    for item in await asyncio.to_thread(db.get_due_sub_notices):
+        shop = item["shop"]
+        lang = shop.get("language") or "ru"
+        date = webapp._fmt_day(shop.get("paid_until"))
+        if item["code"] == "blocked":
+            text = i18n.t("sub_bot_blocked", lang, date=date, link=link)
+        else:
+            text = i18n.t("sub_bot_d", lang, n=item["days_left"], date=date, link=link)
+        if shop.get("notify_telegram_id"):
+            try:
+                await context.bot.send_message(chat_id=shop["notify_telegram_id"], text=text)
+            except Exception as e:
+                logger.warning(f"Не удалось напомнить о подписке точке {shop['id']}: {e}")
+        if item["code"] == "blocked" and ADMIN_TELEGRAM_ID:
+            try:
+                await context.bot.send_message(
+                    chat_id=ADMIN_TELEGRAM_ID,
+                    text=f"🔒 Точка «{shop.get('shop_name') or shop['username']}» заблокирована за неоплату "
+                         f"(оплачено было до {date}).")
+            except Exception as e:
+                logger.warning(f"Не удалось сообщить администратору о блокировке: {e}")
+        db.mark_sub_notice(shop["id"], item["key"])
+        await asyncio.sleep(0.05)
+
+
 async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
     """Ежедневная резервная копия базы данных — отправляется в Telegram
     владельцу платформы (ADMIN_TELEGRAM_ID). Копия делается через
@@ -803,12 +861,14 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(history_pattern), client_history_button))
     app.add_handler(MessageHandler(filters.Regex(shop_info_pattern), shop_info_button))
     app.add_handler(CallbackQueryHandler(broadcast_confirm_callback, pattern="^bc_"))
+    app.add_handler(CallbackQueryHandler(sub_payment_callback, pattern="^subpay:"))
     app.add_handler(CallbackQueryHandler(reminder_button_callback))
 
     job_queue = app.job_queue
     job_queue.run_repeating(check_and_send_reminders, interval=3600, first=60)
     job_queue.run_repeating(check_and_send_installment_reminders, interval=3600, first=90)
     job_queue.run_repeating(check_supplier_debts, interval=3600, first=120)
+    job_queue.run_repeating(check_subscription_notices, interval=3600, first=150)
     # 1:00 по времени сервера (обычно UTC) — около 6 утра в Узбекистане, тихий час
     job_queue.run_daily(send_daily_backup, time=dtime(hour=1, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)

@@ -342,8 +342,22 @@ def login_required(view):
         g.is_employee = bool(session.get("is_employee"))
         g.is_branch = shop.get("role") == "branch"
         g.parent_shop_id = shop.get("parent_shop_id")
+        # подписка: не оплачено (или новый филиал ещё не оплачен) — вся
+        # панель закрыта, открыта только страница «Подписка» (там оплата)
+        g.sub = db.subscription_state(shop)
+        if g.sub["blocked"] and not getattr(view, "_sub_exempt", False):
+            if request.path.startswith("/api/") and "text/html" not in (request.headers.get("Accept") or ""):
+                return jsonify({"ok": False, "error": "subscription", "subscription": True}), 402
+            return redirect("/subscription")
         return view(*args, **kwargs)
     return wrapped
+
+
+def sub_exempt(view):
+    """Разрешает разделу работать и при неоплаченной подписке (страница
+    оплаты, отправка чека). Ставить сразу ПОД @login_required."""
+    view._sub_exempt = True
+    return view
 
 
 def employee_blocked(view):
@@ -1674,6 +1688,9 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .kc-hist-entry .kc-he-items { font-size:12px; color:var(--text); margin-top:6px; line-height:1.5; }
   .kc-hist-entry .kc-he-notes { font-size:12px; color:var(--hint); margin-top:6px; }
   .kc-hist-entry .kc-he-actions { margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); }
+  .sub-banner { display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:12px 14px; border-radius:12px; background:#FEF0DC; color:#7A3A04; font-size:14px; font-weight:700; line-height:1.35; text-decoration:none; border:1.5px solid #F2C27D; }
+  .sub-banner span { flex:1; }
+  .sub-banner i { flex:none; }
 </style>
 </head>
 <body>
@@ -1700,6 +1717,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+    {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
   </nav>
   <div class="side-foot">
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
@@ -1740,6 +1758,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
       {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
       {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+      {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
       <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
   </div>
@@ -1757,6 +1776,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch_short }}</button>
   </div>
 
+  {% if sub_banner %}{% if sub_banner.link %}<a class="sub-banner" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ sub_banner.text }}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<div class="sub-banner"><i class="fa-solid fa-circle-info"></i><span>{{ sub_banner.text }}</span></div>{% endif %}{% endif %}
   <div id="msg"></div>
 
   <div id="view-add" class="card">
@@ -7696,6 +7716,11 @@ NET_GUARD_JS = """<style>
       setTimeout(() => { location.href = '/login'; }, 1500);
       throw netError('session', NT.session, true);
     }
+    if (res.status === 402) {
+      // подписка закончилась, пока панель была открыта
+      location.href = '/subscription';
+      throw netError('session', NT.session, true);
+    }
     const ct = res.headers.get('Content-Type') || '';
     if (!res.ok && ct.indexOf('json') === -1) {
       // сервер ответил не данными, а страницей ошибки
@@ -8226,6 +8251,8 @@ def index():
         usd_rate=_effective_usd_rate(shop),
         usd_rate_own=shop.get("usd_rate") if shop else None,
         usd_rate_head=_head_usd_rate(shop),
+        sub_banner=_sub_banner(shop),
+        is_sub_owner=_is_sub_owner(),
     )
 
 
@@ -9992,6 +10019,27 @@ if ('serviceWorker' in navigator) {
   .sc-tile.open i { color:var(--blue); }
   .sc-tile[disabled] { opacity:.4; cursor:default; }
   @media (max-width:560px) { .row2 { flex-direction:column; gap:0; } }
+  .sc-sub { margin:10px 0; padding:10px 12px; border-radius:12px; background:#F8FAFC; border:1px solid var(--border); font-size:13px; }
+  .sc-sub.bad { background:#FEF2F2; border-color:#FCA5A5; }
+  .sc-sub.warn { background:#FFF7ED; border-color:#FDBA74; }
+  .sc-sub-top { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; }
+  .sub-pill { font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .sub-pill.ok { background:#DCFCE7; color:#166534; }
+  .sub-pill.warn { background:#FFEDD5; color:#9A3412; }
+  .sub-pill.bad { background:#B3241C; color:#fff; }
+  .sub-pill.life { background:#0F52BA; color:#fff; }
+  .sub-pill.unset { background:#E2E8F0; color:#334155; }
+  .sc-sub-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .sc-sub-btns button { border:1.5px solid #0F52BA; background:#fff; color:#0F52BA; border-radius:8px; padding:6px 10px; font-size:12.5px; font-weight:700; cursor:pointer; }
+  .sc-sub-btns button.grey { border-color:#CBD5E1; color:#334155; }
+  .sc-sub-chk { margin-top:8px; padding:8px 10px; border-radius:10px; background:#FEF3C7; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .sc-sub-chk button { border:0; border-radius:8px; padding:6px 10px; font-weight:700; cursor:pointer; color:#fff; }
+  .sc-sub-chk .ok { background:#16A34A; } .sc-sub-chk .no { background:#DC2626; }
+  .pay-item { border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+  .pay-item .pay-cap { white-space:pre-line; }
+  .pay-item .pay-act { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; white-space:normal; }
+  .pay-item .pay-act button, .pay-item .pay-act a { border:0; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; color:#fff; text-decoration:none; font-size:13px; }
+  .pay-act .ok { background:#16A34A; } .pay-act .no { background:#DC2626; } .pay-act a { background:#0F52BA; }
 </style>
 </head>
 <body>
@@ -10067,6 +10115,37 @@ if ('serviceWorker' in navigator) {
     </div>
   </details>
 
+  <details class="adm-sec" id="secSub">
+    <summary>
+      <span class="ic" style="background:#FEF3C7; color:#B45309;"><i class="fa-solid fa-credit-card"></i></span>
+      <span>Подписка: чеки и реквизиты<span class="sub" id="subSecSub">проверка оплат, карта, цены</span></span>
+      <i class="fa-solid fa-chevron-down chev"></i>
+    </summary>
+    <div class="sec-body">
+      <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Чеки на проверке</div>
+      <div id="subPayments"><div class="hint-text">Загружаю…</div></div>
+      <div style="font-weight:700; font-size:13px; margin:14px 0 8px;">Реквизиты для оплаты</div>
+      <div class="row2">
+        <div class="field"><label>Номер карты</label><input id="ss_card_number" inputmode="numeric" placeholder="5614 0000 0000 0000"></div>
+        <div class="field"><label>Имя на карте</label><input id="ss_card_holder" placeholder="Имя Фамилия"></div>
+      </div>
+      <div class="field"><label>Контакт поддержки (Telegram или телефон, необяз.)</label><input id="ss_support_contact" placeholder="@username или +998..."></div>
+      <div style="font-weight:700; font-size:13px; margin:6px 0 8px;">Цены в месяц (сум) и скидки за срок (%)</div>
+      <div class="row2">
+        <div class="field"><label>Главная точка</label><input id="ss_price_main" inputmode="numeric"></div>
+        <div class="field"><label>Каждый филиал</label><input id="ss_price_branch" inputmode="numeric"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>1 мес, %</label><input id="ss_disc_1" inputmode="numeric"></div>
+        <div class="field"><label>3 мес, %</label><input id="ss_disc_3" inputmode="numeric"></div>
+        <div class="field"><label>6 мес, %</label><input id="ss_disc_6" inputmode="numeric"></div>
+        <div class="field"><label>12 мес, %</label><input id="ss_disc_12" inputmode="numeric"></div>
+      </div>
+      <button class="submit" style="width:auto; padding:10px 20px;" onclick="saveSubSettings()">Сохранить</button>
+      <div class="hint-text" style="margin-top:10px;">Точки без даты оплаты («без даты») работают как раньше — поставь им дату в карточке, и подписка начнёт действовать. Блокировка — на следующий день после даты, без льготы. Данные при блокировке не удаляются.</div>
+    </div>
+  </details>
+
   <details class="adm-sec" id="secBackup">
     <summary>
       <span class="ic" style="background:#EFF6FF; color:var(--blue);"><i class="fa-solid fa-box-archive"></i></span>
@@ -10114,6 +10193,11 @@ if ('serviceWorker' in navigator) {
     <button data-f="active" onclick="setShopFilter('active')">Активные</button>
     <button data-f="off" onclick="setShopFilter('off')">Выключенные</button>
     <button data-f="notg" onclick="setShopFilter('notg')">Без Telegram</button>
+    <button data-f="debt" onclick="setShopFilter('debt')">Должники</button>
+    <button data-f="soon" onclick="setShopFilter('soon')">Скоро истекает</button>
+    <button data-f="check" onclick="setShopFilter('check')">Чек ждёт</button>
+    <button data-f="life" onclick="setShopFilter('life')">∞ Бессрочные</button>
+    <button data-f="unset" onclick="setShopFilter('unset')">Без даты</button>
   </div>
   <div id="shops-body"></div>
 </div>
@@ -10150,6 +10234,140 @@ function escapeHtml(str) {
 
 let allShopsCache = [];
 
+const fmtSum = n => (n == null ? '—' : Number(n).toLocaleString('ru-RU'));
+function fmtDay(s) {
+  if (!s) return '—';
+  const p = String(s).slice(0, 10).split('-');
+  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : s;
+}
+
+function renderSubBlock(s) {
+  const u = s.sub;
+  if (!u) return '';
+  let pill, cls = '';
+  if (u.lifetime) pill = '<span class="sub-pill life">∞ бессрочная</span>';
+  else if (!u.paid_until) pill = '<span class="sub-pill unset">без даты — работает</span>';
+  else if (u.expired) { pill = `<span class="sub-pill bad">заблокирована с ${fmtDay(addDays(u.paid_until, 1))}</span>`; cls = 'bad'; }
+  else if (u.days_left <= 5) { pill = `<span class="sub-pill warn">${u.days_left === 0 ? 'сегодня последний день' : 'осталось ' + u.days_left + ' дн.'}</span>`; cls = 'warn'; }
+  else pill = '<span class="sub-pill ok">оплачено</span>';
+  const name = escapeHtml(JSON.stringify(s.shop_name || s.username));
+  const chk = u.pending_payment ? `
+    <div class="sc-sub-chk">🧾 Чек на проверке: <b>${fmtSum(u.pending_payment.amount)} сум</b>
+      ${u.pending_payment.has_receipt ? `<a href="/api/admin/sub/receipt/${u.pending_payment.id}" target="_blank" rel="noopener">открыть чек</a>` : ''}
+      <button class="ok" onclick="decideSub(${u.pending_payment.id}, 1)">✅ Подтвердить</button>
+      <button class="no" onclick="decideSub(${u.pending_payment.id}, 0)">❌ Отклонить</button>
+    </div>` : '';
+  const br = u.pending_branches ? `<div style="margin-top:6px; color:#9A3412;">⏳ Филиалов ждут оплаты: <b>${u.pending_branches}</b> — открой «Филиалы»</div>` : '';
+  const btns = u.lifetime ? `
+      <button class="grey" onclick="subLifetime(${s.id}, 0, ${name})">Снять ∞ (вернуть подписку)</button>` : `
+      <button onclick="subExtend(${s.id}, 1, ${name})">+1 мес</button>
+      <button onclick="subExtend(${s.id}, 3, ${name})">+3</button>
+      <button onclick="subExtend(${s.id}, 6, ${name})">+6</button>
+      <button onclick="subExtend(${s.id}, 12, ${name})">+12</button>
+      <button class="grey" onclick="subSetDate(${s.id}, ${escapeHtml(JSON.stringify(u.paid_until || ''))})">📅 Дата</button>
+      <button class="grey" onclick="subLifetime(${s.id}, 1, ${name})">∞ Бессрочно</button>`;
+  return `
+    <div class="sc-sub ${cls}">
+      <div class="sc-sub-top">${pill}
+        ${!u.lifetime ? `${u.paid_until ? `<span>до <b>${fmtDay(u.paid_until)}</b></span>` : ''}<span>${fmtSum(u.monthly)} сум/мес${u.branch_count ? ' · ' + u.branch_count + ' фил.' : ''}</span>` : ''}
+      </div>
+      ${chk}${br}
+      <div class="sc-sub-btns">${btns}</div>
+    </div>`;
+}
+
+function addDays(day, n) {
+  const d = new Date(String(day).slice(0, 10) + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  const z = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+}
+
+async function subAction(shopId, body) {
+  const res = await fetch(`/api/admin/shops/${shopId}/sub`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function subExtend(shopId, months, name) {
+  if (!confirm(`Продлить «${name}» на ${months} мес. (оплата наличными)?`)) return;
+  const data = await subAction(shopId, {action: 'extend', months});
+  if (data.ok) { showMsg(`✅ Продлено до ${fmtDay(data.paid_until)}`, true); loadShops(); }
+  else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function subSetDate(shopId, current) {
+  const v = prompt('Оплачено до (ДД.ММ.ГГГГ). Пусто — убрать дату (точка работает без подписки):', current ? fmtDay(current) : '');
+  if (v === null) return;
+  const data = await subAction(shopId, {action: 'set_until', date: v.trim()});
+  if (data.ok) { showMsg(data.paid_until ? `✅ Дата: ${fmtDay(data.paid_until)}` : '✅ Дата убрана', true); loadShops(); }
+  else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function subLifetime(shopId, on, name) {
+  const q = on ? `Сделать «${name}» бессрочной (оплачено 100 $ разово)? Блокировки и напоминаний больше не будет.`
+               : `Вернуть «${name}» на ежемесячную подписку?`;
+  if (!confirm(q)) return;
+  const data = await subAction(shopId, {action: 'lifetime', on: !!on});
+  if (data.ok) { showMsg('✅ Готово', true); loadShops(); } else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function decideSub(paymentId, ok) {
+  if (!ok && !confirm('Отклонить этот чек? Точке придёт сообщение, что чек не принят.')) return;
+  const res = await fetch(`/api/admin/sub/payments/${paymentId}/${ok ? 'confirm' : 'reject'}`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) showMsg(ok ? `✅ Подтверждено — до ${fmtDay(data.new_until)}` : 'Чек отклонён', true);
+  else showMsg('Ошибка: ' + data.error, false);
+  loadShops(); loadSubPanel();
+}
+
+async function markBranchPaid(shopId, branchId, name) {
+  if (!confirm(`Отметить филиал «${name}» оплаченным? Он сразу заработает.`)) return;
+  const res = await fetch(`/api/admin/branches/${branchId}/sub_paid`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) { showMsg('✅ Филиал включён', true); loadBranches(shopId); }
+  else showMsg('Ошибка: ' + data.error, false);
+}
+
+async function loadSubPanel() {
+  try {
+    const [pr, sr] = await Promise.all([fetch('/api/admin/sub/payments?status=pending'), fetch('/api/admin/sub/settings')]);
+    const pd = await pr.json(), sd = await sr.json();
+    const box = document.getElementById('subPayments');
+    const list = (pd.payments || []);
+    box.innerHTML = list.length ? list.map(p => `
+      <div class="pay-item"><div class="pay-cap">${escapeHtml(p.caption)}</div><div class="hint-text" style="margin-top:4px;">отправлен ${escapeHtml(p.created_at || '')}</div>
+        <div class="pay-act">
+          ${p.has_receipt ? `<a href="/api/admin/sub/receipt/${p.id}" target="_blank" rel="noopener">открыть чек</a>` : ''}
+          <button class="ok" onclick="decideSub(${p.id}, 1)">✅ Подтвердить</button>
+          <button class="no" onclick="decideSub(${p.id}, 0)">❌ Отклонить</button>
+        </div>
+      </div>`).join('') : '<div class="hint-text">Новых чеков нет.</div>';
+    const sec = document.getElementById('secSub');
+    document.getElementById('subSecSub').textContent = list.length ? `чеков на проверке: ${list.length}` : 'проверка оплат, карта, цены';
+    if (list.length && !sec.dataset.autoOpened) { sec.open = true; sec.dataset.autoOpened = '1'; }
+    const st = sd.settings || {};
+    ['card_number', 'card_holder', 'support_contact', 'price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12']
+      .forEach(k => { const el = document.getElementById('ss_' + k); if (el && document.activeElement !== el) el.value = st[k] == null ? '' : st[k]; });
+  } catch (e) {}
+}
+
+async function saveSubSettings() {
+  const body = {};
+  ['card_number', 'card_holder', 'support_contact'].forEach(k => body[k] = document.getElementById('ss_' + k).value.trim());
+  for (const k of ['price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12']) {
+    const raw = document.getElementById('ss_' + k).value.replace(/[^0-9]/g, '');
+    if (raw === '') { showMsg('Заполните все цены и скидки', false); return; }
+    body[k] = Number(raw);
+  }
+  const res = await fetch('/api/admin/sub/settings', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data.ok) { showMsg('✅ Сохранено', true); loadSubPanel(); loadShops(); } else showMsg('Ошибка: ' + data.error, false);
+}
+
 async function loadShops() {
   const res = await fetch('/api/admin/shops');
   allShopsCache = await res.json();
@@ -10184,7 +10402,12 @@ function filterShops() {
     (shopFilter === 'all' ||
       (shopFilter === 'active' && s.is_active) ||
       (shopFilter === 'off' && !s.is_active) ||
-      (shopFilter === 'notg' && !s.notify_telegram_id))
+      (shopFilter === 'notg' && !s.notify_telegram_id) ||
+      (shopFilter === 'debt' && s.sub && s.sub.expired) ||
+      (shopFilter === 'soon' && s.sub && !s.sub.lifetime && s.sub.days_left !== null && s.sub.days_left >= 0 && s.sub.days_left <= 5) ||
+      (shopFilter === 'check' && s.sub && s.sub.pending_payment) ||
+      (shopFilter === 'life' && s.sub && s.sub.lifetime) ||
+      (shopFilter === 'unset' && s.sub && !s.sub.lifetime && !s.sub.paid_until))
   );
   renderShopsTable(filtered);
 }
@@ -10224,6 +10447,7 @@ function renderShopsTable(shops) {
         ${s.phone ? `<span><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone)}</span>` : ''}
         ${s.notify_telegram_id ? '<span class="ok"><i class="fa-brands fa-telegram"></i> Telegram</span>' : '<span class="no"><i class="fa-brands fa-telegram"></i> нет Telegram</span>'}
       </div>
+      ${renderSubBlock(s)}
 
       <div class="sc-toggles">
         <span>SMS<button class="sw ${s.sms_enabled ? 'on' : ''}" title="${s.sms_enabled ? 'выключить' : 'включить'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})"></button></span>
@@ -10361,6 +10585,7 @@ async function loadBranches(shopId) {
       </div>
       <div id="branch-edit-${b.id}" style="display:none;"></div>
       <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        ${b.branch_pending ? `<span class="sub-pill warn" style="align-self:center;">⏳ ждёт оплаты</span><button class="badge active" onclick="markBranchPaid(${shopId}, ${b.id}, ${escapeHtml(JSON.stringify(b.shop_name || b.username))})">✅ отметить оплату</button>` : ''}
         <button class="badge ${b.is_active ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle', ${b.is_active ? 0 : 1})">${b.is_active ? 'активен' : 'выключен'}</button>
         <button class="badge ${b.sms_enabled ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle_sms', ${b.sms_enabled ? 0 : 1})">SMS: ${b.sms_enabled ? 'включён' : 'выключен'}</button>
         <button class="badge ${b.warehouse_enabled ? 'active' : 'inactive'}" onclick="toggleBranchField(${shopId}, ${b.id}, 'toggle_warehouse', ${b.warehouse_enabled ? 0 : 1})">Склад: ${b.warehouse_enabled ? 'включён' : 'выключен'}</button>
@@ -10524,7 +10749,8 @@ async function createBranch(shopId) {
   });
   const data = await res.json();
   if (data.ok) {
-    showMsgSticky(`✅ Филиал «${shopName}» создан. Логин: <b>${username}</b>, пароль (больше не увидите — сохраните сейчас): <b>${data.password}</b>`);
+    showMsgSticky(`✅ Филиал «${shopName}» создан. Логин: <b>${username}</b>, пароль (больше не увидите — сохраните сейчас): <b>${data.password}</b>` +
+      (data.sub_pending ? '<br>⏳ Филиал заработает после оплаты: владелец оплатит его в разделе «Подписка», или нажми «✅ отметить оплату» (наличные / 100 $ у бессрочной сети).' : ''));
     loadBranches(shopId);
   } else {
     showMsg('Ошибка: ' + data.error, false);
@@ -10767,8 +10993,10 @@ function guardOnce(names) {
 }
 guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'deleteBranch',
   'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
-  'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField']);
+  'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField',
+  'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings']);
 loadShops();
+loadSubPanel();
 </script>
 </body>
 </html>
@@ -10789,6 +11017,7 @@ def api_admin_shops():
     shops = db.list_shops()
     for s in shops:
         s["owner_link"] = _client_link(f"owner_{s['owner_link_token']}") if s.get("owner_link_token") else None
+        s["sub"] = _admin_sub_summary(s)
     return jsonify(shops)
 
 
@@ -10993,7 +11222,11 @@ def api_admin_create_branch(shop_id):
         notify_telegram_id=data.get("notify_telegram_id") or None,
     )
     db.set_shop_warehouse_enabled(branch["id"], True)  # филиалу склад нужен сразу, это весь смысл филиала
-    return jsonify({"ok": True, "id": branch["id"], "username": username, "password": password})
+    pending = db.new_branch_needs_payment(parent)
+    if pending:
+        db.set_branch_pending(branch["id"], True)  # заработает после оплаты
+    return jsonify({"ok": True, "id": branch["id"], "username": username, "password": password,
+                    "sub_pending": pending})
 
 
 def _admin_branch_or_404(branch_id):
@@ -11251,6 +11484,734 @@ def display_page(anpr_token):
         DISPLAY_PAGE, shop_name=shop.get("shop_name") or "", anpr_token=anpr_token,
         T=T, t_json=_json.dumps(T, ensure_ascii=False),
     )
+
+
+# ======================================================================
+# ПОДПИСКА: страница оплаты, приём чека, решения админа
+# ======================================================================
+
+def _fmt_sum(n) -> str:
+    try:
+        return f"{int(n):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _fmt_day(s) -> str:
+    if not s:
+        return "—"
+    s = str(s)[:10]
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").strftime("%d.%m.%Y")
+    except ValueError:
+        return s
+
+
+def _is_sub_owner() -> bool:
+    """Платит только владелец главной точки (не филиал и не сотрудник)."""
+    return not getattr(g, "is_employee", False) and not getattr(g, "is_branch", False)
+
+
+def _sub_banner(shop):
+    """Плашка над разделами панели: подписка скоро закончится / новый филиал
+    ждёт оплаты. None — показывать нечего."""
+    st = getattr(g, "sub", None) or db.subscription_state(shop)
+    T = g.T
+    owner = _is_sub_owner()
+    n = st.get("days_left")
+    if not st.get("lifetime") and n is not None and 0 <= n <= 5:
+        if owner:
+            text = T["sub_banner_today"] if n == 0 else T["sub_banner_owner"].format(n=n)
+        else:
+            text = T["sub_banner_staff_today"] if n == 0 else T["sub_banner_staff"].format(n=n)
+        return {"text": text, "link": owner}
+    if owner:
+        pending = [b for b in db.get_branches(g.shop_id) if b.get("is_active") and b.get("branch_pending")]
+        if pending:
+            names = ", ".join(b.get("shop_name") or b["username"] for b in pending)
+            return {"text": T["sub_banner_branch_pending"].format(names=names), "link": True}
+    return None
+
+
+def _sub_admin_caption(p: dict) -> str:
+    head = db.get_shop(p["shop_id"]) or {}
+    name = head.get("shop_name") or head.get("username") or "—"
+    n = int(p.get("branch_count") or 0)
+    net = "только главная" if n == 0 else f"главная + {n} фил."
+    if p["kind"] == "branches":
+        try:
+            ids = json.loads(p.get("branch_ids") or "[]")
+        except ValueError:
+            ids = []
+        names = ", ".join((db.get_shop(i) or {}).get("shop_name") or str(i) for i in ids) or "—"
+        what = f"Оплата новых филиалов: {names}"
+    else:
+        disc = f" (−{p['discount']}%)" if p.get("discount") else ""
+        what = f"Продление {p['months']} мес{disc}"
+        if p["kind"] == "both":
+            what += " + новые филиалы"
+    lines = [
+        f"🧾 Оплата подписки №{p['id']}",
+        f"Точка: {name} (@{head.get('username', '')})",
+        f"Сеть: {net}",
+        f"Что: {what}",
+        f"Сумма: {_fmt_sum(p.get('amount'))} сум",
+    ]
+    if p.get("new_until"):
+        lines.append(f"Продлится до: {_fmt_day(p['new_until'])}")
+    return "\n".join(lines)
+
+
+def _tg_api(method: str, data: dict = None, files: dict = None):
+    if not BOT_TOKEN:
+        return None
+    try:
+        resp = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/{method}",
+                             data=data, files=files, timeout=30)
+        if not resp.ok:
+            logger.warning(f"Telegram {method}: HTTP {resp.status_code} — {resp.text[:300]}")
+            return None
+        return resp.json().get("result")
+    except Exception as e:
+        logger.error(f"Telegram {method} не выполнен: {e}")
+        return None
+
+
+def _send_receipt_to_admin(p: dict, path: str, mime: str):
+    """Чек — администратору платформы в Telegram с кнопками ✅/❌."""
+    if not ADMIN_TELEGRAM_ID:
+        return
+    markup = json.dumps({"inline_keyboard": [[
+        {"text": "✅ Подтвердить", "callback_data": f"subpay:ok:{p['id']}"},
+        {"text": "❌ Отклонить", "callback_data": f"subpay:no:{p['id']}"},
+    ]]})
+    caption = _sub_admin_caption(p)
+    data = {"chat_id": ADMIN_TELEGRAM_ID, "caption": caption, "reply_markup": markup}
+    fname = os.path.basename(path)
+    result = None
+    if mime in ("image/jpeg", "image/png", "image/webp"):
+        with open(path, "rb") as f:
+            result = _tg_api("sendPhoto", data, {"photo": (fname, f, mime)})
+    if not result:
+        with open(path, "rb") as f:
+            result = _tg_api("sendDocument", data, {"document": (fname, f, mime or "application/octet-stream")})
+    if result and result.get("message_id"):
+        db.set_sub_payment_tg_message(p["id"], result["message_id"])
+
+
+def _sub_owner_link() -> str:
+    return (PUBLIC_URL.rstrip("/") + "/subscription") if PUBLIC_URL else "/subscription"
+
+
+def notify_sub_decision(p: dict):
+    """Сообщение владельцу точки о решении по чеку."""
+    head = db.get_shop(p["shop_id"]) or {}
+    chat = head.get("notify_telegram_id")
+    if not chat:
+        return
+    lang = head.get("language") or "ru"
+    if p["status"] == "confirmed":
+        if p["kind"] == "branches":
+            text = i18n.t("sub_bot_confirmed_br", lang)
+        else:
+            text = i18n.t("sub_bot_confirmed", lang, date=_fmt_day(p.get("new_until")))
+    else:
+        contact = db.get_platform_settings().get("support_contact") or ""
+        text = i18n.t("sub_bot_rejected", lang, link=_sub_owner_link())
+        if contact:
+            text += "\n" + i18n.t("sub_support", lang, contact=contact)
+    _send_telegram_message(chat, text)
+
+
+def sub_decide(payment_id: int, approve: bool):
+    """Единая точка решения по чеку — и из админки, и из кнопок в Telegram.
+    Возвращает заявку после решения или None, если её уже обработали."""
+    p = db.confirm_sub_payment(payment_id) if approve else db.reject_sub_payment(payment_id)
+    if not p:
+        return None
+    if p.get("tg_message_id") and ADMIN_TELEGRAM_ID:
+        mark = (f"✅ Подтверждено — действует до {_fmt_day(p.get('new_until'))}" if approve
+                else "❌ Отклонено")
+        _tg_api("editMessageCaption", {"chat_id": ADMIN_TELEGRAM_ID, "message_id": p["tg_message_id"],
+                                       "caption": _sub_admin_caption(p) + "\n\n" + mark})
+    try:
+        notify_sub_decision(p)
+    except Exception as e:
+        logger.error(f"Не удалось уведомить точку о решении по чеку {payment_id}: {e}")
+    return p
+
+
+_SUB_ALLOWED_EXT = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+                    ".heic": "image/heic", ".heif": "image/heif", ".gif": "image/gif", ".pdf": "application/pdf"}
+_SUB_MAX_FILE = 10 * 1024 * 1024
+
+
+def _sub_option_text(T, o, branch_part) -> str:
+    """Подпись под сроком: цена в месяц, экономия, доплата за новые филиалы."""
+    extra = branch_part["amount"] if branch_part else 0
+    parts = []
+    if o["discount"] or extra:
+        per_month = int(round((o["amount"] - extra) / o["months"] / 100.0)) * 100
+        parts.append(T["sub_per_month"].format(sum=_fmt_sum(per_month)))
+    else:
+        parts.append(T["sub_no_discount"])
+    if o["saving"]:
+        parts.append(T["sub_saving"].format(sum=_fmt_sum(o["saving"])))
+    if extra:
+        parts.append(T["sub_plus_branches"].format(sum=_fmt_sum(extra)))
+    return " · ".join(parts)
+
+
+@app.route("/subscription")
+@login_required
+@sub_exempt
+def subscription_page():
+    shop = db.get_shop(g.shop_id)
+    st = g.sub
+    T = g.T
+    ctx = {"T": T, "lang": g.lang, "st": st, "mode": "owner" if _is_sub_owner() else "staff",
+           "paid_until_txt": _fmt_day(st.get("paid_until")) if st.get("paid_until") else T["sub_not_set"]}
+    if ctx["mode"] == "staff":
+        return render_template_string(SUB_PAGE, **ctx)
+
+    q = db.sub_quote(g.shop_id)
+    settings = q["settings"]
+    n = st.get("days_left")
+    if st["lifetime"]:
+        chip = ("blue", "∞")
+    elif st["expired"]:
+        chip = ("bad", T["sub_status_blocked"])
+    elif n is None:
+        chip = ("warn", T["sub_not_set"])
+    elif n == 0:
+        chip = ("warn", T["sub_last_day"])
+    elif n <= 5:
+        chip = ("warn", T["sub_days_left"].format(n=n))
+    else:
+        chip = ("ok", T["sub_status_active"])
+    net = (T["sub_network_main"].format(sum=_fmt_sum(q["monthly"])) if q["branch_count"] == 0
+           else T["sub_network_br"].format(n=q["branch_count"], sum=_fmt_sum(q["monthly"])))
+    options = []
+    for o in q["options"]:
+        options.append({
+            "months": o["months"], "label": T[f"sub_m{o['months']}"], "discount": o["discount"],
+            "amount_txt": _fmt_sum(o["amount"]), "until_txt": _fmt_day(o["new_until"]),
+            "sub_txt": _sub_option_text(T, o, q["branch_part"]),
+            "best": o["months"] == 12,
+        })
+    names = ", ".join(b["name"] for b in q["pending_branches"])
+    branch_txt = None
+    if q["branch_part"]:
+        bp = q["branch_part"]
+        branch_txt = T["sub_branches_text"].format(names=names, days=bp["days"], date=_fmt_day(bp["until"]))
+        if bp["discount"]:
+            branch_txt += T["sub_branches_disc"].format(d=bp["discount"])
+    pending = db.get_pending_sub_payment(g.shop_id)
+    pending_txt = None
+    if pending:
+        what = (T["sub_what_branches"] if pending["kind"] == "branches"
+                else T["sub_what_extend"].format(m=pending["months"]))
+        pending_txt = T["sub_pending_text"].format(what=what, sum=_fmt_sum(pending["amount"]),
+                                                   date=_fmt_day(pending["created_at"]))
+    history = []
+    for p in db.list_sub_payments(head_id=g.shop_id, limit=12):
+        if p["status"] not in ("confirmed", "rejected", "pending"):
+            continue
+        if p["kind"] == "lifetime":
+            what = T["sub_lifetime_title"]
+        elif p["kind"] == "branches":
+            what = T["sub_what_branches"]
+        else:
+            what = T["sub_what_extend"].format(m=p["months"])
+        left = f"{_fmt_day(p['created_at'])} · {what}"
+        st_txt = {"confirmed": T["sub_st_confirmed"], "rejected": T["sub_st_rejected"],
+                  "pending": T["sub_st_pending"]}[p["status"]]
+        method = T["sub_method_cash"] if p.get("method") == "cash" else T["sub_method_card"]
+        history.append({"left": left, "sub": f"{method} · {st_txt}",
+                        "right": _fmt_sum(p["amount"]) if p.get("amount") else "",
+                        "bad": p["status"] == "rejected"})
+    ctx.update(
+        q=q, chip=chip, net=net, options=options, branch_txt=branch_txt,
+        branch_amount_txt=_fmt_sum(q["branch_part"]["amount"]) if q["branch_part"] else "",
+        branch_until_txt=_fmt_day(q["branch_part"]["until"]) if q["branch_part"] else "",
+        pending_txt=pending_txt, history=history,
+        lifetime_branches=[T["sub_lifetime_branch"].format(name=b["name"]) for b in q["pending_branches"]]
+        if st["lifetime"] else [],
+        expired_txt=T["sub_expired_text"].format(date=_fmt_day(st.get("paid_until"))),
+        card_number=settings.get("card_number") or "", card_holder=settings.get("card_holder") or "",
+        support=T["sub_support"].format(contact=settings["support_contact"]) if settings.get("support_contact") else "",
+    )
+    return render_template_string(SUB_PAGE, **ctx)
+
+
+@app.route("/api/subscription/pay", methods=["POST"])
+@login_required
+@sub_exempt
+def api_subscription_pay():
+    T = g.T
+    if not _is_sub_owner():
+        return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
+    q = db.sub_quote(g.shop_id)
+    if q["state"]["lifetime"]:
+        return jsonify({"ok": False, "error": "lifetime"}), 400
+    if not q["settings"].get("card_number"):
+        return jsonify({"ok": False, "error": T["sub_no_card"]}), 400
+    choice = (request.form.get("choice") or "").strip()
+    pending_ids = [b["id"] for b in q["pending_branches"]]
+    if choice == "branches":
+        if not q["branch_part"]:
+            return jsonify({"ok": False, "error": "нет филиалов для оплаты"}), 400
+        kind, months, amount, discount, new_until = "branches", None, q["branch_part"]["amount"], \
+            q["branch_part"]["discount"], q["branch_part"]["until"]
+    else:
+        opt = next((o for o in q["options"] if str(o["months"]) == choice), None)
+        if not opt:
+            return jsonify({"ok": False, "error": "выберите срок"}), 400
+        kind = "both" if q["branch_part"] else "extend"
+        months, amount, discount, new_until = opt["months"], opt["amount"], opt["discount"], opt["new_until"]
+    f = request.files.get("receipt")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "error": T["sub_file_needed"]}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    mime = _SUB_ALLOWED_EXT.get(ext)
+    if not mime and (f.mimetype or "").startswith("image/"):
+        mime, ext = f.mimetype, ".jpg" if f.mimetype == "image/jpeg" else ".img"
+    if not mime:
+        return jsonify({"ok": False, "error": T["sub_file_type"]}), 400
+    data = f.read(_SUB_MAX_FILE + 1)
+    if len(data) > _SUB_MAX_FILE:
+        return jsonify({"ok": False, "error": T["sub_file_big"]}), 400
+    if not data:
+        return jsonify({"ok": False, "error": T["sub_file_needed"]}), 400
+    pid = db.create_sub_payment(g.shop_id, kind, months, amount, discount, pending_ids,
+                                q["branch_count"], new_until)
+    os.makedirs(db.RECEIPTS_DIR, exist_ok=True)
+    fname = f"{pid}_{secrets.token_hex(4)}{ext}"
+    with open(os.path.join(db.RECEIPTS_DIR, fname), "wb") as out:
+        out.write(data)
+    db.set_sub_payment_receipt(pid, fname, mime)
+    p = db.get_sub_payment(pid)
+    try:
+        _send_receipt_to_admin(p, os.path.join(db.RECEIPTS_DIR, fname), mime)
+    except Exception as e:
+        logger.error(f"Не удалось отправить чек {pid} администратору: {e}")
+    return jsonify({"ok": True, "id": pid})
+
+
+# ---------- Подписка: админка ----------
+
+def _admin_sub_summary(shop: dict) -> dict:
+    q = db.sub_quote(shop["id"])
+    pend = db.get_pending_sub_payment(shop["id"])
+    st = q["state"]
+    return {
+        "lifetime": st["lifetime"], "paid_until": st["paid_until"], "days_left": st["days_left"],
+        "expired": st["expired"], "monthly": q["monthly"], "branch_count": q["branch_count"],
+        "pending_branches": len(q["pending_branches"]),
+        "pending_payment": {"id": pend["id"], "amount": pend["amount"], "kind": pend["kind"],
+                            "months": pend["months"], "has_receipt": bool(pend.get("receipt_file"))}
+        if pend else None,
+    }
+
+
+@app.route("/api/admin/sub/settings")
+@admin_required
+def api_admin_sub_settings():
+    return jsonify({"ok": True, "settings": db.get_platform_settings()})
+
+
+@app.route("/api/admin/sub/settings", methods=["POST"])
+@admin_required
+def api_admin_sub_settings_save():
+    data = request.get_json(force=True) or {}
+    try:
+        db.set_platform_settings({k: v for k, v in data.items() if k in db.SUB_DEFAULTS})
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "проверьте числа"}), 400
+    return jsonify({"ok": True, "settings": db.get_platform_settings()})
+
+
+@app.route("/api/admin/sub/payments")
+@admin_required
+def api_admin_sub_payments():
+    status = request.args.get("status") or None
+    rows = db.list_sub_payments(status=status, limit=100)
+    for r in rows:
+        r["caption"] = _sub_admin_caption(r)
+        r["has_receipt"] = bool(r.get("receipt_file"))
+        r.pop("receipt_file", None)
+    return jsonify({"ok": True, "payments": rows})
+
+
+@app.route("/api/admin/sub/payments/<int:payment_id>/<action>", methods=["POST"])
+@admin_required
+def api_admin_sub_decide(payment_id, action):
+    if action not in ("confirm", "reject"):
+        return jsonify({"ok": False, "error": "неизвестное действие"}), 400
+    p = sub_decide(payment_id, action == "confirm")
+    if not p:
+        return jsonify({"ok": False, "error": "этот чек уже обработан"}), 409
+    return jsonify({"ok": True, "new_until": p.get("new_until")})
+
+
+@app.route("/api/admin/sub/receipt/<int:payment_id>")
+@admin_required
+def api_admin_sub_receipt(payment_id):
+    p = db.get_sub_payment(payment_id)
+    if not p or not p.get("receipt_file"):
+        return "Чек не найден", 404
+    path = os.path.join(db.RECEIPTS_DIR, os.path.basename(p["receipt_file"]))
+    if not os.path.exists(path):
+        return "Файл чека не найден на сервере (например, база восстановлена из копии)", 404
+    return send_file(path, mimetype=p.get("receipt_mime") or "application/octet-stream")
+
+
+@app.route("/api/admin/shops/<int:shop_id>/sub", methods=["POST"])
+@admin_required
+def api_admin_shop_sub(shop_id):
+    shop = db.get_shop(shop_id)
+    if not shop or shop.get("role") != "shop":
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    data = request.get_json(force=True) or {}
+    action = data.get("action")
+    if action == "extend":
+        try:
+            months = int(data.get("months"))
+        except (TypeError, ValueError):
+            months = 0
+        if months not in db.SUB_TERMS:
+            return jsonify({"ok": False, "error": "неверный срок"}), 400
+        q = db.sub_quote(shop_id)
+        amount = next((o["amount"] for o in q["options"] if o["months"] == months), None)
+        new_until = db.admin_extend_subscription(shop_id, months, amount)
+        return jsonify({"ok": True, "paid_until": new_until})
+    if action == "set_until":
+        raw = (data.get("date") or "").strip()
+        day = None
+        if raw:
+            for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+                try:
+                    day = datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    pass
+            if not day:
+                return jsonify({"ok": False, "error": "дата в формате ДД.ММ.ГГГГ"}), 400
+        db.admin_set_paid_until(shop_id, day)
+        return jsonify({"ok": True, "paid_until": day})
+    if action == "lifetime":
+        db.admin_set_lifetime(shop_id, bool(data.get("on")))
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "error": "неизвестное действие"}), 400
+
+
+@app.route("/api/admin/branches/<int:branch_id>/sub_paid", methods=["POST"])
+@admin_required
+def api_admin_branch_sub_paid(branch_id):
+    if not db.admin_mark_branch_paid(branch_id):
+        return jsonify({"ok": False, "error": "филиал не найден"}), 404
+    return jsonify({"ok": True})
+
+
+SUB_PAGE = r"""<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A2540">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<title>{{ T.sub_title }} · OilBook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+<style>
+:root { --line:#E3E8F0; --text:#0B1F3A; --muted:#5B6B82; --blue:#1D6FE0; --blue-bg:#F0F6FF; --green:#0E6B3E; --green-bg:#E3F4EA;
+  --warn:#8A4205; --warn-bg:#FEF0DC; --red:#B3122F; --red-bg:#FCE6EA; --mono:'IBM Plex Mono', ui-monospace, monospace; }
+* { box-sizing:border-box; }
+body { margin:0; background:#F3F5F9; color:var(--text); font-family:'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color:transparent; }
+.wrap { max-width:520px; margin:0 auto; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+.top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px; padding:calc(6px + env(safe-area-inset-top, 0px)) 16px 6px; min-height:56px; background:#fff; border-bottom:1px solid var(--line); }
+.back { width:44px; height:44px; margin-left:-12px; display:flex; align-items:center; justify-content:center; color:var(--text); text-decoration:none; border:0; background:none; font-size:20px; cursor:pointer; }
+.ttl { font-size:18px; font-weight:700; }
+.wm { margin-left:auto; font-family:Sora, sans-serif; font-weight:800; font-size:17px; }
+.wm b { color:var(--blue); font-weight:800; }
+.body { flex:1; padding:16px; display:flex; flex-direction:column; gap:12px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.muted { color:var(--muted); font-size:14px; }
+.big { font-family:var(--mono); font-size:24px; font-weight:600; margin:4px 0 2px; }
+.chip { font-size:13px; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; }
+.chip.warn { color:var(--warn); background:var(--warn-bg); }
+.chip.ok { color:var(--green); background:var(--green-bg); }
+.chip.bad { color:#fff; background:var(--red); }
+.chip.blue { color:#fff; background:var(--blue); }
+.h { font-size:16px; font-weight:700; margin:4px 0 0; }
+.opt { position:relative; display:flex; align-items:center; gap:12px; background:#fff; border:2px solid var(--line); border-radius:14px; padding:12px 14px; cursor:pointer; }
+.opt input { position:absolute; opacity:0; pointer-events:none; }
+.radio { width:20px; height:20px; border-radius:50%; border:2px solid #B8C3D3; flex:none; background:#fff; }
+.opt.sel { border-color:var(--blue); background:var(--blue-bg); }
+.opt.sel .radio { border:6px solid var(--blue); }
+.opt .mid { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.opt .nm { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:16px; font-weight:700; }
+.disc { font-size:12px; font-weight:700; color:var(--green); background:var(--green-bg); padding:2px 8px; border-radius:999px; }
+.best { font-size:12px; font-weight:700; color:#fff; background:var(--blue); padding:2px 8px; border-radius:999px; }
+.opt .sub { font-size:13px; color:var(--muted); }
+.opt .amt { font-family:var(--mono); font-size:16px; font-weight:600; white-space:nowrap; }
+.note { font-size:13px; color:var(--muted); line-height:1.45; }
+.foot { position:sticky; bottom:0; background:#fff; border-top:1px solid var(--line); padding:12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; gap:10px; }
+.btn { height:52px; border:0; border-radius:12px; background:var(--blue); color:#fff; font:700 16px 'Plus Jakarta Sans', system-ui, sans-serif; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:10px; text-decoration:none; }
+.btn:disabled { opacity:.55; cursor:wait; }
+.btn.ghost { background:#fff; color:var(--text); border:1.5px solid #D5DDE8; height:48px; font-size:15px; }
+.btn.line { background:#fff; color:var(--blue); border:1.5px solid var(--blue); height:48px; font-size:15px; }
+.paycard { background:#0B1F3A; color:#fff; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:8px; }
+.paycard .lbl { font-size:12px; color:#B9C6DA; }
+.paycard .num { font-family:var(--mono); font-size:20px; font-weight:600; letter-spacing:.5px; }
+.cp { width:44px; height:44px; border:0; border-radius:10px; background:rgba(255,255,255,.12); color:#fff; font-size:18px; cursor:pointer; flex:none; }
+.cp.light { background:transparent; color:var(--blue); }
+.center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:24px 20px; }
+.ico { width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; }
+.ico.grey { background:#E6EBF2; color:#3E4F68; }
+.ico.green { background:var(--green-bg); color:var(--green); }
+h1 { margin:0; font-size:26px; font-weight:800; }
+.p { margin:0; font-size:16px; line-height:1.45; color:#3E4F68; }
+.warnbox { background:#FFF8EC; border:2px solid #E08A1E; border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; font-size:14px; line-height:1.45; color:#3E4F68; }
+.warnbox b { color:var(--text); font-size:15px; }
+.redbox { background:var(--red-bg); border-radius:14px; padding:14px 16px; color:#7A0C20; font-size:15px; line-height:1.45; }
+.file { display:flex; align-items:center; gap:10px; border:1.5px dashed #9AAAC2; border-radius:12px; padding:14px; cursor:pointer; background:#fff; font-weight:700; color:var(--blue); min-height:52px; }
+.file input { position:absolute; opacity:0; width:1px; height:1px; }
+.file.has { border-style:solid; border-color:var(--green); color:var(--green); }
+.hist .r { display:flex; justify-content:space-between; gap:8px; padding:10px 0; border-top:1px solid #EEF1F6; font-size:14px; }
+.hist .r:first-of-type { border-top:0; }
+.hist .r.bad { color:var(--red); }
+.hist .r > span:last-child { white-space:nowrap; flex:none; }
+.err { color:var(--red); font-size:14px; font-weight:700; }
+.lo { display:block; text-align:center; padding:12px; color:var(--muted); text-decoration:none; font-size:15px; }
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    {% if not st.blocked %}<a class="back" href="/" aria-label="{{ T.sub_back }}"><i class="fa-solid fa-chevron-left"></i></a>{% endif %}
+    <button class="back hidden" id="backStep" type="button" aria-label="{{ T.sub_back }}" onclick="showStep(1)"><i class="fa-solid fa-chevron-left"></i></button>
+    <div class="ttl">{{ T.sub_title }}</div>
+    <div class="wm"><b>Oil</b>Book</div>
+  </div>
+
+{% if mode == 'staff' %}
+  {% if st.blocked %}
+  <div class="center">
+    <div class="ico grey"><i class="fa-solid fa-pause"></i></div>
+    <h1>{{ T.sub_staff_title }}</h1>
+    <p class="p">{% if st.reason == 'branch_pending' %}{{ T.sub_branch_pending_text }}{% else %}{{ T.sub_staff_text }}{% endif %}</p>
+  </div>
+  <div class="foot"><a class="btn ghost" href="/logout">{{ T.sub_logout }}</a></div>
+  {% else %}
+  <div class="body">
+    <div class="card">
+      {% if st.lifetime %}<b>{{ T.sub_lifetime_title }}</b>
+      {% else %}<div class="muted">{{ T.sub_paid_until }}</div><div class="big">{{ paid_until_txt }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+{% else %}
+  <div class="body" id="step1">
+    {% if st.expired %}<div class="redbox"><b>{{ T.sub_expired_title }}</b><br>{{ expired_txt }}</div>{% endif %}
+    {% if pending_txt %}
+    <div class="warnbox"><b><i class="fa-solid fa-hourglass-half"></i> {{ T.sub_pending_title }}</b><span>{{ pending_txt }}</span><span class="note">{{ T.sub_pending_hint }}</span></div>
+    {% endif %}
+    <div class="card">
+      <div class="row"><span class="muted">{{ T.sub_paid_until }}</span><span class="chip {{ chip[0] }}">{{ chip[1] }}</span></div>
+      {% if st.lifetime %}<div class="big" style="font-size:20px;">{{ T.sub_lifetime_title }}</div><div class="muted">{{ T.sub_lifetime_text }}</div>
+      {% else %}<div class="big">{{ paid_until_txt }}</div><div class="muted">{{ net }}</div>{% endif %}
+    </div>
+
+    {% if st.lifetime %}
+      {% for line in lifetime_branches %}<div class="warnbox"><span>{{ line }}</span></div>{% endfor %}
+    {% else %}
+      {% if branch_txt %}
+      <div class="warnbox">
+        <b><i class="fa-solid fa-building"></i> {{ T.sub_branches_title }}</b>
+        <span>{{ branch_txt }}</span>
+        <label class="opt" data-opt>
+          <input type="radio" name="term" value="branches" data-amount="{{ branch_amount_txt }}" data-until="{{ branch_until_txt }}">
+          <span class="radio"></span>
+          <span class="mid"><span class="nm">{{ T.sub_only_branches }}</span></span>
+          <span class="amt">{{ branch_amount_txt }}</span>
+        </label>
+      </div>
+      {% endif %}
+      <div class="h">{% if branch_txt %}{{ T.sub_or_extend }}{% else %}{{ T.sub_choose }}{% endif %}</div>
+      {% for o in options %}
+      <label class="opt" data-opt>
+        <input type="radio" name="term" value="{{ o.months }}" data-amount="{{ o.amount_txt }}" data-until="{{ o.until_txt }}"{% if o.best %} checked{% endif %}>
+        <span class="radio"></span>
+        <span class="mid">
+          <span class="nm">{{ o.label }}{% if o.discount %}<span class="disc">−{{ o.discount }}%</span>{% endif %}{% if o.best %}<span class="best">{{ T.sub_best }}</span>{% endif %}</span>
+          <span class="sub">{{ o.sub_txt }}</span>
+        </span>
+        <span class="amt">{{ o.amount_txt }}</span>
+      </label>
+      {% endfor %}
+      <div class="note">{% if branch_txt %}{{ T.sub_incl_branches_note }} {% endif %}{{ T.sub_note }}</div>
+    {% endif %}
+
+    {% if history %}
+    <div class="card hist">
+      <div class="h" style="margin:0 0 6px;">{{ T.sub_history }}</div>
+      {% for h in history %}
+      <div class="r{% if h.bad %} bad{% endif %}"><span>{{ h.left }}<br><span class="muted">{{ h.sub }}</span></span><span style="font-family:var(--mono);">{{ h.right }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if support %}<div class="note" style="text-align:center;">{{ support }}</div>{% endif %}
+    {% if st.blocked %}<a class="lo" href="/logout">{{ T.sub_logout }}</a>{% endif %}
+  </div>
+
+  {% if not st.lifetime %}
+  <div class="foot" id="foot1">
+    <div class="row muted"><span>{{ T.sub_new_date }}</span><span id="newDate" style="font-family:var(--mono); color:var(--text); font-weight:600;"></span></div>
+    <button class="btn" id="payBtn" type="button" onclick="showStep(2)"></button>
+  </div>
+
+  <div class="body hidden" id="step2">
+    <div class="opt sel" style="cursor:default;">
+      <span class="mid"><span class="nm" id="s2What"></span><span class="sub" id="s2Until"></span></span>
+      <span class="amt" id="s2Amount"></span>
+    </div>
+    {% if card_number %}
+    <div class="h">{{ T.sub_step1 }}</div>
+    <div class="paycard">
+      <span class="lbl">{{ T.sub_card }}</span>
+      <div class="row"><span class="num" id="cardNum">{{ card_number }}</span>
+        <button class="cp" type="button" aria-label="{{ T.sub_copy }}" onclick="copyText(document.getElementById('cardNum').textContent, this)"><i class="fa-regular fa-copy"></i></button></div>
+      {% if card_holder %}<span class="lbl" style="font-size:13px;">{{ card_holder }}</span>{% endif %}
+    </div>
+    <div class="card row" style="padding:6px 8px 6px 16px;">
+      <span class="muted">{{ T.sub_amount }}</span>
+      <span class="row" style="gap:4px;"><span id="s2Amount2" style="font-family:var(--mono); font-size:17px; font-weight:600;"></span>
+        <button class="cp light" type="button" aria-label="{{ T.sub_copy }}" onclick="copyText(document.getElementById('s2Amount2').textContent, this)"><i class="fa-regular fa-copy"></i></button></span>
+    </div>
+    <div class="h">{{ T.sub_step2 }}</div>
+    <div class="note" style="font-size:14px; color:#3E4F68;">{{ T.sub_step2_hint }}</div>
+    <label class="file" id="fileBox">
+      <input type="file" id="receipt" accept="image/*,application/pdf" onchange="onFile()">
+      <i class="fa-solid fa-image"></i><span id="fileName">{{ T.sub_attach }}</span>
+    </label>
+    <div class="err hidden" id="payErr"></div>
+    {% else %}
+    <div class="redbox">{{ T.sub_no_card }}</div>
+    {% endif %}
+  </div>
+  {% if card_number %}
+  <div class="foot hidden" id="foot2">
+    <button class="btn" id="sendBtn" type="button" onclick="sendReceipt()"><i class="fa-solid fa-paper-plane"></i><span>{{ T.sub_send }}</span></button>
+  </div>
+  {% endif %}
+
+  <div class="center hidden" id="step3">
+    <div class="ico green"><i class="fa-solid fa-check"></i></div>
+    <h1>{{ T.sub_sent_title }}</h1>
+    <p class="p">{{ T.sub_sent_text }}</p>
+  </div>
+  <div class="foot hidden" id="foot3">
+    {% if st.blocked %}<a class="btn ghost" href="/logout">{{ T.sub_logout }}</a>
+    {% else %}<a class="btn ghost" href="/">{{ T.sub_back_home }}</a>{% endif %}
+  </div>
+
+<script>
+(function () {
+  const PAY_TPL = {{ T.sub_pay_btn|tojson }};
+  const L = { sending: {{ T.sub_sending|tojson }}, send: {{ T.sub_send|tojson }}, need: {{ T.sub_file_needed|tojson }},
+    big: {{ T.sub_file_big|tojson }}, err: {{ T.sub_err|tojson }}, copied: {{ T.sub_copied|tojson }},
+    attach: {{ T.sub_attach|tojson }}, until: {{ T.sub_new_date|tojson }}, branches: {{ T.sub_only_branches|tojson }} };
+  const $ = id => document.getElementById(id);
+  function current() { return document.querySelector('input[name=term]:checked'); }
+  function refresh() {
+    const r = current();
+    document.querySelectorAll('[data-opt]').forEach(l => l.classList.toggle('sel', !!r && l.contains(r)));
+    if (!r) { $('payBtn').disabled = true; $('payBtn').textContent = PAY_TPL.replace('{sum}', '—'); return; }
+    $('payBtn').disabled = false;
+    $('payBtn').textContent = PAY_TPL.replace('{sum}', r.dataset.amount);
+    $('newDate').textContent = r.dataset.until;
+  }
+  document.querySelectorAll('input[name=term]').forEach(i => i.addEventListener('change', refresh));
+  refresh();
+
+  window.showStep = function (n) {
+    const r = current();
+    if (n === 2 && !r) return;
+    $('step1').classList.toggle('hidden', n !== 1);
+    $('foot1').classList.toggle('hidden', n !== 1);
+    $('step2').classList.toggle('hidden', n !== 2);
+    if ($('foot2')) $('foot2').classList.toggle('hidden', n !== 2);
+    $('step3').classList.toggle('hidden', n !== 3);
+    $('foot3').classList.toggle('hidden', n !== 3);
+    $('backStep').classList.toggle('hidden', n !== 2);
+    const homeBack = document.querySelector('a.back');
+    if (homeBack) homeBack.classList.toggle('hidden', n === 2);
+    if (n === 2) {
+      const lbl = r.closest('label').querySelector('.nm');
+      $('s2What').textContent = r.value === 'branches' ? L.branches : lbl.childNodes[0].textContent.trim();
+      $('s2Until').textContent = L.until + ': ' + r.dataset.until;
+      $('s2Amount').textContent = r.dataset.amount;
+      if ($('s2Amount2')) $('s2Amount2').textContent = r.dataset.amount;
+    }
+    window.scrollTo(0, 0);
+  };
+
+  window.copyText = function (text, btn) {
+    const plain = String(text).replace(/[^0-9]/g, '');
+    const done = () => { const old = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-check"></i>'; setTimeout(() => { btn.innerHTML = old; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(plain).then(done, () => { prompt(L.copied, plain); });
+    } else { prompt(L.copied, plain); }
+  };
+
+  window.onFile = function () {
+    const f = $('receipt').files[0];
+    $('fileName').textContent = f ? f.name : L.attach;
+    $('fileBox').classList.toggle('has', !!f);
+    $('payErr').classList.add('hidden');
+  };
+
+  let busy = false;
+  window.sendReceipt = async function () {
+    if (busy) return;
+    const err = $('payErr');
+    const f = $('receipt').files[0];
+    const r = current();
+    if (!f) { err.textContent = L.need; err.classList.remove('hidden'); return; }
+    if (f.size > 10 * 1024 * 1024) { err.textContent = L.big; err.classList.remove('hidden'); return; }
+    busy = true;
+    const btn = $('sendBtn');
+    btn.disabled = true; btn.querySelector('span').textContent = L.sending;
+    const fd = new FormData();
+    fd.append('choice', r.value);
+    fd.append('receipt', f);
+    try {
+      const res = await fetch('/api/subscription/pay', { method: 'POST', body: fd });
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (res.ok && data.ok) { showStep(3); return; }
+      if (res.status === 401) { location.href = '/login'; return; }
+      err.textContent = data.error || L.err; err.classList.remove('hidden');
+    } catch (e) {
+      err.textContent = L.err; err.classList.remove('hidden');
+    } finally {
+      busy = false; btn.disabled = false; btn.querySelector('span').textContent = L.send;
+    }
+  };
+})();
+</script>
+  {% endif %}
+{% endif %}
+</div>
+</body>
+</html>
+"""
 
 
 def run_webapp():

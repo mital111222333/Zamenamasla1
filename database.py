@@ -294,6 +294,7 @@ def init_db():
 
         conn.commit()
         _migrate(conn)
+        _migrate_subscription(conn)
         _bootstrap_accounts(conn)
 
 
@@ -4480,4 +4481,441 @@ def get_overdue_supplier_debts() -> list:
 def mark_supplier_debt_reminded(supplier_id: int):
     with get_conn() as conn:
         conn.execute("UPDATE suppliers SET debt_reminded_at=? WHERE id=?", (_now_str(), supplier_id))
+        conn.commit()
+
+
+
+# ======================================================================
+# ПОДПИСКА ПЛАТФОРМЫ
+# ======================================================================
+# Платит главная точка (role='shop') за всю сеть: 199 000 за главную +
+# 99 000 за каждый включённый филиал в месяц (цены и скидки — в настройках
+# админки). Дата «оплачено до» хранится у главной; филиалы и сотрудники
+# живут по ней. Последний оплаченный день работает весь, на следующий день
+# вход блокируется (без льготного периода). Данные при этом не трогаются.
+#   paid_until   — последний оплаченный день (YYYY-MM-DD); NULL = дата ещё не
+#                  задана админом → точка работает как раньше (так все уже
+#                  существующие точки не отключатся в день обновления)
+#   license_type — 'sub' (подписка) или 'lifetime' (куплено разово, ∞)
+#   branch_pending — у филиала: создан, но ещё не оплачен → не работает
+# Новый филиал оплачивается за оставшиеся до общей даты дни со скидкой
+# последнего оплаченного срока; у бессрочной сети — 100 $ разово (отмечает админ).
+
+SUB_TERMS = (1, 3, 6, 12)
+SUB_DEFAULTS = {
+    "price_main": 199000,
+    "price_branch": 99000,
+    "disc_1": 0, "disc_3": 5, "disc_6": 15, "disc_12": 30,
+    "card_number": "",
+    "card_holder": "",
+    "support_contact": "",
+}
+_SUB_INT_KEYS = ("price_main", "price_branch", "disc_1", "disc_3", "disc_6", "disc_12")
+RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(DB_PATH)), "receipts")
+
+
+def _migrate_subscription(conn):
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    for col, ddl in {
+        "paid_until": "TEXT",
+        "license_type": "TEXT DEFAULT 'sub'",
+        "branch_pending": "INTEGER DEFAULT 0",
+        "last_period_months": "INTEGER",
+        "sub_notice": "TEXT",
+    }.items():
+        if col not in cols:
+            conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS sub_payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        months INTEGER,
+        discount INTEGER DEFAULT 0,
+        amount INTEGER,
+        branch_count INTEGER DEFAULT 0,
+        branch_ids TEXT,
+        method TEXT DEFAULT 'card',
+        status TEXT DEFAULT 'pending',
+        receipt_file TEXT,
+        receipt_mime TEXT,
+        tg_message_id INTEGER,
+        new_until TEXT,
+        note TEXT,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        decided_at TEXT
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_payments_shop ON sub_payments(shop_id, status)")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS platform_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )
+    """)
+    conn.commit()
+
+
+def get_platform_settings() -> dict:
+    out = dict(SUB_DEFAULTS)
+    with get_conn() as conn:
+        for r in conn.execute("SELECT key, value FROM platform_settings").fetchall():
+            k, v = r["key"], r["value"]
+            if k not in SUB_DEFAULTS:
+                continue
+            if k in _SUB_INT_KEYS:
+                try:
+                    out[k] = int(float(v))
+                except (TypeError, ValueError):
+                    pass
+            else:
+                out[k] = v or ""
+    return out
+
+
+@_serialized
+def set_platform_settings(values: dict):
+    with get_conn() as conn:
+        for k, v in values.items():
+            if k not in SUB_DEFAULTS:
+                continue
+            if k in _SUB_INT_KEYS:
+                v = str(max(0, int(float(v))))
+            else:
+                v = str(v or "").strip()
+            conn.execute("INSERT INTO platform_settings(key, value) VALUES(?, ?) "
+                         "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, v))
+        conn.commit()
+
+
+def _round_k(x) -> int:
+    """Округление суммы до тысячи сумов."""
+    return int(float(x) / 1000.0 + 0.5) * 1000
+
+
+def _parse_day(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _today():
+    return datetime.now().date()
+
+
+def sub_head(shop: dict):
+    """Главная точка, которая платит за эту (для филиала — его главная)."""
+    if shop and shop.get("role") == "branch" and shop.get("parent_shop_id"):
+        return get_shop(shop["parent_shop_id"]) or shop
+    return shop
+
+
+def subscription_state(shop: dict) -> dict:
+    """Можно ли этой точке работать прямо сейчас — для входа и баннера."""
+    head = sub_head(shop) or {}
+    lifetime = (head.get("license_type") or "sub") == "lifetime"
+    until = _parse_day(head.get("paid_until"))
+    today = _today()
+    days_left = (until - today).days if until else None
+    expired = bool(not lifetime and until and today > until)
+    pending = bool(shop and shop.get("role") == "branch" and shop.get("branch_pending"))
+    reason = "expired" if expired else ("branch_pending" if pending else None)
+    return {
+        "head_id": head.get("id"),
+        "lifetime": lifetime,
+        "paid_until": until.strftime("%Y-%m-%d") if until else None,
+        "days_left": days_left,
+        "expired": expired,
+        "blocked": bool(reason),
+        "reason": reason,
+    }
+
+
+def _sub_discount(settings: dict, months) -> int:
+    try:
+        return int(settings.get(f"disc_{int(months)}", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def sub_quote(head_id: int) -> dict:
+    """Всё, что нужно экрану «Подписка»: статус, цена сети в месяц, варианты
+    сроков с суммами и, если есть, оплата новых филиалов."""
+    head = get_shop(head_id)
+    settings = get_platform_settings()
+    branches = [b for b in get_branches(head_id) if b.get("is_active")]
+    pending = [b for b in branches if b.get("branch_pending")]
+    n = len(branches)
+    monthly = settings["price_main"] + settings["price_branch"] * n
+    state = subscription_state(head)
+    today = _today()
+    until = _parse_day(head.get("paid_until"))
+    active_period = bool(until and until >= today)
+
+    branch_part = None
+    if pending and not state["lifetime"] and active_period:
+        days = max(1, (until - today).days)
+        disc = _sub_discount(settings, head.get("last_period_months") or 1)
+        amount = _round_k(settings["price_branch"] * len(pending) * days / 30.0 * (100 - disc) / 100.0)
+        branch_part = {"amount": amount, "days": days, "discount": disc,
+                       "until": until.strftime("%Y-%m-%d")}
+
+    base = until if active_period else today
+    options = []
+    for m in SUB_TERMS:
+        disc = _sub_discount(settings, m)
+        full = monthly * m
+        amount = _round_k(full * (100 - disc) / 100.0)
+        if branch_part:
+            amount += branch_part["amount"]
+            full += branch_part["amount"]
+        options.append({
+            "months": m, "discount": disc, "amount": amount,
+            "per_month": int(round(amount / m / 100.0)) * 100,
+            "saving": max(0, full - amount),
+            "new_until": (base + relativedelta(months=m)).strftime("%Y-%m-%d"),
+        })
+    return {
+        "head_id": head_id,
+        "state": state,
+        "settings": settings,
+        "branch_count": n,
+        "monthly": monthly,
+        "pending_branches": [{"id": b["id"], "name": b.get("shop_name") or b["username"]} for b in pending],
+        "branch_part": branch_part,
+        "options": options,
+    }
+
+
+def get_pending_sub_payment(head_id: int):
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM sub_payments WHERE shop_id=? AND status='pending' "
+                         "ORDER BY id DESC LIMIT 1", (head_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def get_sub_payment(payment_id: int):
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM sub_payments WHERE id=?", (payment_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def list_sub_payments(head_id: int = None, status: str = None, limit: int = 50) -> list:
+    q = ("SELECT p.*, s.shop_name, s.username FROM sub_payments p "
+         "LEFT JOIN shops s ON s.id = p.shop_id WHERE 1=1")
+    args = []
+    if head_id:
+        q += " AND p.shop_id=?"
+        args.append(head_id)
+    if status:
+        q += " AND p.status=?"
+        args.append(status)
+    q += " ORDER BY p.id DESC LIMIT ?"
+    args.append(int(limit))
+    with get_conn() as conn:
+        return [dict(r) for r in conn.execute(q, args).fetchall()]
+
+
+@_serialized
+def create_sub_payment(head_id: int, kind: str, months, amount: int, discount: int,
+                       branch_ids: list, branch_count: int, new_until: str = None) -> int:
+    """Заявка на оплату по чеку. Прежняя непроверенная заявка этой точки
+    заменяется новой (человек мог ошибиться и отправить чек ещё раз)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE sub_payments SET status='replaced', decided_at=datetime('now','localtime') "
+                     "WHERE shop_id=? AND status='pending'", (head_id,))
+        cur = conn.execute("""
+            INSERT INTO sub_payments (shop_id, kind, months, discount, amount, branch_count, branch_ids,
+                                      method, status, new_until)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'card', 'pending', ?)
+        """, (head_id, kind, months, discount, amount, branch_count, json.dumps(branch_ids or []), new_until))
+        conn.commit()
+        return cur.lastrowid
+
+
+@_serialized
+def set_sub_payment_receipt(payment_id: int, file_name: str, mime: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE sub_payments SET receipt_file=?, receipt_mime=? WHERE id=?",
+                     (file_name, mime, payment_id))
+        conn.commit()
+
+
+@_serialized
+def set_sub_payment_tg_message(payment_id: int, message_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE sub_payments SET tg_message_id=? WHERE id=?", (message_id, payment_id))
+        conn.commit()
+
+
+def _extend_head(conn, head_id: int, months: int, from_day):
+    """Продлевает сеть на months от from_day или от текущей даты оплаты, если
+    она позже (оплаченные заранее дни не пропадают). Возвращает новую дату."""
+    row = conn.execute("SELECT paid_until FROM shops WHERE id=?", (head_id,)).fetchone()
+    until = _parse_day(row["paid_until"]) if row else None
+    base = until if (until and until >= from_day) else from_day
+    new_until = (base + relativedelta(months=int(months))).strftime("%Y-%m-%d")
+    conn.execute("UPDATE shops SET paid_until=?, last_period_months=?, sub_notice=NULL WHERE id=?",
+                 (new_until, int(months), head_id))
+    return new_until
+
+
+def _clear_branch_pending(conn, head_id: int, branch_ids):
+    if branch_ids is None:
+        conn.execute("UPDATE shops SET branch_pending=0 WHERE parent_shop_id=?", (head_id,))
+        return
+    for bid in branch_ids:
+        conn.execute("UPDATE shops SET branch_pending=0 WHERE id=? AND parent_shop_id=?", (int(bid), head_id))
+
+
+@_serialized
+def confirm_sub_payment(payment_id: int):
+    """Подтверждение чека. Возвращает обновлённую заявку или None, если её
+    уже обработали (повторное нажатие, вторая кнопка и т.п.)."""
+    with get_conn() as conn:
+        p = conn.execute("SELECT * FROM sub_payments WHERE id=?", (payment_id,)).fetchone()
+        if not p or p["status"] != "pending":
+            return None
+        p = dict(p)
+        try:
+            branch_ids = json.loads(p.get("branch_ids") or "[]")
+        except ValueError:
+            branch_ids = []
+        new_until = None
+        created = _parse_day(p.get("created_at")) or _today()
+        if p["kind"] in ("extend", "both") and p.get("months"):
+            new_until = _extend_head(conn, p["shop_id"], p["months"], created)
+        if p["kind"] in ("branches", "both", "extend"):
+            _clear_branch_pending(conn, p["shop_id"], branch_ids)
+        if new_until is None:
+            row = conn.execute("SELECT paid_until FROM shops WHERE id=?", (p["shop_id"],)).fetchone()
+            new_until = row["paid_until"] if row else None
+        conn.execute("UPDATE sub_payments SET status='confirmed', new_until=?, "
+                     "decided_at=datetime('now','localtime') WHERE id=?", (new_until, payment_id))
+        conn.commit()
+        p.update(status="confirmed", new_until=new_until)
+        return p
+
+
+@_serialized
+def reject_sub_payment(payment_id: int):
+    with get_conn() as conn:
+        p = conn.execute("SELECT * FROM sub_payments WHERE id=?", (payment_id,)).fetchone()
+        if not p or p["status"] != "pending":
+            return None
+        conn.execute("UPDATE sub_payments SET status='rejected', decided_at=datetime('now','localtime') "
+                     "WHERE id=?", (payment_id,))
+        conn.commit()
+        d = dict(p)
+        d["status"] = "rejected"
+        return d
+
+
+@_serialized
+def admin_extend_subscription(head_id: int, months: int, amount=None) -> str:
+    """Оплата наличными — админ продлевает вручную (с записью в историю)."""
+    with get_conn() as conn:
+        new_until = _extend_head(conn, head_id, months, _today())
+        _clear_branch_pending(conn, head_id, None)
+        conn.execute("""
+            INSERT INTO sub_payments (shop_id, kind, months, amount, method, status, new_until, decided_at)
+            VALUES (?, 'extend', ?, ?, 'cash', 'confirmed', ?, datetime('now','localtime'))
+        """, (head_id, int(months), amount, new_until))
+        conn.commit()
+        return new_until
+
+
+@_serialized
+def admin_set_paid_until(head_id: int, day: str = None):
+    d = _parse_day(day) if day else None
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET paid_until=?, sub_notice=NULL WHERE id=?",
+                     (d.strftime("%Y-%m-%d") if d else None, head_id))
+        conn.commit()
+
+
+@_serialized
+def admin_set_lifetime(head_id: int, on: bool):
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET license_type=? WHERE id=?", ("lifetime" if on else "sub", head_id))
+        if on:
+            conn.execute("""
+                INSERT INTO sub_payments (shop_id, kind, method, status, note, decided_at)
+                VALUES (?, 'lifetime', 'cash', 'confirmed', 'бессрочная лицензия', datetime('now','localtime'))
+            """, (head_id,))
+        conn.commit()
+
+
+@_serialized
+def set_branch_pending(branch_id: int, pending: bool):
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET branch_pending=? WHERE id=? AND role='branch'", (1 if pending else 0, branch_id))
+        conn.commit()
+
+
+@_serialized
+def admin_mark_branch_paid(branch_id: int) -> bool:
+    """Филиал оплачен вручную (наличные или 100 $ разово у бессрочной сети)."""
+    with get_conn() as conn:
+        b = conn.execute("SELECT id, parent_shop_id FROM shops WHERE id=? AND role='branch'", (branch_id,)).fetchone()
+        if not b:
+            return False
+        conn.execute("UPDATE shops SET branch_pending=0 WHERE id=?", (branch_id,))
+        conn.execute("""
+            INSERT INTO sub_payments (shop_id, kind, branch_count, branch_ids, method, status, note, decided_at)
+            VALUES (?, 'branches', 1, ?, 'cash', 'confirmed', 'филиал оплачен вручную', datetime('now','localtime'))
+        """, (b["parent_shop_id"], json.dumps([branch_id])))
+        conn.commit()
+        return True
+
+
+def new_branch_needs_payment(head: dict) -> bool:
+    """Нужно ли новому филиалу ждать оплаты: да — у бессрочной сети (100 $
+    разово) и у сети на подписке с заданной датой. Если дата ещё не задана
+    (старый клиент), филиал работает сразу, как и раньше."""
+    if not head:
+        return False
+    if (head.get("license_type") or "sub") == "lifetime":
+        return True
+    return bool(head.get("paid_until"))
+
+
+def get_due_sub_notices() -> list:
+    """Для бота: кому из владельцев пора напомнить (за 5, 3, 1 день) или
+    сообщить о блокировке. Каждое событие отправляется один раз."""
+    today = _today()
+    out = []
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT * FROM shops WHERE role='shop' AND is_active=1 AND paid_until IS NOT NULL
+              AND COALESCE(license_type, 'sub') != 'lifetime'
+        """).fetchall()
+    for r in rows:
+        r = dict(r)
+        until = _parse_day(r.get("paid_until"))
+        if not until:
+            continue
+        left = (until - today).days
+        if left in (5, 3, 1):
+            code = f"d{left}"
+        elif left < 0:
+            code = "blocked"
+        else:
+            continue
+        key = f"{r['paid_until']}:{code}"
+        if r.get("sub_notice") == key:
+            continue
+        if code == "blocked" and left < -3:
+            continue  # о старых блокировках не пишем повторно (например, после восстановления базы)
+        out.append({"shop": r, "code": code, "days_left": left, "key": key})
+    return out
+
+
+@_serialized
+def mark_sub_notice(head_id: int, key: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET sub_notice=? WHERE id=?", (key, head_id))
         conn.commit()
