@@ -5765,4 +5765,46 @@ def get_admin_shop_snapshot(shop_id: int, days: int = 30):
         "revenue": get_revenue_range(shop_id, date_from, today),
         "brands": brands["categories"],
         "warehouse": {"products": products, "summary": wh["summary"]},
+        "suppliers": _admin_suppliers_snapshot(shop_id, date_from, today),
     }
+
+
+def _admin_suppliers_snapshot(shop_id: int, date_from: str, date_to: str) -> dict:
+    """Поставщики точки для окна на карте: контакты, долг и просрочка, сколько
+    взяли товара за период и всего, последние цены закупки по товарам."""
+    sups = list_suppliers(shop_id)
+    out = []
+    with get_conn() as conn:
+        for s in sups:
+            entries = _live(_supplier_charges(conn, shop_id, s["id"]))
+            in_period = [e for e in entries if date_from <= (e.get("date") or "") <= date_to]
+            per = _period_totals(in_period)
+            allt = _period_totals(entries)
+            last_order = max((e["date"] for e in entries if e["type"] == "order" and e.get("date")), default=None)
+            last_pay = max((e["date"] for e in entries if e["type"] == "payment" and e.get("date")), default=None)
+            prods = [r["name"] for r in conn.execute(
+                "SELECT name FROM products WHERE shop_id=? AND supplier_id=? AND is_active=1 ORDER BY name COLLATE NOCASE",
+                (shop_id, s["id"])).fetchall()]
+            prices = []
+            for p in supplier_price_history(shop_id, s["id"])[:40]:
+                prices.append({"name": p["name"], "unit": p["unit"], "last": p["last"], "last_date": p["last_date"],
+                               "change_pct": p["change_pct"], "since_first_pct": p["since_first_pct"],
+                               "times": len(p["history"])})
+            out.append({
+                "id": s["id"], "name": s["name"], "phone": s.get("phone"), "telegram": s.get("telegram"),
+                "contact": s.get("contact"), "delivery_days": s.get("delivery_days"), "pay_days": s.get("pay_days"),
+                "note": s.get("note"), "balance": s["balance"], "overdue": s["overdue"],
+                "next_due": s.get("next_due"), "oldest_overdue": s.get("oldest_overdue"),
+                "bought_period": per["bought"], "paid_period": per["paid"],
+                "bought_all": allt["bought"], "paid_all": allt["paid"],
+                "last_order": last_order, "last_payment": last_pay,
+                "order_count": sum(1 for e in entries if e["type"] == "order"),
+                "products": prods, "prices": prices,
+            })
+        no_sup = conn.execute(
+            "SELECT COUNT(*) FROM products WHERE shop_id=? AND is_active=1 AND supplier_id IS NULL", (shop_id,)).fetchone()[0]
+    out.sort(key=lambda x: (-x["bought_period"], -x["bought_all"], x["name"].lower()))
+    return {"list": out, "no_supplier_products": no_sup,
+            "owe": sum(x["balance"] for x in out if x["balance"] > 0),
+            "overdue": sum(x["overdue"] for x in out),
+            "bought_period": sum(x["bought_period"] for x in out)}

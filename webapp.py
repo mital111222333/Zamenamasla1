@@ -10157,6 +10157,20 @@ if ('serviceWorker' in navigator) {
   .snap-wh-row .sw-m { display:inline-block; margin-top:3px; padding:1px 7px; border-radius:7px; font-size:11.5px; font-weight:700; background:#ECFDF5; color:#047857; font-family:var(--font-body); }
   .snap-wh-row .sw-m.low { background:#FEF2F2; color:#B91C1C; }
   .snap-wh-row .sw-m.none { background:#F1F5F9; color:#94A3B8; }
+  details.sup-card > summary { list-style:none; display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  details.sup-card > summary::-webkit-details-marker { display:none; }
+  details.sup-card > summary .ar-main { flex:1; min-width:0; }
+  details.sup-card > summary .ar-name { font-size:14px; font-weight:800; color:var(--darkblue); }
+  details.sup-card > summary .ar-sub { font-size:11.5px; color:#64748B; margin-top:2px; }
+  details.sup-card > summary .ar-val { text-align:right; font-family:var(--font-mono); font-size:14px; font-weight:700; white-space:nowrap; }
+  details.sup-card > summary .ar-val small { display:block; font-family:var(--font-body); font-size:11px; font-weight:500; color:#64748B; }
+  details.sup-card .sup-chev { color:#94A3B8; transition:transform .2s; }
+  details.sup-card[open] .sup-chev { transform:rotate(180deg); }
+  details.sup-card[open] > summary { border-bottom:1px solid #F1F5F9; }
+  .sup-contacts { display:flex; flex-wrap:wrap; gap:8px; padding:10px 14px 0; font-size:12.5px; }
+  .sup-contacts > * { background:#EFF6FF; color:var(--blue); border-radius:8px; padding:5px 9px; text-decoration:none; font-weight:600; }
+  .sup-h { padding:10px 14px 4px; font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:.4px; }
+  .ana-cmp b.ana-bad, .ar-val small.ana-bad { color:#DC2626; } .ana-cmp b.ana-good, .ar-val small.ana-good { color:#16A34A; }
   .ana-good { color:#16A34A; } .ana-bad { color:#DC2626; } .ana-mute { color:#94A3B8; }
   .ana-brands { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
   .ana-brands span { background:#F1F5F9; border-radius:7px; padding:2px 7px; font-size:11.5px; color:#334155; }
@@ -11568,7 +11582,7 @@ function mapPopupHtml(p) {
     </div>
     ${addr ? `<div class="mp-addr"><i class="fa-solid fa-location-dot"></i> ${addr}</div>` : ''}
     ${p.phone ? `<div class="mp-addr"><i class="fa-solid fa-phone"></i> <a href="tel:${escapeHtml(p.phone)}">${escapeHtml(p.phone)}</a></div>` : ''}
-    <button class="mp-snap" onclick="openSnapshot(${p.id})"><i class="fa-solid fa-oil-can"></i> Статистика масел и склад</button>
+    <button class="mp-snap" onclick="openSnapshot(${p.id})"><i class="fa-solid fa-oil-can"></i> Статистика, склад и поставщики</button>
     <div class="mp-act">
       <button class="b2" onclick="mapOpenCard(${p.id})">Карточка</button>
       <a class="b2" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}">Маршрут</a>
@@ -12264,7 +12278,7 @@ function renderSnapshot() {
   h += '<div class="snap-sec"><i class="fa-solid fa-warehouse" style="color:var(--blue)"></i> Склад</div>';
   if (!all.length) {
     h += `<div class="ana-card"><div class="hint-text" style="padding:14px">${S.shop.warehouse_enabled ? 'На складе точки пока нет товаров.' : 'Склад у этой точки выключен — товары не ведутся.'}</div></div>`;
-    body.innerHTML = h;
+    body.innerHTML = h + snapSuppliersHtml(S);
     return;
   }
   const isOil = p => String(p.category).indexOf('fluid_') === 0;
@@ -12301,7 +12315,59 @@ function renderSnapshot() {
       </div><div class="sw-price">${p.buy !== null && p.buy !== undefined ? anaMoney(p.buy) : '<span class="ana-bad">—</span>'} → ${p.sell ? anaMoney(p.sell) : '—'}
         <small>закупка → продажа, за ${unit}</small>${mHtml}</div></div>`;
   }).join('') : '<div class="hint-text" style="padding:14px">В этой группе товаров нет.</div>') + '</div>';
-  body.innerHTML = h;
+  body.innerHTML = h + snapSuppliersHtml(S);
+}
+function snapSuppliersHtml(S) {
+  const SP = S.suppliers || { list: [] };
+  const per = snapDays === 365 ? 'год' : snapDays === 90 ? '3 мес' : '30 дн';
+  let h = '<div class="snap-sec"><i class="fa-solid fa-truck-field" style="color:#16A34A"></i> Поставщики</div>';
+  if (!SP.list.length) {
+    return h + `<div class="ana-card"><div class="hint-text" style="padding:14px">Точка не ведёт поставщиков в OilBook.${SP.no_supplier_products ? ` Товаров на складе без поставщика: ${SP.no_supplier_products}.` : ''}</div></div>`;
+  }
+  h += `<div class="ana-cmp" style="padding:0 0 10px">
+    <div><b>${fmtShort(SP.owe)}</b>долг поставщикам</div>
+    <div><b class="${SP.overdue ? 'ana-bad' : ''}">${fmtShort(SP.overdue)}</b>просрочено</div>
+    <div><b>${fmtShort(SP.bought_period)}</b>взято товара · ${per}</div>
+    <div><b>${SP.list.length}</b>поставщиков${SP.no_supplier_products ? ` · ${SP.no_supplier_products} товар. без поставщика` : ''}</div>
+  </div>`;
+  SP.list.forEach(s => {
+    const bal = s.balance > 0
+      ? `<span class="${s.overdue ? 'ana-bad' : ''}">${fmtShort(s.balance)}</span><small>${s.overdue ? 'просрочено ' + fmtShort(s.overdue) : 'долг'}</small>`
+      : s.balance < 0 ? `<span class="ana-good">${fmtShort(-s.balance)}</span><small>переплата</small>` : `<span class="ana-mute">0</span><small>долга нет</small>`;
+    const terms = [s.pay_days !== null && s.pay_days !== undefined ? `оплата через ${s.pay_days} дн` : '', s.delivery_days ? 'привоз: ' + escapeHtml(s.delivery_days) : '']
+      .filter(Boolean).join(' · ');
+    const contacts = [
+      s.contact ? `<span><i class="fa-solid fa-user"></i> ${escapeHtml(s.contact)}</span>` : '',
+      s.phone ? `<a href="tel:${escapeHtml(s.phone)}"><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone)}</a>` : '',
+      s.telegram ? `<a target="_blank" rel="noopener" href="https://t.me/${encodeURIComponent(s.telegram)}"><i class="fa-brands fa-telegram"></i> @${escapeHtml(s.telegram)}</a>` : ''
+    ].filter(Boolean).join('');
+    const prices = (s.prices || []).map(p => {
+      const unit = SNAP_UNIT[p.unit] !== undefined ? SNAP_UNIT[p.unit] : p.unit;
+      const ch = p.change_pct === null || p.change_pct === undefined ? ''
+        : `<small class="${p.change_pct > 0 ? 'ana-bad' : 'ana-good'}">${p.change_pct > 0 ? '▲' : '▼'} ${Math.abs(p.change_pct)}%</small>`;
+      return `<div class="ana-row"><div class="ar-main"><div class="ar-name">${escapeHtml(p.name)}</div>
+        <div class="ar-sub">последняя закупка ${fmtDay(p.last_date)} · закупок: ${p.times}</div></div>
+        <div class="ar-val">${anaMoney(p.last)} <span style="font-size:11px;color:#64748B">/${unit}</span>${ch}</div></div>`;
+    }).join('');
+    const noHist = (s.products || []).filter(n => !(s.prices || []).some(p => p.name === n));
+    h += `<details class="ana-card sup-card"><summary>
+        <div class="ar-main"><div class="ar-name">${escapeHtml(s.name)}</div><div class="ar-sub">${terms || 'условия не указаны'}</div></div>
+        <div class="ar-val">${bal}</div><i class="fa-solid fa-chevron-down sup-chev"></i>
+      </summary>
+      ${contacts ? `<div class="sup-contacts">${contacts}</div>` : ''}
+      <div class="ana-cmp">
+        <div><b>${fmtShort(s.bought_period)}</b>взято · ${per}</div>
+        <div><b>${fmtShort(s.paid_period)}</b>оплачено · ${per}</div>
+        <div><b>${fmtShort(s.bought_all)}</b>взято за всё время · ${s.order_count} заказ.</div>
+        <div><b>${fmtShort(s.paid_all)}</b>оплачено за всё время</div>
+      </div>
+      <div class="ana-note">Последний заказ: ${fmtDay(s.last_order)} · последняя оплата: ${fmtDay(s.last_payment)}${s.next_due ? ` · следующий платёж до ${fmtDay(s.next_due.date)} — ${fmtShort(s.next_due.amount)}` : ''}${s.oldest_overdue ? ` · <span class="ana-bad">просрочка с ${fmtDay(s.oldest_overdue)}</span>` : ''}</div>
+      ${prices ? '<div class="sup-h">Цены закупки у этого поставщика</div>' + prices : ''}
+      ${noHist.length ? `<div class="sup-h">Товары поставщика без принятых заказов</div><div class="ana-brands" style="padding:0 14px 12px">${noHist.map(n => `<span>${escapeHtml(n)}</span>`).join('')}</div>` : ''}
+      ${s.note ? `<div class="ana-note">📝 ${escapeHtml(s.note)}</div>` : ''}
+    </details>`;
+  });
+  return h;
 }
 if (location.hash === '#income') admTab('income');
 if (location.hash === '#analytics') admTab('analytics');
