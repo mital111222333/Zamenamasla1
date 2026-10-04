@@ -1264,6 +1264,48 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .dk-hint b { color:var(--blue); }
   .km-chip { border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 9px; font-size:12px; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .add-form { max-width:760px; }
+  .af-title { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:18px; text-transform:uppercase; letter-spacing:.3px; color:var(--darkblue, #0A2540); margin:2px 4px 10px; }
+  .af-title .dot { width:9px; height:9px; border-radius:50%; background:var(--btn); flex:none; box-shadow:0 0 0 4px rgba(225,6,0,.18); }
+  .af-sec { background:#fff; border:1px solid #E2E8F0; border-radius:18px; padding:14px; margin-bottom:12px; box-shadow:0 4px 14px -6px rgba(15,82,186,.10); }
+  .af-h { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#0F172A; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+  .af-h i { width:28px; height:28px; border-radius:9px; background:#EFF6FF; color:var(--blue); display:inline-flex; align-items:center; justify-content:center; font-size:13px; }
+  .af-sub { font-size:12px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; margin:12px 0 6px; }
+  .mil-grid { display:grid; grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr); gap:6px; align-items:end; }
+  .mil-arrow { text-align:center; color:#94A3B8; padding-bottom:14px; font-size:13px; }
+  .mil-l { font-size:12px; color:var(--hint); margin-bottom:5px; }
+  .mil-f { position:relative; }
+  .mil-f input { padding-right:62px; font-size:18px; font-weight:700; font-family:var(--font-mono); }
+  .mil-f input::-webkit-outer-spin-button, .mil-f input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .mil-f input[type=number] { -moz-appearance:textfield; }
+  .mil-f span { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px; color:var(--hint); pointer-events:none; }
+  .mil-f.accent input { border-color:#93C5FD; background:#F8FBFF; }
+  .km-seg { display:grid !important; grid-template-columns:repeat(auto-fit, minmax(64px, 1fr)); gap:4px; background:#EEF2F7; border-radius:12px; padding:4px; margin-top:10px; }
+  .km-seg .km-chip { border:0; background:transparent; border-radius:9px; padding:9px 4px; font-size:13px; color:#475569; }
+  .km-seg .km-chip.on { background:var(--blue); color:#fff; box-shadow:0 2px 6px rgba(15,82,186,.25); }
+  .dk-hint:not(:empty) { background:#ECFDF5; color:#065F46; border-radius:10px; padding:9px 11px; font-size:13px; margin-top:8px; }
+  .dk-hint b { color:#047857 !important; }
+  .af-add { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .af-add:empty { display:none; }
+  .af-add button { border:1.5px dashed #CBD5E1; background:#fff; color:#334155; border-radius:999px; padding:6px 11px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .af-add button i { color:var(--blue); margin-right:3px; }
+  .add-form .item-row { gap:5px; }
+  .add-form .item-row .item-name { flex:1 !important; font-size:12.5px; line-height:1.2; }
+  .add-form .item-row input { padding:8px 6px; }
+  .add-form .item-row select { flex:1.5; padding:8px 4px; }
+  .item-row .row-x { flex:none; width:26px; height:34px; border:0; background:transparent; color:#94A3B8; font-size:15px; cursor:pointer; border-radius:8px; }
+  .item-row .row-x:hover { background:#F1F5F9; color:var(--btn); }
+  .af-ghost { width:100%; padding:9px; border:1.5px dashed #CBD5E1; background:#fff; border-radius:12px; color:#334155; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; }
+  .pay-seg { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }
+  @media (min-width:480px) { .pay-seg { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .pay-seg button { border:1.5px solid var(--border); background:#fff; border-radius:12px; padding:10px 6px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; font-family:inherit; }
+  .pay-seg button.on { border-color:var(--blue); background:#EFF6FF; color:var(--blue); }
+  .af-bar { position:sticky; bottom:calc(76px + env(safe-area-inset-bottom, 0px)); z-index:20; display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #E2E8F0; border-radius:18px; padding:10px 10px 10px 16px; box-shadow:0 8px 24px rgba(15,23,42,.14); margin-top:4px; }
+  @media (min-width:900px) { .af-bar { bottom:14px; } }
+  .af-bar-total { flex:1; min-width:0; }
+  .af-bar-total span { display:block; font-size:11px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; }
+  .af-bar-total b { display:block; font-size:21px; font-weight:800; font-family:var(--font-mono); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .af-save { flex:none; border:0; border-radius:14px; padding:13px 20px; background:linear-gradient(135deg, #E63946, #C1121F); color:#fff; font-size:15px; font-weight:800; font-family:var(--font-display); cursor:pointer; box-shadow:0 6px 14px rgba(230,57,70,.30); }
   .known-client .kc-lv-item {
     display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
     padding:3px 0;
@@ -1785,126 +1827,129 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   {% if sub_banner %}{% if sub_banner.link %}<a class="sub-banner" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ sub_banner.text }}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<div class="sub-banner"><i class="fa-solid fa-circle-info"></i><span>{{ sub_banner.text }}</span></div>{% endif %}{% endif %}
   <div id="msg"></div>
 
-  <div id="view-add" class="card">
-    <div class="card-header"><span class="dot"></span><h3>{{ T.tab_add }}</h3></div>
-    <div class="field">
-      <label><i class="fa-solid fa-id-card"></i>{{ T.field_plate }}</label>
-      <div class="plate-wrap">
-        <span class="plate-chip">UZ</span>
-        <input id="plate" placeholder="01A123BC" oninput="onPlateInput()" onblur="onPlateBlur()" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next">
-        <button type="button" class="ps-cam-btn" onclick="openPlateScanner()" title="{{ T.ps_btn_title }}" aria-label="{{ T.ps_btn_title }}"><i class="fa-solid fa-camera"></i></button>
-        <div id="plateSuggest" class="plate-suggest" style="display:none;"></div>
-      </div>
-      <div id="knownClientPanel"></div>
-    </div>
-    <div class="field">
-      <label><i class="fa-solid fa-user"></i>{{ T.field_owner_name }}</label>
-      <input id="owner_name" placeholder="Имя Фамилия">
-    </div>
-    <div class="field">
-      <label><i class="fa-solid fa-phone"></i>{{ T.field_owner_phone }}</label>
-      <input id="owner_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" enterkeyhint="next">
-      <div class="hint-text">{{ T.hint_owner_phone }}</div>
-    </div>
-    <div class="row2">
+  <div id="view-add" class="add-form">
+    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}</div>
+
+    <div class="af-sec">
+      <div class="af-h"><i class="fa-solid fa-car"></i>{{ T.af_car }}</div>
       <div class="field">
-        <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
-        <select id="car_brand">
-          {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
-        </select>
+        <label><i class="fa-solid fa-id-card"></i>{{ T.field_plate }}</label>
+        <div class="plate-wrap">
+          <span class="plate-chip">UZ</span>
+          <input id="plate" placeholder="01A123BC" oninput="onPlateInput()" onblur="onPlateBlur()" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next">
+          <button type="button" class="ps-cam-btn" onclick="openPlateScanner()" title="{{ T.ps_btn_title }}" aria-label="{{ T.ps_btn_title }}"><i class="fa-solid fa-camera"></i></button>
+          <div id="plateSuggest" class="plate-suggest" style="display:none;"></div>
+        </div>
+        <div id="knownClientPanel"></div>
       </div>
       <div class="field">
-        <label><i class="fa-solid fa-car-side"></i>{{ T.field_car_model }}</label>
-        <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>{{ T.field_mileage }}</label>
-        <input id="mileage" type="number" inputmode="numeric" placeholder="45000" oninput="checkMileageVsDue(); applyKmStep(); applyDailyKm()" enterkeyhint="next">
-        <div id="mileageCompare"></div>
+        <label><i class="fa-solid fa-user"></i>{{ T.field_owner_name }}</label>
+        <input id="owner_name" placeholder="Имя Фамилия">
       </div>
       <div class="field">
-        <label>{{ T.field_next_mileage }}</label>
-        <input id="next_mileage" type="number" inputmode="numeric" placeholder="55000" oninput="KM.manual = true; applyDailyKm()" enterkeyhint="next">
-        <div class="km-chips" id="kmChips"></div>
+        <label><i class="fa-solid fa-phone"></i>{{ T.field_owner_phone }}</label>
+        <input id="owner_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" enterkeyhint="next">
+        <div class="hint-text">{{ T.hint_owner_phone }}</div>
+      </div>
+      <div class="row2" style="margin-bottom:-10px;">
+        <div class="field">
+          <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
+          <select id="car_brand">
+            {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label><i class="fa-solid fa-car-side"></i>{{ T.field_car_model }}</label>
+          <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
+        </div>
       </div>
     </div>
-    <div class="field dk-field">
-      <label>{{ T.daily_km_label }}</label>
-      <div class="dk-row">
-        <input id="daily_km" type="number" inputmode="numeric" placeholder="{{ T.daily_km_ph }}" oninput="DK.intervalManual = false; applyDailyKm()" enterkeyhint="next">
-        <span class="dk-unit">{{ T.km_per_day }}</span>
+
+    <div class="af-sec">
+      <div class="af-h"><i class="fa-solid fa-gauge-high"></i>{{ T.af_mileage }}</div>
+      <div class="mil-grid">
+        <div>
+          <div class="mil-l">{{ T.mil_now }}</div>
+          <div class="mil-f"><input id="mileage" type="number" inputmode="numeric" placeholder="45000" oninput="checkMileageVsDue(); applyKmStep(); applyDailyKm()" enterkeyhint="next"><span>{{ T.km_short }}</span></div>
+        </div>
+        <div class="mil-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        <div>
+          <div class="mil-l">{{ T.mil_next }}</div>
+          <div class="mil-f accent"><input id="next_mileage" type="number" inputmode="numeric" placeholder="55000" oninput="KM.manual = true; applyDailyKm()" enterkeyhint="next"><span>{{ T.km_short }}</span></div>
+        </div>
       </div>
+      <div id="mileageCompare"></div>
+      <div class="km-chips km-seg" id="kmChips"></div>
+      <div class="mil-l" style="margin-top:12px;">{{ T.daily_km_label }}</div>
+      <div class="mil-f"><input id="daily_km" type="number" inputmode="numeric" placeholder="{{ T.daily_km_ph }}" oninput="DK.intervalManual = false; applyDailyKm()" enterkeyhint="next"><span>{{ T.km_per_day }}</span></div>
       <div id="dkSuggest"></div>
       <div id="dkHint" class="dk-hint"></div>
-    </div>
-    {% if warehouse_enabled %}
-    <div class="field pick-search">
-      <label>{{ T.pick_search_label }}</label>
-      <input id="pickSearch" type="search" placeholder="{{ T.pick_search_ph }}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="renderPickResults('main')" onkeydown="onPickKey(event, 'main')">
-      <div id="pickResults" class="pick-results"></div>
-    </div>
-    {% endif %}
-    <div class="field">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_fluids }}</label>
-    </div>
-    <div id="fluidsList"></div>
-
-    <div class="field" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_filters }}</label>
-    </div>
-    <div id="filtersList"></div>
-
-    <div class="field" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.section_other }}</label>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>{{ T.field_other_name }}</label>
-        <input id="other_name" placeholder="{{ T.field_other_name_ph }}">
-      </div>
-      <div class="field">
-        <label>{{ T.field_price }}</label>
-        <input id="other_price" type="number" placeholder="0" oninput="updateTotal()">
+      <div class="mil-l" style="margin-top:12px;">{{ T.field_interval }}</div>
+      <div style="display:flex; gap:8px;">
+        <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;" oninput="DK.intervalManual = true; applyDailyKm()">
+        <select id="interval_unit" style="flex:1;" onchange="DK.intervalManual = true; applyDailyKm()">
+          <option value="months">{{ T.unit_months }}</option>
+          <option value="days">{{ T.unit_days }}</option>
+        </select>
       </div>
     </div>
 
-    {% if warehouse_enabled %}
-    <div class="field" style="margin-top:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600;">{{ T.wh_other_stock_title }}</label>
-    </div>
-    <div id="otherStockRows"></div>
-    <button type="button" class="submit" style="padding:8px; background:var(--border);" onclick="addOtherStockRow('other')">{{ T.wh_add_row }}</button>
-    {% endif %}
-
-    <div class="field" style="margin-top:14px; padding:12px; background:var(--field-bg); border-radius:10px;">
-      <label style="font-size:15px;">{{ T.field_total }}</label>
-      <div id="totalCost" style="font-size:24px; font-weight:600; color:var(--btn); font-family:var(--font-mono);">0</div>
-    </div>
-
-    <div class="field" style="margin-top:14px;">
-      <label>{{ T.payment_split_label }}</label>
+    <div class="af-sec">
+      <div class="af-h"><i class="fa-solid fa-oil-can"></i>{{ T.af_items }}</div>
+      {% if warehouse_enabled %}
+      <div class="field pick-search">
+        <input id="pickSearch" type="search" placeholder="🔍 {{ T.pick_search_ph }}" aria-label="{{ T.pick_search_label }}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="renderPickResults('main')" onkeydown="onPickKey(event, 'main')">
+        <div id="pickResults" class="pick-results"></div>
+      </div>
+      {% endif %}
+      <div id="fluidsList"></div>
+      <div id="filtersList"></div>
+      <div class="af-add" id="itemAddChips"></div>
+      <div class="af-sub">{{ T.section_other }}</div>
       <div class="row2">
         <div class="field">
-          <label style="font-size:11px;"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</label>
-          <input id="pay_cash" type="number" placeholder="0" oninput="onPayCashInput()">
+          <input id="other_name" placeholder="{{ T.field_other_name_ph }}" aria-label="{{ T.field_other_name }}">
         </div>
-        <div class="field">
-          <label style="font-size:11px;"><i class="fa-solid fa-credit-card"></i> {{ T.payment_card }}</label>
-          <input id="pay_card" type="number" placeholder="0" oninput="onPayCardInput()">
+        <div class="field" style="flex:0 0 38%;">
+          <input id="other_price" type="number" placeholder="{{ T.field_price }}" aria-label="{{ T.field_price }}" oninput="updateTotal()">
         </div>
       </div>
-      <div class="checkbox-row" style="margin-top:10px; cursor:pointer;" onclick="document.getElementById('debt_enabled').click()">
-        <input type="checkbox" id="debt_enabled" onchange="toggleDebtSection()" onclick="event.stopPropagation()">
-        <label style="margin:0; cursor:pointer;">{{ T.debt_enable_label }}</label>
+      {% if warehouse_enabled %}
+      <div class="af-sub">{{ T.wh_other_stock_title }}</div>
+      <div id="otherStockRows"></div>
+      <button type="button" class="af-ghost" onclick="addOtherStockRow('other')">{{ T.wh_add_row }}</button>
+      {% endif %}
+    </div>
+
+    <div class="af-sec">
+      <div class="af-h"><i class="fa-solid fa-wallet"></i>{{ T.af_payment }}</div>
+      <div class="pay-seg" id="paySeg">
+        <button type="button" data-m="cash" class="on" onclick="setPayMode('cash')"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</button>
+        <button type="button" data-m="card" onclick="setPayMode('card')"><i class="fa-solid fa-credit-card"></i> {{ T.payment_card }}</button>
+        <button type="button" data-m="mix" onclick="setPayMode('mix')">{{ T.pay_mode_mix }}</button>
+        <button type="button" data-m="debt" onclick="setPayMode('debt')">{{ T.pay_mode_debt }}</button>
       </div>
-      <div id="debtFields" style="display:none; margin-top:10px; padding:12px; background:var(--card); border:1.5px dashed var(--border); border-radius:10px;">
+      <div id="payInputs" style="display:none; margin-top:10px;">
+        <div class="row2">
+          <div class="field">
+            <label style="font-size:11px;"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</label>
+            <input id="pay_cash" type="number" placeholder="0" oninput="onPayCashInput()">
+          </div>
+          <div class="field">
+            <label style="font-size:11px;"><i class="fa-solid fa-credit-card"></i> {{ T.payment_card }}</label>
+            <input id="pay_card" type="number" placeholder="0" oninput="onPayCardInput()">
+          </div>
+        </div>
+      </div>
+      <div style="display:none;">
+        <input type="checkbox" id="debt_enabled" onchange="toggleDebtSection()">
+      </div>
+      <div id="debtFields" style="display:none; margin-top:4px; padding:12px; background:var(--field-bg); border:1.5px dashed var(--border); border-radius:12px;">
         <div class="field">
           <label style="font-size:11px;">{{ T.debt_remaining_label }}</label>
           <div id="debtRemaining" style="font-size:18px; font-weight:700; color:var(--btn); font-family:var(--font-mono);">0</div>
         </div>
-        <div class="row2">
+        <div class="row2" style="margin-bottom:-10px;">
           <div class="field">
             <label style="font-size:11px;">{{ T.debt_installment_amount }}</label>
             <input id="debt_installment_amount" type="number" placeholder="100000">
@@ -1915,23 +1960,14 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="field" style="margin-top:14px;">
-      <label>{{ T.field_interval }}</label>
-      <div style="display:flex; gap:8px;">
-        <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;" oninput="DK.intervalManual = true; applyDailyKm()">
-        <select id="interval_unit" style="flex:1;" onchange="DK.intervalManual = true; applyDailyKm()">
-          <option value="months">{{ T.unit_months }}</option>
-          <option value="days">{{ T.unit_days }}</option>
-        </select>
-      </div>
-    </div>
-    <div class="field">
-      <label>{{ T.field_notes }}</label>
+      <div class="af-sub" style="margin-top:14px;">{{ T.field_notes }}</div>
       <textarea id="notes" rows="2" placeholder="{{ T.notes_ph }}"></textarea>
     </div>
-    <button class="submit" onclick="submitCar()">{{ T.btn_save }}</button>
+
+    <div class="af-bar">
+      <div class="af-bar-total"><span>{{ T.field_total }}</span><b id="totalCost">0</b></div>
+      <button class="af-save" onclick="submitCar()"><i class="fa-solid fa-check"></i> {{ T.btn_save }}</button>
+    </div>
   </div>
 
   <div id="view-table" style="display:none;">
@@ -6182,24 +6218,88 @@ function clearPick(ctx) {
 
 function renderItemLists() {
   document.getElementById('fluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
-    <div class="item-row">
+    <div class="item-row" id="row_${key}">
       <span class="item-name">${T[key]}</span>
       ${brandFieldHtml(key, `fluid_brand_${i}`, `onFluidProductPicked(${i})`)}
       <input id="fluid_price_${i}" type="number" placeholder="${T.price_per_liter_ph}" oninput="updateTotal()">
       <input id="fluid_liters_${i}" type="number" step="0.1" placeholder="${T.liters_ph}" oninput="updateTotal()">
+      <button type="button" class="row-x" onclick="closeItemRow('${key}')" aria-label="${T.af_remove}">✕</button>
     </div>
   `).join('');
   document.getElementById('filtersList').innerHTML = FILTER_KEYS.map((key, i) => {
     const prods = productsForCategory(key);
     const brandField = prods.length ? brandFieldHtml(key, `filter_brand_${i}`, `onFilterProductPicked(${i})`) : '';
     return `
-    <div class="item-row">
+    <div class="item-row" id="row_${key}">
       <span class="item-name" style="flex:${prods.length ? '1.3' : '2.3'};">${T[key]}</span>
       ${brandField}
       <input id="filter_price_${i}" type="number" placeholder="${T.price_ph}" oninput="updateTotal()">
+      <button type="button" class="row-x" onclick="closeItemRow('${key}')" aria-label="${T.af_remove}">✕</button>
     </div>
   `;
   }).join('');
+  syncItemRows();
+}
+
+// Показываем только нужные строки товаров: по умолчанию моторное масло и
+// масляный фильтр, остальные — кнопками «+ АКПП», «+ Антифриз»… Строка с
+// заполненным значением видна всегда (после «Повторить прошлую», выбора из
+// поиска по складу и т.п.). ✕ очищает строку и прячет её.
+const ROW_DEFAULT = ['fluid_0', 'filter_0'];
+let ROW_OPEN = new Set(ROW_DEFAULT);
+function rowFieldIds(key) {
+  const fi = FLUID_KEYS.indexOf(key), ti = FILTER_KEYS.indexOf(key);
+  if (fi >= 0) return [`fluid_brand_${fi}`, `fluid_price_${fi}`, `fluid_liters_${fi}`];
+  if (ti >= 0) return [`filter_brand_${ti}`, `filter_price_${ti}`];
+  return [];
+}
+function rowHasValue(key) {
+  return rowFieldIds(key).some(id => { const el = document.getElementById(id); return el && String(el.value || '').trim() !== ''; });
+}
+function syncItemRows() {
+  const hidden = [];
+  FLUID_KEYS.concat(FILTER_KEYS).forEach(key => {
+    const row = document.getElementById('row_' + key);
+    if (!row) return;
+    if (rowHasValue(key)) ROW_OPEN.add(key);
+    const vis = ROW_OPEN.has(key);
+    row.style.display = vis ? '' : 'none';
+    if (!vis) hidden.push(key);
+  });
+  const box = document.getElementById('itemAddChips');
+  if (box) box.innerHTML = hidden.map(k => `<button type="button" onclick="openItemRow('${k}')"><i class="fa-solid fa-plus"></i>${T[k]}</button>`).join('');
+}
+function openItemRow(key) {
+  ROW_OPEN.add(key);
+  syncItemRows();
+  const first = rowFieldIds(key).map(id => document.getElementById(id)).find(Boolean);
+  if (first) setTimeout(() => first.focus(), 50);
+}
+function closeItemRow(key) {
+  rowFieldIds(key).forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ROW_OPEN.delete(key);
+  updateTotal();
+}
+
+// Оплата одной кнопкой: наличные / карта / наличные + карта / в долг.
+let PAY_MODE = 'cash';
+function setPayMode(m) {
+  PAY_MODE = m;
+  document.querySelectorAll('#paySeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  const inputs = document.getElementById('payInputs');
+  if (inputs) inputs.style.display = (m === 'mix' || m === 'debt') ? 'block' : 'none';
+  const debt = document.getElementById('debt_enabled');
+  if (m === 'debt') {
+    if (debt && !debt.checked) { debt.checked = true; toggleDebtSection(); }
+    paymentSplitTouched = true;
+    document.getElementById('pay_cash').value = '';
+    document.getElementById('pay_card').value = '';
+    updateDebtRemaining();
+    return;
+  }
+  if (debt && debt.checked) { debt.checked = false; toggleDebtSection(); }
+  paymentSplitTouched = false;
+  updateTotal();
 }
 
 function onFluidProductPicked(i) {
@@ -6254,10 +6354,16 @@ function updateTotal() {
   const payCash = document.getElementById('pay_cash');
   const payCard = document.getElementById('pay_card');
   if (payCash && payCard && !paymentSplitTouched) {
-    payCash.value = total || '';
-    payCard.value = '';
+    if (typeof PAY_MODE !== 'undefined' && PAY_MODE === 'card') {
+      payCash.value = '';
+      payCard.value = total || '';
+    } else {
+      payCash.value = total || '';
+      payCard.value = '';
+    }
   }
   updateDebtRemaining();
+  if (typeof syncItemRows === 'function') syncItemRows();
 }
 
 function onPayCashInput() {
@@ -6549,6 +6655,7 @@ function resetItemInputs() {
   otherStockRows = [];
   renderOtherStockRows('other');
   clearPick('main');
+  ROW_OPEN = new Set(ROW_DEFAULT);
   updateTotal();
 }
 
@@ -6816,6 +6923,7 @@ async function submitCar() {
     document.getElementById('interval_unit').value = 'months';
     paymentSplitTouched = false;
     resetDailyKm();
+    setPayMode('cash');
     const payCash = document.getElementById('pay_cash');
     const payCard = document.getElementById('pay_card');
     if (payCash) payCash.value = '';
