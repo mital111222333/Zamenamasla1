@@ -1256,6 +1256,12 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .kc-new-owner-box b { display:block; font-size:14px; margin-bottom:4px; }
   .kc-new-owner-box button { margin-top:8px; padding:7px 12px; border:1px solid #D97706; border-radius:10px; background:#fff; color:#92400E; font-weight:700; font-size:12.5px; font-family:inherit; cursor:pointer; }
   .km-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .dk-row { display:flex; align-items:center; gap:8px; }
+  .dk-row input { flex:1; min-width:0; }
+  .dk-unit { font-size:13px; color:var(--hint); white-space:nowrap; }
+  #dkSuggest .km-chip { margin-top:6px; }
+  .dk-hint { font-size:12.5px; color:#475569; margin-top:6px; line-height:1.45; }
+  .dk-hint b { color:var(--blue); }
   .km-chip { border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 9px; font-size:12px; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .known-client .kc-lv-item {
@@ -1815,14 +1821,23 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div class="row2">
       <div class="field">
         <label>{{ T.field_mileage }}</label>
-        <input id="mileage" type="number" inputmode="numeric" placeholder="45000" oninput="checkMileageVsDue(); applyKmStep()" enterkeyhint="next">
+        <input id="mileage" type="number" inputmode="numeric" placeholder="45000" oninput="checkMileageVsDue(); applyKmStep(); applyDailyKm()" enterkeyhint="next">
         <div id="mileageCompare"></div>
       </div>
       <div class="field">
         <label>{{ T.field_next_mileage }}</label>
-        <input id="next_mileage" type="number" inputmode="numeric" placeholder="55000" oninput="KM.manual = true" enterkeyhint="next">
+        <input id="next_mileage" type="number" inputmode="numeric" placeholder="55000" oninput="KM.manual = true; applyDailyKm()" enterkeyhint="next">
         <div class="km-chips" id="kmChips"></div>
       </div>
+    </div>
+    <div class="field dk-field">
+      <label>{{ T.daily_km_label }}</label>
+      <div class="dk-row">
+        <input id="daily_km" type="number" inputmode="numeric" placeholder="{{ T.daily_km_ph }}" oninput="DK.intervalManual = false; applyDailyKm()" enterkeyhint="next">
+        <span class="dk-unit">{{ T.km_per_day }}</span>
+      </div>
+      <div id="dkSuggest"></div>
+      <div id="dkHint" class="dk-hint"></div>
     </div>
     {% if warehouse_enabled %}
     <div class="field pick-search">
@@ -1905,8 +1920,8 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div class="field" style="margin-top:14px;">
       <label>{{ T.field_interval }}</label>
       <div style="display:flex; gap:8px;">
-        <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;">
-        <select id="interval_unit" style="flex:1;">
+        <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;" oninput="DK.intervalManual = true; applyDailyKm()">
+        <select id="interval_unit" style="flex:1;" onchange="DK.intervalManual = true; applyDailyKm()">
           <option value="months">{{ T.unit_months }}</option>
           <option value="days">{{ T.unit_days }}</option>
         </select>
@@ -6412,6 +6427,86 @@ function applyKmStep() {
   const m = parseInt(document.getElementById('mileage').value);
   const next = document.getElementById('next_mileage');
   if (m > 0 && next) next.value = m + KM.step;
+  applyDailyKm();
+}
+
+// Средний пробег в день → когда следующая замена. Пример: следующая замена
+// через 5 000 км, машина проезжает 80 км в день → через 63 дня. Срок замены
+// (поле «Интервал») выставляется сам в днях; если мастер поправил его вручную —
+// больше не перезаписываем. Для знакомой машины пробег в день подставляется
+// из прошлой замены или считается по прошлому визиту (пробег и дата).
+const DK = { intervalManual: false, applied: false, last: null };
+
+function dkDaysBetween(a, b) {
+  const d1 = new Date(a + 'T00:00:00'), d2 = new Date(b + 'T00:00:00');
+  return Math.round((d2 - d1) / 86400000);
+}
+function dkToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function dkFmtDate(d) {
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+// пробег в день по прошлому визиту: (пробег сейчас − пробег тогда) / дни
+function dkFromHistory() {
+  const L = DK.last;
+  const m = parseInt(document.getElementById('mileage').value);
+  if (!L || !L.mileage || !L.date || !(m > L.mileage)) return null;
+  const days = dkDaysBetween(String(L.date).slice(0, 10), dkToday());
+  if (days < 7) return null;
+  const v = Math.round((m - L.mileage) / days);
+  return v >= 1 && v <= 2000 ? { km: v, days } : null;
+}
+function useDkSuggest(v) {
+  document.getElementById('daily_km').value = v;
+  DK.intervalManual = false;
+  applyDailyKm();
+}
+function applyDailyKm() {
+  const el = document.getElementById('daily_km');
+  const hint = document.getElementById('dkHint');
+  const sug = document.getElementById('dkSuggest');
+  if (!el || !hint) return;
+  const daily = parseInt(el.value);
+  const s = dkFromHistory();
+  sug.innerHTML = s && s.km !== daily
+    ? `<button type="button" class="km-chip" onclick="useDkSuggest(${s.km})">${T.daily_km_hist} ~${s.km} ${T.km_per_day} · ${T.daily_km_use}</button>`
+    : '';
+  if (!(daily > 0)) {
+    hint.textContent = '';
+    if (DK.applied && !DK.intervalManual) {
+      document.getElementById('interval_value').value = 3;
+      document.getElementById('interval_unit').value = 'months';
+    }
+    DK.applied = false;
+    return;
+  }
+  const m = parseInt(document.getElementById('mileage').value);
+  const n = parseInt(document.getElementById('next_mileage').value);
+  if (!(m > 0) || !(n > m)) { hint.textContent = T.daily_km_need; return; }
+  const days = Math.min(730, Math.max(1, Math.round((n - m) / daily)));
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  if (!DK.intervalManual) {
+    document.getElementById('interval_value').value = days;
+    document.getElementById('interval_unit').value = 'days';
+    DK.applied = true;
+  }
+  hint.innerHTML = `${T.daily_km_next} <b>${dkFmtDate(d)}</b> — ${T.daily_km_in} ${days} ${T.daily_km_days} ` +
+    `(${(n - m).toLocaleString('ru-RU')} ${T.km_short} ÷ ${daily} ${T.km_per_day})` +
+    (DK.intervalManual ? `<br><span style="color:#B45309">${T.daily_km_manual}</span> <button type="button" class="km-chip" onclick="DK.intervalManual = false; applyDailyKm()">${T.daily_km_apply} ${days} ${T.daily_km_days}</button>` : '');
+}
+function resetDailyKm() {
+  const el = document.getElementById('daily_km');
+  if (el) el.value = '';
+  DK.intervalManual = false;
+  DK.applied = false;
+  DK.last = null;
+  const hint = document.getElementById('dkHint');
+  if (hint) hint.textContent = '';
+  const sug = document.getElementById('dkSuggest');
+  if (sug) sug.innerHTML = '';
 }
 
 // Клавиатура телефона: цифровая для чисел, «Далее» переходит к следующему полю.
@@ -6513,7 +6608,7 @@ async function lookupPlate(force) {
   LAST_LOOKED_PLATE = plate;
   KNOWN_OWNER = null;
   NEW_OWNER = false;
-  if (!plate) { panel.innerHTML = ''; lastKnownNextMileage = null; checkMileageVsDue(); return; }
+  if (!plate) { panel.innerHTML = ''; lastKnownNextMileage = null; DK.last = null; applyDailyKm(); checkMileageVsDue(); return; }
   try {
     const res = await fetch('/api/history/' + encodeURIComponent(plate));
     const data = await res.json();
@@ -6523,6 +6618,8 @@ async function lookupPlate(force) {
     if (!data.car) {
       panel.innerHTML = crossHtml;
       lastKnownNextMileage = null;
+      DK.last = null;
+      applyDailyKm();
       checkMileageVsDue();
       return;
     }
@@ -6541,6 +6638,13 @@ async function lookupPlate(force) {
     const last = data.history[0];
     const visitCount = data.history.length;
     lastKnownNextMileage = last ? last.next_mileage : null;
+    DK.last = last ? { mileage: last.mileage, date: last.change_date, daily_km: last.daily_km } : null;
+    const dkEl = document.getElementById('daily_km');
+    if (dkEl && !dkEl.value) {
+      const prevDaily = (data.history || []).find(h => h.daily_km);
+      if (prevDaily) dkEl.value = prevDaily.daily_km;
+    }
+    applyDailyKm();
     let lastItemsHtml = '';
     LAST_VISIT_ITEMS = [];
     if (last && last.items_json) {
@@ -6666,6 +6770,7 @@ async function submitCar() {
     items: items,
     interval_value: document.getElementById('interval_value').value,
     interval_unit: document.getElementById('interval_unit').value,
+    daily_km: (document.getElementById('daily_km') || {}).value || '',
     notes: document.getElementById('notes').value.trim(),
     cash_amount: payCashEl ? payCashEl.value : null,
     card_amount: payCardEl ? payCardEl.value : null,
@@ -6710,6 +6815,7 @@ async function submitCar() {
     document.getElementById('interval_value').value = 3;
     document.getElementById('interval_unit').value = 'months';
     paymentSplitTouched = false;
+    resetDailyKm();
     const payCash = document.getElementById('pay_cash');
     const payCard = document.getElementById('pay_card');
     if (payCash) payCash.value = '';
@@ -8482,6 +8588,12 @@ def api_add():
         debt_amount = int(data["debt_amount"]) if data.get("debt_amount") not in (None, "") else 0
         installment_amount = int(data["installment_amount"]) if data.get("installment_amount") not in (None, "") else None
         interval_days = int(data["interval_days"]) if data.get("interval_days") not in (None, "") else None
+        try:
+            daily_km = int(float(data["daily_km"])) if data.get("daily_km") not in (None, "") else None
+        except (TypeError, ValueError):
+            daily_km = None
+        if daily_km is not None and not (1 <= daily_km <= 2000):
+            daily_km = None
 
         # проверка рассрочки — ДО сохранения: раньше запись и списание склада
         # уже происходили, а потом приходила ошибка, человек нажимал ещё раз —
@@ -8513,6 +8625,11 @@ def api_add():
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
             )
+            if daily_km:
+                try:
+                    db.set_oil_change_daily_km(oc_id, daily_km)
+                except Exception as e:  # не критично: замена уже сохранена
+                    logger.warning(f"не удалось сохранить пробег в день: {e}")
 
             if debt_amount > 0:
                 db.create_installment_plan(g.shop_id, car_id, debt_amount, installment_amount, interval_days, oil_change_id=oc_id)

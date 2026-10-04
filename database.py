@@ -296,6 +296,7 @@ def init_db():
         _migrate(conn)
         _migrate_subscription(conn)
         _migrate_name_aliases(conn)
+        _migrate_daily_km(conn)
         _bootstrap_accounts(conn)
 
 
@@ -5808,3 +5809,21 @@ def _admin_suppliers_snapshot(shop_id: int, date_from: str, date_to: str) -> dic
             "owe": sum(x["balance"] for x in out if x["balance"] > 0),
             "overdue": sum(x["overdue"] for x in out),
             "bought_period": sum(x["bought_period"] for x in out)}
+
+
+# ---------- Средний пробег в день (для расчёта следующей замены) ----------
+
+def _migrate_daily_km(conn):
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
+    if "daily_km" not in cols:
+        conn.execute("ALTER TABLE oil_changes ADD COLUMN daily_km INTEGER")
+    conn.commit()
+
+
+@_serialized
+def set_oil_change_daily_km(oc_id: int, daily_km) -> None:
+    """Средний пробег машины в день, указанный при замене, — чтобы в
+    следующий раз он подставился сам."""
+    with get_conn() as conn:
+        conn.execute("UPDATE oil_changes SET daily_km=? WHERE id=?", (daily_km, oc_id))
+        conn.commit()
