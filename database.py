@@ -295,6 +295,7 @@ def init_db():
         conn.commit()
         _migrate(conn)
         _migrate_subscription(conn)
+        _migrate_name_aliases(conn)
         _bootstrap_accounts(conn)
 
 
@@ -5106,4 +5107,662 @@ def get_income_stats() -> dict:
         "journal": journal,
         "price_main": settings["price_main"],
         "price_branch": settings["price_branch"],
+    }
+
+
+# ---------- Админка: карта точек с аналитикой ----------
+
+def get_map_points(days: int = 30) -> dict:
+    """Все точки и филиалы платформы для карты в админке: координаты,
+    статус и короткая аналитика — за последние `days` дней (замены,
+    выручка, средний чек, разные клиенты), изменение выручки к таким же
+    предыдущим `days` дням, дата последней замены и замены сегодня.
+    Один запрос на все точки — карта открывается быстро даже при сотнях точек."""
+    days = max(1, min(int(days or 30), 365))
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    cur_from = (now - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    prev_from = (now - timedelta(days=2 * days - 1)).strftime("%Y-%m-%d")
+    prev_to = (now - timedelta(days=days)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        shops = conn.execute("""
+            SELECT s.id, s.shop_name, s.username, s.role, s.parent_shop_id, s.client_group,
+                   s.address, s.phone, s.hours, s.lat, s.lon, s.is_active,
+                   p.shop_name AS parent_name, p.username AS parent_username,
+                   (SELECT COUNT(*) FROM shops b WHERE b.parent_shop_id = s.id AND b.role='branch') AS branch_count,
+                   (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) AS client_count
+            FROM shops s LEFT JOIN shops p ON p.id = s.parent_shop_id
+            WHERE s.role IN ('shop', 'branch')
+        """).fetchall()
+        stats = conn.execute("""
+            SELECT c.shop_id,
+                   SUM(CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t THEN 1 ELSE 0 END) AS cnt,
+                   SUM(CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t THEN COALESCE(oc.cost, 0) ELSE 0 END) AS total,
+                   SUM(CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t AND oc.cost > 0 THEN 1 ELSE 0 END) AS paid_cnt,
+                   COUNT(DISTINCT CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t THEN c.client_id END) AS clients,
+                   SUM(CASE WHEN oc.change_date >= :pf AND oc.change_date <= :pt THEN COALESCE(oc.cost, 0) ELSE 0 END) AS prev_total,
+                   SUM(CASE WHEN oc.change_date = :t THEN 1 ELSE 0 END) AS today_cnt,
+                   MAX(CASE WHEN oc.change_date <= :t THEN oc.change_date END) AS last_date
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            GROUP BY c.shop_id
+        """, {"cf": cur_from, "t": today, "pf": prev_from, "pt": prev_to}).fetchall()
+    by_shop = {r["shop_id"]: dict(r) for r in stats}
+    points = []
+    for s in shops:
+        d = dict(s)
+        st = by_shop.get(d["id"], {})
+        total = st.get("total") or 0
+        paid = st.get("paid_cnt") or 0
+        prev = st.get("prev_total") or 0
+        last = st.get("last_date")
+        days_idle = None
+        if last:
+            try:
+                days_idle = (now.date() - datetime.strptime(last[:10], "%Y-%m-%d").date()).days
+            except ValueError:
+                days_idle = None
+        if d["role"] == "branch":
+            kind = "branch"
+        elif d["branch_count"]:
+            kind = "main"
+        else:
+            kind = "single"
+        d.update({
+            "kind": kind,
+            "is_active": bool(d["is_active"]),
+            "count": st.get("cnt") or 0,
+            "total": total,
+            "avg": round(total / paid) if paid else 0,
+            "clients": st.get("clients") or 0,
+            "pct": round((total - prev) / prev * 100, 1) if prev else None,
+            "today": st.get("today_cnt") or 0,
+            "last_date": last,
+            "days_idle": days_idle,
+        })
+        points.append(d)
+    return {"days": days, "date_from": cur_from, "date_to": today, "points": points}
+
+
+@_serialized
+def set_shop_location(shop_id: int, lat, lon) -> bool:
+    """Ставит (или убирает, если None) координаты точки или филиала — из
+    карты в админке. Пользователей-админов не трогает."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE shops SET lat=?, lon=? WHERE id=? AND role IN ('shop', 'branch')",
+            (lat, lon, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+# ---------- Админка: аналитика продаж, чистка названий, проверка цен ----------
+#
+# Данные точек НЕ меняются. Названия товаров, как их вписала точка,
+# пропускаются через «автоочистку» (регистр, кириллица → латиница, похожие
+# буквы, вязкость 5-30 → 5W30, лишние слова «масло», «4л»…) и через словарь
+# соответствий name_aliases, который заполняет админ на экране
+# «Сопоставление». Словарь можно исправить в любой момент — аналитика
+# сразу пересчитается, в том числе за прошлое.
+
+import re as _re
+from difflib import SequenceMatcher as _SM
+
+
+def _migrate_name_aliases(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS name_aliases (
+        raw_key TEXT PRIMARY KEY,
+        brand TEXT,
+        product TEXT,
+        status TEXT NOT NULL DEFAULT 'ok',
+        updated_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.commit()
+
+
+# Бренды MITAL — подсвечиваются в аналитике и считаются в «доле MITAL».
+# Чтобы добавить бренд, впиши его ЗАГЛАВНЫМИ буквами так же, как в KNOWN_BRANDS.
+MITAL_BRANDS = {"MITANOL", "LIMAN OIL", "MATTEX", "DELPIN", "ECO FILTER", "MITAL"}
+
+# Известные бренды: правильное имя → другие написания (уже после перевода в
+# латиницу). Похожие с опечатками («MITONOL», «LUKOYL») находятся сами.
+KNOWN_BRANDS = {
+    "MITANOL": ["MITANOL", "MITANOIL"],
+    "LIMAN OIL": ["LIMAN OIL", "LIMAN"],
+    "MATTEX": ["MATTEX", "MATEX"],
+    "DELPIN": ["DELPIN", "DELFIN"],
+    "ECO FILTER": ["ECO FILTER", "ECOFILTER", "EKO FILTER", "EKOFILTER", "EKO FILTR", "ECO FILTR"],
+    "MITAL": ["MITAL"],
+    "LUKOIL": ["LUKOIL", "LUKOYL"],
+    "SHELL": ["SHELL", "SHEL"],
+    "MOBIL": ["MOBIL", "MOBIL 1", "MOBIL1"],
+    "CASTROL": ["CASTROL", "KASTROL"],
+    "TOTAL": ["TOTAL", "TOTALENERGIES", "TOTAL ENERGIES"],
+    "MOTUL": ["MOTUL"],
+    "AVANTOL": ["AVANTOL"],
+    "ZIC": ["ZIC", "ZIK"],
+    "KIXX": ["KIXX", "KIKS", "KIX"],
+    "ROSNEFT": ["ROSNEFT", "ROSNEFT'"],
+    "G-ENERGY": ["G ENERGY", "GENERGY", "DJI ENERJI"],
+    "GAZPROMNEFT": ["GAZPROMNEFT", "GAZPROM"],
+    "LIQUI MOLY": ["LIQUI MOLY", "LIQUIMOLY", "LIKVI MOLI", "LIKVIMOLI"],
+    "MANNOL": ["MANNOL", "MANOL"],
+    "ENEOS": ["ENEOS"],
+    "IDEMITSU": ["IDEMITSU", "IDEMITSY"],
+    "PETRONAS": ["PETRONAS"],
+    "VALVOLINE": ["VALVOLINE"],
+    "ELF": ["ELF"],
+    "SINTEC": ["SINTEC", "SINTEK"],
+    "HI-GEAR": ["HI GEAR", "HIGEAR"],
+    "S-OIL": ["S OIL", "SOIL", "S OIL SEVEN", "S SEVEN", "SOIL SEVEN"],
+    "ADDINOL": ["ADDINOL"],
+    "XADO": ["XADO", "HADO"],
+    "FELIX": ["FELIX", "FELIKS"],
+    "SIBIRSKIY": ["SIBIRSKIY", "SIBIRSKI"],
+    "MANN": ["MANN", "MANN FILTER", "MAN FILTER"],
+    "MAHLE": ["MAHLE"],
+    "BOSCH": ["BOSCH", "BOSH"],
+    "SAKURA": ["SAKURA"],
+    "VIC": ["VIC"],
+    "FILTRON": ["FILTRON"],
+    "TOYOTA": ["TOYOTA"],
+    "HYUNDAI": ["HYUNDAI", "HUNDAI", "XYUNDAY"],
+    "GM": ["GM", "GENERAL MOTORS"],
+    "CHEVROLET": ["CHEVROLET", "SHEVROLE"],
+    "UZAUTO": ["UZAUTO"],
+}
+
+# Слова, которые не являются брендом/товаром — убираются из названия.
+_NOISE = {"MASLO", "MOY", "MOYI", "MOTORNOE", "MOTORNOYE", "KANISTRA", "BUTYLKA", "LITR", "LITRA", "LITROV",
+          "L", "LT", "LTR", "SHT", "SHTUK", "ORIGINAL", "ORIG", "NOVYY", "NOVIY", "ZAMENA", "FILTR", "FILTRI",
+          "FILTER", "FILTERS", "MASLYANYY", "MASLYANIY", "VOZDUSHNYY", "SALONNYY", "TOPLIVNYY", "ANTIFRIZ",
+          "TORMOZNAYA", "ZHIDKOST", "JIDKOST", "OIL"}
+# Обозначения классов и типов — не бренды (для поиска бренда пропускаются).
+_GRADES = {"API", "SAE", "ACEA", "ILSAC", "SL", "SM", "SN", "SP", "SJ", "CF", "CI", "CK", "CH", "SG", "GL",
+           "ATF", "DEXRON", "DEX", "MULTI", "SYNT", "SINT", "SYNTHETIC", "SINTETIKA", "SINTETIK",
+           "POLUSINTETIKA", "POLUSINTETIK", "SEMI", "MINERAL", "MINERALKA", "FULLY", "FULL", "ULTRA",
+           "SUPER", "EXTRA", "PREMIUM", "PRO", "PLUS", "LONG", "LIFE", "G11", "G12", "G13", "DOT", "DOT4",
+           "DOT3", "ECO", "KRASNIY", "KRASNYY", "KRASNYI", "ZELENYY", "ZELENIY", "ZELENYI", "SINIY", "SINIIY",
+           "ROZOVYY", "QIZIL", "YASHIL", "KOK", "RED", "GREEN", "BLUE", "PINK", "YELLOW"}
+
+_HOMOGLYPH = str.maketrans({"А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O",
+                            "Р": "P", "С": "C", "Т": "T", "Х": "X", "У": "Y", "І": "I"})
+_TRANSLIT = {"А": "A", "Б": "B", "В": "V", "Г": "G", "Д": "D", "Е": "E", "Ж": "J", "З": "Z", "И": "I",
+             "Й": "Y", "К": "K", "Л": "L", "М": "M", "Н": "N", "О": "O", "П": "P", "Р": "R", "С": "S",
+             "Т": "T", "У": "U", "Ф": "F", "Х": "H", "Ц": "TS", "Ч": "CH", "Ш": "SH", "Щ": "SH", "Ъ": "",
+             "Ы": "I", "Ь": "", "Э": "E", "Ю": "YU", "Я": "YA", "Ў": "O", "Қ": "K", "Ғ": "G", "Ҳ": "H",
+             "І": "I"}
+_CYR = _re.compile(r"[А-ЯЁЎҚҒҲІ]")
+_LAT = _re.compile(r"[A-Z]")
+
+_ALIAS_MAP = {}
+for _canon, _als in KNOWN_BRANDS.items():
+    for _a in _als + [_canon]:
+        _ALIAS_MAP[" ".join(_a.replace("-", " ").split())] = _canon
+
+
+def _translit_token(tok: str) -> str:
+    if not _CYR.search(tok):
+        return tok
+    if _LAT.search(tok) or any(ch.isdigit() for ch in tok):
+        # слово набрано латиницей, но с «похожими» русскими буквами (MITANОL)
+        tok = tok.translate(_HOMOGLYPH)
+        if not _CYR.search(tok):
+            return tok
+    return "".join(_TRANSLIT.get(ch, ch) for ch in tok)
+
+
+def _clean_tokens(label: str, keep_noise: bool = False) -> list:
+    """«масло Митанол 5-30 SL 4л» → ['MITANOL', '5W30', 'SL'].
+    keep_noise=True — оставить слова вроде FILTER/OIL: они нужны, чтобы
+    узнать бренды «ECO FILTER», «LIMAN OIL»."""
+    s = (label or "").upper().replace("Ё", "Е")
+    s = _re.sub(r"(?<![A-ZА-Я0-9])(\d+(?:[.,]\d+)?)\s*(?:L|Л|LT|LTR|ЛИТР[А-Я]*|LITR[A-Z]*)(?![A-ZА-Я])", " ", s)
+    s = _re.sub(r"\b(0|5|10|15|20|25)\s*[WВV]\s*[-/]?\s*(8|16|20|30|40|50|60)\b", r"\1W\2", s)
+    s = _re.sub(r"\b(0|5|10|15|20|25)\s*[-/]\s*(20|30|40|50|60)\b", r"\1W\2", s)
+    s = _re.sub(r"[^0-9A-ZА-ЯЁЎҚҒҲІ]+", " ", s)
+    out = []
+    for tok in s.split():
+        tok = _translit_token(tok)
+        tok = _re.sub(r"(?<=[A-Z])0(?=[A-Z])", "O", tok)  # MITAN0L → MITANOL
+        if not tok or (tok in _NOISE and not keep_noise):
+            continue
+        out.append(tok)
+    return out
+
+
+def _known_brand_map():
+    """Словарь написаний брендов: встроенный + бренды, подтверждённые админом."""
+    m = dict(_ALIAS_MAP)
+    with get_conn() as conn:
+        for r in conn.execute("SELECT DISTINCT brand FROM name_aliases WHERE status='ok' AND brand IS NOT NULL AND brand != ''"):
+            b = " ".join(r["brand"].upper().replace("-", " ").split())
+            m.setdefault(b, r["brand"].upper())
+    return m
+
+
+def _is_candidate(tok: str) -> bool:
+    return len(tok) >= 2 and tok.isalpha() and tok not in _GRADES and tok not in _NOISE
+
+
+def _detect_brand(tokens: list, bmap: dict):
+    """Ищет бренд в словах названия. Возвращает (бренд, сколько слов он занял,
+    позиция, уверенность 0..1, статус): exact — точно; auto — опечатка,
+    исправлено автоматически; suggest — похоже, нужна проверка; unknown."""
+    if not tokens:
+        return "", 0, 0, 1.0, "nobrand"
+    for i in range(len(tokens)):
+        for n in (3, 2, 1):
+            if i + n <= len(tokens):
+                cand = " ".join(tokens[i:i + n])
+                if cand in bmap:
+                    return bmap[cand], n, i, 1.0, "exact"
+                glued = "".join(tokens[i:i + n])
+                if n > 1 and glued in bmap:
+                    return bmap[glued], n, i, 1.0, "exact"
+    best = (0.0, "", 0, 0)
+    keys = [k for k in bmap if len(k.replace(" ", "")) >= 4]
+    for i in range(len(tokens)):
+        for n in (2, 1):
+            if i + n > len(tokens) or not all(_is_candidate(t) for t in tokens[i:i + n]):
+                continue
+            cand = " ".join(tokens[i:i + n])
+            if len(cand.replace(" ", "")) < 4:
+                continue
+            for k in keys:
+                r = _SM(None, cand, k).ratio()
+                if r > best[0]:
+                    best = (r, bmap[k], n, i)
+    if best[0] >= 0.85 and best[1][:1] == tokens[best[3]][:1]:
+        return best[1], best[2], best[3], round(best[0], 2), "auto"
+    first = next((i for i, t in enumerate(tokens) if _is_candidate(t)), None)
+    if best[0] >= 0.72:
+        return best[1], best[2], best[3], round(best[0], 2), "suggest"
+    if first is None:
+        return "", 0, 0, 1.0, "nobrand"
+    return tokens[first], 1, first, 0.0, "unknown"
+
+
+def _resolve_name(label: str, bmap: dict, aliases: dict, cache: dict) -> dict:
+    """Что на самом деле продано: бренд, товар (для показа) и ключ товара
+    (одинаковый для «MITANOL SL 5W30» и «Митанол 5-30 SL»)."""
+    if label in cache:
+        return cache[label]
+    full = _clean_tokens(label, keep_noise=True)
+    tokens = [t for t in full if t not in _NOISE]
+    raw_key = " ".join(tokens)
+    al = aliases.get(raw_key)
+    if al:
+        if al["status"] == "nobrand":
+            res = {"raw": raw_key, "brand": "", "product": al.get("product") or raw_key,
+                   "status": "mapped", "sug": None, "conf": 1.0}
+        else:
+            brand = (al.get("brand") or "").upper()
+            product = al.get("product") or " ".join([brand] + [t for t in tokens if t not in brand.split()])
+            res = {"raw": raw_key, "brand": brand, "product": product.strip(), "status": "mapped",
+                   "sug": None, "conf": 1.0}
+    else:
+        brand, n, pos, conf, status = _detect_brand(full, bmap)
+        rest = [t for t in (full[:pos] + full[pos + n:] if n else full) if t not in _NOISE]
+        if status in ("exact", "auto"):
+            product = " ".join([brand] + rest)
+            res = {"raw": raw_key, "brand": brand, "product": product, "status": status, "sug": None, "conf": conf}
+        elif status == "suggest":
+            res = {"raw": raw_key, "brand": full[pos] if full else "", "product": raw_key, "status": status,
+                   "sug": {"brand": brand, "product": " ".join([brand] + rest)}, "conf": conf}
+        else:
+            res = {"raw": raw_key, "brand": brand, "product": raw_key, "status": status, "sug": None, "conf": conf}
+    ptoks = _clean_tokens(res["product"])
+    btoks = res["brand"].replace("-", " ").split()
+    res["pkey"] = " ".join(btoks + sorted(t for t in ptoks if t not in btoks)) or raw_key
+    cache[label] = res
+    return res
+
+
+def _load_aliases() -> dict:
+    with get_conn() as conn:
+        return {r["raw_key"]: dict(r) for r in conn.execute("SELECT * FROM name_aliases").fetchall()}
+
+
+def _scan_lines(date_from: str, date_to: str) -> list:
+    """Все проданные товары за период по всем точкам — по одной строке на
+    позицию, с распознанным брендом/товаром. Работа и услуги («Прочее» без
+    товара со склада) пропускаются."""
+    import i18n
+    name_to_key = {}
+    for lang_texts in i18n.TEXTS.values():
+        for k in BRAND_CATEGORY_ORDER:
+            if k in lang_texts:
+                name_to_key[lang_texts[k]] = k
+    other_prefixes = tuple(f"{t.get('other_prefix', '')}:" for t in i18n.TEXTS.values())
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.id, oc.change_date, c.shop_id, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE oc.change_date >= ? AND oc.change_date <= ? AND oc.items_json IS NOT NULL
+        """, (date_from, date_to)).fetchall()
+    bmap = _known_brand_map()
+    aliases = _load_aliases()
+    cache = {}
+    lines = []
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"]) or []
+        except (TypeError, ValueError):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            cat = _item_category_key(item, name_to_key)
+            pid = item.get("product_id")
+            if cat == "other":
+                if not pid:
+                    continue
+                label = (item.get("name") or "").strip()
+                for pref in other_prefixes:
+                    if label.startswith(pref):
+                        label = label[len(pref):].strip()
+                        break
+            else:
+                label = (item.get("brand") or "").strip()
+            label = " ".join(label.split())
+            try:
+                qty = float(item.get("qty") or 0)
+                total = float(item.get("total") or 0)
+            except (TypeError, ValueError):
+                continue
+            if qty <= 0 and total <= 0:
+                continue
+            cp = item.get("cost_price")
+            try:
+                cp = float(cp) if cp is not None else None
+            except (TypeError, ValueError):
+                cp = None
+            res = _resolve_name(label, bmap, aliases, cache)
+            lines.append({"id": r["id"], "date": r["change_date"], "s": r["shop_id"], "c": cat, "label": label,
+                          "qty": qty, "total": total, "cp": cp if cp and cp > 0 else None,
+                          "stock": bool(pid), "res": res})
+    return lines
+
+
+def _median(vals):
+    vals = sorted(vals)
+    n = len(vals)
+    if not n:
+        return None
+    return vals[n // 2] if n % 2 else (vals[n // 2 - 1] + vals[n // 2]) / 2
+
+
+PRICE_HIGH = 2.0   # цена дороже обычной по сети в 2+ раза — подозрительно
+PRICE_LOW = 0.5    # дешевле обычной в 2+ раза — подозрительно
+
+
+def _price_check(lines: list):
+    """Помечает строки с подозрительной ценой продажи или закупки: сильно
+    отличается от обычной (медианной) цены этого же товара по сети, или
+    закупка дороже продажи в 1,5 раза (цена за коробку вместо штуки)."""
+    sale_by, cost_by = {}, {}
+    for ln in lines:
+        k = (ln["c"], ln["res"]["pkey"])
+        if ln["qty"] > 0 and ln["total"] > 0:
+            sale_by.setdefault(k, []).append(ln["total"] / ln["qty"])
+        if ln["cp"]:
+            cost_by.setdefault(k, []).append(ln["cp"])
+    med_s = {k: _median(v) for k, v in sale_by.items() if len(v) >= 3}
+    med_c = {k: _median(v) for k, v in cost_by.items() if len(v) >= 3}
+    for ln in lines:
+        k = (ln["c"], ln["res"]["pkey"])
+        ln["sale_bad"] = False
+        ln["cost_bad"] = False
+        ln["med_sale"] = med_s.get(k)
+        ln["med_cost"] = med_c.get(k)
+        up = ln["total"] / ln["qty"] if ln["qty"] > 0 and ln["total"] > 0 else None
+        ln["unit"] = up
+        if up is None:
+            ln["sale_bad"] = True
+        elif ln["med_sale"] and (up > ln["med_sale"] * PRICE_HIGH or up < ln["med_sale"] * PRICE_LOW):
+            ln["sale_bad"] = True
+        if ln["cp"]:
+            if up and (ln["cp"] > up * 1.5 or up > ln["cp"] * 6):
+                ln["cost_bad"] = True
+            elif ln["med_cost"] and (ln["cp"] > ln["med_cost"] * PRICE_HIGH or ln["cp"] < ln["med_cost"] * PRICE_LOW):
+                ln["cost_bad"] = True
+
+
+def _period_from(days: int):
+    now = datetime.now()
+    return (now - timedelta(days=days - 1)).strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")
+
+
+def get_admin_analytics(days: int = 30) -> dict:
+    """Что продают точки: по точке, категории и товару — количество, сумма,
+    цена и закупка за единицу (без подозрительных цен), сколько продаж ещё
+    не распознано (нужно «Сопоставление») и качество данных точки."""
+    days = max(1, min(int(days or 30), 730))
+    date_from, today = _period_from(days)
+    with get_conn() as conn:
+        shops = conn.execute("""
+            SELECT s.id, s.shop_name, s.username, s.role, s.parent_shop_id, s.client_group, s.is_active,
+                   p.shop_name AS parent_name,
+                   (SELECT COUNT(*) FROM shops b WHERE b.parent_shop_id = s.id AND b.role='branch') AS branch_count
+            FROM shops s LEFT JOIN shops p ON p.id = s.parent_shop_id
+            WHERE s.role IN ('shop', 'branch')
+            ORDER BY s.shop_name
+        """).fetchall()
+    lines = _scan_lines(date_from, today)
+    _price_check(lines)
+    agg, quality = {}, {}
+    for ln in lines:
+        res = ln["res"]
+        q = quality.setdefault(ln["s"], {"lines": 0, "stock": 0, "cost": 0})
+        q["lines"] += 1
+        if ln["stock"]:
+            q["stock"] += 1
+        if ln["cp"]:
+            q["cost"] += 1
+        a = agg.setdefault((ln["s"], ln["c"], res["pkey"]), {
+            "q": 0.0, "t": 0.0, "pq": 0.0, "pt": 0.0, "cq": 0.0, "cs": 0.0, "ct": 0.0,
+            "n": 0, "bad": 0, "ut": 0.0, "sp": {}, "brand": res["brand"]})
+        a["q"] += ln["qty"]
+        a["t"] += ln["total"]
+        a["n"] += 1
+        a["sp"][res["product"]] = a["sp"].get(res["product"], 0) + 1
+        if res["status"] in ("suggest", "unknown"):
+            a["ut"] += ln["total"]
+        if ln["sale_bad"]:
+            a["bad"] += 1
+        else:
+            a["pq"] += ln["qty"]
+            a["pt"] += ln["total"]
+            if ln["cp"] and not ln["cost_bad"]:
+                a["cq"] += ln["qty"]
+                a["cs"] += ln["qty"] * ln["cp"]
+                a["ct"] += ln["total"]
+        if ln["cp"] and ln["cost_bad"] and not ln["sale_bad"]:
+            a["bad"] += 1
+    out_rows = []
+    for (sid, cat, pkey), a in agg.items():
+        display = max(a["sp"].items(), key=lambda kv: kv[1])[0] if a["sp"] else ""
+        brand = a["brand"]
+        out_rows.append({
+            "s": sid, "c": cat, "k": pkey, "p": display, "b": brand,
+            "m": 1 if brand in MITAL_BRANDS else 0,
+            "q": round(a["q"], 2), "t": round(a["t"]), "pq": round(a["pq"], 2), "pt": round(a["pt"]),
+            "cq": round(a["cq"], 2), "cs": round(a["cs"]), "ct": round(a["ct"]),
+            "n": a["n"], "bad": a["bad"], "ut": round(a["ut"]),
+        })
+    points = []
+    for s in shops:
+        d = dict(s)
+        d["kind"] = "branch" if d["role"] == "branch" else ("main" if d["branch_count"] else "single")
+        d["is_active"] = bool(d["is_active"])
+        d["quality"] = quality.get(d["id"], {"lines": 0, "stock": 0, "cost": 0})
+        points.append(d)
+    import i18n
+    ru = i18n.TEXTS.get("ru", {})
+    cats = [{"key": k, "label": ru.get(k, k), "unit": "л" if k in _FLUID_KEYS else "шт"} for k in BRAND_CATEGORY_ORDER]
+    return {"days": days, "date_from": date_from, "date_to": today,
+            "points": points, "categories": cats, "rows": out_rows,
+            "mital_brands": sorted(MITAL_BRANDS)}
+
+
+def get_name_review(days: int = 365) -> dict:
+    """Экран «Сопоставление»: названия, которые не распознаны уверенно (с
+    подсказкой, если она есть), исправленные автоматически (для проверки) и
+    уже подтверждённые админом. Сортировка — по сумме продаж: сначала то,
+    что сильнее всего влияет на цифры."""
+    date_from, today = _period_from(days)
+    lines = _scan_lines(date_from, today)
+    groups = {}
+    for ln in lines:
+        res = ln["res"]
+        if res["status"] in ("exact", "nobrand") or not res["raw"]:
+            continue
+        g = groups.setdefault(res["raw"], {
+            "raw": res["raw"], "status": res["status"], "brand": res["brand"], "product": res["product"],
+            "sug": res["sug"], "conf": res["conf"], "sum": 0, "lines": 0, "shops": set(), "cats": set(),
+            "spellings": {}, "first": ln["date"], "last": ln["date"]})
+        g["sum"] += ln["total"]
+        g["lines"] += 1
+        g["shops"].add(ln["s"])
+        g["cats"].add(ln["c"])
+        if ln["label"]:
+            g["spellings"][ln["label"]] = g["spellings"].get(ln["label"], 0) + 1
+        g["first"] = min(g["first"], ln["date"])
+        g["last"] = max(g["last"], ln["date"])
+    total_sum = sum(ln["total"] for ln in lines) or 0
+    out = {"review": [], "auto": [], "mapped": []}
+    for g in groups.values():
+        g["shops"] = len(g["shops"])
+        g["cats"] = sorted(g["cats"])
+        g["spellings"] = [k for k, _ in sorted(g["spellings"].items(), key=lambda kv: -kv[1])[:4]]
+        g["sum"] = round(g["sum"])
+        bucket = "review" if g["status"] in ("suggest", "unknown") else ("auto" if g["status"] == "auto" else "mapped")
+        out[bucket].append(g)
+    for k in out:
+        out[k].sort(key=lambda g: -g["sum"])
+    aliases = _load_aliases()
+    for g in out["mapped"]:
+        a = aliases.get(g["raw"]) or {}
+        g["alias_status"] = a.get("status")
+    # подтверждённые, которых за период не было в продажах — тоже показываем, чтобы можно было отменить
+    seen = {g["raw"] for g in out["mapped"]}
+    for raw, a in aliases.items():
+        if raw not in seen:
+            out["mapped"].append({"raw": raw, "brand": a.get("brand") or "", "product": a.get("product") or "",
+                                  "status": "mapped", "alias_status": a.get("status"), "sum": 0, "lines": 0,
+                                  "shops": 0, "cats": [], "spellings": [], "first": None, "last": None})
+    unresolved = sum(g["sum"] for g in out["review"])
+    week_ago = (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d")
+    brands = sorted(set(KNOWN_BRANDS) | {(a.get("brand") or "").upper() for a in aliases.values() if a.get("brand")})
+    return {"days": days, "total_sum": round(total_sum), "unresolved_sum": round(unresolved),
+            "unresolved_pct": round(unresolved / total_sum * 100, 1) if total_sum else 0,
+            "new_this_week": sum(1 for g in out["review"] if g["first"] and g["first"] >= week_ago),
+            "brands": [b for b in brands if b], "mital_brands": sorted(MITAL_BRANDS), **out}
+
+
+def get_price_problems(days: int = 90, limit: int = 150) -> list:
+    """Подозрительные цены: продажа или закупка сильно отличается от обычной
+    цены этого товара по сети, или закупка выше продажи (цена за коробку)."""
+    date_from, today = _period_from(days)
+    lines = _scan_lines(date_from, today)
+    _price_check(lines)
+    out = []
+    for ln in lines:
+        if not (ln["sale_bad"] or ln["cost_bad"]):
+            continue
+        if ln["sale_bad"]:
+            kind = "sale"
+            val, med = ln["unit"], ln["med_sale"]
+        else:
+            kind = "cost"
+            val, med = ln["cp"], ln["med_cost"] or ln["unit"]
+        dev = (val / med) if val and med else 0
+        out.append({"id": ln["id"], "date": ln["date"], "s": ln["s"], "c": ln["c"],
+                    "label": ln["label"], "product": ln["res"]["product"], "qty": ln["qty"],
+                    "total": round(ln["total"]), "unit": round(ln["unit"]) if ln["unit"] else None,
+                    "cost": round(ln["cp"]) if ln["cp"] else None,
+                    "med_sale": round(ln["med_sale"]) if ln["med_sale"] else None,
+                    "med_cost": round(ln["med_cost"]) if ln["med_cost"] else None,
+                    "kind": kind, "dev": round(dev, 2) if dev else None})
+    out.sort(key=lambda x: -abs(math.log(x["dev"])) if x["dev"] else 0)
+    return out[:limit]
+
+
+@_serialized
+def save_name_aliases(items: list) -> int:
+    """Подтверждение админом: «это название = такой-то бренд/товар»
+    (status='ok') или «это не бренд» (status='nobrand'). Данные точек не меняются."""
+    n = 0
+    with get_conn() as conn:
+        for it in items:
+            raw = " ".join(str(it.get("raw") or "").split())
+            if not raw:
+                continue
+            status = "nobrand" if it.get("status") == "nobrand" else "ok"
+            brand = " ".join(str(it.get("brand") or "").upper().split())[:60] or None
+            product = " ".join(str(it.get("product") or "").split())[:120] or None
+            if status == "ok" and not brand:
+                continue
+            conn.execute("""
+                INSERT INTO name_aliases(raw_key, brand, product, status, updated_at) VALUES(?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(raw_key) DO UPDATE SET brand=excluded.brand, product=excluded.product,
+                    status=excluded.status, updated_at=excluded.updated_at
+            """, (raw, brand if status == "ok" else None, product, status))
+            n += 1
+        conn.commit()
+    return n
+
+
+@_serialized
+def delete_name_alias(raw_key: str) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM name_aliases WHERE raw_key=?", (raw_key,))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def get_name_review_summary() -> dict:
+    """Для еженедельного сообщения админу в Telegram."""
+    r = get_name_review(365)
+    try:
+        prob = len(get_price_problems(30, 1000))
+    except Exception:
+        prob = 0
+    return {"count": len(r["review"]), "new": r["new_this_week"], "sum": r["unresolved_sum"],
+            "pct": r["unresolved_pct"], "price_problems": prob}
+
+
+def get_admin_shop_snapshot(shop_id: int, days: int = 30):
+    """Копия того, что видит сама точка: статистика брендов (масла, фильтры…)
+    за период и её склад с ценами закупки и продажи. Для окна на карте в админке."""
+    import i18n
+    shop = get_shop(shop_id)
+    if not shop or shop.get("role") not in ("shop", "branch"):
+        return None
+    days = max(1, min(int(days or 30), 730))
+    date_from, today = _period_from(days)
+    ru = i18n.TEXTS.get("ru", {})
+    brands = get_brand_breakdown(shop_id, date_from, today, limit=10)
+    for c in brands["categories"]:
+        c["label"] = ru.get(c["key"], c["key"])
+    wh = get_warehouse_overview(shop_id)
+    products = []
+    for p in wh["products"]:
+        products.append({
+            "id": p["id"], "name": p["name"], "category": p["category"],
+            "category_label": ru.get(p["category"], "Прочее") if p["category"] != "other" else "Прочее",
+            "unit": p["unit"], "stock": p["stock_qty"], "buy": p.get("purchase_price"),
+            "sell": p.get("sell_price"), "margin_pct": p.get("margin_pct"), "sold_30d": p.get("sold_30d"),
+            "status": p.get("status"), "last_sale": p.get("last_sale"),
+        })
+    parent = get_shop(shop["parent_shop_id"]) if shop.get("parent_shop_id") else None
+    return {
+        "shop": {"id": shop["id"], "name": shop.get("shop_name") or shop["username"], "username": shop["username"],
+                 "role": shop["role"], "parent_name": (parent or {}).get("shop_name"),
+                 "warehouse_enabled": bool(shop.get("warehouse_enabled")), "address": shop.get("address")},
+        "days": days, "date_from": date_from, "date_to": today,
+        "revenue": get_revenue_range(shop_id, date_from, today),
+        "brands": brands["categories"],
+        "warehouse": {"products": products, "summary": wh["summary"]},
     }

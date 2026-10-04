@@ -766,6 +766,33 @@ async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(0.05)
 
 
+async def send_weekly_data_check(context: ContextTypes.DEFAULT_TYPE):
+    """По понедельникам (утро по Ташкенту) — админу платформы: сколько
+    названий товаров ждут «Сопоставления» и сколько подозрительных цен.
+    Если проверять нечего — ничего не присылаем."""
+    if not ADMIN_TELEGRAM_ID or datetime.now().weekday() != 0:
+        return
+    try:
+        info = await asyncio.to_thread(db.get_name_review_summary)
+    except Exception as e:
+        logger.error(f"Не удалось посчитать проверку названий: {e}")
+        return
+    if not info["count"] and not info["price_problems"]:
+        return
+    lines = ["🔎 Проверка данных OilBook за неделю"]
+    if info["count"]:
+        new = f" (новых за неделю: {info['new']})" if info["new"] else ""
+        lines.append(f"• Нераспознанных названий: {info['count']}{new} — {info['pct']}% продаж")
+    if info["price_problems"]:
+        lines.append(f"• Подозрительных цен за 30 дней: {info['price_problems']}")
+    if webapp.PUBLIC_URL:
+        lines.append(f"\nОткрыть: {webapp.PUBLIC_URL.rstrip('/')}/admin#analytics → «Сопоставление»")
+    try:
+        await context.bot.send_message(chat_id=ADMIN_TELEGRAM_ID, text="\n".join(lines))
+    except Exception as e:
+        logger.error(f"Не удалось отправить проверку данных: {e}")
+
+
 async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
     """Ежедневная резервная копия базы данных — отправляется в Telegram
     владельцу платформы (ADMIN_TELEGRAM_ID). Копия делается через
@@ -871,6 +898,8 @@ def main():
     job_queue.run_repeating(check_subscription_notices, interval=3600, first=150)
     # 1:00 по времени сервера (обычно UTC) — около 6 утра в Узбекистане, тихий час
     job_queue.run_daily(send_daily_backup, time=dtime(hour=1, minute=0))
+    # 4:00 UTC = 9:00 по Ташкенту; внутри проверяется, что сегодня понедельник
+    job_queue.run_daily(send_weekly_data_check, time=dtime(hour=4, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)
 
     logger.info("Бот и веб-панель запущены...")

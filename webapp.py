@@ -10043,6 +10043,128 @@ if ('serviceWorker' in navigator) {
   .adm-tabs { display:flex; gap:6px; background:#E2E8F0; padding:4px; border-radius:12px; margin-bottom:14px; }
   .adm-tabs button { flex:1; height:42px; border:0; border-radius:9px; background:transparent; font-weight:700; font-size:14px; color:#475569; cursor:pointer; font-family:inherit; }
   .adm-tabs button.on { background:#fff; color:var(--blue); box-shadow:0 1px 3px rgba(15,23,42,.12); }
+  .map-kpis { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+  @media (min-width:700px) { .map-kpis { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .map-kpi { background:#fff; border:1px solid var(--border); border-radius:14px; padding:10px 12px; }
+  .map-kpi b { display:block; font-family:var(--font-display); font-size:20px; color:var(--darkblue); line-height:1.15; }
+  .map-kpi span { font-size:11.5px; color:#64748B; }
+  .map-bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  .map-seg { display:inline-flex; background:#E2E8F0; border-radius:10px; padding:3px; }
+  .map-seg button { border:0; background:transparent; border-radius:8px; padding:6px 10px; font-size:12.5px; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
+  .map-seg button.on { background:#fff; color:var(--blue); box-shadow:0 1px 2px rgba(15,23,42,.12); }
+  .map-bar select { border:1px solid var(--border); border-radius:10px; padding:7px 10px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--text); }
+  .map-bar label.chk { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:#475569; text-transform:none; letter-spacing:0; margin:0; cursor:pointer; }
+  .map-bar label.chk input { width:auto; }
+  .map-wrap { position:relative; border-radius:18px; overflow:hidden; border:2px solid #DBEAFE; background:#E5E7EB; }
+  #admMapBox { height:62vh; min-height:340px; max-height:640px; width:100%; }
+  #admMapBox.picking { cursor:crosshair; }
+  .map-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:#475569; margin:8px 2px 4px; }
+  .map-legend i.dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .map-pick { position:absolute; left:10px; right:10px; bottom:26px; z-index:1000; background:#0A2540; color:#fff; border-radius:14px; padding:10px 12px; font-size:13.5px; box-shadow:0 8px 20px rgba(0,0,0,.25); display:none; }
+  .map-pick .pk-act { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .map-pick button { border:0; border-radius:9px; padding:8px 12px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; }
+  .map-pick .pk-geo { background:#00A8E8; color:#fff; } .map-pick .pk-cancel { background:#fff; color:#0A2540; }
+  .map-pop { font-family:var(--font-body); min-width:220px; }
+  .map-pop .mp-name { font-weight:800; font-size:15px; color:var(--darkblue); }
+  .map-pop .mp-kind { font-size:11.5px; color:#64748B; margin:2px 0 6px; }
+  .map-pop .mp-st { font-size:12.5px; font-weight:700; margin-bottom:6px; }
+  .map-pop .mp-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:6px 0; }
+  .map-pop .mp-grid div { background:#F1F5F9; border-radius:8px; padding:6px 8px; font-size:11px; color:#64748B; }
+  .map-pop .mp-grid b { display:block; font-size:14px; color:var(--darkblue); font-family:var(--font-display); }
+  .map-pop .mp-addr { font-size:12px; color:#475569; margin:4px 0; }
+  .map-pop .mp-snap { display:block; width:100%; margin-top:8px; border:0; border-radius:10px; padding:10px; background:#0F52BA; color:#fff; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; }
+  .map-pop .mp-act { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .map-pop .mp-act button, .map-pop .mp-act a { border:0; border-radius:8px; padding:6px 9px; font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; font-family:inherit; }
+  .map-pop .mp-act .b1 { background:#0F52BA; color:#fff; } .map-pop .mp-act .b2 { background:#E2E8F0; color:#1E293B; }
+  .map-list { background:#fff; border:1px solid var(--border); border-radius:16px; margin-top:12px; overflow:hidden; }
+  .map-list h3 { margin:0; padding:12px 14px; font-size:14.5px; font-family:var(--font-display); color:var(--darkblue); border-bottom:1px solid #F1F5F9; }
+  .map-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid #F1F5F9; cursor:pointer; }
+  .map-row:last-child { border-bottom:0; }
+  .map-row .mr-n { font-weight:800; color:#94A3B8; width:20px; font-size:12px; flex:none; }
+  .map-row .mr-dot { width:10px; height:10px; border-radius:50%; flex:none; }
+  .map-row .mr-name { flex:1; min-width:0; font-size:13.5px; font-weight:700; }
+  .map-row .mr-name small { display:block; font-weight:500; color:#64748B; font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .map-row .mr-val { text-align:right; font-family:var(--font-mono); font-size:13px; font-weight:600; white-space:nowrap; }
+  .map-row .mr-val small { display:block; font-size:11px; font-family:var(--font-body); }
+  .map-row .mr-pin { border:0; background:#EFF6FF; color:var(--blue); border-radius:9px; padding:7px 10px; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; flex:none; }
+  .leaflet-container { font-family:var(--font-body); }
+  @media (max-width:440px) { .adm-tabs button { font-size:12.5px; } .adm-tabs button i { display:none; } }
+  .ana-sel { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .ana-sel select { flex:1; min-width:140px; border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; background:#fff; color:var(--text); }
+  .ana-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px; -webkit-overflow-scrolling:touch; }
+  .ana-chips button { flex:none; border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .ana-chips button.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .ana-card { background:#fff; border:1px solid var(--border); border-radius:16px; margin-bottom:12px; overflow:hidden; }
+  .ana-card > h3 { margin:0; padding:12px 14px; font-size:14.5px; font-family:var(--font-display); color:var(--darkblue); border-bottom:1px solid #F1F5F9; display:flex; align-items:center; gap:8px; }
+  .ana-card > h3 small { margin-left:auto; font-family:var(--font-body); font-weight:500; font-size:11.5px; color:#94A3B8; }
+  .ana-card .ana-note { padding:8px 14px; font-size:12px; color:#64748B; background:#F8FAFC; border-bottom:1px solid #F1F5F9; }
+  .ana-row { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid #F1F5F9; }
+  .ana-row:last-child { border-bottom:0; }
+  .ana-row.click { cursor:pointer; }
+  .ana-row .ar-main { flex:1; min-width:0; }
+  .ana-row .ar-name { font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ana-row .ar-sub { font-size:11.5px; color:#64748B; margin-top:1px; }
+  .ana-row .ar-bar { height:6px; background:#F1F5F9; border-radius:3px; margin-top:5px; overflow:hidden; }
+  .ana-row .ar-bar i { display:block; height:100%; background:#0F52BA; border-radius:3px; }
+  .ana-row .ar-bar i.mital { background:#EAB308; }
+  .ana-row .ar-val { text-align:right; font-family:var(--font-mono); font-size:13px; font-weight:600; white-space:nowrap; }
+  .ana-row .ar-val small { display:block; font-family:var(--font-body); font-size:11px; color:#64748B; font-weight:500; }
+  .mital-tag { display:inline-block; background:#FEF3C7; color:#B45309; border-radius:6px; padding:1px 6px; font-size:10px; font-weight:800; margin-left:5px; vertical-align:1px; letter-spacing:.3px; }
+  .ana-tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .ana-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .ana-tbl .ar-sub { font-weight:500; color:#64748B; font-size:11px; margin-top:2px; }
+  .ana-range { padding:4px 14px 10px; font-size:12px; color:#475569; line-height:1.6; }
+  .ana-range b { font-family:var(--font-mono); color:var(--darkblue); }
+  .ana-tbl th { background:#F8FAFC; color:#64748B; font-size:10px; text-transform:uppercase; letter-spacing:.2px; font-weight:700; text-align:right; padding:8px 6px; border-bottom:1px solid var(--border); }
+  .ana-tbl th:first-child, .ana-tbl td:first-child { padding-left:14px; } .ana-tbl th:last-child, .ana-tbl td:last-child { padding-right:14px; }
+  .ana-tbl th:first-child, .ana-tbl td:first-child { text-align:left; }
+  .ana-tbl td { padding:8px 6px; border-bottom:1px solid #F1F5F9; text-align:right; font-family:var(--font-mono); white-space:nowrap; font-size:12px; }
+  .ana-tbl td:first-child { font-family:var(--font-body); font-weight:700; white-space:normal; }
+  .ana-tbl tr.click { cursor:pointer; }
+  .ana-tbl tr.sum td { background:#F8FAFC; font-weight:700; }
+  .ana-btn { border:0; background:#EFF6FF; color:var(--blue); border-radius:9px; padding:8px 12px; font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit; }
+  .ana-dq { display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#fff; border:1px solid var(--border); border-radius:14px; padding:10px 12px; margin-bottom:12px; font-size:12.5px; color:#475569; }
+  .ana-dq .dq-txt { flex:1; min-width:200px; line-height:1.5; }
+  .ana-dq .dq-txt b { color:var(--darkblue); }
+  .ana-dq .dq-act { display:flex; gap:6px; flex-wrap:wrap; }
+  .nm-card { padding:12px 14px; }
+  .nm-card .ar-sub, .ana-row .ar-sub { font-size:11.5px; color:#64748B; margin-top:2px; }
+  .nm-spell { font-weight:800; font-size:14.5px; color:var(--darkblue); word-break:break-word; }
+  .nm-spell small { display:block; font-weight:500; font-size:11.5px; color:#64748B; margin-top:2px; }
+  .nm-sug { font-size:13px; margin-top:8px; color:#334155; }
+  .nm-act { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .nm-act button { border:0; border-radius:9px; padding:8px 12px; font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit; background:#E2E8F0; color:#1E293B; }
+  .nm-act button.ok { background:#16A34A; color:#fff; }
+  .nm-act button.no { background:#FEE2E2; color:#B91C1C; }
+  .nm-form { margin-top:10px; }
+  .nm-form label { margin-top:6px; }
+  .snap-ov { position:fixed; inset:0; z-index:5000; background:rgba(15,23,42,.55); display:none; }
+  .snap-box { position:absolute; left:0; right:0; bottom:0; top:max(24px, env(safe-area-inset-top, 0px)); background:var(--bg); border-radius:20px 20px 0 0; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  @media (min-width:900px) { .snap-box { left:50%; transform:translateX(-50%); width:760px; top:30px; bottom:30px; border-radius:20px; } }
+  .snap-head { position:sticky; top:0; z-index:2; background:#0A2540; color:#fff; padding:14px 16px 12px; display:flex; gap:10px; align-items:flex-start; }
+  .snap-head .sh-name { font-family:var(--font-display); font-weight:700; font-size:17px; line-height:1.2; }
+  .snap-head .sh-sub { font-size:12px; color:#93C5FD; margin-top:3px; }
+  .snap-head .sh-x { margin-left:auto; border:0; background:rgba(255,255,255,.12); color:#fff; width:36px; height:36px; border-radius:10px; font-size:18px; cursor:pointer; flex:none; }
+  .snap-body { padding:12px 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .snap-sec { font-family:var(--font-display); font-size:16px; color:var(--darkblue); margin:16px 2px 8px; display:flex; align-items:center; gap:8px; }
+  .snap-wh-row { display:flex; gap:10px; align-items:center; padding:10px 14px; border-bottom:1px solid #F1F5F9; }
+  .snap-wh-row:last-child { border-bottom:0; }
+  .snap-wh-row .sw-main { flex:1; min-width:0; }
+  .snap-wh-row .sw-name { font-weight:700; font-size:13.5px; }
+  .snap-wh-row .sw-sub { font-size:11.5px; color:#64748B; margin-top:2px; }
+  .snap-wh-row .sw-price { text-align:right; font-family:var(--font-mono); font-size:12.5px; white-space:nowrap; }
+  .snap-wh-row .sw-price small { display:block; font-family:var(--font-body); font-size:11px; color:#64748B; }
+  .snap-wh-row .sw-m { display:inline-block; margin-top:3px; padding:1px 7px; border-radius:7px; font-size:11.5px; font-weight:700; background:#ECFDF5; color:#047857; font-family:var(--font-body); }
+  .snap-wh-row .sw-m.low { background:#FEF2F2; color:#B91C1C; }
+  .snap-wh-row .sw-m.none { background:#F1F5F9; color:#94A3B8; }
+  .ana-good { color:#16A34A; } .ana-bad { color:#DC2626; } .ana-mute { color:#94A3B8; }
+  .ana-brands { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+  .ana-brands span { background:#F1F5F9; border-radius:7px; padding:2px 7px; font-size:11.5px; color:#334155; }
+  .ana-brands span.m { background:#FEF3C7; color:#B45309; font-weight:700; }
+  .ana-cmp { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; padding:12px 14px; }
+  @media (min-width:700px) { .ana-cmp { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .ana-cmp div { background:#F8FAFC; border-radius:10px; padding:8px 10px; font-size:11.5px; color:#64748B; }
+  .ana-cmp b { display:block; font-family:var(--font-display); font-size:17px; color:var(--darkblue); }
   .inc-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; margin-bottom:12px; }
   @media (min-width:900px) { .inc-grid { grid-template-columns:repeat(4, minmax(0,1fr)); } }
   .inc-kpi { background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 14px; }
@@ -10099,6 +10221,8 @@ if ('serviceWorker' in navigator) {
   <div class="adm-tabs" id="admTabs">
     <button class="on" data-t="main" onclick="admTab('main')"><i class="fa-solid fa-store"></i> Точки</button>
     <button data-t="income" onclick="admTab('income')"><i class="fa-solid fa-sack-dollar"></i> Доходы</button>
+    <button data-t="map" onclick="admTab('map')"><i class="fa-solid fa-map-location-dot"></i> Карта</button>
+    <button data-t="analytics" onclick="admTab('analytics')"><i class="fa-solid fa-chart-pie"></i> Аналитика</button>
   </div>
   <div id="admMain">
 
@@ -10246,6 +10370,76 @@ if ('serviceWorker' in navigator) {
   <div id="shops-body"></div>
   </div>
   <div id="admIncome" style="display:none;"><div class="hint-text">Загружаю…</div></div>
+  <div id="admMap" style="display:none;">
+    <div class="map-kpis" id="mapKpis"></div>
+    <div class="map-bar">
+      <div class="map-seg" id="mapDaysSeg">
+        <button data-d="7" onclick="setMapDays(7)">7 дн</button>
+        <button class="on" data-d="30" onclick="setMapDays(30)">30 дн</button>
+        <button data-d="90" onclick="setMapDays(90)">3 мес</button>
+      </div>
+      <div class="map-seg" id="mapMetricSeg">
+        <button class="on" data-m="count" onclick="setMapMetric('count')">Замены</button>
+        <button data-m="total" onclick="setMapMetric('total')">Выручка</button>
+      </div>
+    </div>
+    <div class="map-bar">
+      <div class="map-seg" id="mapFilterSeg">
+        <button class="on" data-f="all" onclick="setMapFilter('all')">Все</button>
+        <button data-f="green" onclick="setMapFilter('green')">Работают</button>
+        <button data-f="yellow" onclick="setMapFilter('yellow')">Реже</button>
+        <button data-f="red" onclick="setMapFilter('red')">Молчат</button>
+        <button data-f="off" onclick="setMapFilter('off')">Выкл.</button>
+      </div>
+      <select id="mapGroup" onchange="mapGroupSel=this.value; renderMap();"><option value="">Все сети</option></select>
+      <label class="chk"><input type="checkbox" id="mapLinksChk" checked onchange="renderMap()"> Связи филиалов</label>
+    </div>
+    <div class="map-wrap">
+      <div id="admMapBox"></div>
+      <div class="map-pick" id="mapPick">
+        <div id="mapPickText"></div>
+        <div class="pk-act">
+          <button class="pk-geo" onclick="mapPickHere()"><i class="fa-solid fa-location-crosshairs"></i> Я сейчас здесь</button>
+          <button class="pk-cancel" onclick="mapPickCancel()">Отмена</button>
+        </div>
+      </div>
+    </div>
+    <div class="map-legend">
+      <span><i class="dot" style="background:#16A34A"></i>замена за последние 3 дня</span>
+      <span><i class="dot" style="background:#EAB308"></i>4–14 дней назад</span>
+      <span><i class="dot" style="background:#DC2626"></i>больше 14 дней / не было</span>
+      <span><i class="dot" style="background:#94A3B8"></i>выключена</span>
+      <span>● размер круга — <b id="mapLegendMetric">замены</b> за период; толстая обводка — главная точка</span>
+    </div>
+    <div class="map-list" id="mapNoCoords" style="display:none;"></div>
+    <div class="map-list" id="mapRating"></div>
+  </div>
+  <div id="admAna" style="display:none;">
+    <div class="map-bar" id="anaDaysBar">
+      <div class="map-seg" id="anaDaysSeg">
+        <button class="on" data-d="30" onclick="setAnaDays(30)">30 дн</button>
+        <button data-d="90" onclick="setAnaDays(90)">3 мес</button>
+        <button data-d="365" onclick="setAnaDays(365)">Год</button>
+      </div>
+    </div>
+    <div id="anaFilters">
+    <div class="ana-sel">
+      <select id="anaGroup" onchange="anaGroup=this.value; anaShop=0; renderAna();"></select>
+      <select id="anaShopSel" onchange="anaShop=Number(this.value)||0; renderAna();"></select>
+    </div>
+    <div class="ana-chips" id="anaCats"></div>
+    </div>
+    <div id="anaBody"><div class="hint-text">Загружаю…</div></div>
+  </div>
+</div>
+<div class="snap-ov" id="snapOv" onclick="if (event.target === this) closeSnapshot()">
+  <div class="snap-box">
+    <div class="snap-head">
+      <div><div class="sh-name" id="snapName">—</div><div class="sh-sub" id="snapSub"></div></div>
+      <button class="sh-x" onclick="closeSnapshot()" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="snap-body" id="snapBody"></div>
+  </div>
 </div>
 
 <script>
@@ -10422,8 +10616,13 @@ function admTab(t) {
   document.querySelectorAll('#admTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   document.getElementById('admMain').style.display = t === 'main' ? '' : 'none';
   document.getElementById('admIncome').style.display = t === 'income' ? '' : 'none';
-  try { history.replaceState(null, '', t === 'income' ? '#income' : location.pathname); } catch (e) {}
+  document.getElementById('admMap').style.display = t === 'map' ? '' : 'none';
+  document.getElementById('admAna').style.display = t === 'analytics' ? '' : 'none';
+  if (t !== 'map' && typeof mapPickCancel === 'function' && mapPickId) mapPickCancel();
+  try { history.replaceState(null, '', t === 'main' ? location.pathname : '#' + t); } catch (e) {}
   if (t === 'income') loadIncome();
+  if (t === 'map') loadMap();
+  if (t === 'analytics') loadAna();
   window.scrollTo(0, 0);
 }
 
@@ -11195,7 +11394,918 @@ guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'de
   'subPrice', 'editPayAmount', 'cancelPayment']);
 loadShops();
 loadSubPanel();
+// ---------- Карта точек с аналитикой ----------
+let MAP = null, MAPDATA = null, mapLayer = null, mapDays = 30, mapMetric = 'count', mapFilt = 'all', mapGroupSel = '';
+let mapMarkers = {}, mapPickId = null, mapFitted = false, mapSaving = false, leafletPromise = null;
+const MAP_COLORS = { green: '#16A34A', yellow: '#EAB308', red: '#DC2626', off: '#94A3B8' };
+
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (leafletPromise) return leafletPromise;
+  leafletPromise = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    js.onload = () => resolve();
+    js.onerror = () => { leafletPromise = null; reject(new Error('leaflet')); };
+    document.head.appendChild(js);
+  });
+  return leafletPromise;
+}
+
+function mapStatus(p) {
+  if (!p.is_active) return 'off';
+  if (p.days_idle === null || p.days_idle === undefined) return 'red';
+  if (p.days_idle <= 3) return 'green';
+  if (p.days_idle <= 14) return 'yellow';
+  return 'red';
+}
+function mapIdleText(p) {
+  if (!p.is_active) return 'Точка выключена';
+  if (!p.last_date) return 'Замен ещё не было';
+  if (p.days_idle === 0) return `Сегодня замен: ${p.today}`;
+  if (p.days_idle === 1) return 'Последняя замена вчера';
+  return `Последняя замена ${p.days_idle} дн. назад`;
+}
+function mapKindText(p) {
+  if (p.kind === 'branch') return 'Филиал · ' + escapeHtml(p.parent_name || p.parent_username || '');
+  if (p.kind === 'main') return `Главная точка · филиалов: ${p.branch_count}`;
+  return 'Самостоятельная точка';
+}
+function mapPctHtml(pct) {
+  if (pct === null || pct === undefined) return '<span style="color:#94A3B8">—</span>';
+  const up = pct >= 0;
+  return `<span style="color:${up ? '#16A34A' : '#DC2626'}">${up ? '▲' : '▼'} ${Math.abs(pct)}%</span>`;
+}
+function mapVisible() {
+  if (!MAPDATA) return [];
+  return MAPDATA.points.filter(p =>
+    (!mapGroupSel || (p.client_group || '') === mapGroupSel) &&
+    (mapFilt === 'all' || mapStatus(p) === mapFilt));
+}
+
+async function loadMap() {
+  const kp = document.getElementById('mapKpis');
+  if (!MAPDATA) kp.innerHTML = '<div class="hint-text">Загружаю карту…</div>';
+  try {
+    await loadLeaflet();
+  } catch (e) {
+    kp.innerHTML = '<div class="msg err">Не удалось загрузить карту — проверь интернет и открой вкладку ещё раз.</div>';
+    return;
+  }
+  let data;
+  try {
+    const res = await fetch(`/api/admin/map?days=${mapDays}`);
+    data = await res.json();
+  } catch (e) {
+    if (!MAPDATA) kp.innerHTML = '<div class="msg err">Не удалось получить данные точек.</div>';
+    return;
+  }
+  if (!data || !data.points) return;
+  MAPDATA = data;
+  if (!MAP) {
+    MAP = L.map('admMapBox', { zoomControl: true }).setView([40.8, 71.8], 8);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    }).addTo(MAP);
+    mapLayer = L.layerGroup().addTo(MAP);
+    MAP.on('click', e => { if (mapPickId) mapSaveLocation(mapPickId, e.latlng.lat, e.latlng.lng); });
+  }
+  const groups = [...new Set(MAPDATA.points.map(p => p.client_group).filter(Boolean))].sort();
+  const sel = document.getElementById('mapGroup');
+  sel.innerHTML = '<option value="">Все сети</option>' + groups.map(g =>
+    `<option value="${escapeHtml(g)}"${g === mapGroupSel ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('');
+  sel.style.display = groups.length ? '' : 'none';
+  setTimeout(() => { MAP.invalidateSize(); renderMap(); }, 30);
+}
+
+function renderMap() {
+  if (!MAP || !MAPDATA) return;
+  const pts = mapVisible();
+  const withXY = pts.filter(p => p.lat !== null && p.lon !== null);
+  const noXY = pts.filter(p => p.lat === null || p.lon === null);
+  const all = MAPDATA.points;
+  const sum = (arr, k) => arr.reduce((a, p) => a + (Number(p[k]) || 0), 0);
+  const per = MAPDATA.days === 7 ? '7 дней' : MAPDATA.days === 90 ? '3 месяца' : '30 дней';
+
+  document.getElementById('mapKpis').innerHTML = `
+    <div class="map-kpi"><b>${withXY.length} <small style="font-size:13px;color:#94A3B8">из ${all.length}</small></b><span>на карте</span></div>
+    <div class="map-kpi"><b style="color:#16A34A">${all.filter(p => p.is_active && p.today > 0).length}</b><span>работали сегодня</span></div>
+    <div class="map-kpi"><b style="color:#DC2626">${all.filter(p => mapStatus(p) === 'red').length}</b><span>молчат больше 14 дней</span></div>
+    <div class="map-kpi"><b>${fmtShort(sum(pts, 'total'))}</b><span>${sum(pts, 'count').toLocaleString('ru-RU')} замен · ${per}</span></div>`;
+  document.getElementById('mapLegendMetric').textContent = mapMetric === 'total' ? 'выручка' : 'замены';
+
+  mapLayer.clearLayers();
+  mapMarkers = {};
+  const maxV = Math.max(1, ...withXY.map(p => Number(p[mapMetric]) || 0));
+  if (document.getElementById('mapLinksChk').checked) {
+    const byId = {};
+    MAPDATA.points.forEach(p => { byId[p.id] = p; });
+    withXY.forEach(p => {
+      const par = p.kind === 'branch' ? byId[p.parent_shop_id] : null;
+      if (par && par.lat !== null && par.lon !== null) {
+        L.polyline([[par.lat, par.lon], [p.lat, p.lon]], { color: '#0F52BA', weight: 2, opacity: .55, dashArray: '6 6', interactive: false }).addTo(mapLayer);
+      }
+    });
+  }
+  withXY.slice().sort((a, b) => (Number(b[mapMetric]) || 0) - (Number(a[mapMetric]) || 0)).forEach(p => {
+    const v = Number(p[mapMetric]) || 0;
+    const st = mapStatus(p);
+    const r = 7 + 22 * Math.sqrt(v / maxV);
+    const m = L.circleMarker([p.lat, p.lon], {
+      radius: r, color: p.kind === 'main' ? '#0A2540' : '#fff', weight: p.kind === 'main' ? 4 : 2,
+      fillColor: MAP_COLORS[st], fillOpacity: .85
+    }).addTo(mapLayer);
+    m.bindPopup(() => mapPopupHtml(p), { maxWidth: 280 });
+    m.bindTooltip(escapeHtml(p.shop_name || p.username), { direction: 'top', offset: [0, -r] });
+    mapMarkers[p.id] = m;
+  });
+  if (!mapFitted && withXY.length) {
+    mapFitted = true;
+    if (withXY.length === 1) MAP.setView([withXY[0].lat, withXY[0].lon], 14);
+    else MAP.fitBounds(withXY.map(p => [p.lat, p.lon]), { padding: [30, 30], maxZoom: 14 });
+  }
+
+  const nc = document.getElementById('mapNoCoords');
+  if (noXY.length) {
+    nc.style.display = '';
+    nc.innerHTML = `<h3><i class="fa-solid fa-location-dot" style="color:#DC2626"></i> Нет на карте (${noXY.length})</h3>` +
+      noXY.map(p => `<div class="map-row" style="cursor:default">
+        <span class="mr-dot" style="background:${MAP_COLORS[mapStatus(p)]}"></span>
+        <span class="mr-name">${escapeHtml(p.shop_name || p.username)}<small>${mapKindText(p)}</small></span>
+        <button class="mr-pin" onclick="mapStartPick(${p.id})"><i class="fa-solid fa-map-pin"></i> Указать</button>
+      </div>`).join('');
+  } else {
+    nc.style.display = 'none';
+  }
+
+  const ranked = pts.slice().sort((a, b) => (Number(b[mapMetric]) || 0) - (Number(a[mapMetric]) || 0));
+  document.getElementById('mapRating').innerHTML = `<h3><i class="fa-solid fa-ranking-star" style="color:#EAB308"></i> Рейтинг за ${per} — по ${mapMetric === 'total' ? 'выручке' : 'заменам'}</h3>` +
+    (ranked.length ? ranked.map((p, i) => `<div class="map-row" onclick="mapFocus(${p.id})">
+        <span class="mr-n">${i + 1}</span>
+        <span class="mr-dot" style="background:${MAP_COLORS[mapStatus(p)]}"></span>
+        <span class="mr-name">${escapeHtml(p.shop_name || p.username)}<small>${mapKindText(p)} · ${mapIdleText(p)}</small></span>
+        <span class="mr-val">${mapMetric === 'total' ? fmtShort(p.total) : p.count + ' зам.'}<small>${mapPctHtml(p.pct)}</small></span>
+      </div>`).join('') : '<div class="hint-text" style="padding:12px 14px">Нет точек под этот фильтр.</div>');
+}
+
+function mapPopupHtml(p) {
+  const st = mapStatus(p);
+  const addr = [p.address, p.hours].filter(Boolean).map(escapeHtml).join(' · ');
+  const per = MAPDATA.days === 7 ? '7 дн' : MAPDATA.days === 90 ? '3 мес' : '30 дн';
+  return `<div class="map-pop">
+    <div class="mp-name">${escapeHtml(p.shop_name || p.username)}</div>
+    <div class="mp-kind">${mapKindText(p)}${p.client_group ? ' · ' + escapeHtml(p.client_group) : ''}</div>
+    <div class="mp-st" style="color:${MAP_COLORS[st]}">● ${mapIdleText(p)}</div>
+    <div class="mp-grid">
+      <div><b>${p.count}</b>замен · ${per}</div>
+      <div><b>${fmtShort(p.total)}</b>выручка ${mapPctHtml(p.pct)}</div>
+      <div><b>${fmtShort(p.avg)}</b>средний чек</div>
+      <div><b>${p.clients}</b>клиентов · всего ${p.client_count}</div>
+    </div>
+    ${addr ? `<div class="mp-addr"><i class="fa-solid fa-location-dot"></i> ${addr}</div>` : ''}
+    ${p.phone ? `<div class="mp-addr"><i class="fa-solid fa-phone"></i> <a href="tel:${escapeHtml(p.phone)}">${escapeHtml(p.phone)}</a></div>` : ''}
+    <button class="mp-snap" onclick="openSnapshot(${p.id})"><i class="fa-solid fa-oil-can"></i> Статистика масел и склад</button>
+    <div class="mp-act">
+      <button class="b2" onclick="mapOpenCard(${p.id})">Карточка</button>
+      <a class="b2" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}">Маршрут</a>
+      <button class="b2" onclick="anaOpenFromMap(${p.id})">Аналитика</button>
+      <button class="b2" onclick="mapStartPick(${p.id})">Переместить</button>
+    </div>
+  </div>`;
+}
+
+function setMapDays(d) {
+  mapDays = d;
+  document.querySelectorAll('#mapDaysSeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.d) === d));
+  loadMap();
+}
+function setMapMetric(m) {
+  mapMetric = m;
+  document.querySelectorAll('#mapMetricSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  renderMap();
+}
+function setMapFilter(f) {
+  mapFilt = f;
+  document.querySelectorAll('#mapFilterSeg button').forEach(b => b.classList.toggle('on', b.dataset.f === f));
+  renderMap();
+}
+function mapFocus(id) {
+  const p = MAPDATA.points.find(x => x.id === id);
+  if (!p) return;
+  if (p.lat === null || p.lon === null) { mapStartPick(id); return; }
+  document.querySelector('#admMap .map-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  MAP.setView([p.lat, p.lon], Math.max(MAP.getZoom(), 14));
+  setTimeout(() => { if (mapMarkers[id]) mapMarkers[id].openPopup(); }, 350);
+}
+function mapOpenCard(id) {
+  const p = MAPDATA.points.find(x => x.id === id);
+  if (!p) return;
+  admTab('main');
+  setShopFilter('all');
+  const search = document.getElementById('shopSearch');
+  search.value = p.kind === 'branch' ? (p.parent_username || '') : (p.username || '');
+  filterShops();
+  setTimeout(() => search.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+function mapStartPick(id) {
+  const p = MAPDATA.points.find(x => x.id === id);
+  if (!p) return;
+  if (MAP) MAP.closePopup();
+  mapPickId = id;
+  document.getElementById('mapPickText').innerHTML = `<i class="fa-solid fa-map-pin"></i> Нажми на карте, где находится <b>${escapeHtml(p.shop_name || p.username)}</b>. Можно приблизить карту пальцами.`;
+  document.getElementById('mapPick').style.display = 'block';
+  document.getElementById('admMapBox').classList.add('picking');
+  document.querySelector('#admMap .map-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function mapPickCancel() {
+  mapPickId = null;
+  document.getElementById('mapPick').style.display = 'none';
+  document.getElementById('admMapBox').classList.remove('picking');
+}
+function mapPickHere() {
+  if (!mapPickId) return;
+  if (!navigator.geolocation) { showMsg('Телефон не даёт определить местоположение.', false); return; }
+  const id = mapPickId;
+  navigator.geolocation.getCurrentPosition(
+    pos => mapSaveLocation(id, pos.coords.latitude, pos.coords.longitude),
+    () => showMsg('Не удалось определить местоположение — разреши доступ к геолокации или нажми место на карте.', false),
+    { enableHighAccuracy: true, timeout: 15000 });
+}
+async function mapSaveLocation(id, lat, lon) {
+  if (mapSaving) return;
+  const p = MAPDATA.points.find(x => x.id === id);
+  const name = p ? (p.shop_name || p.username) : '';
+  if (!confirm(`Поставить «${name}» сюда?\\n${lat.toFixed(6)}, ${lon.toFixed(6)}`)) return;
+  mapSaving = true;
+  try {
+    const res = await fetch(`/api/admin/shops/${id}/location`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: lat, lon: lon })
+    });
+    const data = await res.json();
+    if (!data.ok) { showMsg(data.error || 'Не удалось сохранить место.', false); return; }
+    if (p) { p.lat = data.lat; p.lon = data.lon; }
+    mapPickCancel();
+    renderMap();
+    MAP.setView([data.lat, data.lon], Math.max(MAP.getZoom(), 15));
+    showMsg(`Точка «${escapeHtml(name)}» на карте.`, true);
+  } catch (e) {
+    showMsg('Не удалось сохранить место — проверь интернет.', false);
+  } finally {
+    mapSaving = false;
+  }
+}
+// ---------- Аналитика продаж: бренды, доля MITAL, цены, возможности ----------
+let ANA_CATLIST = [];
+let anaView = 'main', NAMES = null, nmTab = 'review', nmEdit = null, nmSearch = '', PRICEPROB = null, ppShop = 0;
+let ANA = null, anaDays = 30, anaGroup = '', anaShop = 0, anaCat = 'all', anaProduct = '', anaLoading = false;
+const ANA_CATS = [
+  ['all', 'Все товары'], ['fluid_0', 'Моторное'], ['fluid_1', 'АКПП/МКПП'], ['fluid_2', 'Антифриз'],
+  ['fluid_3', 'Тормозная'], ['fluid_4', 'Редуктор'], ['filters', 'Фильтры'], ['other', 'Прочие товары']
+];
+
+async function loadAna() {
+  if (anaLoading) return;
+  anaLoading = true;
+  if (!ANA) document.getElementById('anaBody').innerHTML = '<div class="hint-text">Загружаю…</div>';
+  try {
+    const res = await fetch(`/api/admin/analytics?days=${anaDays}`);
+    const data = await res.json();
+    if (data && data.rows) { ANA = data; ANA_CATLIST = data.categories || ANA_CATLIST; }
+  } catch (e) {
+    if (!ANA) document.getElementById('anaBody').innerHTML = '<div class="msg err">Не удалось получить данные — проверь интернет.</div>';
+  } finally {
+    anaLoading = false;
+  }
+  if (ANA) renderAna();
+}
+function setAnaDays(d) {
+  anaDays = d;
+  document.querySelectorAll('#anaDaysSeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.d) === d));
+  if (anaView === 'prices') { PRICEPROB = null; renderPriceProblems(); loadPriceProblems(); }
+  loadAna();
+}
+function setAnaCat(c) { anaCat = c; anaProduct = ''; renderAna(); }
+function anaPickShop(id) {
+  anaShop = id || 0;
+  renderAna();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function anaOpenFromMap(id) {
+  anaView = 'main';
+  document.getElementById('anaFilters').style.display = '';
+  document.getElementById('anaDaysBar').style.display = '';
+  admTab('analytics');
+  anaShop = id;
+  if (ANA) renderAna();
+}
+function anaPickProduct(key) {
+  anaProduct = key;
+  renderAna();
+  const el = document.getElementById('anaPrices');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function anaKey(k) { return encodeURIComponent(k).replace(/'/g, '%27'); }
+function anaCatOk(c) {
+  return anaCat === 'all' || c === anaCat || (anaCat === 'filters' && String(c).indexOf('filter_') === 0);
+}
+function anaUnit(c) { return String(c).indexOf('fluid_') === 0 ? 'л' : 'шт'; }
+function anaCatLabel(c) {
+  const f = (ANA.categories || []).find(x => x.key === c);
+  return f ? f.label : c;
+}
+function anaPoint(id) { return ANA.points.find(p => p.id === id); }
+function anaPointName(p) { return p ? (p.shop_name || p.username) : '—'; }
+function anaPointSub(p) {
+  if (!p) return '';
+  if (p.kind === 'branch') return 'филиал · ' + escapeHtml(p.parent_name || '');
+  if (p.kind === 'main') return 'главная точка';
+  return 'самостоятельная';
+}
+// точки в рамках выбранной сети (без учёта выбранной точки)
+function anaGroupIds() {
+  const ids = new Set();
+  ANA.points.forEach(p => { if (!anaGroup || (p.client_group || '') === anaGroup) ids.add(p.id); });
+  return ids;
+}
+function anaRows(withShop) {
+  const ids = anaGroupIds();
+  return ANA.rows.filter(r => ids.has(r.s) && anaCatOk(r.c) && (!withShop || !anaShop || r.s === anaShop));
+}
+function anaTotals(rows) {
+  const t = { t: 0, m: 0, cs: 0, ct: 0, bad: 0, q: 0, ut: 0 };
+  rows.forEach(r => { t.t += r.t; t.q += r.q; t.cs += r.cs; t.ct += r.ct; t.bad += r.bad; t.ut += r.ut || 0; if (r.m) t.m += r.t; });
+  t.share = t.t ? Math.round(t.m / t.t * 100) : null;
+  t.markup = t.cs ? Math.round((t.ct - t.cs) / t.cs * 100) : null;
+  return t;
+}
+function anaQuality(ids) {
+  let lines = 0, stock = 0, cost = 0;
+  ANA.points.forEach(p => { if (ids.has(p.id)) { lines += p.quality.lines; stock += p.quality.stock; cost += p.quality.cost; } });
+  return { lines, stock, cost, stockPct: lines ? Math.round(stock / lines * 100) : null, costPct: lines ? Math.round(cost / lines * 100) : null };
+}
+function anaPct(v) { return v === null || v === undefined ? '—' : v + '%'; }
+function anaMoney(v) { return v === null || v === undefined || isNaN(v) ? '—' : Math.round(v).toLocaleString('ru-RU'); }
+function anaQty(q, unit) {
+  const n = Math.round(q * 10) / 10;
+  return n.toLocaleString('ru-RU') + ' ' + unit;
+}
+// бренды: сумма, количество (если единица одна), доля
+function anaBrands(rows) {
+  const by = {};
+  rows.forEach(r => {
+    const k = r.b || '—';
+    const b = by[k] = by[k] || { name: k === '—' ? 'без марки' : k, t: 0, q: 0, units: new Set(), m: r.m };
+    b.t += r.t; b.q += r.q; b.units.add(anaUnit(r.c));
+  });
+  return Object.values(by).sort((a, b) => b.t - a.t);
+}
+// товары: агрегируем по категории + названию
+function anaProducts(rows) {
+  const by = {};
+  rows.forEach(r => {
+    const k = r.c + '|' + r.k;
+    const p = by[k] = by[k] || { key: k, name: r.p || 'без названия', c: r.c, m: r.m, t: 0, q: 0, pt: 0, pq: 0, cs: 0, cq: 0, ct: 0, bad: 0, shops: new Set() };
+    p.t += r.t; p.q += r.q; p.pt += r.pt; p.pq += r.pq; p.cs += r.cs; p.cq += r.cq; p.ct += r.ct; p.bad += r.bad; p.shops.add(r.s);
+  });
+  return Object.values(by).sort((a, b) => b.t - a.t);
+}
+function anaMarkupHtml(ct, cs) {
+  if (!cs) return '<span class="ana-mute">—</span>';
+  const v = Math.round((ct - cs) / cs * 100);
+  return `<span class="${v < 10 ? 'ana-bad' : ''}">${v}%</span>`;
+}
+
+function renderAna() {
+  if (anaView === 'names') { renderNames(); return; }
+  if (anaView === 'prices') { renderPriceProblems(); return; }
+  if (!ANA) return;
+  document.getElementById('anaFilters').style.display = '';
+  // фильтры: сеть, точка, категория
+  const groups = [...new Set(ANA.points.map(p => p.client_group).filter(Boolean))].sort();
+  const gSel = document.getElementById('anaGroup');
+  gSel.innerHTML = '<option value="">Все сети</option>' + groups.map(g =>
+    `<option value="${escapeHtml(g)}"${g === anaGroup ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('');
+  gSel.style.display = groups.length ? '' : 'none';
+  const ids = anaGroupIds();
+  if (anaShop && !ids.has(anaShop)) anaShop = 0;
+  const sSel = document.getElementById('anaShopSel');
+  sSel.innerHTML = `<option value="0">Все точки (${ids.size})</option>` + ANA.points.filter(p => ids.has(p.id)).map(p =>
+    `<option value="${p.id}"${p.id === anaShop ? ' selected' : ''}>${escapeHtml(anaPointName(p))}${p.kind === 'branch' ? ' (филиал)' : ''}</option>`).join('');
+  document.getElementById('anaCats').innerHTML = ANA_CATS.map(([k, l]) =>
+    `<button class="${k === anaCat ? 'on' : ''}" onclick="setAnaCat('${k}')">${l}</button>`).join('');
+
+  const rows = anaRows(true);
+  const netRows = anaRows(false);
+  const tot = anaTotals(rows);
+  const netTot = anaTotals(netRows);
+  const scopeIds = anaShop ? new Set([anaShop]) : ids;
+  const ql = anaQuality(scopeIds);
+  const netQl = anaQuality(ids);
+  const per = anaDays === 365 ? 'год' : anaDays === 90 ? '3 месяца' : '30 дней';
+  const vsNet = (v, n) => anaShop ? `<small style="display:block;font-size:11px;color:#94A3B8;font-weight:500">сеть: ${n}</small>` : '';
+  let h = '';
+
+  // ---- 1. ключевые цифры ----
+  h += `<div class="map-kpis">
+    <div class="map-kpi"><b>${fmtShort(tot.t)}</b><span>продажи товаров · ${per}</span></div>
+    <div class="map-kpi"><b style="color:#B45309">${anaPct(tot.share)}</b><span>доля MITAL по сумме</span>${vsNet(tot.share, anaPct(netTot.share))}</div>
+    <div class="map-kpi"><b>${anaPct(tot.markup)}</b><span>средняя наценка</span>${vsNet(tot.markup, anaPct(netTot.markup))}</div>
+    <div class="map-kpi"><b style="color:${ql.stockPct !== null && ql.stockPct < 50 ? '#DC2626' : '#16A34A'}">${anaPct(ql.stockPct)}</b><span>позиций со склада</span>${vsNet(ql.stockPct, anaPct(netQl.stockPct))}</div>
+  </div>`;
+  if (!rows.length) {
+    h += '<div class="ana-card"><div class="hint-text" style="padding:14px">За этот период и фильтр продаж товаров нет.</div></div>';
+    document.getElementById('anaBody').innerHTML = h;
+    return;
+  }
+  const utPct = tot.t ? Math.round(tot.ut / tot.t * 1000) / 10 : 0;
+  h += `<div class="ana-dq">
+    <div class="dq-txt"><b>Точность данных</b><br>
+      ${utPct > 0 ? `<span class="${utPct >= 5 ? 'ana-bad' : ''}">Не распознано: ${utPct}% продаж (${fmtShort(tot.ut)})</span>` : '<span class="ana-good">Все названия распознаны ✓</span>'}
+      · ${tot.bad ? `<span class="ana-bad">подозрительных цен: ${tot.bad}</span> — не входят в цены и наценку` : '<span class="ana-good">подозрительных цен нет</span>'}</div>
+    <div class="dq-act"><button class="ana-btn" onclick="anaOpenView('names')"><i class="fa-solid fa-spell-check"></i> Сопоставление</button>
+      <button class="ana-btn" onclick="anaOpenView('prices')"><i class="fa-solid fa-triangle-exclamation"></i> Проблемные цены</button></div>
+  </div>`;
+
+  // ---- 3. карточка выбранной точки ----
+  if (anaShop) {
+    const p = anaPoint(anaShop);
+    const oilRows = ANA.rows.filter(r => r.s === anaShop && r.c === 'fluid_0');
+    const netOil = ANA.rows.filter(r => ids.has(r.s) && r.c === 'fluid_0');
+    const lp = rs => { const q = rs.reduce((a, r) => a + r.pq, 0); return q ? rs.reduce((a, r) => a + r.pt, 0) / q : null; };
+    const cp = rs => { const q = rs.reduce((a, r) => a + r.cq, 0); return q ? rs.reduce((a, r) => a + r.cs, 0) / q : null; };
+    h += `<div class="ana-card"><h3><i class="fa-solid fa-store" style="color:var(--blue)"></i> ${escapeHtml(anaPointName(p))}<small>${anaPointSub(p)}</small></h3>
+      <div class="ana-cmp">
+        <div><b>${anaMoney(lp(oilRows))}</b>моторное масло, сум/л · сеть ${anaMoney(lp(netOil))}</div>
+        <div><b>${anaMoney(cp(oilRows))}</b>закупка масла, сум/л · сеть ${anaMoney(cp(netOil))}</div>
+        <div><b>${anaPct(ql.costPct)}</b>позиций с ценой закупки · сеть ${anaPct(netQl.costPct)}</div>
+        <div><b>${ql.lines}</b>проданных позиций за ${per}</div>
+      </div>
+      <div class="ana-note">${ql.stockPct !== null && ql.stockPct < 50 ? '⚠️ Больше половины масла и фильтров точка вписывает вручную, не со склада — наценка и закупка по ним неизвестны. Цифры точки пока неполные.' : 'Данные точки достаточно полные: большая часть товаров выбирается со склада.'}</div>
+      <div style="padding:10px 14px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="ana-btn" onclick="anaPickShop(0)"><i class="fa-solid fa-arrow-left"></i> Вся сеть</button>
+        <button class="ana-btn" onclick="openSnapshot(${anaShop})"><i class="fa-solid fa-oil-can"></i> Статистика и склад точки</button>
+        <button class="ana-btn" onclick="admTab('map'); setTimeout(() => { if (MAPDATA) mapFocus(${anaShop}); }, 600);"><i class="fa-solid fa-map-location-dot"></i> На карте</button>
+      </div></div>`;
+  }
+
+  // ---- 1. бренды ----
+  const brands = anaBrands(rows);
+  const top = brands.slice(0, 12);
+  const rest = brands.slice(12);
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-tags" style="color:#EAB308"></i> Бренды — что продаётся<small>по сумме</small></h3>` +
+    top.map(b => {
+      const share = tot.t ? Math.round(b.t / tot.t * 1000) / 10 : 0;
+      const qty = b.units.size === 1 ? anaQty(b.q, [...b.units][0]) : '';
+      return `<div class="ana-row"><div class="ar-main">
+        <div class="ar-name">${escapeHtml(b.name)}${b.m ? '<span class="mital-tag">MITAL</span>' : ''}</div>
+        <div class="ar-bar"><i class="${b.m ? 'mital' : ''}" style="width:${Math.max(2, Math.min(100, share))}%"></i></div>
+      </div><div class="ar-val">${fmtShort(b.t)}<small>${share}%${qty ? ' · ' + qty : ''}</small></div></div>`;
+    }).join('') +
+    (rest.length ? `<div class="ana-row"><div class="ar-main"><div class="ar-name ana-mute">Остальные (${rest.length})</div></div><div class="ar-val">${fmtShort(rest.reduce((a, b) => a + b.t, 0))}</div></div>` : '') +
+    '</div>';
+
+  // ---- 1. топ товаров ----
+  const prods = anaProducts(rows);
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-ranking-star" style="color:var(--blue)"></i> Топ товаров<small>нажми — цены по точкам</small></h3>
+    <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Товар</th><th>Цена</th><th>Закупка</th><th>Нац.</th></tr>` +
+    prods.slice(0, 15).map(p => `<tr class="click" onclick="anaPickProduct('${anaKey(p.key)}')">
+      <td>${escapeHtml(p.name)}${p.m ? '<span class="mital-tag">MITAL</span>' : ''}${p.bad ? ' ⚠️' : ''}<div class="ar-sub">${escapeHtml(anaCatLabel(p.c))} · ${anaQty(p.q, anaUnit(p.c))} · ${fmtShort(p.t)} сум</div></td>
+      <td>${anaMoney(p.pq ? p.pt / p.pq : null)}</td>
+      <td>${p.cq ? anaMoney(p.cs / p.cq) : '<span class="ana-mute">—</span>'}</td>
+      <td>${anaMarkupHtml(p.ct, p.cs)}</td></tr>`).join('') +
+    '</table></div></div>';
+
+  // ---- 2. цены по точкам ----
+  const netProds = anaProducts(netRows).filter(p => p.shops.size >= 1);
+  if (!anaProduct || !netProds.find(p => anaKey(p.key) === anaProduct)) {
+    const first = netProds.find(p => p.shops.size > 1) || netProds[0];
+    anaProduct = first ? anaKey(first.key) : '';
+  }
+  const cur = netProds.find(p => anaKey(p.key) === anaProduct);
+  if (cur) {
+    const unit = anaUnit(cur.c);
+    const pr = netRows.filter(r => r.c + '|' + r.k === cur.key).sort((a, b) => (b.pq ? b.pt / b.pq : 0) - (a.pq ? a.pt / a.pq : 0));
+    const sales = pr.filter(r => r.pq > 0).map(r => r.pt / r.pq);
+    const costs = pr.filter(r => r.cq > 0).map(r => r.cs / r.cq);
+    const mn = a => a.length ? Math.min(...a) : null, mx = a => a.length ? Math.max(...a) : null;
+    const minS = mn(sales), maxS = mx(sales), minC = mn(costs), maxC = mx(costs);
+    const multi = pr.length > 1;
+    h += `<div class="ana-card" id="anaPrices"><h3><i class="fa-solid fa-scale-balanced" style="color:#16A34A"></i> Цены по точкам</h3>
+      <div style="padding:10px 14px 4px"><select style="width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:13px;font-family:inherit;background:#fff" onchange="anaPickProduct(this.value)">` +
+      netProds.slice(0, 200).map(p => `<option value="${anaKey(p.key)}"${anaKey(p.key) === anaProduct ? ' selected' : ''}>${escapeHtml(p.name)} — ${p.shops.size} точ.</option>`).join('') +
+      `</select></div>
+      <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Точка</th><th>Цена/${unit}</th><th>Закупка</th><th>Нац.</th></tr>` +
+      pr.map(r => {
+        const sp = r.pq ? r.pt / r.pq : null, cp = r.cq ? r.cs / r.cq : null;
+        const p = anaPoint(r.s);
+        const sCls = multi && sp === maxS ? 'ana-bad' : multi && sp === minS ? 'ana-good' : '';
+        const cCls = multi && cp !== null && costs.length > 1 && cp === minC ? 'ana-good' : multi && cp !== null && costs.length > 1 && cp === maxC ? 'ana-bad' : '';
+        return `<tr class="click${r.s === anaShop ? ' sum' : ''}" onclick="anaPickShop(${r.s})"><td>${escapeHtml(anaPointName(p))}${r.bad ? ' ⚠️' : ''}<div class="ar-sub">${anaPointSub(p)} · ${anaQty(r.q, unit)}</div></td>
+          <td class="${sCls}">${anaMoney(sp)}</td>
+          <td class="${cCls}">${cp === null ? '<span class="ana-mute">—</span>' : anaMoney(cp)}</td><td>${anaMarkupHtml(r.ct, r.cs)}</td></tr>`;
+      }).join('') +
+      ''+
+      `</table></div>` +
+      (multi ? `<div class="ana-range">Продажа за ${unit}: мин <b>${anaMoney(minS)}</b> · средн. <b>${anaMoney(cur.pq ? cur.pt / cur.pq : null)}</b> · макс <b>${anaMoney(maxS)}</b>` +
+        (costs.length ? `<br>Закупка за ${unit}: мин <b>${anaMoney(minC)}</b> · средн. <b>${anaMoney(cur.cs / cur.cq)}</b> · макс <b>${anaMoney(maxC)}</b>` : '') +
+        `<br>Всего продано: <b>${anaQty(cur.q, unit)}</b> · наценка по сети ${anaMarkupHtml(cur.ct, cur.cs)}</div>` : '') +
+      `<div class="ana-note">Зелёный — самая низкая цена, красный — самая высокая. Нажми на точку, чтобы открыть её аналитику.</div></div>`;
+  }
+
+  // ---- 3. сравнение точек (только для всей сети) ----
+  if (!anaShop) {
+    const per_shop = {};
+    netRows.forEach(r => { (per_shop[r.s] = per_shop[r.s] || []).push(r); });
+    const list = ANA.points.filter(p => ids.has(p.id)).map(p => ({ p, t: anaTotals(per_shop[p.id] || []), q: p.quality }))
+      .sort((a, b) => b.t.t - a.t.t);
+    h += `<div class="ana-card"><h3><i class="fa-solid fa-store" style="color:var(--blue)"></i> Точки<small>нажми — аналитика точки</small></h3>
+      <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Точка</th><th>Продажи</th><th>MITAL</th><th>Нац.</th><th>Склад</th></tr>` +
+      list.map(x => {
+        const sp = x.q.lines ? Math.round(x.q.stock / x.q.lines * 100) : null;
+        return `<tr class="click" onclick="anaPickShop(${x.p.id})"><td>${escapeHtml(anaPointName(x.p))}<div class="ar-sub">${anaPointSub(x.p)}</div></td>
+        <td>${fmtShort(x.t.t)}</td><td style="color:#B45309">${anaPct(x.t.share)}</td><td>${anaPct(x.t.markup)}</td>
+        <td class="${sp !== null && sp < 50 ? 'ana-bad' : ''}">${anaPct(sp)}</td></tr>`;
+      }).join('') + '</table></div><div class="ana-note">Нац. — средняя наценка. Склад — какая доля масла и фильтров выбрана со склада: чем выше, тем точнее цифры точки.</div></div>';
+  }
+
+  // ---- 4. возможности для продаж ----
+  const opp = {};
+  netRows.forEach(r => {
+    if (anaShop && r.s !== anaShop) return;
+    const o = opp[r.s] = opp[r.s] || { s: r.s, other: 0, mital: 0, brands: {} };
+    if (r.m) o.mital += r.t; else o.other += r.t;
+    const b = o.brands[r.b || 'без марки'] = o.brands[r.b || 'без марки'] || { name: r.b || 'без марки', t: 0, q: 0, units: new Set(), m: r.m };
+    b.t += r.t; b.q += r.q; b.units.add(anaUnit(r.c));
+  });
+  const oppList = Object.values(opp).filter(o => o.other > 0).sort((a, b) => b.other - a.other);
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-bullseye" style="color:#DC2626"></i> Возможности для продаж<small>что точки берут у других</small></h3>
+    <div class="ana-note">Сколько точка продала товаров других брендов — это объём, который можно предложить заменить. Жёлтым — бренды MITAL.</div>` +
+    (oppList.length ? oppList.slice(0, 30).map(o => {
+      const p = anaPoint(o.s);
+      const all = o.other + o.mital;
+      const share = all ? Math.round(o.mital / all * 100) : 0;
+      const bs = Object.values(o.brands).sort((a, b) => b.t - a.t).slice(0, 6);
+      return `<div class="ana-row click" onclick="anaPickShop(${o.s})"><div class="ar-main">
+        <div class="ar-name">${escapeHtml(anaPointName(p))} <span class="ar-sub" style="display:inline">${anaPointSub(p)}</span></div>
+        <div class="ana-brands">${bs.map(b => `<span class="${b.m ? 'm' : ''}">${escapeHtml(b.name)} ${b.units.size === 1 ? anaQty(b.q, [...b.units][0]) : fmtShort(b.t)}</span>`).join('')}</div>
+        <div class="ar-bar"><i class="mital" style="width:${Math.max(share ? 2 : 0, share)}%"></i></div>
+      </div><div class="ar-val ana-bad">${fmtShort(o.other)}<small>MITAL ${share}%</small></div></div>`;
+    }).join('') : '<div class="hint-text" style="padding:12px 14px">Здесь все продажи — бренды MITAL. 👍</div>') +
+    '</div>';
+
+  document.getElementById('anaBody').innerHTML = h;
+}
+// ---------- Сопоставление названий и проблемные цены ----------
+function anaOpenView(v) {
+  anaView = v;
+  nmEdit = null;
+  document.getElementById('anaFilters').style.display = v === 'main' ? '' : 'none';
+  document.getElementById('anaDaysBar').style.display = v === 'names' ? 'none' : '';
+  if (v === 'names') { renderNames(); loadNames(); }
+  else if (v === 'prices') { renderPriceProblems(); loadPriceProblems(); }
+  else { if (ANA) renderAna(); loadAna(); }
+  window.scrollTo(0, 0);
+}
+async function loadNames() {
+  try {
+    const res = await fetch('/api/admin/names?days=365');
+    const data = await res.json();
+    if (data && data.review) NAMES = data;
+  } catch (e) {
+    if (!NAMES) document.getElementById('anaBody').innerHTML = '<div class="msg err">Не удалось загрузить — проверь интернет.</div>';
+    return;
+  }
+  if (anaView === 'names') renderNames();
+}
+function nmBack() { return `<button class="ana-btn" style="margin-bottom:10px" onclick="anaOpenView('main')"><i class="fa-solid fa-arrow-left"></i> Аналитика</button>`; }
+function nmCats(cats) { return (cats || []).map(c => { const f = ANA_CATLIST.find(x => x.key === c); return f ? f.label : c; }).join(', '); }
+function nmList() { return NAMES ? (NAMES[nmTab] || []) : []; }
+
+function renderNames() {
+  const box = document.getElementById('anaBody');
+  if (!NAMES) { box.innerHTML = nmBack() + '<div class="hint-text">Загружаю…</div>'; return; }
+  const N = NAMES;
+  const sug = N.review.filter(g => g.sug);
+  let h = nmBack();
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-spell-check" style="color:var(--blue)"></i> Сопоставление названий<small>за год</small></h3>
+    <div class="ana-note">Точки вписывают названия по-разному («Митанол», «Mitonol 5-30»). Здесь ты один раз указываешь, что это за товар, — и аналитика всей сети, включая прошлое, сразу считается правильно. Данные самих точек не меняются.</div>
+    <div class="ana-cmp">
+      <div><b class="${N.unresolved_pct >= 5 ? 'ana-bad' : ''}">${N.unresolved_pct}%</b>продаж не распознано</div>
+      <div><b>${fmtShort(N.unresolved_sum)}</b>сумма нераспознанных</div>
+      <div><b>${N.review.length}</b>названий проверить</div>
+      <div><b>${N.auto.length}</b>исправлено автоматически</div>
+    </div></div>`;
+  h += `<div class="ana-chips">
+    <button class="${nmTab === 'review' ? 'on' : ''}" onclick="nmTab='review'; nmEdit=null; renderNames()">Проверить (${N.review.length})</button>
+    <button class="${nmTab === 'auto' ? 'on' : ''}" onclick="nmTab='auto'; nmEdit=null; renderNames()">Исправлено авто (${N.auto.length})</button>
+    <button class="${nmTab === 'mapped' ? 'on' : ''}" onclick="nmTab='mapped'; nmEdit=null; renderNames()">Подтверждено (${N.mapped.length})</button>
+  </div>`;
+  h += `<datalist id="nmBrands">${(N.brands || []).map(b => `<option value="${escapeHtml(b)}">`).join('')}</datalist>`;
+  const list = nmList();
+  if (nmTab === 'review' && sug.length > 1) {
+    h += `<button class="ana-btn" style="margin-bottom:10px" onclick="nmAcceptAll()"><i class="fa-solid fa-check-double"></i> Принять все подсказки (${sug.length})</button>`;
+  }
+  if (nmTab === 'auto' && list.length > 1) {
+    h += `<button class="ana-btn" style="margin-bottom:10px" onclick="nmConfirmAuto()"><i class="fa-solid fa-check-double"></i> Всё верно — подтвердить все (${list.length})</button>`;
+  }
+  if (nmTab === 'mapped') {
+    h += `<input placeholder="🔍 Поиск" value="${escapeHtml(nmSearch)}" oninput="nmSearch=this.value; renderNamesList()" style="margin-bottom:10px">`;
+  }
+  h += '<div id="nmList"></div>';
+  box.innerHTML = h;
+  renderNamesList();
+}
+
+function renderNamesList() {
+  const el = document.getElementById('nmList');
+  if (!el) return;
+  let list = nmList().map((g, i) => [g, i]);
+  if (nmTab === 'mapped' && nmSearch.trim()) {
+    const q = nmSearch.trim().toUpperCase();
+    list = list.filter(([g]) => (g.raw + ' ' + (g.brand || '') + ' ' + (g.product || '')).toUpperCase().includes(q));
+  }
+  if (!list.length) {
+    el.innerHTML = `<div class="ana-card"><div class="hint-text" style="padding:14px">${nmTab === 'review' ? 'Всё распознано — проверять нечего 👍' : 'Пусто.'}</div></div>`;
+    return;
+  }
+  el.innerHTML = list.slice(0, 150).map(([g, i]) => nmCard(g, i)).join('') +
+    (list.length > 150 ? `<div class="hint-text">Показаны первые 150 из ${list.length}.</div>` : '');
+}
+
+function nmCard(g, i) {
+  const spell = (g.spellings && g.spellings.length) ? g.spellings : [g.raw];
+  const meta = g.lines ? `${g.shops} точ. · ${g.lines} продаж · ${fmtShort(g.sum)} сум${g.cats.length ? ' · ' + escapeHtml(nmCats(g.cats)) : ''}` : 'в продажах за год не встречалось';
+  let body = `<div class="nm-spell">${escapeHtml(spell[0])}${spell.length > 1 ? `<small>также: ${spell.slice(1).map(escapeHtml).join(' · ')}</small>` : ''}</div>
+    <div class="ar-sub">${meta}</div>`;
+  if (nmEdit === nmTab + i) {
+    const b0 = g.sug ? g.sug.brand : (g.brand || '');
+    const p0 = g.sug ? g.sug.product : (g.product || g.raw);
+    body += `<div class="nm-form">
+      <label>Бренд</label><input id="nmB" list="nmBrands" value="${escapeHtml(b0)}" placeholder="например, MITANOL" autocapitalize="characters">
+      <label>Товар (как показывать в аналитике)</label><input id="nmP" value="${escapeHtml(p0)}" placeholder="например, MITANOL 5W-30 SL">
+      <div class="nm-act"><button class="ok" onclick="nmSaveEdit('${nmTab}', ${i})">Сохранить</button>
+        <button onclick="nmEdit=null; renderNamesList()">Отмена</button></div></div>`;
+  } else if (nmTab === 'review') {
+    if (g.sug) {
+      body += `<div class="nm-sug">Похоже на: <b>${escapeHtml(g.sug.product)}</b>${(NAMES.mital_brands || []).includes(g.sug.brand) ? '<span class="mital-tag">MITAL</span>' : ''}</div>
+        <div class="nm-act"><button class="ok" onclick="nmAccept(${i})">✓ Да, это оно</button>
+          <button onclick="nmEdit='review${i}'; renderNamesList()">✏️ Другое</button>
+          <button onclick="nmNoBrand('review', ${i})">Не бренд</button></div>`;
+    } else {
+      body += `<div class="nm-sug ana-mute">Бренд не найден в словаре</div>
+        <div class="nm-act"><button class="ok" onclick="nmNewBrand(${i})">✓ Новый бренд «${escapeHtml(g.brand || '')}»</button>
+          <button onclick="nmEdit='review${i}'; renderNamesList()">✏️ Указать бренд</button>
+          <button onclick="nmNoBrand('review', ${i})">Не бренд</button></div>`;
+    }
+  } else if (nmTab === 'auto') {
+    body += `<div class="nm-sug">Исправлено на: <b>${escapeHtml(g.product)}</b> <span class="ana-mute">(${Math.round((g.conf || 0) * 100)}%)</span></div>
+      <div class="nm-act"><button class="ok" onclick="nmConfirmOne(${i})">✓ Верно</button>
+        <button onclick="nmEdit='auto${i}'; renderNamesList()">✏️ Исправить</button></div>`;
+  } else {
+    body += `<div class="nm-sug">${g.alias_status === 'nobrand' ? '<b>Не бренд</b>' : `→ <b>${escapeHtml(g.product || g.brand)}</b> · бренд ${escapeHtml(g.brand || '')}`}</div>
+      <div class="nm-act"><button onclick="nmEdit='mapped${i}'; renderNamesList()">✏️ Изменить</button>
+        <button class="no" onclick="nmUndo(${i})">Отменить</button></div>`;
+  }
+  return `<div class="ana-card nm-card">${body}</div>`;
+}
+
+async function nmPost(items) {
+  try {
+    const res = await fetch('/api/admin/names', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+    const data = await res.json();
+    if (!data.ok) { showMsg(data.error || 'Не удалось сохранить.', false); return false; }
+    ANA = null;  // аналитика пересчитается при возврате
+    nmEdit = null;
+    await loadNames();
+    return true;
+  } catch (e) {
+    showMsg('Не удалось сохранить — проверь интернет.', false);
+    return false;
+  }
+}
+function nmAccept(i) {
+  const g = NAMES.review[i];
+  if (g && g.sug) nmPost([{ raw: g.raw, brand: g.sug.brand, product: g.sug.product }]);
+}
+function nmNewBrand(i) {
+  const g = NAMES.review[i];
+  if (g && g.brand) nmPost([{ raw: g.raw, brand: g.brand, product: g.product }]);
+}
+function nmNoBrand(tab, i) {
+  const g = NAMES[tab][i];
+  if (g) nmPost([{ raw: g.raw, status: 'nobrand', product: g.raw }]);
+}
+function nmSaveEdit(tab, i) {
+  const g = NAMES[tab][i];
+  const brand = document.getElementById('nmB').value.trim();
+  const product = document.getElementById('nmP').value.trim();
+  if (!brand) { showMsg('Впиши бренд.', false); return; }
+  nmPost([{ raw: g.raw, brand, product: product || brand }]);
+}
+function nmConfirmOne(i) {
+  const g = NAMES.auto[i];
+  if (g) nmPost([{ raw: g.raw, brand: g.brand, product: g.product }]);
+}
+function nmAcceptAll() {
+  const items = NAMES.review.filter(g => g.sug).map(g => ({ raw: g.raw, brand: g.sug.brand, product: g.sug.product }));
+  if (!items.length) return;
+  if (!confirm(`Принять все подсказки (${items.length})? Сначала пролистай список — если какая-то подсказка неверная, исправь её отдельно.`)) return;
+  nmPost(items);
+}
+function nmConfirmAuto() {
+  const items = NAMES.auto.map(g => ({ raw: g.raw, brand: g.brand, product: g.product }));
+  if (!items.length || !confirm(`Подтвердить все автоисправления (${items.length})?`)) return;
+  nmPost(items);
+}
+async function nmUndo(i) {
+  const g = NAMES.mapped[i];
+  if (!g || !confirm(`Отменить сопоставление «${g.raw}»? Название снова будет распознаваться автоматически.`)) return;
+  try {
+    await fetch('/api/admin/names/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: g.raw }) });
+    ANA = null;
+    await loadNames();
+  } catch (e) {
+    showMsg('Не удалось — проверь интернет.', false);
+  }
+}
+
+async function loadPriceProblems() {
+  try {
+    const res = await fetch(`/api/admin/price_problems?days=${anaDays}`);
+    const data = await res.json();
+    if (Array.isArray(data)) PRICEPROB = data;
+  } catch (e) {
+    if (!PRICEPROB) document.getElementById('anaBody').innerHTML = '<div class="msg err">Не удалось загрузить — проверь интернет.</div>';
+    return;
+  }
+  if (!ANA) await loadAna();
+  if (anaView === 'prices') renderPriceProblems();
+}
+function renderPriceProblems() {
+  const box = document.getElementById('anaBody');
+  if (!PRICEPROB || !ANA) { box.innerHTML = nmBack() + '<div class="hint-text">Загружаю…</div>'; return; }
+  const per = anaDays === 365 ? 'год' : anaDays === 90 ? '3 месяца' : '30 дней';
+  const shops = [...new Set(PRICEPROB.map(x => x.s))];
+  const list = PRICEPROB.filter(x => !ppShop || x.s === ppShop);
+  let h = nmBack();
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-triangle-exclamation" style="color:#DC2626"></i> Проблемные цены<small>${per}</small></h3>
+    <div class="ana-note">Цена продажи или закупки сильно отличается от обычной цены этого товара по сети (в 2 раза и больше), или закупка дороже продажи — чаще всего это цена за коробку/канистру вместо литра или штуки. Такие позиции не входят в средние цены и наценку. Исправить может только сама точка — в «Базе» или на складе (✏️).</div>
+    <div style="padding:10px 14px"><select style="width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:13px;font-family:inherit;background:#fff" onchange="ppShop=Number(this.value)||0; renderPriceProblems()">
+      <option value="0">Все точки (${PRICEPROB.length})</option>
+      ${shops.map(id => `<option value="${id}"${id === ppShop ? ' selected' : ''}>${escapeHtml(anaPointName(anaPoint(id)))} (${PRICEPROB.filter(x => x.s === id).length})</option>`).join('')}
+    </select></div></div>`;
+  if (!list.length) {
+    h += '<div class="ana-card"><div class="hint-text" style="padding:14px">Подозрительных цен нет 👍</div></div>';
+  } else {
+    h += '<div class="ana-card">' + list.map(x => {
+      const unit = anaUnit(x.c);
+      const p = anaPoint(x.s);
+      const what = x.kind === 'sale'
+        ? `Продажа <b class="ana-bad">${anaMoney(x.unit)}</b> за ${unit}${x.med_sale ? ` — обычно ${anaMoney(x.med_sale)}` : ''}`
+        : `Закупка <b class="ana-bad">${anaMoney(x.cost)}</b> за ${unit}${x.med_cost ? ` — обычно ${anaMoney(x.med_cost)}` : ` при продаже ${anaMoney(x.unit)}`}`;
+      return `<div class="ana-row"><div class="ar-main">
+        <div class="ar-name" style="white-space:normal">${escapeHtml(anaPointName(p))} · <span style="font-weight:600">${escapeHtml(x.label || x.product)}</span></div>
+        <div class="ar-sub">${fmtDay(x.date)} · ${anaQty(x.qty, unit)} за ${anaMoney(x.total)} сум</div>
+        <div style="font-size:12.5px;margin-top:3px">${what}</div>
+      </div>${x.dev ? `<div class="ar-val ana-bad">×${x.dev >= 1 ? String(Math.round(x.dev * 10) / 10).replace('.', ',') : String(Math.round(1 / x.dev * 10) / 10).replace('.', ',') + '↓'}</div>` : ''}</div>`;
+    }).join('') + '</div>';
+  }
+  box.innerHTML = h;
+}
+// ---------- Копия статистики брендов и склада одной точки ----------
+let SNAP = null, snapId = 0, snapDays = 30, snapWh = 'oil', snapSeq = 0;
+const SNAP_UNIT = { l: 'л', pc: 'шт', '': '' };
+
+function openSnapshot(id) {
+  snapId = id;
+  SNAP = null;
+  snapWh = 'oil';
+  if (MAP) MAP.closePopup();
+  const p = (MAPDATA && MAPDATA.points.find(x => x.id === id)) || (ANA && anaPoint(id));
+  document.getElementById('snapName').textContent = p ? (p.shop_name || p.username) : '…';
+  document.getElementById('snapSub').textContent = '';
+  document.getElementById('snapOv').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  renderSnapshot();
+  loadSnapshot();
+}
+function closeSnapshot() {
+  document.getElementById('snapOv').style.display = 'none';
+  document.body.style.overflow = '';
+  snapSeq++;
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('snapOv').style.display === 'block') closeSnapshot(); });
+
+async function loadSnapshot() {
+  const seq = ++snapSeq;
+  try {
+    const res = await fetch(`/api/admin/shops/${snapId}/snapshot?days=${snapDays}`);
+    const data = await res.json();
+    if (seq !== snapSeq) return;
+    if (!data || !data.shop) {
+      document.getElementById('snapBody').innerHTML = `<div class="msg err">${escapeHtml((data && data.error) || 'Не удалось загрузить.')}</div>`;
+      return;
+    }
+    SNAP = data;
+  } catch (e) {
+    if (seq === snapSeq) document.getElementById('snapBody').innerHTML = '<div class="msg err">Не удалось загрузить — проверь интернет.</div>';
+    return;
+  }
+  renderSnapshot();
+}
+function setSnapDays(d) { snapDays = d; renderSnapshot(); loadSnapshot(); }
+function setSnapWh(w) { snapWh = w; renderSnapshot(); }
+
+function renderSnapshot() {
+  const body = document.getElementById('snapBody');
+  const seg = `<div class="map-seg" style="margin-bottom:10px">
+    ${[[30, '30 дней'], [90, '3 месяца'], [365, 'Год']].map(([d, l]) => `<button class="${d === snapDays ? 'on' : ''}" onclick="setSnapDays(${d})">${l}</button>`).join('')}
+  </div>`;
+  if (!SNAP) { body.innerHTML = seg + '<div class="hint-text">Загружаю…</div>'; return; }
+  const S = SNAP;
+  document.getElementById('snapName').textContent = S.shop.name;
+  document.getElementById('snapSub').textContent = (S.shop.role === 'branch' ? 'Филиал' + (S.shop.parent_name ? ' · ' + S.shop.parent_name : '') : 'Точка') +
+    (S.shop.address ? ' · ' + S.shop.address : '');
+  const rv = S.revenue || {};
+  let h = seg;
+  h += `<div class="map-kpis">
+    <div class="map-kpi"><b>${fmtShort(rv.total || 0)}</b><span>выручка</span></div>
+    <div class="map-kpi"><b>${rv.count || 0}</b><span>замен и услуг</span></div>
+    <div class="map-kpi"><b>${fmtShort(rv.avg || 0)}</b><span>средний чек</span></div>
+    <div class="map-kpi"><b>${(rv.clients && rv.clients.total) || 0}</b><span>клиентов</span></div>
+  </div>`;
+
+  // --- бренды: копия экрана точки ---
+  h += '<div class="snap-sec"><i class="fa-solid fa-oil-can" style="color:#EAB308"></i> Бренды: что продаётся</div>';
+  if (!S.brands.length) {
+    h += '<div class="ana-card"><div class="hint-text" style="padding:14px">За этот период продаж с указанием масла и фильтров нет.</div></div>';
+  }
+  S.brands.forEach(c => {
+    const unit = SNAP_UNIT[c.unit] !== undefined ? SNAP_UNIT[c.unit] : '';
+    const bySum = c.metric === 'sum';
+    h += `<div class="ana-card"><h3>${escapeHtml(c.label)}<small>${bySum ? fmtShort(c.total_sum) + ' сум' : anaQty(c.total_qty, unit) + ' · ' + fmtShort(c.total_sum) + ' сум'}</small></h3>` +
+      c.top.map(b => `<div class="ana-row"><div class="ar-main">
+          <div class="ar-name">${b.no_brand ? '<span class="ana-mute">без марки</span>' : escapeHtml(b.name)}</div>
+          <div class="ar-bar"><i style="width:${Math.max(2, Math.min(100, b.share))}%"></i></div>
+        </div><div class="ar-val">${bySum ? fmtShort(b.sum) : anaQty(b.qty, unit)}<small>${b.share}% · ${b.visits} раз${bySum ? '' : ' · ' + fmtShort(b.sum)}</small></div></div>`).join('') +
+      (c.others ? `<div class="ana-row"><div class="ar-main"><div class="ar-name ana-mute">Остальные (${c.others.count})</div></div>
+        <div class="ar-val">${bySum ? fmtShort(c.others.sum) : anaQty(c.others.qty, unit)}<small>${c.others.share}%</small></div></div>` : '') +
+      '</div>';
+  });
+
+  // --- склад: копия склада точки ---
+  const all = S.warehouse.products || [];
+  h += '<div class="snap-sec"><i class="fa-solid fa-warehouse" style="color:var(--blue)"></i> Склад</div>';
+  if (!all.length) {
+    h += `<div class="ana-card"><div class="hint-text" style="padding:14px">${S.shop.warehouse_enabled ? 'На складе точки пока нет товаров.' : 'Склад у этой точки выключен — товары не ведутся.'}</div></div>`;
+    body.innerHTML = h;
+    return;
+  }
+  const isOil = p => String(p.category).indexOf('fluid_') === 0;
+  const isFil = p => String(p.category).indexOf('filter_') === 0;
+  const prods = all.filter(p => snapWh === 'all' || (snapWh === 'oil' && isOil(p)) || (snapWh === 'filter' && isFil(p)) || (snapWh === 'other' && !isOil(p) && !isFil(p)));
+  h += `<div class="ana-chips">
+    <button class="${snapWh === 'oil' ? 'on' : ''}" onclick="setSnapWh('oil')">Масла (${all.filter(isOil).length})</button>
+    <button class="${snapWh === 'filter' ? 'on' : ''}" onclick="setSnapWh('filter')">Фильтры (${all.filter(isFil).length})</button>
+    <button class="${snapWh === 'other' ? 'on' : ''}" onclick="setSnapWh('other')">Прочее (${all.filter(p => !isOil(p) && !isFil(p)).length})</button>
+    <button class="${snapWh === 'all' ? 'on' : ''}" onclick="setSnapWh('all')">Всё (${all.length})</button>
+  </div>`;
+  let buyV = 0, sellV = 0, noBuy = 0;
+  prods.forEach(p => {
+    const st = Math.max(0, Number(p.stock) || 0);
+    if (p.buy !== null && p.buy !== undefined) buyV += st * p.buy; else noBuy++;
+    if (p.sell) sellV += st * p.sell;
+  });
+  h += `<div class="ana-cmp" style="padding:0 0 10px">
+    <div><b>${fmtShort(buyV)}</b>остаток по закупке</div>
+    <div><b>${fmtShort(sellV)}</b>если продать всё</div>
+    <div><b>${fmtShort(sellV - buyV)}</b>возможная наценка</div>
+    <div><b class="${noBuy ? 'ana-bad' : ''}">${noBuy}</b>без цены закупки</div>
+  </div>`;
+  const sorted = prods.slice().sort((a, b) => String(a.category).localeCompare(String(b.category)) || String(a.name).localeCompare(String(b.name)));
+  h += '<div class="ana-card">' + (sorted.length ? sorted.map(p => {
+    const unit = SNAP_UNIT[p.unit] !== undefined ? SNAP_UNIT[p.unit] : p.unit;
+    const stCls = p.status === 'out' ? 'ana-bad' : p.status === 'low' ? 'ana-bad' : '';
+    const m = p.margin_pct;
+    const mHtml = m === null || m === undefined ? '<span class="sw-m none">наценка —</span>'
+      : `<span class="sw-m ${m < 10 ? 'low' : ''}">+${m}%</span>`;
+    return `<div class="snap-wh-row"><div class="sw-main">
+        <div class="sw-name">${escapeHtml(p.name)}</div>
+        <div class="sw-sub">${escapeHtml(p.category_label)} · <span class="${stCls}">остаток ${anaQty(Number(p.stock) || 0, unit)}</span>${p.sold_30d ? ` · продано за 30 дн ${anaQty(p.sold_30d, unit)}` : ''}</div>
+      </div><div class="sw-price">${p.buy !== null && p.buy !== undefined ? anaMoney(p.buy) : '<span class="ana-bad">—</span>'} → ${p.sell ? anaMoney(p.sell) : '—'}
+        <small>закупка → продажа, за ${unit}</small>${mHtml}</div></div>`;
+  }).join('') : '<div class="hint-text" style="padding:14px">В этой группе товаров нет.</div>') + '</div>';
+  body.innerHTML = h;
+}
 if (location.hash === '#income') admTab('income');
+if (location.hash === '#analytics') admTab('analytics');
+if (location.hash === '#map') admTab('map');
 </script>
 </body>
 </html>
@@ -11218,6 +12328,98 @@ def api_admin_shops():
         s["owner_link"] = _client_link(f"owner_{s['owner_link_token']}") if s.get("owner_link_token") else None
         s["sub"] = _admin_sub_summary(s)
     return jsonify(shops)
+
+
+@app.route("/api/admin/map")
+@admin_required
+def api_admin_map():
+    """Карта точек: координаты, статус и аналитика за период (по умолчанию 30 дней)."""
+    try:
+        days = int(request.args.get("days") or 30)
+    except ValueError:
+        days = 30
+    return jsonify(db.get_map_points(days))
+
+
+@app.route("/api/admin/analytics")
+@admin_required
+def api_admin_analytics():
+    """Аналитика продаж всех точек: товары, бренды, цены продажи и закупки."""
+    try:
+        days = int(request.args.get("days") or 30)
+    except ValueError:
+        days = 30
+    return jsonify(db.get_admin_analytics(days))
+
+
+def _int_arg(name, default):
+    try:
+        return max(1, min(int(request.args.get(name) or default), 730))
+    except ValueError:
+        return default
+
+
+@app.route("/api/admin/names")
+@admin_required
+def api_admin_names():
+    """«Сопоставление»: нераспознанные, исправленные автоматически и подтверждённые названия."""
+    return jsonify(db.get_name_review(_int_arg("days", 365)))
+
+
+@app.route("/api/admin/names", methods=["POST"])
+@admin_required
+def api_admin_names_save():
+    data = request.get_json(force=True) or {}
+    items = data.get("items") or []
+    if not isinstance(items, list) or not items:
+        return jsonify({"ok": False, "error": "нечего сохранять"}), 400
+    n = db.save_name_aliases(items[:500])
+    return jsonify({"ok": True, "saved": n})
+
+
+@app.route("/api/admin/names/delete", methods=["POST"])
+@admin_required
+def api_admin_names_delete():
+    data = request.get_json(force=True) or {}
+    ok = db.delete_name_alias(str(data.get("raw") or ""))
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/admin/price_problems")
+@admin_required
+def api_admin_price_problems():
+    """Подозрительные цены продажи/закупки за период."""
+    return jsonify(db.get_price_problems(_int_arg("days", 90)))
+
+
+@app.route("/api/admin/shops/<int:shop_id>/snapshot")
+@admin_required
+def api_admin_shop_snapshot(shop_id):
+    """Копия статистики брендов и склада одной точки — для окна на карте."""
+    data = db.get_admin_shop_snapshot(shop_id, _int_arg("days", 30))
+    if not data:
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    return jsonify(data)
+
+
+@app.route("/api/admin/shops/<int:shop_id>/location", methods=["POST"])
+@admin_required
+def api_admin_set_location(shop_id):
+    """Поставить точку/филиал на карту (или убрать с карты — пустые lat/lon)."""
+    data = request.get_json(force=True) or {}
+    lat, lon = data.get("lat"), data.get("lon")
+    if lat in (None, "") and lon in (None, ""):
+        lat = lon = None
+    else:
+        try:
+            lat, lon = round(float(lat), 6), round(float(lon), 6)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "неверные координаты"}), 400
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return jsonify({"ok": False, "error": "координаты вне допустимого диапазона"}), 400
+    if not db.set_shop_location(shop_id, lat, lon):
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    return jsonify({"ok": True, "lat": lat, "lon": lon})
 
 
 @app.route("/api/admin/backup_now", methods=["POST"])
