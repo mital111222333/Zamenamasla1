@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>10-modul. Shoxobcha pullari — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Sora:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2350;
+  --ink-2:#3E5479;
+  --muted:#6B7F9E;
+  --bg:#EEF4FB;
+  --card:#FFFFFF;
+  --line:#D9E4F2;
+  --blue:#1463E6;
+  --cyan:#1FB5F2;
+  --soft:#E3EEFD;
+  --red:#E5484D;
+  --amber:#F2A20C;
+  --green:#15A35B;
+  --grad:linear-gradient(135deg,#1FB5F2 0%,#1463E6 100%);
+  --font:'Onest', 'Segoe UI', Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F;
+  }
+}
+:root[data-theme="dark"]{ --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 110px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* app header */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-word{font-family:'Sora',var(--font);font-weight:800;font-size:20px;letter-spacing:-.4px;line-height:1}
+.brand-word .o{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-word .b{color:#0A2A5E}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word .b{color:#E8F0FC} }
+.crumb{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px;line-height:1.25}
+.crumb b{display:block;color:var(--ink);font-weight:700;font-size:14px}
+.progress{height:3px;background:var(--grad);width:100%;transform:scaleX(0);transform-origin:0 50%}
+.toc{max-width:860px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 12px;background:var(--soft);border-radius:999px;white-space:nowrap}
+.toc a.on{color:#fff;background:var(--blue)}
+
+/* hero */
+.hero{background:var(--grad);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;bottom:-90px;width:300px;height:390px;background:rgba(255,255,255,.10);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;transform:rotate(-12deg)}
+.hero .wrap{position:relative;z-index:1;padding-top:34px;padding-bottom:34px}
+.mod-tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.08;font-weight:900;margin:0 0 14px;letter-spacing:-.6px;max-width:640px}
+.hero .lead{font-size:clamp(16px,2.3vw,19px);opacity:.92;max-width:600px;margin:0 0 24px}
+.formula-hero{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(6,30,80,.28);border-radius:18px;padding:14px;max-width:620px}
+.fh{background:#fff;color:var(--blue);border-radius:12px;padding:8px 12px;font-weight:800;font-size:15px;line-height:1.2;text-align:center}
+.fh small{display:block;font-size:11px;font-weight:600;color:#6B7F9E}
+.fop{font-weight:900;font-size:22px;opacity:.9}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.meta span{background:rgba(255,255,255,.16);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+
+/* goals */
+.goals{background:var(--card);border-radius:20px;padding:20px;margin-top:-1px;margin-bottom:8px}
+.goals h2{font-size:18px;margin:0 0 12px}
+.goals ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.goals li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45}
+.goals li i{width:28px;height:28px;border-radius:9px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--blue);font-style:normal;font-weight:800;font-size:14px}
+
+/* section */
+section.part{padding:40px 0 8px}
+.part-card{background:var(--card);border-radius:24px;padding:24px 20px;box-shadow:0 1px 0 var(--line)}
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.part h2{font-size:clamp(22px,4.6vw,30px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.3px}
+.part h3{font-size:18px;margin:28px 0 10px;line-height:1.3}
+.part p{margin:0 0 12px;color:var(--ink-2)}
+.part p b,.part li b{color:var(--ink)}
+.kicker{font-size:19px;font-weight:700;color:var(--ink)!important;line-height:1.4;margin-bottom:16px!important}
+.who{display:inline-flex;gap:6px;margin-bottom:14px}
+.who span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--blue)}
+
+.fig{background:var(--bg);border-radius:18px;padding:18px;margin:18px 0}
+.fig-t{font-weight:800;font-size:15px;margin:0 0 14px;color:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin:12px 0 0!important;line-height:1.45}
+.ex{font-size:12px;font-weight:700;color:var(--amber);background:rgba(242,162,12,.12);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+
+.note{display:grid;grid-template-columns:26px 1fr;gap:12px;border-radius:16px;padding:14px 16px;margin:18px 0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.note b{display:block;color:var(--ink);margin-bottom:3px}
+.note.case{background:rgba(21,163,91,.09)}
+.note.warn{background:rgba(229,72,77,.08)}
+.note.tip{background:var(--soft)}
+.note.app{background:linear-gradient(135deg,rgba(31,181,242,.12),rgba(20,99,230,.12));border:1px solid rgba(20,99,230,.25)}
+
+/* calculator */
+.calc{display:grid;gap:14px}
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+.inp input:focus{border-color:var(--blue);outline:none}
+.total{background:var(--grad);color:#fff;border-radius:16px;padding:16px;text-align:center}
+.total small{display:block;font-size:13px;opacity:.9;font-weight:600}
+.total b{font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:-.5px}
+.levers{display:grid;gap:10px;margin-top:4px}
+.lv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:14px}
+.lv-name{font-weight:700;line-height:1.3}
+.lv-bar{background:var(--card);border-radius:10px;height:34px;position:relative;overflow:hidden}
+.lv-fill{position:absolute;inset:0 auto 0 0;background:var(--grad);border-radius:10px;transition:width .3s}
+.lv-val{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-weight:800;font-size:14px;color:var(--ink)}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} .lv{grid-template-columns:1fr} }
+
+/* bucket */
+.bucket{display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:10px}
+.bk-side{display:grid;gap:8px}
+.bk-chip{border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.3}
+.bk-chip.in{background:rgba(21,163,91,.12);color:var(--green)}
+.bk-chip.out{background:rgba(229,72,77,.1);color:var(--red)}
+.bk-chip small{display:block;font-weight:500;color:var(--ink-2);font-size:12px}
+@media (max-width:600px){ .bucket{grid-template-columns:1fr} .bk-svg{order:-1;max-width:170px;margin:0 auto} }
+
+/* lifetime */
+.life{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px}
+.life div{background:var(--grad);border-radius:6px 6px 2px 2px}
+.life-axis{display:grid;grid-template-columns:repeat(3,1fr);font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;text-align:center}
+.life-axis span{border-top:2px solid var(--line);padding-top:4px}
+.big-num{display:flex;gap:14px;align-items:center;margin-top:14px}
+.big-num b{font-size:30px;font-weight:900;color:var(--blue);letter-spacing:-.5px;line-height:1}
+.big-num span{font-size:14px;color:var(--ink-2);line-height:1.35}
+
+/* stacked check */
+.stack{display:grid;gap:12px}
+.st-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
+.st-name{font-weight:800;font-size:14px;line-height:1.25}
+.st-name small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.st-bar{display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--card)}
+.st-bar span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;padding:0 3px}
+.c-oil{background:#1463E6}.c-flt{background:#1FB5F2}.c-work{background:#0A2A5E}.c-air{background:#15A35B}.c-cab{background:#F2A20C}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+/* waterfall */
+.wf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:220px;align-items:stretch}
+.wf-col{position:relative}
+.wf-b{position:absolute;left:0;right:0;border-radius:8px}
+.wf-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:800}
+.wf-l{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;line-height:1.2;overflow-wrap:anywhere}
+
+/* three levers */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .three{grid-template-columns:1fr} }
+.tl{background:var(--card);border-radius:16px;padding:16px;border-top:4px solid var(--blue)}
+.tl:nth-child(2){border-color:var(--cyan)}.tl:nth-child(3){border-color:var(--green)}
+.tl h4{margin:8px 0 6px;font-size:16px}
+.tl ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.tl .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+/* leaks */
+.leaks{display:grid;gap:8px}
+.leak{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.leak b{color:var(--ink);display:block}
+.leak .d{width:34px;height:34px;border-radius:10px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.leak em{font-style:normal;color:var(--blue);font-weight:700}
+
+/* scripts */
+.say{display:grid;gap:6px;margin-bottom:12px}
+.say-who{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble{background:var(--card);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.45;font-weight:600;border:1px solid var(--line)}
+.bubble.good{border-color:rgba(21,163,91,.5)}
+.bubble.bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--red);font-weight:500}
+
+/* oilbook map */
+.map{display:grid;gap:8px}
+.mp{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+.mp div{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.3}
+.mp .q{background:var(--card);font-weight:700}
+.mp .a{background:var(--grad);color:#fff;font-weight:700}
+.mp .a small{display:block;font-weight:500;opacity:.9;font-size:12px}
+@media (max-width:520px){ .mp{grid-template-columns:1fr} .mp svg{transform:rotate(90deg);margin:0 auto} }
+
+/* task */
+.task{list-style:none;counter-reset:t;margin:0;padding:0;display:grid;gap:8px}
+.task li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--bg);border-radius:14px;padding:12px;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.task li::before{content:counter(t);width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:520px){ .sheet{grid-template-columns:1fr} }
+.cell{background:var(--card);border-radius:14px;padding:12px}
+.cell label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.cell input,.cell textarea{width:100%;border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;font-weight:700;font-size:16px;resize:vertical}
+.cell input:focus,.cell textarea:focus{border-color:var(--blue);outline:none}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.choice button[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+.saved{font-size:13px;color:var(--green);font-weight:700;margin-top:8px;min-height:20px}
+
+/* quiz */
+.q{background:var(--bg);border-radius:16px;padding:16px;margin-bottom:10px}
+.q-n{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.q-t{font-weight:700;font-size:16.5px;margin-bottom:10px;line-height:1.4}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;font-size:15px;line-height:1.4}
+.opt:hover:not([disabled]){border-color:var(--blue)}
+.opt.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.opt.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.opt[disabled]{cursor:default}
+.q-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2)}
+.q.done .q-ex{display:block}
+.result{display:none;background:var(--grad);color:#fff;border-radius:18px;padding:20px;text-align:center;margin-top:6px}
+.result.show{display:block}
+.result b{display:block;font-size:34px;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--blue);color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.white{background:#fff;color:var(--blue)}
+
+.done-card{text-align:center;padding:36px 0 50px}
+.done-card small{color:var(--muted);font-size:14px}
+.done-card h2{font-size:clamp(22px,4.5vw,30px);margin:6px 0 16px;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 34px}
+
+/* module 2 extras */
+.sae{display:flex;align-items:flex-end;gap:2px;font-weight:900;letter-spacing:-1px;line-height:1}
+.sae-big{background:#fff;color:var(--blue);border-radius:20px;padding:16px 18px 12px;display:inline-block;max-width:100%}
+.sae-row{display:flex;align-items:flex-end;gap:4px;font-size:clamp(46px,13vw,76px);font-weight:900;letter-spacing:-2px;line-height:1}
+.sae-row .w{color:#1FB5F2}
+.sae-row .h{color:#0A2A5E}
+.sae-cap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:12px;font-weight:700;color:#3E5479;letter-spacing:0;line-height:1.3}
+.sae-cap span{border-top:3px solid #1FB5F2;padding-top:6px}
+.sae-cap span+span{border-color:#0A2A5E}
+
+.funcs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:640px){ .funcs{grid-template-columns:repeat(2,1fr)} .funcs .fn:last-child{grid-column:1/-1} }
+.fn{background:var(--card);border-radius:14px;padding:14px 10px;text-align:center;font-size:13px;line-height:1.35;color:var(--ink-2)}
+.fn b{display:block;color:var(--ink);font-size:14.5px;margin:8px 0 4px}
+.fn .ico{width:44px;height:44px;margin:0 auto;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+.comp{display:flex;height:54px;border-radius:14px;overflow:hidden;font-weight:800;font-size:14px;color:#fff}
+.comp div{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;padding:0 6px}
+.adds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+@media (max-width:560px){ .adds{grid-template-columns:repeat(2,1fr)} }
+.add{background:var(--card);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.35;color:var(--ink-2);border-left:4px solid var(--cyan)}
+.add b{display:block;color:var(--ink);font-size:14px}
+
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .types{grid-template-columns:1fr} }
+.type{background:var(--card);border-radius:16px;padding:16px;border-top:5px solid #9DB4D6}
+.type:nth-child(2){border-color:var(--cyan)}.type:nth-child(3){border-color:var(--blue)}
+.type h4{margin:0 0 10px;font-size:17px}
+.meter{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.dots{display:flex;gap:4px}
+.dots i{width:16px;height:8px;border-radius:4px;background:var(--line)}
+.dots i.on{background:var(--blue)}
+.type p{font-size:13.5px!important;margin:10px 0 0!important;line-height:1.45}
+
+.thermo{position:relative;padding:6px 0 0}
+.th-axis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.th-col{text-align:center}
+.th-bar{height:120px;border-radius:10px;background:linear-gradient(180deg,var(--soft),var(--card));position:relative;overflow:hidden}
+.th-fill{position:absolute;left:0;right:0;bottom:0;background:var(--grad);border-radius:10px}
+.th-grade{font-weight:900;font-size:18px;margin-top:6px;color:var(--ink)}
+.th-t{font-size:12px;color:var(--muted);font-weight:700}
+.hot{display:grid;gap:8px}
+.hot-row{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
+.hot-row b{font-size:18px;font-weight:900;text-align:right}
+.hot-bar{height:28px;border-radius:8px;background:linear-gradient(90deg,#F2A20C,#E5484D);display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+
+.timeline{display:flex;gap:0;overflow-x:auto;padding-bottom:4px}
+.tm{flex:1 1 0;min-width:52px;text-align:center;position:relative;padding-top:22px}
+.tm::before{content:"";position:absolute;top:8px;left:0;right:0;height:4px;background:var(--line)}
+.tm::after{content:"";position:absolute;top:2px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--card);border:4px solid #9DB4D6}
+.tm.new::after{border-color:var(--blue);background:var(--blue)}
+.tm b{display:block;font-size:17px;font-weight:900}
+.tm span{font-size:12px;color:var(--muted);font-weight:700}
+
+.std{display:grid;gap:10px}
+.sd{display:grid;grid-template-columns:86px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;align-items:start}
+.sd .tag{background:var(--grad);color:#fff;border-radius:10px;padding:8px 6px;text-align:center;font-weight:900;font-size:15px;line-height:1.1}
+.sd .tag small{display:block;font-size:10.5px;font-weight:600;opacity:.9;margin-top:2px}
+.sd div{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.sd div b{color:var(--ink)}
+
+/* label decoder */
+.label{background:linear-gradient(160deg,#0A2A5E,#1463E6);color:#fff;border-radius:22px;padding:22px 18px;max-width:380px;margin:0 auto;box-shadow:0 12px 30px rgba(10,35,80,.25)}
+.lb-brand{font-weight:900;font-size:22px;letter-spacing:-.4px}
+.lb-sub{font-size:12px;opacity:.8;margin-bottom:14px}
+.lb-sae{font-size:44px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:12px}
+.hs{display:inline-block;border:2px dashed rgba(255,255,255,.55);border-radius:10px;padding:4px 8px;margin:0 4px 8px 0;font-weight:800;font-size:14px;cursor:pointer;background:transparent;color:#fff}
+.hs:hover,.hs.on{background:#fff;color:var(--blue);border-style:solid;border-color:#fff}
+.lb-sae .hs{font-size:44px;padding:2px 10px;letter-spacing:-1.5px;font-weight:900}
+.lb-vol{margin-top:6px;font-size:13px;opacity:.85}
+.explain{max-width:520px;margin:14px auto 0;background:var(--card);border-radius:16px;padding:14px 16px;font-size:15px;line-height:1.5;color:var(--ink-2);min-height:92px}
+.explain b{display:block;color:var(--ink);margin-bottom:4px}
+
+/* choose flow */
+.flow{display:grid;gap:0}
+.fstep{display:grid;grid-template-columns:44px 1fr;gap:12px;position:relative;padding-bottom:16px}
+.fstep:not(:last-child)::before{content:"";position:absolute;left:21px;top:44px;bottom:0;width:3px;background:var(--line)}
+.fnum{width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:17px}
+.fcard{background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.fcard b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
+.fcard .stop{display:inline-block;margin-top:6px;background:rgba(229,72,77,.1);color:var(--red);font-weight:700;font-size:13px;border-radius:8px;padding:3px 8px}
+
+/* myths */
+.myth{background:var(--card);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.myth button{width:100%;border:0;background:transparent;text-align:left;padding:14px 16px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-weight:700;font-size:15.5px;line-height:1.4}
+.myth .badge{font-size:12px;font-weight:800;color:var(--red);background:rgba(229,72,77,.1);border-radius:8px;padding:4px 8px;white-space:nowrap}
+.myth .ans{display:none;padding:0 16px 14px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.myth .ans b{color:var(--green)}
+.myth.open .ans{display:block}
+.myth.open .badge{color:var(--green);background:rgba(21,163,91,.1)}
+
+/* trainer */
+.case-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
+.case-card h4{margin:0 0 6px;font-size:16px}
+.req{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.45}
+.req small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.can{display:grid;gap:8px}
+.can button{text-align:left;border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14.5px;line-height:1.4}
+.can button b{display:block;font-size:15px}
+.can button.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.can button.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.can button[disabled]{cursor:default}
+.case-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.case-card.done .case-ex{display:block}
+
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} }
+.res3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+@media (max-width:520px){ .res3{grid-template-columns:1fr} }
+.r3{background:var(--grad);color:#fff;border-radius:14px;padding:12px;text-align:center}
+.r3:nth-child(2){background:#0A2A5E}.r3:nth-child(3){background:var(--green)}
+.r3 small{display:block;font-size:12px;opacity:.9;line-height:1.3}
+.r3 b{display:block;font-size:22px;font-weight:900;margin-top:4px}
+
+.np{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:560px){ .np{grid-template-columns:1fr} }
+.npc{background:var(--card);border-radius:14px;padding:12px;text-align:center;font-size:13px;color:var(--ink-2);line-height:1.35}
+.npc b{display:block;font-size:20px;font-weight:900;margin:4px 0}
+.npc.g b{color:var(--green)}.npc.s b{color:var(--blue)}.npc.r b{color:var(--red)}
+.np-tot{grid-column:1/-1;background:var(--grad);color:#fff;border-radius:14px;padding:12px;text-align:center;font-weight:800}
+.np-tot b{font-size:24px;display:block}
+.np-warn{grid-column:1/-1;background:rgba(242,162,12,.14);color:#8A5A00;border-radius:12px;padding:10px 12px;font-size:13.5px;font-weight:600;line-height:1.4}
+
+.mm{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){ .mm{grid-template-columns:1fr} }
+.mmc{background:var(--card);border-radius:14px;padding:14px;font-size:14px;line-height:1.45;color:var(--ink-2)}
+.mmc b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+.mmc .f{display:block;font-weight:800;color:var(--blue);margin-top:6px;font-size:13.5px}
+
+.exp{display:grid;grid-template-columns:200px 1fr;gap:18px;align-items:center}
+@media (max-width:600px){ .exp{grid-template-columns:1fr} .exp svg{max-width:200px;margin:0 auto;display:block} }
+.exp ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.exp li{display:grid;grid-template-columns:14px 1fr auto;gap:10px;font-size:14px;line-height:1.35;color:var(--ink-2);align-items:center}
+.exp li i{width:14px;height:14px;border-radius:4px}
+.exp li b{color:var(--ink)}
+.exp li em{font-style:normal;font-weight:800;color:var(--ink)}
+.exp li small{display:block;font-size:11.5px;color:var(--muted)}
+
+.be-bar{margin-top:14px;background:var(--card);border-radius:14px;padding:14px}
+.be-track{height:30px;border-radius:10px;background:var(--bg);position:relative;overflow:hidden}
+.be-fill{position:absolute;left:0;top:0;bottom:0;background:var(--grad);border-radius:10px}
+.be-line{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--red)}
+.be-cap{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--muted);margin-top:6px;gap:8px}
+.be-txt{font-size:14.5px;color:var(--ink-2);margin-top:10px;line-height:1.45}
+
+.debt{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:600px){ .debt{grid-template-columns:1fr} }
+.dbc{background:var(--card);border-radius:14px;padding:14px;font-size:13.5px;line-height:1.45;color:var(--ink-2);border-top:4px solid var(--c)}
+.dbc b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+.rules{display:grid;gap:8px}
+.ru{display:grid;grid-template-columns:30px 1fr;gap:10px;background:var(--card);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;color:var(--ink-2)}
+.ru i{width:30px;height:30px;border-radius:9px;background:var(--grad);color:#fff;font-style:normal;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:13px}
+.ru b{color:var(--ink)}
+
+.stat-mock{background:var(--card);border-radius:18px;padding:14px;max-width:420px;margin:0 auto}
+.sm-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.sm-h b{font-size:15px}.sm-h span{font-size:12px;font-weight:800;color:var(--green);background:rgba(21,163,91,.1);border-radius:8px;padding:2px 7px}
+.sm-big{font-size:28px;font-weight:900;letter-spacing:-.5px}
+.sm-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.sm-k{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted);font-weight:700}
+.sm-k b{display:block;font-size:15px;color:var(--ink)}
+.sm-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:4px}
+.sm-cols{display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:12px;position:relative}
+.sm-cols i{flex:1;background:#9DC1F5;border-radius:3px 3px 0 0}
+.sm-cols i.best{background:var(--red)}
+.sm-avg{position:absolute;left:0;right:0;border-top:2px dashed #0A2A5E}
+.legend5{display:grid;gap:8px;margin-top:14px}
+.l5{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:14px;line-height:1.4;color:var(--ink-2)}
+.l5 i{width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-style:normal;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.l5 b{color:var(--ink)}
+
+.month{display:grid;gap:10px}
+.mres{background:var(--card);border-radius:16px;padding:14px;margin-top:6px}
+.mres-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.mres-row:last-child{border-bottom:0;font-weight:900;font-size:16px}
+.mres-row b{font-weight:800}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1FB5F2"/><stop offset="1" stop-color="#1463E6"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 24 32"><path d="M12 1C12 1 2 13.5 2 20.5a10 10 0 0 0 20 0C22 13.5 12 1 12 1Z"/></symbol>
+  </defs>
+</svg>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top" aria-label="OilBook">
+      <svg width="20" height="26" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+      <span class="brand-word"><span class="o">Oil</span><span class="b">Book</span></span>
+    </a>
+    <div class="crumb"><b>Taʼlim</b>10-modul, jami 12 ta</div>
+  </div>
+  <nav class="toc" aria-label="Dars boʻlimlari">
+    <a href="#s1">Foyda tarkibi</a>
+    <a href="#s2">Narx qoʻyish</a>
+    <a href="#s3">Xarajatlar</a>
+    <a href="#s4">Zararsizlik</a>
+    <a href="#s5">Qarzlar</a>
+    <a href="#s6">Statistikani oʻqish</a>
+    <a href="#s7">Pul tartibi</a>
+    <a href="#train">Mashq</a>
+    <a href="#task">Oy yakuni</a>
+    <a href="#quiz">Test</a>
+  </nav>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <span class="mod-tag">10-modul · ega uchun</span>
+    <h1>Shoxobcha pullari</h1>
+    <p class="lead">Narxni qanday qoʻyish, xarajatlarni qanday nazorat qilish, oyiga nechta almashtirish zararsizlik uchun kerak va OilBook statistikasini 10 daqiqada qanday oʻqish.</p>
+    <div class="meta"><span>50 daqiqa</span><span>7 ta boʻlim</span><span>Narx va zararsizlik kalkulyatorlari</span><span>Oy yakuni varaqasi</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="goals" style="margin-top:16px">
+    <h2>Darsdan keyin siz:</h2>
+    <ul>
+      <li><i>1</i>Foydangiz nimadan tashkil topishini aniq bilasiz</li>
+      <li><i>2</i>Ustama va marjani ajratib, narxni toʻgʻri qoʻyasiz</li>
+      <li><i>3</i>Oyiga nechta almashtirish zararsizlik uchun kerakligini hisoblaysiz</li>
+      <li><i>4</i>Haftasiga 10 daqiqada statistikani oʻqib, qaror qabul qilasiz</li>
+    </ul>
+  </div>
+
+<!-- 10.1 -->
+<section class="part" id="s1"><div class="part-card">
+  <div class="ph"><span class="pn">10.1</span><h2>Foyda nimadan tashkil topadi</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">OilBook sof foydani uch qismdan hisoblaydi: tovardan foyda, ish va xizmatlardan foyda, minus xarajatlar.</p>
+  <div class="fig">
+    <p class="fig-t">Sof foyda kartochkasi <span class="ex">misol, 30 kun</span></p>
+    <div class="np">
+      <div class="npc g">Mahsulotlar foydasi<b>+21,4 mln</b>sotish narxi − xarid narxi</div>
+      <div class="npc s">Ish va xizmatlar<b>+9,8 mln</b>ish haqi, yuvish va boshqalar</div>
+      <div class="npc r">Xarajatlar<b>−19,2 mln</b>ijara, ish haqi, svet…</div>
+      <div class="np-tot">Sof foyda<b>12,0 mln soʻm</b></div>
+      <div class="np-warn">⚠️ Foydaga kirmadi (xarid narxi yoʻq): 3,1 mln soʻm — bu sotuvlarning foydasi nomaʼlum. Omborda xarid narxini kiriting (9-modul).</div>
+    </div>
+    <p class="cap">Raqamlar shartli. Sariq ogohlantirish qancha kichik boʻlsa, sof foyda shuncha aniq.</p>
+  </div>
+  <p><b>Ish va xizmatlar</b> — ombordagi tovarga bogʻlanmagan pozitsiyalar: ish haqi, yuvish, «Boshqa» kabi. Ularda xarid narxi yoʻq — butun summa foyda hisoblanadi. Shuning uchun moy yoki filtrni «Boshqa» qilib qoʻlda yozmang: u xizmat sifatida hisoblanib, foydani notoʻgʻri koʻrsatadi.</p>
+</div></section>
+
+<!-- 10.2 -->
+<section class="part" id="s2"><div class="part-card">
+  <div class="ph"><span class="pn">10.2</span><h2>Narx qoʻyish: ustama va marja</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">«25% qoʻyaman» — bu ustamami yoki marjami? Bu ikkisini chalkashtirish koʻp egalarni pulsiz qoldiradi.</p>
+  <div class="fig">
+    <div class="mm">
+      <div class="mmc"><b>Ustama</b>Xarid narxiga qancha qoʻshdingiz.<span class="f">(sotish − xarid) ÷ xarid</span></div>
+      <div class="mmc"><b>Marja</b>Sotish narxining qancha qismi sizga qoldi.<span class="f">(sotish − xarid) ÷ sotish</span></div>
+    </div>
+    <p class="cap">Misol: 100 ming soʻmga olib, 125 mingga sotsangiz — ustama 25%, marja esa 20%. Xarajatlarni marjadan qoplaysiz.</p>
+  </div>
+  <div class="fig">
+    <p class="fig-t">Narx kalkulyatori</p>
+    <div style="display:grid;gap:12px">
+      <div class="inp"><label for="n1">Birlik xarid narxi, soʻm</label><input id="n1" type="number" inputmode="numeric" min="0" step="1000" value="120000"></div>
+      <div class="inp"><label for="n2">Ustama, %</label><input id="n2" type="number" inputmode="numeric" min="0" step="1" value="25"></div>
+    </div>
+    <div class="res3" aria-live="polite">
+      <div class="r3"><small>Sotish narxi</small><b id="nS">—</b></div>
+      <div class="r3"><small>Birlikdan foyda</small><b id="nP">—</b></div>
+      <div class="r3"><small>Marja</small><b id="nM">—</b></div>
+    </div>
+  </div>
+  <h3>Narx qoʻyishda nimaga qarash kerak</h3>
+  <div class="rules">
+    <div class="ru"><i>1</i><div><b>Xarid narxi va xarajatlar.</b> Narx ularni qoplashi va foyda qoldirishi kerak.</div></div>
+    <div class="ru"><i>2</i><div><b>Atrofdagi narxlar.</b> Raqobatchidan biroz qimmat boʻlish mumkin — agar xizmat va ishonch yaxshiroq boʻlsa.</div></div>
+    <div class="ru"><i>3</i><div><b>Ish haqi alohida.</b> Ishni bepul qilib, moyga qoʻshib yubormang — mijoz nima uchun toʻlayotganini koʻrsin.</div></div>
+    <div class="ru"><i>4</i><div><b>Xarid narxi oshsa — sotuv narxini ham yangilang.</b> OilBook «sotuv xariddan past» deb ogohlantiradi.</div></div>
+  </div>
+</div></section>
+
+<!-- 10.3 -->
+<section class="part" id="s3"><div class="part-card">
+  <div class="ph"><span class="pn">10.3</span><h2>Xarajatlar: hammasini yozing</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Katta xarajatlar esda turadi. Kichiklari unutiladi — lekin oy oxirida ular ham sezilarli summa.</p>
+  <div class="fig">
+    <p class="fig-t">Oylik xarajatlar tarkibi <span class="ex">misol</span></p>
+    <div class="exp">
+      <svg viewBox="0 0 120 120" role="img" aria-label="Xarajatlar: ish haqi 13, ijara 6, kommunal 2, reklama 1, boshqa 1 million">
+        <g transform="rotate(-90 60 60)" fill="none" stroke-width="22">
+          <circle cx="60" cy="60" r="42" stroke="#1463E6" stroke-dasharray="148.6 263.9"/>
+          <circle cx="60" cy="60" r="42" stroke="#1FB5F2" stroke-dasharray="68.6 263.9" stroke-dashoffset="-148.6"/>
+          <circle cx="60" cy="60" r="42" stroke="#15A35B" stroke-dasharray="22.9 263.9" stroke-dashoffset="-217.2"/>
+          <circle cx="60" cy="60" r="42" stroke="#F2A20C" stroke-dasharray="11.5 263.9" stroke-dashoffset="-240.1"/>
+          <circle cx="60" cy="60" r="42" stroke="#9DB4D6" stroke-dasharray="11.5 263.9" stroke-dashoffset="-251.6"/>
+        </g>
+        <text x="60" y="58" text-anchor="middle" font-size="16" font-weight="900" fill="var(--ink)" font-family="Onest,sans-serif">23</text>
+        <text x="60" y="73" text-anchor="middle" font-size="10" font-weight="700" fill="var(--muted)" font-family="Onest,sans-serif">mln soʻm</text>
+      </svg>
+      <ul>
+        <li><i style="background:#1463E6"></i><div><b>Ish haqi</b><small>doimiy</small></div><em>13 mln</em></li>
+        <li><i style="background:#1FB5F2"></i><div><b>Ijara</b><small>doimiy</small></div><em>6 mln</em></li>
+        <li><i style="background:#15A35B"></i><div><b>Svet, suv, gaz, internet</b><small>doimiy</small></div><em>2 mln</em></li>
+        <li><i style="background:#F2A20C"></i><div><b>Reklama</b><small>oʻzgaruvchan</small></div><em>1 mln</em></li>
+        <li><i style="background:#9DB4D6"></i><div><b>Latta, sorbent, choy, mayda</b><small>oʻzgaruvchan</small></div><em>1 mln</em></li>
+      </ul>
+    </div>
+  </div>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>«Xarajatlar» boʻlimida har bir xarajat toifasi bilan yoziladi. Ijara, ish haqi kabi har oy takrorlanadiganlarini bir marta «Takrorlanuvchi xarajatlar»ga sozlang — oyning kuni koʻrsatiladi, toʻlov vaqti kelganda eslatiladi, siz faqat «Toʻlangan deb belgilash»ni bosasiz.</div>
+  </div>
+</div></section>
+
+<!-- 10.4 -->
+<section class="part" id="s4"><div class="part-card">
+  <div class="ph"><span class="pn">10.4</span><h2>Zararsizlik nuqtasi</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Oyiga nechta almashtirish qilsangiz, xarajatlar qoplanadi? Undan keyingi har bir mashina — sof foyda.</p>
+  <p>Formula: <b>oylik doimiy xarajatlar ÷ bitta almashtirishdan oʻrtacha foyda</b>. Bitta almashtirishdan foyda — tovardan ustama va ish haqi.</p>
+  <div class="fig">
+    <p class="fig-t">Zararsizlik kalkulyatori</p>
+    <div style="display:grid;gap:12px">
+      <div class="inp"><label for="z1">Oylik doimiy xarajatlar, soʻm</label><input id="z1" type="number" inputmode="numeric" min="0" step="100000" value="21000000"></div>
+      <div class="inp"><label for="z2">Bitta almashtirishdan foyda, soʻm<small>tovar ustamasi + ish haqi</small></label><input id="z2" type="number" inputmode="numeric" min="0" step="1000" value="95000"></div>
+      <div class="inp"><label for="z3">Oyiga ish kunlari</label><input id="z3" type="number" inputmode="numeric" min="1" max="31" value="26"></div>
+      <div class="inp"><label for="z4">Hozir oyiga almashtirishlar</label><input id="z4" type="number" inputmode="numeric" min="0" value="300"></div>
+    </div>
+    <div class="res3" aria-live="polite">
+      <div class="r3"><small>Oyiga kerak</small><b id="zM">—</b></div>
+      <div class="r3"><small>Kuniga kerak</small><b id="zD">—</b></div>
+      <div class="r3"><small>Hozirgi sof foyda</small><b id="zP">—</b></div>
+    </div>
+    <div class="be-bar">
+      <div class="be-track"><div class="be-fill" id="zFill"></div><span class="be-line" id="zLine"></span></div>
+      <div class="be-cap"><span>0</span><span style="color:var(--red)">zararsizlik</span><span id="zMax">—</span></div>
+      <div class="be-txt" id="zTxt"></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 10.5 -->
+<section class="part" id="s5"><div class="part-card">
+  <div class="ph"><span class="pn">10.5</span><h2>Qarzlar: mijozlarniki va sizniki</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Qarz — bu tushum emas. Pul kassaga tushmaguncha, u faqat yozuv.</p>
+  <div class="fig">
+    <div class="debt">
+      <div class="dbc" style="--c:var(--red)"><b>Qarzga</b>Butun summa qarz. Muddatini albatta kiriting.</div>
+      <div class="dbc" style="--c:var(--amber)"><b>Boʻlib toʻlash</b>Toʻlov summasi va «har necha kunda». Mijoz botga ulangan boʻlsa — bot oʻzi eslatadi, aks holda sizga «oʻzingiz eslating» deb xabar keladi.</div>
+      <div class="dbc" style="--c:var(--blue)"><b>Yetkazib beruvchi qarzi</b>Buyurtma qabul qilinganda yoziladi. Toʻlov muddati kiritilsa, muddati oʻtgani koʻrinadi.</div>
+    </div>
+  </div>
+  <h3>Qarz qoidalari — oldindan belgilang</h3>
+  <div class="rules">
+    <div class="ru"><i>1</i><div><b>Kimga:</b> faqat doimiy, tanish mijozlarga.</div></div>
+    <div class="ru"><i>2</i><div><b>Qancha:</b> bitta mijozga eng koʻp qancha — chegarani oldindan belgilang.</div></div>
+    <div class="ru"><i>3</i><div><b>Qachongacha:</b> har bir qarz aniq muddat bilan.</div></div>
+    <div class="ru"><i>4</i><div><b>Muddati oʻtsa:</b> eski qarz yopilmaguncha yangi qarz yoʻq.</div></div>
+  </div>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>«Qarzlar» boʻlimida muddati oʻtganlar qizil raqam bilan koʻrinadi, bosh sahifada esa «Qarzlar va boʻlib toʻlash» xulosasi — jami qarz va muddati oʻtgan qarzdorlar soni.</div>
+  </div>
+</div></section>
+
+<!-- 10.6 -->
+<section class="part" id="s6"><div class="part-card">
+  <div class="ph"><span class="pn">10.6</span><h2>Statistikani 10 daqiqada oʻqish</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Haftada bir marta, bir xil kunda — 5 ta raqamga qarang va bitta qaror qabul qiling.</p>
+  <div class="fig">
+    <div class="stat-mock" aria-hidden="true">
+      <div class="sm-h"><b>Bu oy</b><span>+12% oʻtgan oyga nisbatan</span></div>
+      <div class="sm-big">96,4 mln</div>
+      <div class="sm-row">
+        <div class="sm-k">Oʻrtacha chek<b>338 ming</b></div>
+        <div class="sm-k">Xizmatlar<b>285</b></div>
+        <div class="sm-k">Mijozlar: yangi / qaytgan<div class="sm-bar"><span style="flex:35;background:#1FB5F2"></span><span style="flex:65;background:#1463E6"></span></div></div>
+        <div class="sm-k">Toʻlov: naqd / karta<div class="sm-bar"><span style="flex:55;background:#15A35B"></span><span style="flex:45;background:#F2A20C"></span></div></div>
+      </div>
+      <div class="sm-cols" id="smCols"></div>
+    </div>
+    <div class="legend5">
+      <div class="l5"><i>1</i><div><b>Tushum va oʻzgarish %</b> — oʻtgan davrga nisbatan oʻsyapmi yoki tushyapti?</div></div>
+      <div class="l5"><i>2</i><div><b>Oʻrtacha chek</b> — oʻsmasa, 7-modulga qayting.</div></div>
+      <div class="l5"><i>3</i><div><b>Yangi / qaytgan</b> — qaytganlar ulushi tushsa, 8-modulga qayting.</div></div>
+      <div class="l5"><i>4</i><div><b>30 kunlik tushum grafigi</b> — eng yaxshi kun qizil, punktir — ish kuni oʻrtachasi. Qaysi kunlar boʻsh?</div></div>
+      <div class="l5"><i>5</i><div><b>Sof foyda va sariq ogohlantirish</b> — foyda qanchalik aniq?</div></div>
+    </div>
+    <p class="cap">Raqamlar shartli. «Ixtiyoriy davr»da istalgan sanalarni solishtirish mumkin, «Brendlar»da esa qaysi moy va filtrlar koʻproq sotilayotgani koʻrinadi.</p>
+  </div>
+</div></section>
+
+<!-- 10.7 -->
+<section class="part" id="s7"><div class="part-card">
+  <div class="ph"><span class="pn">10.7</span><h2>Pul tartibi: 4 ta oddiy odat</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <div class="rules">
+    <div class="ru"><i>1</i><div><b>Biznes va oila pulini ajrating.</b> Kassadan olgan pulingiz — bu sizning oyligingiz. Uni oldindan belgilang va xarajat sifatida yozing.</div></div>
+    <div class="ru"><i>2</i><div><b>Har kuni kassani OilBook bilan solishtiring.</b> Naqd va karta summasi statistikadagi bilan mos kelsin.</div></div>
+    <div class="ru"><i>3</i><div><b>Zaxira fondi.</b> Har oy foydaning bir qismini alohida qoʻying — taʼmir, asbob, qiyin oylar uchun.</div></div>
+    <div class="ru"><i>4</i><div><b>Oy yakuni.</b> Har oy boshida oʻtgan oy raqamlarini yozing va bitta maqsad qoʻying — quyidagi varaqa shuning uchun.</div></div>
+  </div>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Zaxira nusxa</b>«Eksport» boʻlimidan barcha almashtirishlarni Excelga yuklab olish mumkin — buxgalter yoki oʻzingiz uchun.</div>
+  </div>
+</div></section>
+
+<!-- trainer -->
+<section class="part" id="train"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Mashq</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Toʻrtta vaziyat. Toʻgʻri qarorni tanlang.</p>
+  <div id="cases"></div>
+</div></section>
+
+<!-- task -->
+<section class="part" id="task"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Topshiriq: oy yakuni varaqasi</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">OilBook statistikasidan oʻtgan oy raqamlarini kiriting. Varaqa shu telefonda saqlanadi.</p>
+  <div class="fig">
+    <div class="month">
+      <div class="inp"><label for="m1">Tushum, soʻm</label><input id="m1" type="number" inputmode="numeric" min="0" step="100000" placeholder="0"></div>
+      <div class="inp"><label for="m2">Mahsulotlar foydasi, soʻm</label><input id="m2" type="number" inputmode="numeric" min="0" step="100000" placeholder="0"></div>
+      <div class="inp"><label for="m3">Ish va xizmatlar, soʻm</label><input id="m3" type="number" inputmode="numeric" min="0" step="100000" placeholder="0"></div>
+      <div class="inp"><label for="m4">Xarajatlar, soʻm</label><input id="m4" type="number" inputmode="numeric" min="0" step="100000" placeholder="0"></div>
+      <div class="inp"><label for="m5">Foydaga kirmagan summa, soʻm<small>sariq ogohlantirish</small></label><input id="m5" type="number" inputmode="numeric" min="0" step="100000" placeholder="0"></div>
+    </div>
+    <div class="mres" aria-live="polite">
+      <div class="mres-row"><span>Sof foyda</span><b id="rN">—</b></div>
+      <div class="mres-row"><span>Sof foyda tushumdan</span><b id="rP">—</b></div>
+      <div class="mres-row"><span>Hisobga olinmagan sotuv ulushi</span><b id="rU">—</b></div>
+      <div class="mres-row"><span>Keyingi oyga maqsad</span><b id="rG">—</b></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- quiz -->
+<section class="part" id="quiz"><div class="part-card">
+  <div class="ph"><span class="pn">?</span><h2>Test</h2></div>
+  <p class="kicker">10 ta savol. Modulni topshirish uchun 8 ta toʻgʻri javob kerak.</p>
+  <div id="quizBox"></div>
+  <div class="result" id="result" aria-live="polite"></div>
+</div></section>
+
+<div class="done-card">
+  <small>Keyingi modul</small>
+  <h2>11. Jamoa: ustalarni yollash va rivojlantirish</h2>
+  <a class="btn" href="#top">Dars boshiga</a>
+</div>
+</div>
+</main>
+<footer>OilBook taʼlimi — moy almashtirish shoxobchalari uchun kurs</footer>
+
+<script>
+(function(){
+  var KEY='oilbook-course-m10-uz-';
+  var store={get:function(k){try{return JSON.parse(localStorage.getItem(KEY+k));}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v));}catch(e){}}};
+  function fmt(n){ return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+  function mln(n){ return (n/1e6).toFixed(1).replace('.',',')+' mln'; }
+
+  var bar=document.getElementById('progress'), nav=document.querySelector('.toc');
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  var cur=-2, ticking=false;
+  function update(){
+    ticking=false;
+    var h=document.documentElement;
+    bar.style.transform='scaleX('+(h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight)).toFixed(3)+')';
+    var c=-1; for(var i=0;i<secs.length;i++){ if(secs[i]&&secs[i].getBoundingClientRect().top<150) c=i; else break; }
+    if(c!==cur){ cur=c; links.forEach(function(a,i){a.classList.toggle('on',i===c);}); if(c>=0){ var a=links[c]; nav.scrollLeft=a.offsetLeft-(nav.clientWidth-a.offsetWidth)/2; } }
+  }
+  window.addEventListener('scroll',function(){ if(!ticking){ticking=true;requestAnimationFrame(update);} },{passive:true});
+  update();
+
+  /* price */
+  var n1=document.getElementById('n1'), n2=document.getElementById('n2');
+  function np(){ var b=+n1.value||0, u=+n2.value||0, s=b*(1+u/100), p=s-b;
+    document.getElementById('nS').textContent=b?fmt(s):'—'; document.getElementById('nP').textContent=b?fmt(p):'—'; document.getElementById('nM').textContent=b&&s?(100*p/s).toFixed(1).replace('.',',')+'%':'—'; }
+  n1.addEventListener('input',np); n2.addEventListener('input',np); np();
+
+  /* break-even */
+  var z=['z1','z2','z3','z4'].map(function(i){return document.getElementById(i);});
+  function be(){
+    var fx=+z[0].value||0, pr=+z[1].value||0, d=+z[2].value||1, now=+z[3].value||0;
+    var need=pr?Math.ceil(fx/pr):0, net=now*pr-fx, max=Math.max(need,now)*1.25||1;
+    document.getElementById('zM').textContent=pr?need:'—';
+    document.getElementById('zD').textContent=pr?(need/d).toFixed(1).replace('.',','):'—';
+    document.getElementById('zP').textContent=pr?(net<0?'−':'')+mln(Math.abs(net)):'—';
+    document.getElementById('zFill').style.width=(100*now/max).toFixed(1)+'%';
+    document.getElementById('zLine').style.left=(100*need/max).toFixed(1)+'%';
+    document.getElementById('zMax').textContent=Math.round(max)+' ta';
+    document.getElementById('zTxt').textContent = !pr ? '' : (now>=need ? 'Siz zararsizlikdan '+(now-need)+' ta almashtirish yuqoridasiz. Har bir qoʻshimcha mashina — '+fmt(pr)+' soʻm sof foyda.' : 'Zararsizlikka yetish uchun oyiga yana '+(need-now)+' ta almashtirish kerak — kuniga taxminan '+((need-now)/d).toFixed(1).replace('.',',')+' ta.');
+  }
+  z.forEach(function(x){x.addEventListener('input',be);}); be();
+
+  /* stat mock bars */
+  var V=[3.1,2.8,3.6,3.3,2.2,4.1,3.0,3.4,3.9,2.6,3.2,4.6,3.5,2.9,3.3,3.8,2.4,3.6,4.0,3.1,3.7,2.7,3.4,4.2,3.0,3.6];
+  var mx=Math.max.apply(null,V), avg=V.reduce(function(a,b){return a+b;},0)/V.length;
+  document.getElementById('smCols').innerHTML=V.map(function(v){return '<i class="'+(v===mx?'best':'')+'" style="height:'+(100*v/mx).toFixed(0)+'%"></i>';}).join('')+'<span class="sm-avg" style="bottom:'+(100*avg/mx).toFixed(0)+'%"></span>';
+
+  /* trainer */
+  var CS=[
+    {t:'Yetkazib beruvchi moy narxini 10% oshirdi. Sotuv narxi oʻzgarmagan.',o:['Hech narsa qilmaslik','Omborda xarid narxini yangilab, sotuv narxini ham qayta koʻrib chiqish','Mijozlarga ish haqini bepul qilish'],a:1,e:'Aks holda har bir sotuvdagi foyda sezdirmasdan kamayadi.'},
+    {t:'Statistikada «Foydaga kirmadi: 8 mln» koʻrinyapti.',o:['Eʼtibor bermaslik','Qaysi tovarlarda xarid narxi yoʻqligini topib, omborga kiritish','Tushumni kamaytirish'],a:1,e:'Xarid narxi kiritilsa, oldingi sotuvlar ham hisoblanadi va foyda aniq boʻladi.'},
+    {t:'Doimiy mijoz uchinchi marta qarzga soʻrayapti, oldingi qarzi muddati oʻtgan.',o:['Yana qarzga berish','Avval eski qarzni yopishni xushmuomalalik bilan soʻrash','Mijozni haydab yuborish'],a:1,e:'Qoida: eski qarz yopilmaguncha yangi qarz yoʻq. Qoidani oldindan hammaga bir xil qoʻllang.'},
+    {t:'Hisoblasangiz, zararsizlik uchun kuniga 9 ta almashtirish kerak, sizda 7 ta.',o:['Narxni keskin tushirish','Qaytgan mijozlar va oʻrtacha chekni oshirish, keraksiz xarajatlarni qisqartirish','Hech narsa qilmaslik'],a:1,e:'Keskin chegirma foydani yanada kamaytiradi. 7 va 8-modullar — mashinalar sonini va chekni oshirish yoʻli.'}
+  ];
+  var cs=document.getElementById('cases');
+  cs.innerHTML=CS.map(function(c,i){
+    return '<div class="case-card" data-i="'+i+'"><div class="req"><small>Vaziyat</small>'+c.t+'</div><div class="can">'+c.o.map(function(o,k){return '<button type="button" data-k="'+k+'"><b>'+o+'</b></button>';}).join('')+'</div><div class="case-ex">'+c.e+'</div></div>';
+  }).join('');
+  cs.addEventListener('click',function(e){
+    var b=e.target.closest('.can button'); if(!b) return;
+    var card=b.closest('.case-card'); if(card.classList.contains('done')) return;
+    var c=CS[+card.dataset.i]; card.classList.add('done');
+    card.querySelectorAll('.can button').forEach(function(x){ x.disabled=true; if(+x.dataset.k===c.a) x.classList.add('ok'); else if(x===b) x.classList.add('no'); });
+  });
+
+  /* month sheet */
+  var m=['m1','m2','m3','m4','m5'].map(function(i){return document.getElementById(i);});
+  var sv=store.get('month'); if(sv){ m.forEach(function(x,i){ if(sv[i]) x.value=sv[i]; }); }
+  function ms(){
+    store.set('month',m.map(function(x){return x.value;}));
+    var r=+m[0].value||0, g=+m[1].value||0, s=+m[2].value||0, e=+m[3].value||0, u=+m[4].value||0;
+    var net=g+s-e;
+    document.getElementById('rN').textContent = (g||s||e)? (net<0?'−':'')+fmt(Math.abs(net))+' soʻm' : '—';
+    document.getElementById('rP').textContent = r&&(g||s||e) ? (100*net/r).toFixed(1).replace('.',',')+'%' : '—';
+    document.getElementById('rU').textContent = r ? (100*u/r).toFixed(1).replace('.',',')+'%' : '—';
+    var goal='—';
+    if(r){ if(u/r>0.05) goal='Xarid narxlarini kiritish'; else if(net<0) goal='Zararsizlikka chiqish'; else goal='Sof foydani +10%'; }
+    document.getElementById('rG').textContent=goal;
+  }
+  m.forEach(function(x){x.addEventListener('input',ms);}); ms();
+
+  /* quiz */
+  var Q=[
+    {q:'OilBook sof foydani qanday hisoblaydi?',o:['Tushum minus xarajatlar','Mahsulotlar foydasi + ish va xizmatlar − xarajatlar','Faqat moy foydasi'],a:1,e:'Xarid narxi yoʻq sotuvlar sariq ogohlantirishda alohida koʻrsatiladi.'},
+    {q:'100 mingga olib, 125 mingga sotdingiz. Marja qancha?',o:['25%','20%','125%'],a:1,e:'Ustama 25%, marja esa (125−100)÷125 = 20%.'},
+    {q:'Moy yoki filtrni «Boshqa» qilib qoʻlda yozsangiz?',o:['Foyda toʻgʻri hisoblanadi','U xizmat sifatida hisoblanib, foydani notoʻgʻri koʻrsatadi','Hech narsa boʻlmaydi'],a:1,e:'Tovarlarni doim ombordan tanlang.'},
+    {q:'Takrorlanuvchi xarajat nima uchun kerak?',o:['Har oy ijara va ish haqini qayta yozmaslik va eslatma olish uchun','Xarajatni yashirish uchun','Faqat reklama uchun'],a:0,e:'Oyning kuni koʻrsatiladi, toʻlov vaqti kelganda eslatiladi.'},
+    {q:'Zararsizlik nuqtasi qanday hisoblanadi?',o:['Tushum ÷ 2','Oylik doimiy xarajat ÷ bitta almashtirishdan foyda','Mijozlar soni × 10'],a:1,e:'Undan keyingi har bir mashina — sof foyda.'},
+    {q:'Qarz qachon tushum hisoblanadi?',o:['Yozilgan zahoti','Pul kassaga tushganda','Hech qachon'],a:1,e:'Qarz — faqat yozuv, hali pul emas.'},
+    {q:'Boʻlib toʻlashda mijoz botga ulanmagan boʻlsa?',o:['Hech kim eslatmaydi','Egaga «oʻzingiz eslating» deb xabar keladi','Toʻlov oʻzi yechiladi'],a:1,e:'Ulangan mijozga esa bot oʻzi eslatadi.'},
+    {q:'Statistikadagi 30 kunlik grafikda qizil ustun nimani bildiradi?',o:['Zararli kun','Eng yaxshi kun','Dam olish kuni'],a:1,e:'Punktir — ish kunining oʻrtachasi.'},
+    {q:'Qaytgan mijozlar ulushi tushsa, qaysi modulga qaytish kerak?',o:['5-modul','8-modul','2-modul'],a:1,e:'Baza, eslatmalar, botga bogʻlash.'},
+    {q:'Kassadan oʻzingizga olgan pul bilan nima qilish kerak?',o:['Yozmaslik','Oldindan belgilab, xarajat sifatida yozish','Tushumga qoʻshish'],a:1,e:'Biznes va oila pulini ajrating.'}
+  ];
+  var box=document.getElementById('quizBox'), res=document.getElementById('result'), ans={};
+  function renderQ(){
+    ans={}; res.className='result'; res.innerHTML='';
+    box.innerHTML=Q.map(function(x,i){return '<div class="q" data-i="'+i+'"><div class="q-n">Savol '+(i+1)+' / 10</div><div class="q-t">'+x.q+'</div><div class="opts">'+x.o.map(function(t,k){return '<button class="opt" type="button" data-k="'+k+'">'+t+'</button>';}).join('')+'</div><div class="q-ex">'+x.e+'</div></div>';}).join('');
+  }
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b) return;
+    var card=b.closest('.q'), i=+card.dataset.i; if(i in ans) return;
+    ans[i]=+b.dataset.k; card.classList.add('done');
+    card.querySelectorAll('.opt').forEach(function(o){ o.disabled=true; if(+o.dataset.k===Q[i].a) o.classList.add('ok'); else if(o===b) o.classList.add('no'); });
+    if(Object.keys(ans).length===Q.length){
+      var ok=Q.filter(function(x,qi){return ans[qi]===x.a;}).length; store.set('quiz',ok);
+      res.innerHTML='<b>'+ok+' / 10</b>'+(ok>=8?'Modul topshirildi. Keyingisi — «Jamoa».':'10 tadan 8 ta toʻgʻri javob kerak. 10.1–10.5-boʻlimlarni qayta oʻqib, yana urinib koʻring.')+'<div style="margin-top:14px"><button class="btn white" type="button" id="retry">Qaytadan topshirish</button></div>';
+      res.className='result show';
+      document.getElementById('retry').addEventListener('click',function(){ renderQ(); box.scrollIntoView({block:'start'}); });
+    }
+  });
+  renderQ();
+})();
+</script>
+
+</body>
+</html>

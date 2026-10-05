@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5-modul. Moy almashtirish texnologiyasi — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Sora:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2350;
+  --ink-2:#3E5479;
+  --muted:#6B7F9E;
+  --bg:#EEF4FB;
+  --card:#FFFFFF;
+  --line:#D9E4F2;
+  --blue:#1463E6;
+  --cyan:#1FB5F2;
+  --soft:#E3EEFD;
+  --red:#E5484D;
+  --amber:#F2A20C;
+  --green:#15A35B;
+  --grad:linear-gradient(135deg,#1FB5F2 0%,#1463E6 100%);
+  --font:'Onest', 'Segoe UI', Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F;
+  }
+}
+:root[data-theme="dark"]{ --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 110px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* app header */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-word{font-family:'Sora',var(--font);font-weight:800;font-size:20px;letter-spacing:-.4px;line-height:1}
+.brand-word .o{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-word .b{color:#0A2A5E}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word .b{color:#E8F0FC} }
+.crumb{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px;line-height:1.25}
+.crumb b{display:block;color:var(--ink);font-weight:700;font-size:14px}
+.progress{height:3px;background:var(--grad);width:100%;transform:scaleX(0);transform-origin:0 50%}
+.toc{max-width:860px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 12px;background:var(--soft);border-radius:999px;white-space:nowrap}
+.toc a.on{color:#fff;background:var(--blue)}
+
+/* hero */
+.hero{background:var(--grad);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;bottom:-90px;width:300px;height:390px;background:rgba(255,255,255,.10);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;transform:rotate(-12deg)}
+.hero .wrap{position:relative;z-index:1;padding-top:34px;padding-bottom:34px}
+.mod-tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.08;font-weight:900;margin:0 0 14px;letter-spacing:-.6px;max-width:640px}
+.hero .lead{font-size:clamp(16px,2.3vw,19px);opacity:.92;max-width:600px;margin:0 0 24px}
+.formula-hero{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(6,30,80,.28);border-radius:18px;padding:14px;max-width:620px}
+.fh{background:#fff;color:var(--blue);border-radius:12px;padding:8px 12px;font-weight:800;font-size:15px;line-height:1.2;text-align:center}
+.fh small{display:block;font-size:11px;font-weight:600;color:#6B7F9E}
+.fop{font-weight:900;font-size:22px;opacity:.9}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.meta span{background:rgba(255,255,255,.16);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+
+/* goals */
+.goals{background:var(--card);border-radius:20px;padding:20px;margin-top:-1px;margin-bottom:8px}
+.goals h2{font-size:18px;margin:0 0 12px}
+.goals ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.goals li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45}
+.goals li i{width:28px;height:28px;border-radius:9px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--blue);font-style:normal;font-weight:800;font-size:14px}
+
+/* section */
+section.part{padding:40px 0 8px}
+.part-card{background:var(--card);border-radius:24px;padding:24px 20px;box-shadow:0 1px 0 var(--line)}
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.part h2{font-size:clamp(22px,4.6vw,30px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.3px}
+.part h3{font-size:18px;margin:28px 0 10px;line-height:1.3}
+.part p{margin:0 0 12px;color:var(--ink-2)}
+.part p b,.part li b{color:var(--ink)}
+.kicker{font-size:19px;font-weight:700;color:var(--ink)!important;line-height:1.4;margin-bottom:16px!important}
+.who{display:inline-flex;gap:6px;margin-bottom:14px}
+.who span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--blue)}
+
+.fig{background:var(--bg);border-radius:18px;padding:18px;margin:18px 0}
+.fig-t{font-weight:800;font-size:15px;margin:0 0 14px;color:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin:12px 0 0!important;line-height:1.45}
+.ex{font-size:12px;font-weight:700;color:var(--amber);background:rgba(242,162,12,.12);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+
+.note{display:grid;grid-template-columns:26px 1fr;gap:12px;border-radius:16px;padding:14px 16px;margin:18px 0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.note b{display:block;color:var(--ink);margin-bottom:3px}
+.note.case{background:rgba(21,163,91,.09)}
+.note.warn{background:rgba(229,72,77,.08)}
+.note.tip{background:var(--soft)}
+.note.app{background:linear-gradient(135deg,rgba(31,181,242,.12),rgba(20,99,230,.12));border:1px solid rgba(20,99,230,.25)}
+
+/* calculator */
+.calc{display:grid;gap:14px}
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+.inp input:focus{border-color:var(--blue);outline:none}
+.total{background:var(--grad);color:#fff;border-radius:16px;padding:16px;text-align:center}
+.total small{display:block;font-size:13px;opacity:.9;font-weight:600}
+.total b{font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:-.5px}
+.levers{display:grid;gap:10px;margin-top:4px}
+.lv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:14px}
+.lv-name{font-weight:700;line-height:1.3}
+.lv-bar{background:var(--card);border-radius:10px;height:34px;position:relative;overflow:hidden}
+.lv-fill{position:absolute;inset:0 auto 0 0;background:var(--grad);border-radius:10px;transition:width .3s}
+.lv-val{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-weight:800;font-size:14px;color:var(--ink)}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} .lv{grid-template-columns:1fr} }
+
+/* bucket */
+.bucket{display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:10px}
+.bk-side{display:grid;gap:8px}
+.bk-chip{border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.3}
+.bk-chip.in{background:rgba(21,163,91,.12);color:var(--green)}
+.bk-chip.out{background:rgba(229,72,77,.1);color:var(--red)}
+.bk-chip small{display:block;font-weight:500;color:var(--ink-2);font-size:12px}
+@media (max-width:600px){ .bucket{grid-template-columns:1fr} .bk-svg{order:-1;max-width:170px;margin:0 auto} }
+
+/* lifetime */
+.life{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px}
+.life div{background:var(--grad);border-radius:6px 6px 2px 2px}
+.life-axis{display:grid;grid-template-columns:repeat(3,1fr);font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;text-align:center}
+.life-axis span{border-top:2px solid var(--line);padding-top:4px}
+.big-num{display:flex;gap:14px;align-items:center;margin-top:14px}
+.big-num b{font-size:30px;font-weight:900;color:var(--blue);letter-spacing:-.5px;line-height:1}
+.big-num span{font-size:14px;color:var(--ink-2);line-height:1.35}
+
+/* stacked check */
+.stack{display:grid;gap:12px}
+.st-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
+.st-name{font-weight:800;font-size:14px;line-height:1.25}
+.st-name small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.st-bar{display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--card)}
+.st-bar span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;padding:0 3px}
+.c-oil{background:#1463E6}.c-flt{background:#1FB5F2}.c-work{background:#0A2A5E}.c-air{background:#15A35B}.c-cab{background:#F2A20C}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+/* waterfall */
+.wf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:220px;align-items:stretch}
+.wf-col{position:relative}
+.wf-b{position:absolute;left:0;right:0;border-radius:8px}
+.wf-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:800}
+.wf-l{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;line-height:1.2;overflow-wrap:anywhere}
+
+/* three levers */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .three{grid-template-columns:1fr} }
+.tl{background:var(--card);border-radius:16px;padding:16px;border-top:4px solid var(--blue)}
+.tl:nth-child(2){border-color:var(--cyan)}.tl:nth-child(3){border-color:var(--green)}
+.tl h4{margin:8px 0 6px;font-size:16px}
+.tl ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.tl .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+/* leaks */
+.leaks{display:grid;gap:8px}
+.leak{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.leak b{color:var(--ink);display:block}
+.leak .d{width:34px;height:34px;border-radius:10px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.leak em{font-style:normal;color:var(--blue);font-weight:700}
+
+/* scripts */
+.say{display:grid;gap:6px;margin-bottom:12px}
+.say-who{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble{background:var(--card);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.45;font-weight:600;border:1px solid var(--line)}
+.bubble.good{border-color:rgba(21,163,91,.5)}
+.bubble.bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--red);font-weight:500}
+
+/* oilbook map */
+.map{display:grid;gap:8px}
+.mp{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+.mp div{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.3}
+.mp .q{background:var(--card);font-weight:700}
+.mp .a{background:var(--grad);color:#fff;font-weight:700}
+.mp .a small{display:block;font-weight:500;opacity:.9;font-size:12px}
+@media (max-width:520px){ .mp{grid-template-columns:1fr} .mp svg{transform:rotate(90deg);margin:0 auto} }
+
+/* task */
+.task{list-style:none;counter-reset:t;margin:0;padding:0;display:grid;gap:8px}
+.task li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--bg);border-radius:14px;padding:12px;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.task li::before{content:counter(t);width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:520px){ .sheet{grid-template-columns:1fr} }
+.cell{background:var(--card);border-radius:14px;padding:12px}
+.cell label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.cell input,.cell textarea{width:100%;border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;font-weight:700;font-size:16px;resize:vertical}
+.cell input:focus,.cell textarea:focus{border-color:var(--blue);outline:none}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.choice button[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+.saved{font-size:13px;color:var(--green);font-weight:700;margin-top:8px;min-height:20px}
+
+/* quiz */
+.q{background:var(--bg);border-radius:16px;padding:16px;margin-bottom:10px}
+.q-n{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.q-t{font-weight:700;font-size:16.5px;margin-bottom:10px;line-height:1.4}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;font-size:15px;line-height:1.4}
+.opt:hover:not([disabled]){border-color:var(--blue)}
+.opt.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.opt.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.opt[disabled]{cursor:default}
+.q-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2)}
+.q.done .q-ex{display:block}
+.result{display:none;background:var(--grad);color:#fff;border-radius:18px;padding:20px;text-align:center;margin-top:6px}
+.result.show{display:block}
+.result b{display:block;font-size:34px;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--blue);color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.white{background:#fff;color:var(--blue)}
+
+.done-card{text-align:center;padding:36px 0 50px}
+.done-card small{color:var(--muted);font-size:14px}
+.done-card h2{font-size:clamp(22px,4.5vw,30px);margin:6px 0 16px;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 34px}
+
+/* module 2 extras */
+.sae{display:flex;align-items:flex-end;gap:2px;font-weight:900;letter-spacing:-1px;line-height:1}
+.sae-big{background:#fff;color:var(--blue);border-radius:20px;padding:16px 18px 12px;display:inline-block;max-width:100%}
+.sae-row{display:flex;align-items:flex-end;gap:4px;font-size:clamp(46px,13vw,76px);font-weight:900;letter-spacing:-2px;line-height:1}
+.sae-row .w{color:#1FB5F2}
+.sae-row .h{color:#0A2A5E}
+.sae-cap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:12px;font-weight:700;color:#3E5479;letter-spacing:0;line-height:1.3}
+.sae-cap span{border-top:3px solid #1FB5F2;padding-top:6px}
+.sae-cap span+span{border-color:#0A2A5E}
+
+.funcs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:640px){ .funcs{grid-template-columns:repeat(2,1fr)} .funcs .fn:last-child{grid-column:1/-1} }
+.fn{background:var(--card);border-radius:14px;padding:14px 10px;text-align:center;font-size:13px;line-height:1.35;color:var(--ink-2)}
+.fn b{display:block;color:var(--ink);font-size:14.5px;margin:8px 0 4px}
+.fn .ico{width:44px;height:44px;margin:0 auto;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+.comp{display:flex;height:54px;border-radius:14px;overflow:hidden;font-weight:800;font-size:14px;color:#fff}
+.comp div{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;padding:0 6px}
+.adds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+@media (max-width:560px){ .adds{grid-template-columns:repeat(2,1fr)} }
+.add{background:var(--card);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.35;color:var(--ink-2);border-left:4px solid var(--cyan)}
+.add b{display:block;color:var(--ink);font-size:14px}
+
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .types{grid-template-columns:1fr} }
+.type{background:var(--card);border-radius:16px;padding:16px;border-top:5px solid #9DB4D6}
+.type:nth-child(2){border-color:var(--cyan)}.type:nth-child(3){border-color:var(--blue)}
+.type h4{margin:0 0 10px;font-size:17px}
+.meter{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.dots{display:flex;gap:4px}
+.dots i{width:16px;height:8px;border-radius:4px;background:var(--line)}
+.dots i.on{background:var(--blue)}
+.type p{font-size:13.5px!important;margin:10px 0 0!important;line-height:1.45}
+
+.thermo{position:relative;padding:6px 0 0}
+.th-axis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.th-col{text-align:center}
+.th-bar{height:120px;border-radius:10px;background:linear-gradient(180deg,var(--soft),var(--card));position:relative;overflow:hidden}
+.th-fill{position:absolute;left:0;right:0;bottom:0;background:var(--grad);border-radius:10px}
+.th-grade{font-weight:900;font-size:18px;margin-top:6px;color:var(--ink)}
+.th-t{font-size:12px;color:var(--muted);font-weight:700}
+.hot{display:grid;gap:8px}
+.hot-row{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
+.hot-row b{font-size:18px;font-weight:900;text-align:right}
+.hot-bar{height:28px;border-radius:8px;background:linear-gradient(90deg,#F2A20C,#E5484D);display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+
+.timeline{display:flex;gap:0;overflow-x:auto;padding-bottom:4px}
+.tm{flex:1 1 0;min-width:52px;text-align:center;position:relative;padding-top:22px}
+.tm::before{content:"";position:absolute;top:8px;left:0;right:0;height:4px;background:var(--line)}
+.tm::after{content:"";position:absolute;top:2px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--card);border:4px solid #9DB4D6}
+.tm.new::after{border-color:var(--blue);background:var(--blue)}
+.tm b{display:block;font-size:17px;font-weight:900}
+.tm span{font-size:12px;color:var(--muted);font-weight:700}
+
+.std{display:grid;gap:10px}
+.sd{display:grid;grid-template-columns:86px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;align-items:start}
+.sd .tag{background:var(--grad);color:#fff;border-radius:10px;padding:8px 6px;text-align:center;font-weight:900;font-size:15px;line-height:1.1}
+.sd .tag small{display:block;font-size:10.5px;font-weight:600;opacity:.9;margin-top:2px}
+.sd div{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.sd div b{color:var(--ink)}
+
+/* label decoder */
+.label{background:linear-gradient(160deg,#0A2A5E,#1463E6);color:#fff;border-radius:22px;padding:22px 18px;max-width:380px;margin:0 auto;box-shadow:0 12px 30px rgba(10,35,80,.25)}
+.lb-brand{font-weight:900;font-size:22px;letter-spacing:-.4px}
+.lb-sub{font-size:12px;opacity:.8;margin-bottom:14px}
+.lb-sae{font-size:44px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:12px}
+.hs{display:inline-block;border:2px dashed rgba(255,255,255,.55);border-radius:10px;padding:4px 8px;margin:0 4px 8px 0;font-weight:800;font-size:14px;cursor:pointer;background:transparent;color:#fff}
+.hs:hover,.hs.on{background:#fff;color:var(--blue);border-style:solid;border-color:#fff}
+.lb-sae .hs{font-size:44px;padding:2px 10px;letter-spacing:-1.5px;font-weight:900}
+.lb-vol{margin-top:6px;font-size:13px;opacity:.85}
+.explain{max-width:520px;margin:14px auto 0;background:var(--card);border-radius:16px;padding:14px 16px;font-size:15px;line-height:1.5;color:var(--ink-2);min-height:92px}
+.explain b{display:block;color:var(--ink);margin-bottom:4px}
+
+/* choose flow */
+.flow{display:grid;gap:0}
+.fstep{display:grid;grid-template-columns:44px 1fr;gap:12px;position:relative;padding-bottom:16px}
+.fstep:not(:last-child)::before{content:"";position:absolute;left:21px;top:44px;bottom:0;width:3px;background:var(--line)}
+.fnum{width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:17px}
+.fcard{background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.fcard b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
+.fcard .stop{display:inline-block;margin-top:6px;background:rgba(229,72,77,.1);color:var(--red);font-weight:700;font-size:13px;border-radius:8px;padding:3px 8px}
+
+/* myths */
+.myth{background:var(--card);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.myth button{width:100%;border:0;background:transparent;text-align:left;padding:14px 16px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-weight:700;font-size:15.5px;line-height:1.4}
+.myth .badge{font-size:12px;font-weight:800;color:var(--red);background:rgba(229,72,77,.1);border-radius:8px;padding:4px 8px;white-space:nowrap}
+.myth .ans{display:none;padding:0 16px 14px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.myth .ans b{color:var(--green)}
+.myth.open .ans{display:block}
+.myth.open .badge{color:var(--green);background:rgba(21,163,91,.1)}
+
+/* trainer */
+.case-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
+.case-card h4{margin:0 0 6px;font-size:16px}
+.req{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.45}
+.req small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.can{display:grid;gap:8px}
+.can button{text-align:left;border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14.5px;line-height:1.4}
+.can button b{display:block;font-size:15px}
+.can button.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.can button.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.can button[disabled]{cursor:default}
+.case-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.case-card.done .case-ex{display:block}
+
+.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:560px){ .tools{grid-template-columns:repeat(3,1fr)} }
+.tool{background:var(--card);border-radius:14px;padding:12px 6px;text-align:center;font-size:12.5px;font-weight:700;line-height:1.25;color:var(--ink)}
+.tool .ico{width:42px;height:42px;margin:0 auto 6px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+.tbar{display:flex;height:40px;border-radius:12px;overflow:hidden}
+.tbar div{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden}
+.tleg{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;margin-top:10px;font-size:13px;color:var(--ink-2)}
+.tleg i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+.runner{background:var(--card);border-radius:18px;overflow:hidden}
+.run-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;background:var(--grad);color:#fff}
+.run-top b{font-size:28px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.run-top small{display:block;font-size:12px;opacity:.9}
+.run-top .btn{background:#fff;color:var(--blue);padding:10px 14px}
+.steps{list-style:none;margin:0;padding:0}
+.st{display:grid;grid-template-columns:40px 1fr auto;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);align-items:start;cursor:pointer}
+.st:last-child{border-bottom:0}
+.st .num{width:34px;height:34px;border-radius:10px;border:2px solid var(--blue);color:var(--blue);font-weight:900;display:flex;align-items:center;justify-content:center;font-size:14px}
+.st.done .num{background:var(--green);border-color:var(--green);color:#fff}
+.st b{display:block;font-size:15px;line-height:1.3}
+.st span{display:block;font-size:13.5px;color:var(--ink-2);line-height:1.45;margin-top:3px}
+.st span.warn{color:var(--red);font-weight:600}
+.st em{font-style:normal;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap;padding-top:8px}
+.st.done b{color:var(--muted)}
+.run-res{padding:14px 16px;font-weight:700;color:var(--green);display:none}
+.run-res.show{display:block}
+
+.tubes{display:grid;grid-template-columns:repeat(5,1fr);gap:14px 8px;align-items:start}
+@media (max-width:560px){ .tubes{grid-template-columns:repeat(3,1fr)} }
+.tube{text-align:center;font-size:12.5px;line-height:1.3;color:var(--ink-2)}
+.tube .glass{width:44px;height:110px;margin:0 auto 8px;border:3px solid #B9C9E2;border-top:0;border-radius:0 0 22px 22px;position:relative;overflow:hidden;background:rgba(255,255,255,.6)}
+.tube .liq{position:absolute;left:0;right:0;bottom:0;height:78%}
+.tube b{display:block;color:var(--ink);font-size:13.5px;margin-bottom:2px}
+.tube .act{display:block;margin-top:4px;font-weight:700;color:var(--blue);font-size:12px}
+
+.safe{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (max-width:560px){ .safe{grid-template-columns:1fr} }
+.sf{display:grid;grid-template-columns:40px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px;font-size:14px;line-height:1.4;color:var(--ink-2)}
+.sf i{width:40px;height:40px;border-radius:12px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.sf b{display:block;color:var(--ink)}
+
+.cycle{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;align-items:stretch}
+@media (max-width:620px){ .cycle{grid-template-columns:1fr 1fr} }
+.cy{background:var(--card);border-radius:14px;padding:12px;text-align:center;font-size:13px;line-height:1.35;color:var(--ink-2);position:relative}
+.cy b{display:block;color:var(--ink);font-size:14px;margin:6px 0 2px}
+.cy.bad{background:rgba(229,72,77,.08)}
+
+.exit{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:620px){ .exit{grid-template-columns:1fr} }
+.ex5{background:var(--card);border-radius:14px;padding:12px;font-size:13.5px;line-height:1.35;color:var(--ink-2);display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+@media (min-width:621px){ .ex5{grid-template-columns:1fr;text-align:center;justify-items:center} }
+.ex5 i{width:36px;height:36px;border-radius:50%;background:var(--green);color:#fff;font-style:normal;font-weight:900;display:flex;align-items:center;justify-content:center}
+.ex5 b{color:var(--ink)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1FB5F2"/><stop offset="1" stop-color="#1463E6"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 24 32"><path d="M12 1C12 1 2 13.5 2 20.5a10 10 0 0 0 20 0C22 13.5 12 1 12 1Z"/></symbol>
+  </defs>
+</svg>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top" aria-label="OilBook">
+      <svg width="20" height="26" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+      <span class="brand-word"><span class="o">Oil</span><span class="b">Book</span></span>
+    </a>
+    <div class="crumb"><b>Taʼlim</b>5-modul, jami 12 ta</div>
+  </div>
+  <nav class="toc" aria-label="Dars boʻlimlari">
+    <a href="#s1">Nega standart</a>
+    <a href="#s2">Tayyorgarlik</a>
+    <a href="#s3">12 qadam</a>
+    <a href="#s4">Eski moy nima deydi</a>
+    <a href="#s5">Xavfsizlik</a>
+    <a href="#s6">Ishlatilgan moy</a>
+    <a href="#s7">Chiqish nazorati</a>
+    <a href="#train">Mashq</a>
+    <a href="#task">Topshiriq</a>
+    <a href="#quiz">Test</a>
+  </nav>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <span class="mod-tag">5-modul · usta uchun</span>
+    <h1>Moy almashtirish texnologiyasi</h1>
+    <p class="lead">Har safar bir xil, toza va xavfsiz: 12 qadamlik standart, eski moydan muammoni koʻra bilish va mashinani xatosiz topshirish.</p>
+    <div class="meta"><span>45 daqiqa</span><span>7 ta boʻlim</span><span>Taymerli ish kartasi</span><span>10 ta savollik test</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="goals" style="margin-top:16px">
+    <h2>Darsdan keyin siz:</h2>
+    <ul>
+      <li><i>1</i>Moy almashtirishni har safar bir xil 12 qadamda bajarasiz</li>
+      <li><i>2</i>Eski moyga qarab motordagi muammoni sezasiz</li>
+      <li><i>3</i>Oʻzingizni va mijoz mashinasini xavfsiz saqlaysiz</li>
+      <li><i>4</i>Mashinani topshirishdan oldin 5 ta nazoratni bajarasiz</li>
+    </ul>
+  </div>
+
+<!-- 5.1 -->
+<section class="part" id="s1"><div class="part-card">
+  <div class="ph"><span class="pn">5.1</span><h2>Nega standart kerak</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Xatolar bilmaslikdan emas, shoshilish va «esdan chiqib qolishi»dan boʻladi.</p>
+  <p>Tajribali usta ham kun oxirida charchaydi, telefon jiringlaydi, mijoz gap soʻraydi — va moy quyish qopqogʻi yopilmay qoladi. Standart — bu har safar bir xil tartib. U ustaga oʻylamasdan toʻgʻri ishlashga yordam beradi, yangi ustani esa tez oʻrgatadi.</p>
+  <div class="fig">
+    <p class="fig-t">Bitta almashtirish vaqti qayerga ketadi <span class="ex">taxminan 25 daqiqa</span></p>
+    <div class="tbar" role="img" aria-label="Qabul 3, tayyorgarlik 3, eski moyni toʻkish 6, filtr 3, quyish 4, tekshiruv 3, topshirish 3 daqiqa">
+      <div style="flex:3;background:#0A2A5E">3</div><div style="flex:3;background:#1463E6">3</div><div style="flex:6;background:#1F8BEA">6</div><div style="flex:3;background:#1FB5F2">3</div><div style="flex:4;background:#15A35B">4</div><div style="flex:3;background:#F2A20C">3</div><div style="flex:3;background:#8E5BD6">3</div>
+    </div>
+    <div class="tleg">
+      <span><i style="background:#0A2A5E"></i>Qabul va OilBook</span><span><i style="background:#1463E6"></i>Tayyorgarlik, himoya</span>
+      <span><i style="background:#1F8BEA"></i>Eski moyni toʻkish</span><span><i style="background:#1FB5F2"></i>Filtr</span>
+      <span><i style="background:#15A35B"></i>Yangi moy quyish</span><span><i style="background:#F2A20C"></i>Tekshiruv</span>
+      <span><i style="background:#8E5BD6"></i>Topshirish</span>
+    </div>
+    <p class="cap">Daqiqa hisobida. Eski moy toʻkilayotgan 6 daqiqa — 5 daqiqalik tekshiruvni (3-modul) qilish uchun eng yaxshi vaqt.</p>
+  </div>
+</div></section>
+
+<!-- 5.2 -->
+<section class="part" id="s2"><div class="part-card">
+  <div class="ph"><span class="pn">5.2</span><h2>Tayyorgarlik: hammasi qoʻl ostida</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Mashina kirishidan oldin kerakli hamma narsa joyida boʻlsa, ish tezroq va tozaroq ketadi.</p>
+  <div class="fig">
+    <div class="tools">
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg></div>Kalit va golovkalar</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/></svg></div>Filtr yechgich</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M4 5h16l-6 8v6l-4 2v-8z"/></svg></div>Voronka</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M3 10h18l-2 9H5z"/><path d="M8 10V6h8v4"/></svg></div>Eski moy idishi</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.5"/></svg></div>Yangi shayba</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M7 3h10v18H7z"/><path d="M10 7h4"/></svg></div>Toza latta</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M6 12V5a2 2 0 0 1 4 0v5M10 9V4a2 2 0 0 1 4 0v6M14 9V6a2 2 0 0 1 4 0v8a7 7 0 0 1-7 7H10a6 6 0 0 1-6-6v-2a2 2 0 0 1 4 0"/></svg></div>Qoʻlqop</div>
+      <div class="tool"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M5 20V9a7 7 0 0 1 14 0v11"/><path d="M5 14h14"/></svg></div>Qoplamalar</div>
+    </div>
+    <p class="cap">Qoplamalar: oʻrindiq, rul, pol gilami va qanot uchun. Ular 30 soniyada qoʻyiladi, mijoz esa ularni albatta koʻradi.</p>
+  </div>
+</div></section>
+
+<!-- 5.3 -->
+<section class="part" id="s3"><div class="part-card">
+  <div class="ph"><span class="pn">5.3</span><h2>12 qadamlik standart</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Bu — ish kartasi. «Boshlash» tugmasini bosing, har bir bajarilgan qadamni belgilang va oʻz vaqtingizni koʻring.</p>
+  <div class="fig" style="padding:0;background:transparent">
+    <div class="runner">
+      <div class="run-top"><div><small>Vaqt</small><b id="clock">00:00</b></div><button class="btn" type="button" id="runBtn">Boshlash</button></div>
+      <ol class="steps" id="steps"></ol>
+      <div class="run-res" id="runRes" aria-live="polite"></div>
+    </div>
+  </div>
+  <div class="note warn">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg>
+    <div><b>Probkani qattiq tortmang</b>Koʻp mashinalarda karter alyuminiydan — rezba oson buziladi va bu qimmat taʼmir. Probka qoʻllanmadagi kuch bilan yoki ehtiyotkorlik bilan buraladi, shayba esa har safar yangisi qoʻyiladi.</div>
+  </div>
+</div></section>
+
+<!-- 5.4 -->
+<section class="part" id="s4"><div class="part-card">
+  <div class="ph"><span class="pn">5.4</span><h2>Eski moy nima deydi</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Toʻkilayotgan moyga bir qarash — bepul diagnostika. Uni mijozga aytish — katta ishonch.</p>
+  <div class="fig">
+    <div class="tubes">
+      <div class="tube"><div class="glass"><div class="liq" style="background:linear-gradient(#5A4A2A,#2E2414)"></div></div><b>Qora, bir xil</b>Odatiy holat<span class="act">Muammo yoʻq</span></div>
+      <div class="tube"><div class="glass"><div class="liq" style="background:linear-gradient(#1A1612,#0C0A08);height:60%"></div></div><b>Juda qalin, smolasimon</b>Uzoq almashtirilmagan<span class="act">Oraliqni qisqartirish</span></div>
+      <div class="tube"><div class="glass"><div class="liq" style="background:linear-gradient(#E8DCC0,#C9B98F)"></div></div><b>Sutsimon, koʻpikli</b>Antifriz yoki suv aralashgan boʻlishi mumkin<span class="act">Mijozga aytish, servis</span></div>
+      <div class="tube"><div class="glass"><div class="liq" style="background:linear-gradient(#8A7A50,#5E5232);height:88%"></div></div><b>Suyuq, benzin hidi</b>Yoqilgʻi aralashgan boʻlishi mumkin<span class="act">Mijozga aytish, servis</span></div>
+      <div class="tube"><div class="glass"><div class="liq" style="background:radial-gradient(circle at 30% 40%,#D9D9D9 2px,transparent 3px),radial-gradient(circle at 65% 65%,#D9D9D9 2px,transparent 3px),linear-gradient(#3A3226,#1E1A14)"></div></div><b>Yaltiroq zarrachalar</b>Metall yeyilishi<span class="act">Mijozga aytish, servis</span></div>
+    </div>
+    <p class="cap">Usta tashxis qoʻymaydi — faqat koʻrganini aytadi va servisga tekshirtirishni maslahat beradi. Ayniqsa sutsimon moy jiddiy belgi boʻlishi mumkin.</p>
+  </div>
+  <div class="fig">
+    <div class="say"><div class="say-who">Mijozga qanday aytish</div><div class="bubble good">«Eski moyingiz biroz sutsimon rangda chiqdi — bu baʼzan sovutish suyuqligi moyga tushayotganini bildiradi. Men tashxis qoʻymayman, lekin motor servisida tekshirtirib koʻring. Kech qolsa, taʼmir qimmatlashadi».</div></div>
+  </div>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Yozib qoʻying</b>Koʻrganingizni va mijozga nima aytganingizni qisqa yozib qoʻying. Keyingi safar mijoz kelganda «servisda tekshirtirdingizmi?» deb soʻraysiz — bu gʻamxoʻrlik.</div>
+  </div>
+</div></section>
+
+<!-- 5.5 -->
+<section class="part" id="s5"><div class="part-card">
+  <div class="ph"><span class="pn">5.5</span><h2>Xavfsizlik</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Tez ishlash — yaxshi. Lekin birorta mashina ustaning sogʻligʻidan qimmat emas.</p>
+  <div class="fig">
+    <div class="safe">
+      <div class="sf"><i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 1 1 2 2 3 2 0-2-1-3 0-5z"/></svg></i><div><b>Issiq moy kuydiradi</b>Probkani yechayotganda qoʻlni oqim yoʻlidan oling, qoʻlqop kiying.</div></div>
+      <div class="sf"><i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M4 20h16M7 20V10h10v10M9 10V6h6v4"/></svg></i><div><b>Koʻtargich tayanchlari</b>Faqat qoʻllanmadagi tayanch nuqtalariga. Koʻtarib, mashinani bir silkitib tekshiring.</div></div>
+      <div class="sf"><i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><rect x="3" y="12" width="18" height="8"/><path d="M3 12l3-3h12l3 3"/></svg></i><div><b>Yama</b>Ish boʻlmaganda yama ustini yoping yoki toʻsiq qoʻying. Qorongʻida — yoritish.</div></div>
+      <div class="sf"><i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M4 18c3 0 3-2 6-2s3 2 6 2 3-2 4-2"/></svg></i><div><b>Sirpanchiq pol</b>Toʻkilgan moyni darhol sorbent yoki qum bilan yigʻing.</div></div>
+      <div class="sf"><i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><rect x="8" y="6" width="8" height="15" rx="2"/><path d="M10 6V3h4v3M16 9h3"/></svg></i><div><b>Oʻt oʻchirgich</b>Koʻrinadigan joyda, muddati oʻtmagan. Ishlatilgan latta — yopiq temir idishda.</div></div>
+      <div class="sf"><i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><circle cx="8" cy="13" r="3"/><circle cx="16" cy="13" r="3"/><path d="M11 13h2M5 13H3M19 13h2"/></svg></i><div><b>Koʻz va teri</b>Yama ostida ishlaganda koʻzoynak. Moyli qoʻlni ish tugagach yuving.</div></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 5.6 -->
+<section class="part" id="s6"><div class="part-card">
+  <div class="ph"><span class="pn">5.6</span><h2>Ishlatilgan moy va filtrlar</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Bir litr ishlatilgan moy juda katta hajmdagi suvni ichishga yaroqsiz qilib qoʻyishi mumkin.</p>
+  <p>Ishlatilgan moyni yerga, ariq yoki kanalizatsiyaga toʻkish mumkin emas. U yopiq idishlarda yigʻiladi va uni qabul qiladigan tashkilotga topshiriladi. Eski filtrlarda ham moy qoladi — ularni alohida yigʻing.</p>
+  <div class="fig">
+    <p class="fig-t">Toʻgʻri yoʻl</p>
+    <div class="cycle">
+      <div class="cy"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M3 10h18l-2 9H5z"/></svg><b>Toʻkish</b>maxsus idishga</div>
+      <div class="cy"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2h6v2"/></svg><b>Saqlash</b>yopiq bochka, filtrlar alohida</div>
+      <div class="cy"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><rect x="2" y="8" width="13" height="9"/><path d="M15 11h4l3 3v3h-7"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg><b>Topshirish</b>qabul qiluvchi tashkilotga</div>
+      <div class="cy bad"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg><b>Mumkin emas</b>yerga, ariqqa, kanalizatsiyaga</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 5.7 -->
+<section class="part" id="s7"><div class="part-card">
+  <div class="ph"><span class="pn">5.7</span><h2>Chiqish nazorati: 5 ta tekshiruv</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Mashinani mijozga berishdan oldin — har safar, bitta ham istisnosiz.</p>
+  <div class="fig">
+    <div class="exit">
+      <div class="ex5"><i>1</i><div><b>Moy quyish qopqogʻi</b> yopilgan</div></div>
+      <div class="ex5"><i>2</i><div><b>Shchup</b> joyida, daraja MAX ga yaqin</div></div>
+      <div class="ex5"><i>3</i><div><b>Probka va filtr</b> quruq, oqish yoʻq</div></div>
+      <div class="ex5"><i>4</i><div><b>Kapot ostida</b> latta va asbob qolmagan</div></div>
+      <div class="ex5"><i>5</i><div><b>Moy bosimi chirogʻi</b> ishga tushgandan keyin oʻchgan</div></div>
+    </div>
+    <p class="cap">Moy bosimi chirogʻi bir necha soniyadan keyin ham oʻchmasa — motorni darhol oʻchiring va sababini toping.</p>
+  </div>
+  <div class="note case">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#15A35B" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <div><b>Vaziyat</b>Usta shoshilib, moy quyish qopqogʻini kapot ustida qoldirdi. Mijoz 10 km yurgach, motor moy bilan purkalgan, kapot ostidan tutun chiqdi. Bitta qopqoq — mijozning ishonchi va shoxobchaning obroʻsi. 5 ta tekshiruv 30 soniya oladi.</div>
+  </div>
+</div></section>
+
+<!-- trainer -->
+<section class="part" id="train"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Mashq</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Toʻrtta vaziyat. Toʻgʻri harakatni tanlang.</p>
+  <div id="cases"></div>
+</div></section>
+
+<!-- task -->
+<section class="part" id="task"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Amaliy topshiriq</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Uch kun davomida bajariladi.</p>
+  <ol class="task">
+    <li><div><b>Usta:</b> 3 ta mashinada ish kartasidan foydalaning — taymerni yoqib, har bir qadamni belgilang. Eng sekin qadamni toping.</div></li>
+    <li><div><b>Usta:</b> har bir mashinada 5 ta chiqish nazoratini bajaring.</div></li>
+    <li><div><b>Ega:</b> asboblar roʻyxatini tekshiring: qoplamalar, yangi shaybalar, oʻt oʻchirgich, ishlatilgan moy idishi bormi?</div></li>
+    <li><div><b>Ega:</b> ishlatilgan moyni kim va qachon olib ketishini aniqlang.</div></li>
+  </ol>
+  <div class="fig">
+    <p class="fig-t">Bajarilganini belgilang</p>
+    <div class="choice" id="taskDone">
+      <button type="button" data-v="0" aria-pressed="false">3 ta mashina kartasi</button>
+      <button type="button" data-v="1" aria-pressed="false">Chiqish nazorati</button>
+      <button type="button" data-v="2" aria-pressed="false">Asboblar tekshirildi</button>
+      <button type="button" data-v="3" aria-pressed="false">Ishlatilgan moy hal qilindi</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- quiz -->
+<section class="part" id="quiz"><div class="part-card">
+  <div class="ph"><span class="pn">?</span><h2>Test</h2></div>
+  <p class="kicker">10 ta savol. Modulni topshirish uchun 8 ta toʻgʻri javob kerak.</p>
+  <div id="quizBox"></div>
+  <div class="result" id="result" aria-live="polite"></div>
+</div></section>
+
+<div class="done-card">
+  <small>Keyingi modul</small>
+  <h2>6. Mijozni kutib olish va kuzatib qoʻyish</h2>
+  <a class="btn" href="#top">Dars boshiga</a>
+</div>
+</div>
+</main>
+<footer>OilBook taʼlimi — moy almashtirish shoxobchalari uchun kurs</footer>
+
+<script>
+(function(){
+  var KEY='oilbook-course-m5-uz-';
+  var store={get:function(k){try{return JSON.parse(localStorage.getItem(KEY+k));}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v));}catch(e){}}};
+
+  var bar=document.getElementById('progress'), nav=document.querySelector('.toc');
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  var cur=-2, ticking=false;
+  function update(){
+    ticking=false;
+    var h=document.documentElement;
+    bar.style.transform='scaleX('+(h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight)).toFixed(3)+')';
+    var c=-1; for(var i=0;i<secs.length;i++){ if(secs[i]&&secs[i].getBoundingClientRect().top<150) c=i; else break; }
+    if(c!==cur){ cur=c; links.forEach(function(a,i){a.classList.toggle('on',i===c);}); if(c>=0){ var a=links[c]; nav.scrollLeft=a.offsetLeft-(nav.clientWidth-a.offsetWidth)/2; } }
+  }
+  window.addEventListener('scroll',function(){ if(!ticking){ticking=true;requestAnimationFrame(update);} },{passive:true});
+  update();
+
+  /* work card */
+  var S=[
+    ['Qabul','Mijozni kutib oling, davlat raqami va probegni soʻrang, mashinani OilBookda toping yoki qoʻshing.','2 daq'],
+    ['Himoya','Oʻrindiq, rul, pol va qanot qoplamalarini qoʻying.','1 daq'],
+    ['Motorni isitish','Motor sovuq boʻlsa, 2–3 daqiqa ishlating — iliq moy yaxshi oqadi. Qizdirib yubormang.','2 daq'],
+    ['Qopqoqni ochish','Moy quyish qopqogʻini oching va kapot ustidagi koʻrinadigan joyga qoʻying — havo kirib, moy tezroq oqadi.','10 son'],
+    ['Koʻtarish','Koʻtargichda — tayanch nuqtalariga, yamada — gʻildirak ostiga tirgak.','1 daq'],
+    ['Eski moyni toʻkish','Idishni qoʻying, probkani yeching, moy toʻliq oqib tushguncha kuting. Shu vaqtda 5 daqiqalik tekshiruvni qiling.','6 daq','Issiq moy — qoʻlni oqim yoʻlidan oling'],
+    ['Eski moyni koʻrish','Rangi, qalinligi, hidi, zarrachalar — 5.4-boʻlim.','20 son'],
+    ['Filtr','Eski filtrni yeching, eski halqa qolmaganini tekshiring, yangisining halqasini moylab, qoʻlda burang.','3 daq'],
+    ['Probka','Yangi shayba bilan, ortiqcha kuchsiz burang. Atrofini artib qoʻying.','1 daq','Alyuminiy karter — rezbani buzmang'],
+    ['Yangi moy quyish','Ozroq quying, qopqoqni yoping, 1 daqiqa ishga tushiring, chiroq oʻchganini koʻring, keyin shchup boʻyicha MAX ga yetkazing.','4 daq'],
+    ['Tozalik','Tomchilarni arting, qoplamalarni oling, asboblarni yigʻing.','2 daq'],
+    ['Topshirish','5 ta chiqish nazorati, stiker, OilBookga yozish, mijozga tushuntirish.','3 daq']
+  ];
+  var ol=document.getElementById('steps'), clock=document.getElementById('clock'), btn=document.getElementById('runBtn'), rr=document.getElementById('runRes');
+  ol.innerHTML=S.map(function(s,i){return '<li class="st" data-i="'+i+'" role="checkbox" aria-checked="false" tabindex="0"><span class="num">'+(i+1)+'</span><div><b>'+s[0]+'</b><span>'+s[1]+'</span>'+(s[3]?'<span class="warn">'+s[3]+'</span>':'')+'</div><em>'+s[2]+'</em></li>';}).join('');
+  var t0=0, timer=null, done={};
+  function fmt(sec){ var m=Math.floor(sec/60), s=sec%60; return (m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
+  function tick(){ clock.textContent=fmt(Math.floor((Date.now()-t0)/1000)); }
+  btn.addEventListener('click',function(){
+    if(timer){ clearInterval(timer); timer=null; btn.textContent='Boshlash'; return; }
+    done={}; ol.querySelectorAll('.st').forEach(function(li){li.classList.remove('done');li.setAttribute('aria-checked','false');});
+    rr.className='run-res'; t0=Date.now(); tick(); timer=setInterval(tick,1000); btn.textContent='Toʻxtatish';
+  });
+  function toggle(li){
+    var i=li.dataset.i; done[i]=!done[i];
+    li.classList.toggle('done',!!done[i]); li.setAttribute('aria-checked',String(!!done[i]));
+    var n=Object.keys(done).filter(function(k){return done[k];}).length;
+    if(n===S.length){
+      var sec=timer?Math.floor((Date.now()-t0)/1000):0;
+      if(timer){ clearInterval(timer); timer=null; btn.textContent='Boshlash'; }
+      var best=store.get('best');
+      if(sec && (!best || sec<best)){ best=sec; store.set('best',sec); }
+      rr.textContent='12 qadam bajarildi'+(sec?' — '+fmt(sec)+'.':'.')+(best?' Eng yaxshi natijangiz: '+fmt(best)+'.':'');
+      rr.className='run-res show';
+    }
+  }
+  ol.addEventListener('click',function(e){ var li=e.target.closest('.st'); if(li) toggle(li); });
+  ol.addEventListener('keydown',function(e){ if(e.key===' '||e.key==='Enter'){ var li=e.target.closest('.st'); if(li){ e.preventDefault(); toggle(li);} } });
+
+  /* trainer */
+  var CS=[
+    {t:'Toʻkilayotgan eski moy sutsimon va koʻpikli.',o:['Hech narsa demay, yangi moy quyish','Mijozga koʻrsatib, motor servisida tekshirtirishni maslahat berish','Mijozga «motoringiz buzilgan» deb aytish'],a:1,e:'Usta tashxis qoʻymaydi, lekin koʻrganini aytadi. Bu antifriz moyga tushayotganining belgisi boʻlishi mumkin.'},
+    {t:'Yangi moy quyib, motorni ishga tushirdingiz — moy bosimi chirogʻi 10 soniyadan keyin ham yonib turibdi.',o:['Kutib turish, oʻzi oʻchadi','Motorni darhol oʻchirib, daraja, filtr va oqishni tekshirish','Mijozga mashinani berib yuborish'],a:1,e:'Chiroq bosim yoʻqligini bildiradi. Moysiz ishlash motorni bir necha daqiqada buzishi mumkin.'},
+    {t:'Probka rezbasi qattiq ketyapti, shayba eski.',o:['Kuchliroq tortish','Probkani tekshirib, yangi shayba bilan ehtiyotkorlik bilan burash','Shaybasiz burash'],a:1,e:'Alyuminiy karterda rezba oson buziladi. Yangi shayba — zichlik uchun.'},
+    {t:'Kun oxiri, ishlatilgan moy idishi toʻlib qoldi.',o:['Orqadagi ariqqa toʻkish','Yopiq bochkaga quyib, qabul qiluvchiga topshirishgacha saqlash','Tuproqqa toʻkib, qum sepish'],a:1,e:'Ishlatilgan moy faqat yopiq idishda saqlanadi va topshiriladi.'}
+  ];
+  var cs=document.getElementById('cases');
+  cs.innerHTML=CS.map(function(c,i){
+    return '<div class="case-card" data-i="'+i+'"><div class="req"><small>Vaziyat</small>'+c.t+'</div><div class="can">'+c.o.map(function(o,k){return '<button type="button" data-k="'+k+'"><b>'+o+'</b></button>';}).join('')+'</div><div class="case-ex">'+c.e+'</div></div>';
+  }).join('');
+  cs.addEventListener('click',function(e){
+    var b=e.target.closest('.can button'); if(!b) return;
+    var card=b.closest('.case-card'); if(card.classList.contains('done')) return;
+    var c=CS[+card.dataset.i]; card.classList.add('done');
+    card.querySelectorAll('.can button').forEach(function(x){ x.disabled=true; if(+x.dataset.k===c.a) x.classList.add('ok'); else if(x===b) x.classList.add('no'); });
+  });
+
+  /* task */
+  var td=store.get('task')||{}, tdb=document.getElementById('taskDone');
+  function paint(){ tdb.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed',String(!!td[b.dataset.v])); }); }
+  tdb.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; td[b.dataset.v]=!td[b.dataset.v]; store.set('task',td); paint(); });
+  paint();
+
+  /* quiz */
+  var Q=[
+    {q:'Nega moy almashtirishda standart kerak?',o:['Tezroq tugatish uchun','Shoshilganda ham hech narsa esdan chiqmasligi uchun','Mijoz shuni talab qilgani uchun'],a:1,e:'Xatolar koʻpincha shoshilish va unutishdan boʻladi.'},
+    {q:'Moy toʻkishdan oldin motor qanday boʻlishi kerak?',o:['Juda issiq','Iliq — moy yaxshi oqadi','Muzdek sovuq'],a:1,e:'Iliq moy yaxshi oqadi, lekin juda issiq moy kuydiradi.'},
+    {q:'Moy quyish qopqogʻi nima uchun oldindan ochiladi?',o:['Havo kirib, moy tezroq oqishi uchun','Moy hidini chiqarish uchun','Shunchaki odat'],a:0,e:'Qopqoqni koʻrinadigan joyga qoʻying — yopishni unutmaslik uchun.'},
+    {q:'Eski moy toʻkilayotgan vaqtda nima qilish foydali?',o:['Dam olish','5 daqiqalik tekshiruvni bajarish','Telefonda gaplashish'],a:1,e:'Bu vaqt — filtr va suyuqliklarni koʻrish uchun eng qulay payt.'},
+    {q:'Sutsimon, koʻpikli eski moy nimani bildirishi mumkin?',o:['Moy juda yangi','Antifriz yoki suv aralashgan boʻlishi mumkin','Moy sintetika'],a:1,e:'Mijozga aytib, servisga tekshirtirishni maslahat bering.'},
+    {q:'Probka shaybasi bilan nima qilinadi?',o:['Har safar yangisi qoʻyiladi','Hech qachon almashtirilmaydi','Shaybasiz buraladi'],a:0,e:'Yangi shayba zich bosadi va oqishning oldini oladi.'},
+    {q:'Yangi moy quyib ishga tushirgach, nimaga qaraladi?',o:['Radio ishlayaptimi','Moy bosimi chirogʻi oʻchdimi','Oynalar tozami'],a:1,e:'Oʻchmasa — darhol motorni oʻchiring.'},
+    {q:'Ishlatilgan moy bilan nima qilinadi?',o:['Ariqqa toʻkiladi','Yopiq idishda saqlanib, qabul qiluvchiga topshiriladi','Yerga koʻmiladi'],a:1,e:'Eski filtrlar ham alohida yigʻiladi.'},
+    {q:'Qaysi biri chiqish nazoratiga kirmaydi?',o:['Qopqoq yopilgan','Shchup joyida','Mashina yuvilgan'],a:2,e:'5 ta nazorat: qopqoq, shchup, oqish, kapot ostida narsa qolmagan, bosim chirogʻi.'},
+    {q:'Koʻtargichda mashina qayerdan koʻtariladi?',o:['Istalgan joyidan','Qoʻllanmadagi tayanch nuqtalaridan','Bamperdan'],a:1,e:'Koʻtarib, bir silkitib tekshiring.'}
+  ];
+  var box=document.getElementById('quizBox'), res=document.getElementById('result'), ans={};
+  function renderQ(){
+    ans={}; res.className='result'; res.innerHTML='';
+    box.innerHTML=Q.map(function(x,i){return '<div class="q" data-i="'+i+'"><div class="q-n">Savol '+(i+1)+' / 10</div><div class="q-t">'+x.q+'</div><div class="opts">'+x.o.map(function(t,k){return '<button class="opt" type="button" data-k="'+k+'">'+t+'</button>';}).join('')+'</div><div class="q-ex">'+x.e+'</div></div>';}).join('');
+  }
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b) return;
+    var card=b.closest('.q'), i=+card.dataset.i; if(i in ans) return;
+    ans[i]=+b.dataset.k; card.classList.add('done');
+    card.querySelectorAll('.opt').forEach(function(o){ o.disabled=true; if(+o.dataset.k===Q[i].a) o.classList.add('ok'); else if(o===b) o.classList.add('no'); });
+    if(Object.keys(ans).length===Q.length){
+      var ok=Q.filter(function(x,qi){return ans[qi]===x.a;}).length; store.set('quiz',ok);
+      res.innerHTML='<b>'+ok+' / 10</b>'+(ok>=8?'Modul topshirildi. Keyingisi — «Mijozni kutib olish va kuzatib qoʻyish».':'10 tadan 8 ta toʻgʻri javob kerak. 5.3–5.7-boʻlimlarni qayta oʻqib, yana urinib koʻring.')+'<div style="margin-top:14px"><button class="btn white" type="button" id="retry">Qaytadan topshirish</button></div>';
+      res.className='result show';
+      document.getElementById('retry').addEventListener('click',function(){ renderQ(); box.scrollIntoView({block:'start'}); });
+    }
+  });
+  renderQ();
+})();
+</script>
+
+</body>
+</html>

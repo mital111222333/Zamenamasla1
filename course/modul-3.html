@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3-modul. Filtrlar va texnik suyuqliklar — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Sora:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2350;
+  --ink-2:#3E5479;
+  --muted:#6B7F9E;
+  --bg:#EEF4FB;
+  --card:#FFFFFF;
+  --line:#D9E4F2;
+  --blue:#1463E6;
+  --cyan:#1FB5F2;
+  --soft:#E3EEFD;
+  --red:#E5484D;
+  --amber:#F2A20C;
+  --green:#15A35B;
+  --grad:linear-gradient(135deg,#1FB5F2 0%,#1463E6 100%);
+  --font:'Onest', 'Segoe UI', Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F;
+  }
+}
+:root[data-theme="dark"]{ --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 110px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* app header */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-word{font-family:'Sora',var(--font);font-weight:800;font-size:20px;letter-spacing:-.4px;line-height:1}
+.brand-word .o{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-word .b{color:#0A2A5E}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word .b{color:#E8F0FC} }
+.crumb{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px;line-height:1.25}
+.crumb b{display:block;color:var(--ink);font-weight:700;font-size:14px}
+.progress{height:3px;background:var(--grad);width:100%;transform:scaleX(0);transform-origin:0 50%}
+.toc{max-width:860px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 12px;background:var(--soft);border-radius:999px;white-space:nowrap}
+.toc a.on{color:#fff;background:var(--blue)}
+
+/* hero */
+.hero{background:var(--grad);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;bottom:-90px;width:300px;height:390px;background:rgba(255,255,255,.10);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;transform:rotate(-12deg)}
+.hero .wrap{position:relative;z-index:1;padding-top:34px;padding-bottom:34px}
+.mod-tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.08;font-weight:900;margin:0 0 14px;letter-spacing:-.6px;max-width:640px}
+.hero .lead{font-size:clamp(16px,2.3vw,19px);opacity:.92;max-width:600px;margin:0 0 24px}
+.formula-hero{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(6,30,80,.28);border-radius:18px;padding:14px;max-width:620px}
+.fh{background:#fff;color:var(--blue);border-radius:12px;padding:8px 12px;font-weight:800;font-size:15px;line-height:1.2;text-align:center}
+.fh small{display:block;font-size:11px;font-weight:600;color:#6B7F9E}
+.fop{font-weight:900;font-size:22px;opacity:.9}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.meta span{background:rgba(255,255,255,.16);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+
+/* goals */
+.goals{background:var(--card);border-radius:20px;padding:20px;margin-top:-1px;margin-bottom:8px}
+.goals h2{font-size:18px;margin:0 0 12px}
+.goals ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.goals li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45}
+.goals li i{width:28px;height:28px;border-radius:9px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--blue);font-style:normal;font-weight:800;font-size:14px}
+
+/* section */
+section.part{padding:40px 0 8px}
+.part-card{background:var(--card);border-radius:24px;padding:24px 20px;box-shadow:0 1px 0 var(--line)}
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.part h2{font-size:clamp(22px,4.6vw,30px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.3px}
+.part h3{font-size:18px;margin:28px 0 10px;line-height:1.3}
+.part p{margin:0 0 12px;color:var(--ink-2)}
+.part p b,.part li b{color:var(--ink)}
+.kicker{font-size:19px;font-weight:700;color:var(--ink)!important;line-height:1.4;margin-bottom:16px!important}
+.who{display:inline-flex;gap:6px;margin-bottom:14px}
+.who span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--blue)}
+
+.fig{background:var(--bg);border-radius:18px;padding:18px;margin:18px 0}
+.fig-t{font-weight:800;font-size:15px;margin:0 0 14px;color:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin:12px 0 0!important;line-height:1.45}
+.ex{font-size:12px;font-weight:700;color:var(--amber);background:rgba(242,162,12,.12);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+
+.note{display:grid;grid-template-columns:26px 1fr;gap:12px;border-radius:16px;padding:14px 16px;margin:18px 0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.note b{display:block;color:var(--ink);margin-bottom:3px}
+.note.case{background:rgba(21,163,91,.09)}
+.note.warn{background:rgba(229,72,77,.08)}
+.note.tip{background:var(--soft)}
+.note.app{background:linear-gradient(135deg,rgba(31,181,242,.12),rgba(20,99,230,.12));border:1px solid rgba(20,99,230,.25)}
+
+/* calculator */
+.calc{display:grid;gap:14px}
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+.inp input:focus{border-color:var(--blue);outline:none}
+.total{background:var(--grad);color:#fff;border-radius:16px;padding:16px;text-align:center}
+.total small{display:block;font-size:13px;opacity:.9;font-weight:600}
+.total b{font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:-.5px}
+.levers{display:grid;gap:10px;margin-top:4px}
+.lv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:14px}
+.lv-name{font-weight:700;line-height:1.3}
+.lv-bar{background:var(--card);border-radius:10px;height:34px;position:relative;overflow:hidden}
+.lv-fill{position:absolute;inset:0 auto 0 0;background:var(--grad);border-radius:10px;transition:width .3s}
+.lv-val{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-weight:800;font-size:14px;color:var(--ink)}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} .lv{grid-template-columns:1fr} }
+
+/* bucket */
+.bucket{display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:10px}
+.bk-side{display:grid;gap:8px}
+.bk-chip{border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.3}
+.bk-chip.in{background:rgba(21,163,91,.12);color:var(--green)}
+.bk-chip.out{background:rgba(229,72,77,.1);color:var(--red)}
+.bk-chip small{display:block;font-weight:500;color:var(--ink-2);font-size:12px}
+@media (max-width:600px){ .bucket{grid-template-columns:1fr} .bk-svg{order:-1;max-width:170px;margin:0 auto} }
+
+/* lifetime */
+.life{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px}
+.life div{background:var(--grad);border-radius:6px 6px 2px 2px}
+.life-axis{display:grid;grid-template-columns:repeat(3,1fr);font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;text-align:center}
+.life-axis span{border-top:2px solid var(--line);padding-top:4px}
+.big-num{display:flex;gap:14px;align-items:center;margin-top:14px}
+.big-num b{font-size:30px;font-weight:900;color:var(--blue);letter-spacing:-.5px;line-height:1}
+.big-num span{font-size:14px;color:var(--ink-2);line-height:1.35}
+
+/* stacked check */
+.stack{display:grid;gap:12px}
+.st-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
+.st-name{font-weight:800;font-size:14px;line-height:1.25}
+.st-name small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.st-bar{display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--card)}
+.st-bar span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;padding:0 3px}
+.c-oil{background:#1463E6}.c-flt{background:#1FB5F2}.c-work{background:#0A2A5E}.c-air{background:#15A35B}.c-cab{background:#F2A20C}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+/* waterfall */
+.wf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:220px;align-items:stretch}
+.wf-col{position:relative}
+.wf-b{position:absolute;left:0;right:0;border-radius:8px}
+.wf-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:800}
+.wf-l{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;line-height:1.2;overflow-wrap:anywhere}
+
+/* three levers */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .three{grid-template-columns:1fr} }
+.tl{background:var(--card);border-radius:16px;padding:16px;border-top:4px solid var(--blue)}
+.tl:nth-child(2){border-color:var(--cyan)}.tl:nth-child(3){border-color:var(--green)}
+.tl h4{margin:8px 0 6px;font-size:16px}
+.tl ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.tl .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+/* leaks */
+.leaks{display:grid;gap:8px}
+.leak{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.leak b{color:var(--ink);display:block}
+.leak .d{width:34px;height:34px;border-radius:10px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.leak em{font-style:normal;color:var(--blue);font-weight:700}
+
+/* scripts */
+.say{display:grid;gap:6px;margin-bottom:12px}
+.say-who{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble{background:var(--card);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.45;font-weight:600;border:1px solid var(--line)}
+.bubble.good{border-color:rgba(21,163,91,.5)}
+.bubble.bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--red);font-weight:500}
+
+/* oilbook map */
+.map{display:grid;gap:8px}
+.mp{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+.mp div{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.3}
+.mp .q{background:var(--card);font-weight:700}
+.mp .a{background:var(--grad);color:#fff;font-weight:700}
+.mp .a small{display:block;font-weight:500;opacity:.9;font-size:12px}
+@media (max-width:520px){ .mp{grid-template-columns:1fr} .mp svg{transform:rotate(90deg);margin:0 auto} }
+
+/* task */
+.task{list-style:none;counter-reset:t;margin:0;padding:0;display:grid;gap:8px}
+.task li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--bg);border-radius:14px;padding:12px;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.task li::before{content:counter(t);width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:520px){ .sheet{grid-template-columns:1fr} }
+.cell{background:var(--card);border-radius:14px;padding:12px}
+.cell label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.cell input,.cell textarea{width:100%;border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;font-weight:700;font-size:16px;resize:vertical}
+.cell input:focus,.cell textarea:focus{border-color:var(--blue);outline:none}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.choice button[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+.saved{font-size:13px;color:var(--green);font-weight:700;margin-top:8px;min-height:20px}
+
+/* quiz */
+.q{background:var(--bg);border-radius:16px;padding:16px;margin-bottom:10px}
+.q-n{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.q-t{font-weight:700;font-size:16.5px;margin-bottom:10px;line-height:1.4}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;font-size:15px;line-height:1.4}
+.opt:hover:not([disabled]){border-color:var(--blue)}
+.opt.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.opt.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.opt[disabled]{cursor:default}
+.q-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2)}
+.q.done .q-ex{display:block}
+.result{display:none;background:var(--grad);color:#fff;border-radius:18px;padding:20px;text-align:center;margin-top:6px}
+.result.show{display:block}
+.result b{display:block;font-size:34px;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--blue);color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.white{background:#fff;color:var(--blue)}
+
+.done-card{text-align:center;padding:36px 0 50px}
+.done-card small{color:var(--muted);font-size:14px}
+.done-card h2{font-size:clamp(22px,4.5vw,30px);margin:6px 0 16px;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 34px}
+
+/* module 2 extras */
+.sae{display:flex;align-items:flex-end;gap:2px;font-weight:900;letter-spacing:-1px;line-height:1}
+.sae-big{background:#fff;color:var(--blue);border-radius:20px;padding:16px 18px 12px;display:inline-block;max-width:100%}
+.sae-row{display:flex;align-items:flex-end;gap:4px;font-size:clamp(46px,13vw,76px);font-weight:900;letter-spacing:-2px;line-height:1}
+.sae-row .w{color:#1FB5F2}
+.sae-row .h{color:#0A2A5E}
+.sae-cap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:12px;font-weight:700;color:#3E5479;letter-spacing:0;line-height:1.3}
+.sae-cap span{border-top:3px solid #1FB5F2;padding-top:6px}
+.sae-cap span+span{border-color:#0A2A5E}
+
+.funcs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:640px){ .funcs{grid-template-columns:repeat(2,1fr)} .funcs .fn:last-child{grid-column:1/-1} }
+.fn{background:var(--card);border-radius:14px;padding:14px 10px;text-align:center;font-size:13px;line-height:1.35;color:var(--ink-2)}
+.fn b{display:block;color:var(--ink);font-size:14.5px;margin:8px 0 4px}
+.fn .ico{width:44px;height:44px;margin:0 auto;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+.comp{display:flex;height:54px;border-radius:14px;overflow:hidden;font-weight:800;font-size:14px;color:#fff}
+.comp div{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;padding:0 6px}
+.adds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+@media (max-width:560px){ .adds{grid-template-columns:repeat(2,1fr)} }
+.add{background:var(--card);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.35;color:var(--ink-2);border-left:4px solid var(--cyan)}
+.add b{display:block;color:var(--ink);font-size:14px}
+
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .types{grid-template-columns:1fr} }
+.type{background:var(--card);border-radius:16px;padding:16px;border-top:5px solid #9DB4D6}
+.type:nth-child(2){border-color:var(--cyan)}.type:nth-child(3){border-color:var(--blue)}
+.type h4{margin:0 0 10px;font-size:17px}
+.meter{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.dots{display:flex;gap:4px}
+.dots i{width:16px;height:8px;border-radius:4px;background:var(--line)}
+.dots i.on{background:var(--blue)}
+.type p{font-size:13.5px!important;margin:10px 0 0!important;line-height:1.45}
+
+.thermo{position:relative;padding:6px 0 0}
+.th-axis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.th-col{text-align:center}
+.th-bar{height:120px;border-radius:10px;background:linear-gradient(180deg,var(--soft),var(--card));position:relative;overflow:hidden}
+.th-fill{position:absolute;left:0;right:0;bottom:0;background:var(--grad);border-radius:10px}
+.th-grade{font-weight:900;font-size:18px;margin-top:6px;color:var(--ink)}
+.th-t{font-size:12px;color:var(--muted);font-weight:700}
+.hot{display:grid;gap:8px}
+.hot-row{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
+.hot-row b{font-size:18px;font-weight:900;text-align:right}
+.hot-bar{height:28px;border-radius:8px;background:linear-gradient(90deg,#F2A20C,#E5484D);display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+
+.timeline{display:flex;gap:0;overflow-x:auto;padding-bottom:4px}
+.tm{flex:1 1 0;min-width:52px;text-align:center;position:relative;padding-top:22px}
+.tm::before{content:"";position:absolute;top:8px;left:0;right:0;height:4px;background:var(--line)}
+.tm::after{content:"";position:absolute;top:2px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--card);border:4px solid #9DB4D6}
+.tm.new::after{border-color:var(--blue);background:var(--blue)}
+.tm b{display:block;font-size:17px;font-weight:900}
+.tm span{font-size:12px;color:var(--muted);font-weight:700}
+
+.std{display:grid;gap:10px}
+.sd{display:grid;grid-template-columns:86px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;align-items:start}
+.sd .tag{background:var(--grad);color:#fff;border-radius:10px;padding:8px 6px;text-align:center;font-weight:900;font-size:15px;line-height:1.1}
+.sd .tag small{display:block;font-size:10.5px;font-weight:600;opacity:.9;margin-top:2px}
+.sd div{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.sd div b{color:var(--ink)}
+
+/* label decoder */
+.label{background:linear-gradient(160deg,#0A2A5E,#1463E6);color:#fff;border-radius:22px;padding:22px 18px;max-width:380px;margin:0 auto;box-shadow:0 12px 30px rgba(10,35,80,.25)}
+.lb-brand{font-weight:900;font-size:22px;letter-spacing:-.4px}
+.lb-sub{font-size:12px;opacity:.8;margin-bottom:14px}
+.lb-sae{font-size:44px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:12px}
+.hs{display:inline-block;border:2px dashed rgba(255,255,255,.55);border-radius:10px;padding:4px 8px;margin:0 4px 8px 0;font-weight:800;font-size:14px;cursor:pointer;background:transparent;color:#fff}
+.hs:hover,.hs.on{background:#fff;color:var(--blue);border-style:solid;border-color:#fff}
+.lb-sae .hs{font-size:44px;padding:2px 10px;letter-spacing:-1.5px;font-weight:900}
+.lb-vol{margin-top:6px;font-size:13px;opacity:.85}
+.explain{max-width:520px;margin:14px auto 0;background:var(--card);border-radius:16px;padding:14px 16px;font-size:15px;line-height:1.5;color:var(--ink-2);min-height:92px}
+.explain b{display:block;color:var(--ink);margin-bottom:4px}
+
+/* choose flow */
+.flow{display:grid;gap:0}
+.fstep{display:grid;grid-template-columns:44px 1fr;gap:12px;position:relative;padding-bottom:16px}
+.fstep:not(:last-child)::before{content:"";position:absolute;left:21px;top:44px;bottom:0;width:3px;background:var(--line)}
+.fnum{width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:17px}
+.fcard{background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.fcard b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
+.fcard .stop{display:inline-block;margin-top:6px;background:rgba(229,72,77,.1);color:var(--red);font-weight:700;font-size:13px;border-radius:8px;padding:3px 8px}
+
+/* myths */
+.myth{background:var(--card);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.myth button{width:100%;border:0;background:transparent;text-align:left;padding:14px 16px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-weight:700;font-size:15.5px;line-height:1.4}
+.myth .badge{font-size:12px;font-weight:800;color:var(--red);background:rgba(229,72,77,.1);border-radius:8px;padding:4px 8px;white-space:nowrap}
+.myth .ans{display:none;padding:0 16px 14px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.myth .ans b{color:var(--green)}
+.myth.open .ans{display:block}
+.myth.open .badge{color:var(--green);background:rgba(21,163,91,.1)}
+
+/* trainer */
+.case-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
+.case-card h4{margin:0 0 6px;font-size:16px}
+.req{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.45}
+.req small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.can{display:grid;gap:8px}
+.can button{text-align:left;border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14.5px;line-height:1.4}
+.can button b{display:block;font-size:15px}
+.can button.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.can button.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.can button[disabled]{cursor:default}
+.case-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.case-card.done .case-ex{display:block}
+
+.carmap{position:relative;max-width:560px;margin:0 auto}
+.carmap svg{display:block;width:100%;height:auto}
+.fl-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+@media (max-width:560px){ .fl-list{grid-template-columns:1fr} }
+.fl{display:grid;grid-template-columns:32px 1fr;gap:10px;background:var(--card);border-radius:12px;padding:10px 12px;font-size:13.5px;line-height:1.4;color:var(--ink-2)}
+.fl b{display:block;color:var(--ink);font-size:14.5px}
+.fl i{width:32px;height:32px;border-radius:10px;background:var(--grad);color:#fff;font-style:normal;font-weight:900;display:flex;align-items:center;justify-content:center}
+
+.parts{display:grid;grid-template-columns:200px 1fr;gap:18px;align-items:center}
+@media (max-width:620px){ .parts{grid-template-columns:1fr} .parts svg{max-width:200px;margin:0 auto;display:block} }
+.pl{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pl li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:14px;line-height:1.4;color:var(--ink-2)}
+.pl li b{color:var(--ink);display:block}
+.pl li i{width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-style:normal;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+.steps4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:640px){ .steps4{grid-template-columns:repeat(2,1fr)} }
+.s4{background:var(--card);border-radius:14px;padding:12px;font-size:13.5px;line-height:1.4;color:var(--ink-2);position:relative}
+.s4 b{display:block;color:var(--ink);font-size:14.5px;margin:6px 0 4px}
+.s4 .n{width:28px;height:28px;border-radius:9px;background:var(--grad);color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.vs-c{background:var(--card);border-radius:14px;padding:14px;text-align:center}
+.vs-c svg{display:block;margin:0 auto 8px}
+.vs-c b{display:block;font-size:15px}
+.vs-c span{font-size:13px;color:var(--ink-2)}
+
+.signs{display:grid;gap:8px}
+.sg{display:grid;grid-template-columns:36px 1fr;gap:12px;background:var(--card);border-radius:12px;padding:10px 12px;font-size:14.5px;line-height:1.4;color:var(--ink-2);align-items:center}
+.sg i{width:36px;height:36px;border-radius:10px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-style:normal}
+
+.fluids{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:640px){ .fluids{grid-template-columns:1fr} }
+.fd{background:var(--card);border-radius:16px;padding:14px;display:grid;grid-template-columns:48px 1fr;gap:12px}
+.fd .jar{width:48px;height:60px;border-radius:10px 10px 14px 14px;border:3px solid var(--line);position:relative;overflow:hidden;background:var(--bg)}
+.fd .jar span{position:absolute;left:0;right:0;bottom:0}
+.fd h4{margin:0 0 4px;font-size:15.5px}
+.fd p{font-size:13.5px!important;margin:0 0 6px!important;line-height:1.45}
+.fd .int{display:inline-block;font-size:12px;font-weight:800;color:var(--blue);background:var(--soft);border-radius:8px;padding:3px 8px}
+
+.mixgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:560px){ .mixgrid{grid-template-columns:1fr} }
+.mx{background:var(--card);border-radius:14px;padding:12px;font-size:13.5px;line-height:1.4;color:var(--ink-2);border-top:5px solid var(--c)}
+.mx b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+
+.check5{display:grid;gap:8px}
+.c5{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--card);border-radius:14px;padding:12px 14px;cursor:pointer;border:2px solid transparent}
+.c5 input{appearance:none;-webkit-appearance:none;width:24px;height:24px;border:2px solid var(--blue);border-radius:7px;margin:0;display:grid;place-items:center;cursor:pointer}
+.c5 input:checked{background:var(--blue)}
+.c5 input:checked::after{content:"";width:10px;height:6px;border-left:3px solid #fff;border-bottom:3px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.c5.on{border-color:rgba(21,163,91,.5)}
+.c5 b{display:block;font-size:15px}
+.c5 span{font-size:13px;color:var(--ink-2);line-height:1.35;display:block}
+.c5 em{font-style:normal;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
+.c5-total{margin-top:10px;font-weight:800;font-size:15px;color:var(--blue)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1FB5F2"/><stop offset="1" stop-color="#1463E6"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 24 32"><path d="M12 1C12 1 2 13.5 2 20.5a10 10 0 0 0 20 0C22 13.5 12 1 12 1Z"/></symbol>
+  </defs>
+</svg>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top" aria-label="OilBook">
+      <svg width="20" height="26" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+      <span class="brand-word"><span class="o">Oil</span><span class="b">Book</span></span>
+    </a>
+    <div class="crumb"><b>Taʼlim</b>3-modul, jami 12 ta</div>
+  </div>
+  <nav class="toc" aria-label="Dars boʻlimlari">
+    <a href="#s1">Filtrlar xaritasi</a>
+    <a href="#s2">Moy filtri</a>
+    <a href="#s3">Havo filtri</a>
+    <a href="#s4">Salon filtri</a>
+    <a href="#s5">Yoqilgʻi filtri</a>
+    <a href="#s6">Suyuqliklar</a>
+    <a href="#s7">5 daqiqalik tekshiruv</a>
+    <a href="#train">Mashq</a>
+    <a href="#task">Topshiriq</a>
+    <a href="#quiz">Test</a>
+  </nav>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <span class="mod-tag">3-modul · usta uchun, ega ham koʻrsin</span>
+    <h1>Filtrlar va texnik suyuqliklar</h1>
+    <p class="lead">Mashinada qanday filtrlar va suyuqliklar bor, ularni qachon almashtirish kerak va har bir mijozga 5 daqiqada qanday halol tekshiruv qilish mumkin.</p>
+    <div class="meta"><span>45 daqiqa</span><span>7 ta boʻlim</span><span>Belgilar boʻyicha mashq</span><span>10 ta savollik test</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="goals" style="margin-top:16px">
+    <h2>Darsdan keyin siz:</h2>
+    <ul>
+      <li><i>1</i>Mashinadagi 4 ta filtr qayerda va nima uchun kerakligini bilasiz</li>
+      <li><i>2</i>Moy filtrini xatosiz oʻrnatasiz</li>
+      <li><i>3</i>Antifriz, tormoz va uzatmalar qutisi suyuqliklarini ajrata olasiz</li>
+      <li><i>4</i>Har bir mashinada 5 daqiqalik tekshiruv qilib, mijozga halol tavsiya berasiz</li>
+    </ul>
+  </div>
+
+<!-- 3.1 -->
+<section class="part" id="s1"><div class="part-card">
+  <div class="ph"><span class="pn">3.1</span><h2>Mashinadagi filtrlar xaritasi</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Oddiy yengil mashinada toʻrtta asosiy filtr bor. Har biri motorni yoki odamni kir va changdan himoya qiladi.</p>
+  <div class="fig">
+    <div class="carmap">
+      <svg viewBox="20 44 490 140" role="img" aria-label="Mashina sxemasi: 1 moy filtri motorda, 2 havo filtri motor ustida, 3 salon filtri old oyna ostida, 4 yoqilgʻi filtri bak yonida">
+        <path d="M30 150 Q34 112 80 104 L150 98 Q186 58 250 54 L330 54 Q372 56 404 96 L470 106 Q500 112 500 150 Z" fill="var(--card)" stroke="#1463E6" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M168 98 Q196 66 250 64 L300 64 L300 98 Z M312 64 L330 64 Q362 66 388 98 L312 98 Z" fill="var(--soft)" stroke="#1463E6" stroke-width="2"/>
+        <circle cx="120" cy="152" r="26" fill="#0A2A5E"/><circle cx="120" cy="152" r="10" fill="#9DB4D6"/>
+        <circle cx="410" cy="152" r="26" fill="#0A2A5E"/><circle cx="410" cy="152" r="10" fill="#9DB4D6"/>
+        <rect x="58" y="112" width="70" height="30" rx="6" fill="var(--bg)" stroke="#9DB4D6" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="93" y="131" text-anchor="middle" font-size="11" font-weight="700" fill="#6B7F9E" font-family="Onest,sans-serif">motor</text>
+        <rect x="350" y="122" width="56" height="20" rx="5" fill="var(--bg)" stroke="#9DB4D6" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="378" y="136" text-anchor="middle" font-size="11" font-weight="700" fill="#6B7F9E" font-family="Onest,sans-serif">bak</text>
+        <g font-family="Onest,sans-serif" font-weight="900" font-size="15" fill="#fff" text-anchor="middle">
+          <circle cx="76" cy="146" r="14" fill="#1463E6"/><text x="76" y="151">1</text>
+          <circle cx="110" cy="96" r="14" fill="#1463E6"/><text x="110" y="101">2</text>
+          <circle cx="170" cy="84" r="14" fill="#1FB5F2"/><text x="170" y="89">3</text>
+          <circle cx="342" cy="146" r="14" fill="#15A35B"/><text x="342" y="151">4</text>
+        </g>
+      </svg>
+    </div>
+    <div class="fl-list">
+      <div class="fl"><i>1</i><div><b>Moy filtri</b>Moydagi metall zarralari va kirni ushlaydi. Har moy almashtirishda.</div></div>
+      <div class="fl"><i>2</i><div><b>Havo filtri</b>Motorga kirayotgan havoni changdan tozalaydi.</div></div>
+      <div class="fl"><i style="background:#1FB5F2">3</i><div><b>Salon filtri</b>Odam nafas oladigan havoni tozalaydi.</div></div>
+      <div class="fl"><i style="background:#15A35B">4</i><div><b>Yoqilgʻi filtri</b>Benzin yoki dizeldagi kir va suvni ushlaydi.</div></div>
+    </div>
+    <p class="cap">Joylashuv mashina modeliga qarab farq qiladi. Sxema — umumiy tasavvur uchun.</p>
+  </div>
+</div></section>
+
+<!-- 3.2 -->
+<section class="part" id="s2"><div class="part-card">
+  <div class="ph"><span class="pn">3.2</span><h2>Moy filtri</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Yangi moyni eski filtr bilan qoldirish — toza suvni iflos chelakka quyish bilan barobar.</p>
+  <p>Eski filtrda oldingi moyning kiri va metall zarralari qoladi. Yangi moy birinchi daqiqalardanoq shu kirni yuvib, motorga olib ketadi. Shuning uchun moy filtri <b>har bir</b> moy almashtirishda almashtiriladi.</p>
+
+  <div class="fig">
+    <p class="fig-t">Moy filtri ichida nima bor</p>
+    <div class="parts">
+      <svg viewBox="0 0 200 240" aria-hidden="true">
+        <rect x="30" y="30" width="140" height="190" rx="18" fill="url(#g)"/>
+        <rect x="48" y="52" width="104" height="146" rx="8" fill="#fff" opacity=".95"/>
+        <g stroke="#9DB4D6" stroke-width="3">
+          <path d="M58 62v126M68 62v126M78 62v126M122 62v126M132 62v126M142 62v126"/>
+        </g>
+        <rect x="88" y="58" width="24" height="134" rx="6" fill="#E3EEFD"/>
+        <rect x="40" y="16" width="120" height="16" rx="8" fill="#0A2A5E"/>
+        <path d="M90 20h20" stroke="#F2A20C" stroke-width="5" stroke-linecap="round"/>
+        <rect x="90" y="196" width="20" height="14" rx="4" fill="#F2A20C"/>
+        <g font-family="Onest,sans-serif" font-weight="800" font-size="13" fill="#fff" text-anchor="middle">
+          <circle cx="182" cy="24" r="12" fill="#1463E6"/><text x="182" y="29">1</text>
+          <circle cx="18" cy="120" r="12" fill="#1463E6"/><text x="18" y="125">2</text>
+          <circle cx="100" cy="40" r="12" fill="#1463E6"/><text x="100" y="45">3</text>
+          <circle cx="132" cy="214" r="12" fill="#1463E6"/><text x="132" y="219">4</text>
+        </g>
+      </svg>
+      <ul class="pl">
+        <li><i>1</i><div><b>Rezina halqa</b>Filtrni korpusga zich bosadi. Moy oqmasligi shunga bogʻliq.</div></li>
+        <li><i>2</i><div><b>Filtrlovchi qogʻoz</b>Burmalangan qogʻoz — maydoni katta, kirni ushlaydi.</div></li>
+        <li><i>3</i><div><b>Teskari klapan</b>Motor toʻxtaganda moy filtrdan oqib ketmaydi — ishga tushirishda moy darhol keladi.</div></li>
+        <li><i>4</i><div><b>Aylanib oʻtish klapani</b>Filtr toʻlib qolsa yoki moy sovuq boʻlsa, moyni filtrsiz oʻtkazadi — motor moysiz qolmaydi.</div></li>
+      </ul>
+    </div>
+    <p class="cap">Arzon filtrlarda klapanlar sifatsiz boʻlishi mumkin — shuning uchun filtr ham ishonchli brenddan, masalan ECO FILTER kabi tekshirilgan filtrlardan olinadi.</p>
+  </div>
+
+  <h3>Toʻgʻri oʻrnatish: 4 qadam</h3>
+  <div class="fig">
+    <div class="steps4">
+      <div class="s4"><span class="n">1</span><b>Eski halqani tekshiring</b>Eski filtrning rezina halqasi korpusda qolib ketmaganini koʻring.</div>
+      <div class="s4"><span class="n">2</span><b>Halqani moylang</b>Yangi filtr halqasiga barmoq bilan ozgina toza moy suring.</div>
+      <div class="s4"><span class="n">3</span><b>Qoʻlda burang</b>Halqa tekkandan keyin taxminan 3/4 aylanish. Filtr qutisidagi koʻrsatmaga qarang.</div>
+      <div class="s4"><span class="n">4</span><b>Oqishni tekshiring</b>Motorni ishga tushirib, filtr atrofini koʻring, keyin moy darajasini tekshiring.</div>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg>
+    <div><b>Eng xavfli xato — ikki qavat halqa</b>Eski halqa korpusga yopishib qoladi, usta uni koʻrmay yangi filtrni ustidan buraydi. Ikkita halqa zich bosmaydi, yoʻlda bosim ostida moy chiqib ketadi — motor moysiz qoladi. Har safar 1-qadamni bajaring.</div>
+  </div>
+  <div class="note warn">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg>
+    <div><b>Kalit bilan qattiq burash</b>Keyingi safar filtrni yechib boʻlmaydi, halqa ezilib, oqish boshlanadi. Moy filtri qoʻl bilan buraladi.</div>
+  </div>
+</div></section>
+
+<!-- 3.3 -->
+<section class="part" id="s3"><div class="part-card">
+  <div class="ph"><span class="pn">3.3</span><h2>Havo filtri</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Motor havoni koʻp «nafas oladi». Changli havo — motor ichida jilvir qogʻoz kabi ishlaydi.</p>
+  <p>Vodiyda yoʻllar changli, yozda ayniqsa. Shuning uchun havo filtri ishlab chiqaruvchi yozgan muddatdan oldin ham kirlanib qolishi mumkin. Uni <b>har moy almashtirishda ochib koʻrish</b> kerak — bu bir daqiqa vaqt oladi.</p>
+  <div class="fig">
+    <p class="fig-t">Qachon almashtirish kerak</p>
+    <div class="vs">
+      <div class="vs-c">
+        <svg width="90" height="70" viewBox="0 0 90 70" aria-hidden="true"><rect x="4" y="4" width="82" height="62" rx="8" fill="#fff" stroke="#9DB4D6" stroke-width="3"/><path d="M14 12v46M24 12v46M34 12v46M44 12v46M54 12v46M64 12v46M74 12v46" stroke="#E3EEFD" stroke-width="5"/></svg>
+        <b>Yangi</b><span>Oq yoki och sariq, burmalar orasi toza</span>
+      </div>
+      <div class="vs-c">
+        <svg width="90" height="70" viewBox="0 0 90 70" aria-hidden="true"><rect x="4" y="4" width="82" height="62" rx="8" fill="#8A8F97" stroke="#5E646C" stroke-width="3"/><path d="M14 12v46M24 12v46M34 12v46M44 12v46M54 12v46M64 12v46M74 12v46" stroke="#6E737B" stroke-width="5"/><circle cx="30" cy="30" r="5" fill="#5E646C"/><circle cx="60" cy="44" r="4" fill="#5E646C"/></svg>
+        <b>Almashtirish vaqti</b><span>Kulrang, burmalarda chang, barg yoki hasharot</span>
+      </div>
+    </div>
+    <p class="cap">Odatiy oraliq — taxminan 15–30 ming km yoki qoʻllanma boʻyicha. Changli yoʻllarda tezroq.</p>
+  </div>
+  <div class="note case">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#15A35B" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <div><b>Mijozga koʻrsatish</b>Filtrni olib, mijozning koʻz oldida yorugʻlikka tutib koʻrsating. Kulrang filtrni koʻrgan mijoz «almashtiring» deb oʻzi aytadi. Filtr toza boʻlsa — «hali yaxshi, keyingi safar koʻramiz» deng.</div>
+  </div>
+</div></section>
+
+<!-- 3.4 -->
+<section class="part" id="s4"><div class="part-card">
+  <div class="ph"><span class="pn">3.4</span><h2>Salon filtri</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Bu filtr motorni emas, odamni himoya qiladi — haydovchi va oilasi nafas oladigan havoni.</p>
+  <p>Salon filtri konditsioner va pechka orqali salonga kiradigan havoni tozalaydi. Ikki xil boʻladi: <b>oddiy</b> — chang va gulchangni ushlaydi; <b>koʻmirli</b> — yana hid va gazlarni ham yutadi.</p>
+  <div class="fig">
+    <p class="fig-t">Mijoz aytadigan belgilar — salon filtrini tekshirish vaqti</p>
+    <div class="signs">
+      <div class="sg"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M4 8h12a3 3 0 1 0-3-3M4 12h16a3 3 0 1 1-3 3M4 16h8"/></svg></i>Konditsioner yoki pechka kuchsiz puflayapti</div>
+      <div class="sg"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M8 3c0 3 3 3 3 6s-3 3-3 6M14 3c0 3 3 3 3 6s-3 3-3 6"/></svg></i>Konditsioner yoqilganda yoqimsiz hid keladi</div>
+      <div class="sg"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 10h.01M11 12h.01M15 9h.01"/></svg></i>Oynalar tez terlaydi</div>
+      <div class="sg"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 15c1-1 2.5-1.5 4-1.5s3 .5 4 1.5M9 9h.01M15 9h.01"/></svg></i>Salonda chang koʻp, allergiya bezovta qiladi</div>
+    </div>
+    <p class="cap">Odatda yiliga bir marta yoki qoʻllanma boʻyicha. Bahor va yoz oldidan tekshirish ayniqsa foydali.</p>
+  </div>
+</div></section>
+
+<!-- 3.5 -->
+<section class="part" id="s5"><div class="part-card">
+  <div class="ph"><span class="pn">3.5</span><h2>Yoqilgʻi filtri</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Sifatsiz yoqilgʻidagi kir va suv forsunkalarga yetib bormasligi kerak.</p>
+  <p>Koʻp zamonaviy benzinli mashinalarda yoqilgʻi filtri bak ichida turadi va kam almashtiriladi. Dizelda esa yoqilgʻi filtri juda muhim — undagi suv yoqilgʻi apparaturasini qimmat taʼmirga olib kelishi mumkin. Almashtirish oraligʻi — faqat qoʻllanma boʻyicha.</p>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Gaz uskunasi bor mashinalar</b>Metan yoki propanda yuradigan mashinalarda gaz uskunasining oʻz filtrlari bor. Ularni gaz uskunasi ustasi tekshiradi. Shoxobchangizda bu xizmat boʻlmasa, mijozga eslatib qoʻying — bu ham gʻamxoʻrlik.</div>
+  </div>
+</div></section>
+
+<!-- 3.6 -->
+<section class="part" id="s6"><div class="part-card">
+  <div class="ph"><span class="pn">3.6</span><h2>Texnik suyuqliklar</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Motor moyidan tashqari mashinada yana kamida beshta suyuqlik bor. Har birini tekshirish — mijozga xizmat va shoxobchaga qoʻshimcha daromad.</p>
+  <div class="fig">
+    <div class="fluids">
+      <div class="fd"><div class="jar"><span style="height:70%;background:linear-gradient(#FF8FA3,#E5484D)"></span></div><div><h4>Antifriz (sovutish suyuqligi)</h4><p>Motorni qizib ketishdan va qishda muzlashdan saqlaydi. Darajasi kengaytirish bakida MIN–MAX oraligʻida boʻlsin.</p><span class="int">Taxminan 2–5 yilda</span></div></div>
+      <div class="fd"><div class="jar"><span style="height:60%;background:linear-gradient(#F7D774,#C99A1A)"></span></div><div><h4>Tormoz suyuqligi</h4><p>Havodan namlik yutadi — vaqt oʻtishi bilan tormoz yomonlashadi. Qorayib qolgani — almashtirish belgisi.</p><span class="int">Odatda 2 yilda</span></div></div>
+      <div class="fd"><div class="jar"><span style="height:65%;background:linear-gradient(#FF7B7B,#B3262B)"></span></div><div><h4>Avtomat quti suyuqligi (ATF)</h4><p>Avtomat qutini moylaydi va boshqaradi. Variator (CVT) uchun alohida suyuqlik kerak.</p><span class="int">Qoʻllanma boʻyicha</span></div></div>
+      <div class="fd"><div class="jar"><span style="height:55%;background:linear-gradient(#D9B36A,#8C6A2B)"></span></div><div><h4>Mexanik quti moyi</h4><p>Masalan, 75W-90. GL-4 va GL-5 bir xil emas — qoʻllanmada qaysi biri yozilgan boʻlsa, oʻshani quying.</p><span class="int">Qoʻllanma boʻyicha</span></div></div>
+      <div class="fd"><div class="jar"><span style="height:60%;background:linear-gradient(#9AD7A8,#2E8B57)"></span></div><div><h4>Gidrokuchaytirgich suyuqligi</h4><p>Rul yengil aylanishi uchun. Darajasi kamaysa, rul ogʻirlashadi yoki gʻichirlaydi.</p><span class="int">Darajasini har safar</span></div></div>
+      <div class="fd"><div class="jar"><span style="height:80%;background:linear-gradient(#9FDFFF,#1FB5F2)"></span></div><div><h4>Oyna yuvish suyuqligi</h4><p>Eng oddiy, lekin mijoz eng koʻp minnatdor boʻladigani. Qishda — muzlamaydiganini.</p><span class="int">Har safar quyib bering</span></div></div>
+    </div>
+    <p class="cap">Oraliqlar taxminiy. Aniq muddat va turini doim mashina qoʻllanmasidan tekshiring.</p>
+  </div>
+
+  <h3>Antifriz: rangiga emas, turiga qarang</h3>
+  <p>Antifrizning rangi — shunchaki boʻyoq. Bir xil rangli ikki antifriz turli kimyoviy tarkibda boʻlishi mumkin. Turli turdagi antifrizlarni aralashtirish tavsiya etilmaydi: choʻkma hosil boʻlib, radiator kanallarini toʻsib qoʻyishi mumkin.</p>
+  <div class="fig">
+    <div class="mixgrid">
+      <div class="mx" style="--c:#15A35B"><b>G11</b>Eski avlod, silikatli. Koʻproq eski mashinalarda.</div>
+      <div class="mx" style="--c:#E5484D"><b>G12 / G12+</b>Karboksilatli, uzoqroq xizmat qiladi.</div>
+      <div class="mx" style="--c:#8E5BD6"><b>G12++ / G13</b>Aralash (gibrid) tarkib, zamonaviy mashinalar uchun.</div>
+    </div>
+    <p class="cap">Mashina qoʻllanmasida qaysi tur yozilgan boʻlsa, oʻsha quyiladi. Konsentratni suv bilan yarmiga aralashtirganda odatda taxminan −35 °C gacha himoya beradi — qutidagi jadvalga qarang.</p>
+  </div>
+
+  <div class="note warn">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg>
+    <div><b>Xavfsizlik</b>Issiq motorda sovutish tizimi qopqogʻini hech qachon ochmang — bosim ostidagi qaynoq suyuqlik otilib chiqadi. Tormoz suyuqligida DOT 3, DOT 4 va DOT 5.1 bir-biriga mos, lekin DOT 5 (silikonli) ularga aralashtirilmaydi.</div>
+  </div>
+</div></section>
+
+<!-- 3.7 -->
+<section class="part" id="s7"><div class="part-card">
+  <div class="ph"><span class="pn">3.7</span><h2>Har bir mashinada 5 daqiqalik tekshiruv</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Moy almashayotganda shu roʻyxatni bajaring. Mijoz gʻamxoʻrlikni koʻradi, chek esa halol yoʻl bilan oshadi.</p>
+  <div class="fig">
+    <p class="fig-t">Tekshiruvni sinab koʻring — belgilang</p>
+    <div class="check5" id="check5"></div>
+    <div class="c5-total" id="c5total" aria-live="polite"></div>
+  </div>
+  <h3>Natijani mijozga qanday aytish</h3>
+  <div class="fig">
+    <div class="say"><div class="say-who">Toʻgʻri</div><div class="bubble good">«Moyni almashtirdik. Qoʻshimcha tekshirdik: antifriz va tormoz suyuqligi joyida. Havo filtri kulrang boʻlib qolibdi — mana, koʻring. Hozir almashtiraylikmi yoki keyingi safar?»</div></div>
+    <div class="say"><div class="say-who">Mijoz: «Keyingi safar»</div><div class="bubble good">«Mayli, yozib qoʻydim. Keyingi safar kelganingizda birinchi shuni koʻramiz».</div></div>
+    <div class="say"><div class="say-who">Notoʻgʻri</div><div class="bubble bad">Soʻramasdan almashtirib, chekka qoʻshib qoʻyish.</div></div>
+  </div>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>Almashtirishni yozayotganda faqat moyni emas, almashtirilgan barcha filtrlarni ham kiriting. Keyingi safar mashina tarixida havo yoki salon filtri qachon almashtirilgani koʻrinadi — mijozga aniq aytasiz: «oxirgi marta 20 ming km oldin almashtirilgan».</div>
+  </div>
+</div></section>
+
+<!-- trainer -->
+<section class="part" id="train"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Mashq: belgiga qarab toping</h2></div>
+  <div class="who"><span>Usta</span></div>
+  <p class="kicker">Mijoz shikoyat qildi yoki siz nimanidir koʻrdingiz. Nima qilasiz?</p>
+  <div id="cases"></div>
+</div></section>
+
+<!-- task -->
+<section class="part" id="task"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Amaliy topshiriq</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Bir hafta davomida bajariladi.</p>
+  <ol class="task">
+    <li><div><b>Usta:</b> har bir mashinada 5 daqiqalik tekshiruvni bajaring va natijani mijozga ayting.</div></li>
+    <li><div><b>Usta:</b> har bir moy filtrini oʻrnatishdan oldin eski halqa qolmaganini tekshiring — bir hafta davomida bironta ham istisnosiz.</div></li>
+    <li><div><b>Ega:</b> shoxobchangizga eng koʻp keladigan 10 ta model uchun moy, havo va salon filtrlari doim omborda borligini tekshiring.</div></li>
+    <li><div><b>Ega:</b> hafta oxirida OilBookda nechta almashtirishda havo yoki salon filtri ham sotilganini sanab chiqing.</div></li>
+  </ol>
+  <div class="fig">
+    <p class="fig-t">Bajarilganini belgilang</p>
+    <div class="choice" id="taskDone">
+      <button type="button" data-v="0" aria-pressed="false">Tekshiruv har mashinada</button>
+      <button type="button" data-v="1" aria-pressed="false">Halqa har safar tekshirildi</button>
+      <button type="button" data-v="2" aria-pressed="false">Filtrlar assortimenti</button>
+      <button type="button" data-v="3" aria-pressed="false">Haftalik hisob</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- quiz -->
+<section class="part" id="quiz"><div class="part-card">
+  <div class="ph"><span class="pn">?</span><h2>Test</h2></div>
+  <p class="kicker">10 ta savol. Modulni topshirish uchun 8 ta toʻgʻri javob kerak.</p>
+  <div id="quizBox"></div>
+  <div class="result" id="result" aria-live="polite"></div>
+</div></section>
+
+<div class="done-card">
+  <small>Keyingi modul</small>
+  <h2>4. Mashinaga moy va filtr tanlash</h2>
+  <a class="btn" href="#top">Dars boshiga</a>
+</div>
+</div>
+</main>
+<footer>OilBook taʼlimi — moy almashtirish shoxobchalari uchun kurs</footer>
+
+<script>
+(function(){
+  var KEY='oilbook-course-m3-uz-';
+  var store={get:function(k){try{return JSON.parse(localStorage.getItem(KEY+k));}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v));}catch(e){}}};
+
+  var bar=document.getElementById('progress'), nav=document.querySelector('.toc');
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  var cur=-2, ticking=false;
+  function update(){
+    ticking=false;
+    var h=document.documentElement;
+    bar.style.transform='scaleX('+(h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight)).toFixed(3)+')';
+    var c=-1; for(var i=0;i<secs.length;i++){ if(secs[i]&&secs[i].getBoundingClientRect().top<150) c=i; else break; }
+    if(c!==cur){ cur=c; links.forEach(function(a,i){a.classList.toggle('on',i===c);}); if(c>=0){ var a=links[c]; nav.scrollLeft=a.offsetLeft-(nav.clientWidth-a.offsetWidth)/2; } }
+  }
+  window.addEventListener('scroll',function(){ if(!ticking){ticking=true;requestAnimationFrame(update);} },{passive:true});
+  update();
+
+  /* 5-minute check */
+  var C5=[
+    ['Moy filtri','Eski halqa qolmaganini koʻrish','30 son'],
+    ['Havo filtri','Ochib, yorugʻlikka tutib koʻrish','1 daq'],
+    ['Antifriz','Darajasi va rangi, oqish izlari','30 son'],
+    ['Tormoz suyuqligi','Darajasi va rangi','30 son'],
+    ['Gidrokuchaytirgich','Bakdagi daraja','20 son'],
+    ['Oyna yuvish suyuqligi','Boʻsh boʻlsa — quyib berish','20 son'],
+    ['Salon filtri','Mijoz shikoyat qilsa yoki oson ochilsa','1 daq']
+  ];
+  var c5=document.getElementById('check5'), c5t=document.getElementById('c5total');
+  c5.innerHTML=C5.map(function(x,i){return '<label class="c5"><input type="checkbox" data-i="'+i+'"><div><b>'+x[0]+'</b><span>'+x[1]+'</span></div><em>'+x[2]+'</em></label>';}).join('');
+  function c5upd(){
+    var n=c5.querySelectorAll('input:checked').length;
+    c5.querySelectorAll('.c5').forEach(function(l){ l.classList.toggle('on', l.querySelector('input').checked); });
+    c5t.textContent = n===C5.length ? 'Tekshiruv tugadi — natijani mijozga ayting.' : 'Bajarildi: '+n+' / '+C5.length;
+  }
+  c5.addEventListener('change',c5upd); c5upd();
+
+  /* trainer */
+  var CS=[
+    {t:'Mijoz: «Konditsionerni yoqsam, salonda yomon hid keladi»',o:['Moy filtrini almashtirish','Salon filtrini tekshirish va koʻrsatish','Antifriz qoʻshish'],a:1,e:'Hid va kuchsiz puflash — salon filtrining tipik belgisi. Koʻmirli filtr hidni yaxshiroq yutadi.'},
+    {t:'Tormoz suyuqligi qorayib qolgan, mijoz 3 yildan beri almashtirmagan',o:['Hech narsa demaslik','Ustiga yangi suyuqlik qoʻshish','Mijozga koʻrsatib, almashtirishni taklif qilish'],a:2,e:'Tormoz suyuqligi namlik yutadi va odatda 2 yilda almashtiriladi. Bu xavfsizlik masalasi — albatta ayting.'},
+    {t:'Antifriz darajasi MIN dan past, radiator atrofida izlar bor',o:['Oqish joyini koʻrsatib, tekshiruvga yuborish','Faqat suv quyib qoʻyish','Darajani koʻtarib, hech narsa demaslik'],a:0,e:'Daraja oʻzidan oʻzi kamaymaydi. Oqishni koʻrsating — qizib ketish motorni qimmat taʼmirga olib keladi.'},
+    {t:'Yangi filtrni burayotganda, eski halqa korpusda qolganini koʻrdingiz',o:['Ustidan burayverish','Eski halqani olib tashlash, keyin oʻrnatish','Kalit bilan qattiqroq burash'],a:1,e:'Ikki qavat halqa — yoʻlda moy chiqib ketishiga olib keladi. Eski halqa albatta olinadi.'}
+  ];
+  var cs=document.getElementById('cases');
+  cs.innerHTML=CS.map(function(c,i){
+    return '<div class="case-card" data-i="'+i+'"><div class="req"><small>Vaziyat</small>'+c.t+'</div><div class="can">'+c.o.map(function(o,k){return '<button type="button" data-k="'+k+'"><b>'+o+'</b></button>';}).join('')+'</div><div class="case-ex">'+c.e+'</div></div>';
+  }).join('');
+  cs.addEventListener('click',function(e){
+    var b=e.target.closest('.can button'); if(!b) return;
+    var card=b.closest('.case-card'); if(card.classList.contains('done')) return;
+    var c=CS[+card.dataset.i]; card.classList.add('done');
+    card.querySelectorAll('.can button').forEach(function(x){ x.disabled=true; if(+x.dataset.k===c.a) x.classList.add('ok'); else if(x===b) x.classList.add('no'); });
+  });
+
+  /* task */
+  var td=store.get('task')||{}, tdb=document.getElementById('taskDone');
+  function paint(){ tdb.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed',String(!!td[b.dataset.v])); }); }
+  tdb.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; td[b.dataset.v]=!td[b.dataset.v]; store.set('task',td); paint(); });
+  paint();
+
+  /* quiz */
+  var Q=[
+    {q:'Moy filtri qachon almashtiriladi?',o:['Har ikkinchi moy almashtirishda','Har bir moy almashtirishda','Faqat filtr yirtilganda'],a:1,e:'Eski filtrdagi kir yangi moyni darhol ifloslantiradi.'},
+    {q:'Moy filtri oʻrnatishdan oldin birinchi navbatda nima qilinadi?',o:['Filtrni kalit bilan tortish','Eski halqa korpusda qolmaganini tekshirish','Filtrni moy bilan toʻldirish shart'],a:1,e:'Ikki qavat halqa — eng xavfli xato.'},
+    {q:'Moy filtri qanday buraladi?',o:['Kalit bilan iloji boricha qattiq','Qoʻlda, halqa tekkandan keyin taxminan 3/4 aylanish','Bitta aylanishdan kam, boʻshroq'],a:1,e:'Filtr qutisidagi koʻrsatmaga ham qarang.'},
+    {q:'Teskari klapan nima uchun kerak?',o:['Moy filtrdan oqib ketmasligi uchun, motor toʻxtaganda','Moyni sovutish uchun','Filtrni yengil burash uchun'],a:0,e:'Shunda ishga tushirishda moy darhol keladi.'},
+    {q:'Vodiyda havo filtrini qachon tekshirish kerak?',o:['Faqat 30 ming km da','Har moy almashtirishda ochib koʻrish','Hech qachon, u almashtirilmaydi'],a:1,e:'Changli yoʻllarda filtr tez kirlanadi — tekshirish bir daqiqa vaqt oladi.'},
+    {q:'Konditsionerdan hid kelsa, nima tekshiriladi?',o:['Salon filtri','Yoqilgʻi filtri','Tormoz suyuqligi'],a:0,e:'Hid va kuchsiz puflash — salon filtri belgisi.'},
+    {q:'Antifriz turini qanday aniqlash kerak?',o:['Rangiga qarab','Qoʻllanma va idishdagi yozuv boʻyicha','Hidiga qarab'],a:1,e:'Rang — faqat boʻyoq, tarkibni koʻrsatmaydi.'},
+    {q:'Tormoz suyuqligi nega almashtiriladi?',o:['U bugʻlanib ketadi','Havodan namlik yutib, tormoz yomonlashadi','Rangi chiroyli boʻlishi uchun'],a:1,e:'Odatda 2 yilda almashtiriladi.'},
+    {q:'Issiq motorda antifriz qopqogʻini ochish mumkinmi?',o:['Ha, tezroq quyiladi','Yoʻq — qaynoq suyuqlik bosim ostida otilib chiqadi','Faqat yozda mumkin'],a:1,e:'Motor sovuguncha kuting.'},
+    {q:'Mijoz «filtrni keyingi safar» desa, nima qilasiz?',o:['Baribir almashtirib qoʻyaman','Mayli deyman va keyingi safar birinchi tekshiraman','Xafa boʻlaman'],a:1,e:'Tanlov mijozda. Keyingi safar mashina tarixidan eslab, yana taklif qilasiz.'}
+  ];
+  var box=document.getElementById('quizBox'), res=document.getElementById('result'), ans={};
+  function renderQ(){
+    ans={}; res.className='result'; res.innerHTML='';
+    box.innerHTML=Q.map(function(x,i){return '<div class="q" data-i="'+i+'"><div class="q-n">Savol '+(i+1)+' / 10</div><div class="q-t">'+x.q+'</div><div class="opts">'+x.o.map(function(t,k){return '<button class="opt" type="button" data-k="'+k+'">'+t+'</button>';}).join('')+'</div><div class="q-ex">'+x.e+'</div></div>';}).join('');
+  }
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b) return;
+    var card=b.closest('.q'), i=+card.dataset.i; if(i in ans) return;
+    ans[i]=+b.dataset.k; card.classList.add('done');
+    card.querySelectorAll('.opt').forEach(function(o){ o.disabled=true; if(+o.dataset.k===Q[i].a) o.classList.add('ok'); else if(o===b) o.classList.add('no'); });
+    if(Object.keys(ans).length===Q.length){
+      var ok=Q.filter(function(x,qi){return ans[qi]===x.a;}).length; store.set('quiz',ok);
+      res.innerHTML='<b>'+ok+' / 10</b>'+(ok>=8?'Modul topshirildi. Keyingisi — «Mashinaga moy va filtr tanlash».':'10 tadan 8 ta toʻgʻri javob kerak. 3.2 va 3.6-boʻlimlarni qayta oʻqib, yana urinib koʻring.')+'<div style="margin-top:14px"><button class="btn white" type="button" id="retry">Qaytadan topshirish</button></div>';
+      res.className='result show';
+      document.getElementById('retry').addEventListener('click',function(){ renderQ(); box.scrollIntoView({block:'start'}); });
+    }
+  });
+  renderQ();
+})();
+</script>
+
+</body>
+</html>

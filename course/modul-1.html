@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>1-modul. Moy almashtirish shoxobchasi qanday daromad qiladi — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Sora:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2350;
+  --ink-2:#3E5479;
+  --muted:#6B7F9E;
+  --bg:#EEF4FB;
+  --card:#FFFFFF;
+  --line:#D9E4F2;
+  --blue:#1463E6;
+  --cyan:#1FB5F2;
+  --soft:#E3EEFD;
+  --red:#E5484D;
+  --amber:#F2A20C;
+  --green:#15A35B;
+  --grad:linear-gradient(135deg,#1FB5F2 0%,#1463E6 100%);
+  --font:'Onest', 'Segoe UI', Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F;
+  }
+}
+:root[data-theme="dark"]{ --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 110px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* app header */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-word{font-family:'Sora',var(--font);font-weight:800;font-size:20px;letter-spacing:-.4px;line-height:1}
+.brand-word .o{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-word .b{color:#0A2A5E}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word .b{color:#E8F0FC} }
+.crumb{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px;line-height:1.25}
+.crumb b{display:block;color:var(--ink);font-weight:700;font-size:14px}
+.progress{height:3px;background:var(--grad);width:100%;transform:scaleX(0);transform-origin:0 50%}
+.toc{max-width:860px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 12px;background:var(--soft);border-radius:999px;white-space:nowrap}
+.toc a.on{color:#fff;background:var(--blue)}
+
+/* hero */
+.hero{background:var(--grad);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;bottom:-90px;width:300px;height:390px;background:rgba(255,255,255,.10);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;transform:rotate(-12deg)}
+.hero .wrap{position:relative;z-index:1;padding-top:34px;padding-bottom:34px}
+.mod-tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.08;font-weight:900;margin:0 0 14px;letter-spacing:-.6px;max-width:640px}
+.hero .lead{font-size:clamp(16px,2.3vw,19px);opacity:.92;max-width:600px;margin:0 0 24px}
+.formula-hero{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(6,30,80,.28);border-radius:18px;padding:14px;max-width:620px}
+.fh{background:#fff;color:var(--blue);border-radius:12px;padding:8px 12px;font-weight:800;font-size:15px;line-height:1.2;text-align:center}
+.fh small{display:block;font-size:11px;font-weight:600;color:#6B7F9E}
+.fop{font-weight:900;font-size:22px;opacity:.9}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.meta span{background:rgba(255,255,255,.16);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+
+/* goals */
+.goals{background:var(--card);border-radius:20px;padding:20px;margin-top:-1px;margin-bottom:8px}
+.goals h2{font-size:18px;margin:0 0 12px}
+.goals ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.goals li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45}
+.goals li i{width:28px;height:28px;border-radius:9px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--blue);font-style:normal;font-weight:800;font-size:14px}
+
+/* section */
+section.part{padding:40px 0 8px}
+.part-card{background:var(--card);border-radius:24px;padding:24px 20px;box-shadow:0 1px 0 var(--line)}
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.part h2{font-size:clamp(22px,4.6vw,30px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.3px}
+.part h3{font-size:18px;margin:28px 0 10px;line-height:1.3}
+.part p{margin:0 0 12px;color:var(--ink-2)}
+.part p b,.part li b{color:var(--ink)}
+.kicker{font-size:19px;font-weight:700;color:var(--ink)!important;line-height:1.4;margin-bottom:16px!important}
+.who{display:inline-flex;gap:6px;margin-bottom:14px}
+.who span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--blue)}
+
+.fig{background:var(--bg);border-radius:18px;padding:18px;margin:18px 0}
+.fig-t{font-weight:800;font-size:15px;margin:0 0 14px;color:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin:12px 0 0!important;line-height:1.45}
+.ex{font-size:12px;font-weight:700;color:var(--amber);background:rgba(242,162,12,.12);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+
+.note{display:grid;grid-template-columns:26px 1fr;gap:12px;border-radius:16px;padding:14px 16px;margin:18px 0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.note b{display:block;color:var(--ink);margin-bottom:3px}
+.note.case{background:rgba(21,163,91,.09)}
+.note.warn{background:rgba(229,72,77,.08)}
+.note.tip{background:var(--soft)}
+.note.app{background:linear-gradient(135deg,rgba(31,181,242,.12),rgba(20,99,230,.12));border:1px solid rgba(20,99,230,.25)}
+
+/* calculator */
+.calc{display:grid;gap:14px}
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+.inp input:focus{border-color:var(--blue);outline:none}
+.total{background:var(--grad);color:#fff;border-radius:16px;padding:16px;text-align:center}
+.total small{display:block;font-size:13px;opacity:.9;font-weight:600}
+.total b{font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:-.5px}
+.levers{display:grid;gap:10px;margin-top:4px}
+.lv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:14px}
+.lv-name{font-weight:700;line-height:1.3}
+.lv-bar{background:var(--card);border-radius:10px;height:34px;position:relative;overflow:hidden}
+.lv-fill{position:absolute;inset:0 auto 0 0;background:var(--grad);border-radius:10px;transition:width .3s}
+.lv-val{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-weight:800;font-size:14px;color:var(--ink)}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} .lv{grid-template-columns:1fr} }
+
+/* bucket */
+.bucket{display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:10px}
+.bk-side{display:grid;gap:8px}
+.bk-chip{border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.3}
+.bk-chip.in{background:rgba(21,163,91,.12);color:var(--green)}
+.bk-chip.out{background:rgba(229,72,77,.1);color:var(--red)}
+.bk-chip small{display:block;font-weight:500;color:var(--ink-2);font-size:12px}
+@media (max-width:600px){ .bucket{grid-template-columns:1fr} .bk-svg{order:-1;max-width:170px;margin:0 auto} }
+
+/* lifetime */
+.life{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px}
+.life div{background:var(--grad);border-radius:6px 6px 2px 2px}
+.life-axis{display:grid;grid-template-columns:repeat(3,1fr);font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;text-align:center}
+.life-axis span{border-top:2px solid var(--line);padding-top:4px}
+.big-num{display:flex;gap:14px;align-items:center;margin-top:14px}
+.big-num b{font-size:30px;font-weight:900;color:var(--blue);letter-spacing:-.5px;line-height:1}
+.big-num span{font-size:14px;color:var(--ink-2);line-height:1.35}
+
+/* stacked check */
+.stack{display:grid;gap:12px}
+.st-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
+.st-name{font-weight:800;font-size:14px;line-height:1.25}
+.st-name small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.st-bar{display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--card)}
+.st-bar span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;padding:0 3px}
+.c-oil{background:#1463E6}.c-flt{background:#1FB5F2}.c-work{background:#0A2A5E}.c-air{background:#15A35B}.c-cab{background:#F2A20C}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+/* waterfall */
+.wf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:220px;align-items:stretch}
+.wf-col{position:relative}
+.wf-b{position:absolute;left:0;right:0;border-radius:8px}
+.wf-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:800}
+.wf-l{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;line-height:1.2;overflow-wrap:anywhere}
+
+/* three levers */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .three{grid-template-columns:1fr} }
+.tl{background:var(--card);border-radius:16px;padding:16px;border-top:4px solid var(--blue)}
+.tl:nth-child(2){border-color:var(--cyan)}.tl:nth-child(3){border-color:var(--green)}
+.tl h4{margin:8px 0 6px;font-size:16px}
+.tl ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.tl .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+/* leaks */
+.leaks{display:grid;gap:8px}
+.leak{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.leak b{color:var(--ink);display:block}
+.leak .d{width:34px;height:34px;border-radius:10px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.leak em{font-style:normal;color:var(--blue);font-weight:700}
+
+/* scripts */
+.say{display:grid;gap:6px;margin-bottom:12px}
+.say-who{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble{background:var(--card);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.45;font-weight:600;border:1px solid var(--line)}
+.bubble.good{border-color:rgba(21,163,91,.5)}
+.bubble.bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--red);font-weight:500}
+
+/* oilbook map */
+.map{display:grid;gap:8px}
+.mp{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+.mp div{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.3}
+.mp .q{background:var(--card);font-weight:700}
+.mp .a{background:var(--grad);color:#fff;font-weight:700}
+.mp .a small{display:block;font-weight:500;opacity:.9;font-size:12px}
+@media (max-width:520px){ .mp{grid-template-columns:1fr} .mp svg{transform:rotate(90deg);margin:0 auto} }
+
+/* task */
+.task{list-style:none;counter-reset:t;margin:0;padding:0;display:grid;gap:8px}
+.task li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--bg);border-radius:14px;padding:12px;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.task li::before{content:counter(t);width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:520px){ .sheet{grid-template-columns:1fr} }
+.cell{background:var(--card);border-radius:14px;padding:12px}
+.cell label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.cell input,.cell textarea{width:100%;border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;font-weight:700;font-size:16px;resize:vertical}
+.cell input:focus,.cell textarea:focus{border-color:var(--blue);outline:none}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.choice button[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+.saved{font-size:13px;color:var(--green);font-weight:700;margin-top:8px;min-height:20px}
+
+/* quiz */
+.q{background:var(--bg);border-radius:16px;padding:16px;margin-bottom:10px}
+.q-n{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.q-t{font-weight:700;font-size:16.5px;margin-bottom:10px;line-height:1.4}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;font-size:15px;line-height:1.4}
+.opt:hover:not([disabled]){border-color:var(--blue)}
+.opt.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.opt.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.opt[disabled]{cursor:default}
+.q-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2)}
+.q.done .q-ex{display:block}
+.result{display:none;background:var(--grad);color:#fff;border-radius:18px;padding:20px;text-align:center;margin-top:6px}
+.result.show{display:block}
+.result b{display:block;font-size:34px;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--blue);color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.white{background:#fff;color:var(--blue)}
+
+.done-card{text-align:center;padding:36px 0 50px}
+.done-card small{color:var(--muted);font-size:14px}
+.done-card h2{font-size:clamp(22px,4.5vw,30px);margin:6px 0 16px;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 34px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1FB5F2"/><stop offset="1" stop-color="#1463E6"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 24 32"><path d="M12 1C12 1 2 13.5 2 20.5a10 10 0 0 0 20 0C22 13.5 12 1 12 1Z"/></symbol>
+    <symbol id="arr" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top" aria-label="OilBook">
+      <svg width="20" height="26" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+      <span class="brand-word"><span class="o">Oil</span><span class="b">Book</span></span>
+    </a>
+    <div class="crumb"><b>Taʼlim</b>1-modul, jami 12 ta</div>
+  </div>
+  <nav class="toc" aria-label="Dars boʻlimlari">
+    <a href="#s1">Daromad formulasi</a>
+    <a href="#s2">Mashinalar qayerdan</a>
+    <a href="#s3">Oʻrtacha chek</a>
+    <a href="#s4">Tushum va foyda</a>
+    <a href="#s5">Ustaning roli</a>
+    <a href="#s6">OilBookdagi raqamlar</a>
+    <a href="#task">Topshiriq</a>
+    <a href="#quiz">Test</a>
+  </nav>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <span class="mod-tag">1-modul · ega va usta uchun</span>
+    <h1>Moy almashtirish shoxobchasi qanday daromad qiladi</h1>
+    <p class="lead">Shoxobcha daromadi nimalardan tashkil topadi, nega tushum hali foyda emas va jamoadagi har bir kishi qaysi uchta raqamga taʼsir qiladi.</p>
+    <div class="formula-hero" aria-label="Tushum: kuniga mashinalar soni, oʻrtacha chek va ish kunlari koʻpaytmasi">
+      <div class="fh">Mashinalar<small>kuniga</small></div><span class="fop">×</span>
+      <div class="fh">Oʻrtacha chek<small>soʻm</small></div><span class="fop">×</span>
+      <div class="fh">Ish kunlari<small>oyiga</small></div><span class="fop">=</span>
+      <div class="fh">Tushum<small>bir oyda</small></div>
+    </div>
+    <div class="meta"><span>40 daqiqa</span><span>6 ta boʻlim</span><span>OilBookda topshiriq</span><span>10 ta savollik test</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="goals" style="margin-top:16px">
+    <h2>Darsdan keyin siz:</h2>
+    <ul>
+      <li><i>1</i>Shoxobchangiz daromadini bitta oddiy formula bilan hisoblay olasiz</li>
+      <li><i>2</i>Nega doimiy mijoz yangisidan qimmatroq ekanini tushunasiz</li>
+      <li><i>3</i>Tushumni foydadan ajrata olasiz va pul qayerda yoʻqolayotganini topasiz</li>
+      <li><i>4</i>OilBookda oʻz raqamlaringizni topib, birinchi navbatda nimani yaxshilashni tanlaysiz</li>
+    </ul>
+  </div>
+
+<!-- 1 -->
+<section class="part" id="s1"><div class="part-card">
+  <div class="ph"><span class="pn">1.1</span><h2>Shoxobcha daromadi formulasi</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Har qanday moy almashtirish shoxobchasining tushumi — bir-biriga koʻpaytirilgan uchta son.</p>
+  <p><b>Kuniga mashinalar</b> — nechta mashinaga xizmat koʻrsatdingiz. <b>Oʻrtacha chek</b> — bitta mijoz bir kelganida oʻrtacha qancha toʻlaydi. <b>Ish kunlari</b> — shoxobcha oyiga necha kun ishlaydi.</p>
+  <p>Bu nega muhim: koʻproq topish uchun «umuman koʻproq ishlash» shart emas. Uchta sondan qaysi birini oshira olishingizni aniqlang — va aynan shuni oshiring.</p>
+
+  <div class="fig">
+    <p class="fig-t">Shoxobchangizni hisoblang</p>
+    <div class="calc">
+      <div class="inp"><label for="cCars">Kuniga mashinalar<small>oddiy kunda oʻrtacha</small></label><input id="cCars" type="number" inputmode="numeric" min="0" value="12"></div>
+      <div class="inp"><label for="cCheck">Oʻrtacha chek, soʻm<small>OilBook «Statistika»sida bor</small></label><input id="cCheck" type="number" inputmode="numeric" min="0" step="1000" value="320000"></div>
+      <div class="inp"><label for="cDays">Oyiga ish kunlari</label><input id="cDays" type="number" inputmode="numeric" min="0" max="31" value="26"></div>
+      <div class="total" aria-live="polite"><small>Bir oylik tushum</small><b id="cTotal">—</b></div>
+    </div>
+    <p class="fig-t" style="margin-top:20px">Nima koʻproq pul keltiradi?</p>
+    <div class="levers" id="levers"></div>
+    <p class="cap">Taqqoslash: hozirgi tushumingiz, kuniga 2 ta mashina qoʻshilsa, oʻrtacha chek 10% oshsa va ikkalasi birga boʻlsa.</p>
+  </div>
+
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Asosiy xulosa</b>Ikki sonning birdaniga ozgina oʻsishi bitta sonning katta oʻsishidan koʻproq natija beradi. Kuniga +2 mashina va chekka +10% birgalikda — koʻpincha tushumga +25–30%.</div>
+  </div>
+</div></section>
+
+<!-- 2 -->
+<section class="part" id="s2"><div class="part-card">
+  <div class="ph"><span class="pn">1.2</span><h2>Mashinalar qayerdan keladi</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Kuniga keladigan mashinalar — bu yangi mijozlar va qaytib kelganlar. Ikkinchisi muhimroq.</p>
+  <p>Moy muntazam almashtiriladi — har necha ming kilometrda. Demak, har bir mijoz sizga yiliga bir necha marta, yillar davomida kelishi mumkin. Shoxobcha koʻp yangi mijoz kelganda emas, eskilari ketmaganda oʻsadi.</p>
+
+  <div class="fig">
+    <p class="fig-t">Shoxobcha — suvli chelakka oʻxshaydi</p>
+    <div class="bucket">
+      <div class="bk-side">
+        <div class="bk-chip in">Yangi mijozlar<small>reklama, xaritalar, qoʻshnilar, tavsiyalar</small></div>
+        <div class="bk-chip in">Qaytib kelgan mijozlar<small>oʻz vaqtida eslatildi, xizmat yoqdi</small></div>
+      </div>
+      <svg class="bk-svg" viewBox="0 0 160 170" role="img" aria-label="Chelak: mijozlar tepadan keladi va teshiklardan oqib ketadi">
+        <path d="M60 4v26M100 4v26" stroke="#15A35B" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 8"/>
+        <path d="M18 40h124l-14 118a8 8 0 0 1-8 7H40a8 8 0 0 1-8-7Z" fill="var(--card)" stroke="#1463E6" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M30 88h100l-9 70a6 6 0 0 1-6 5H45a6 6 0 0 1-6-5Z" fill="url(#g)" opacity=".9"/>
+        <circle cx="34" cy="120" r="5" fill="#E5484D"/><circle cx="128" cy="106" r="5" fill="#E5484D"/><circle cx="122" cy="146" r="5" fill="#E5484D"/>
+        <path d="M24 122h-14M140 108h14M132 148h14" stroke="#E5484D" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 5"/>
+        <text x="80" y="132" text-anchor="middle" fill="#fff" font-size="15" font-weight="800" font-family="Onest,sans-serif">Bazangiz</text>
+      </svg>
+      <div class="bk-side">
+        <div class="bk-chip out">Almashtirishni unutdi<small>hech kim eslatmadi</small></div>
+        <div class="bk-chip out">Norozi boʻlib ketdi<small>iflos, uzoq, tushuntirilmadi</small></div>
+        <div class="bk-chip out">Usta bilan birga ketdi<small>mijoz shoxobchaniki emas, «ustaniki» edi</small></div>
+      </div>
+    </div>
+    <p class="cap">Chelakka reklama orqali tobora koʻproq suv quyish mumkin — yoki avval teshiklarni yopish. Teshiklarni yopish arzonroq.</p>
+  </div>
+
+  <h3>Bitta doimiy mijoz qancha pul olib keladi</h3>
+  <div class="fig">
+    <p class="fig-t">Bitta mijoz 3 yil davomida <span class="ex">misol</span></p>
+    <div class="life" aria-hidden="true">
+      <div style="height:55%"></div><div style="height:55%"></div><div style="height:55%"></div><div style="height:55%"></div>
+      <div style="height:62%"></div><div style="height:62%"></div><div style="height:62%"></div><div style="height:62%"></div>
+      <div style="height:70%"></div><div style="height:70%"></div><div style="height:70%"></div><div style="height:70%"></div>
+    </div>
+    <div class="life-axis"><span>1-yil</span><span>2-yil</span><span>3-yil</span></div>
+    <div class="big-num"><b>≈ 4 mln soʻm</b><span>3 yilda 12 marta almashtirish, har biri 320–400 ming soʻmdan. Chek oʻsib boradi: mijoz ishona boshlaydi va filtr hamda suyuqliklarga rozi boʻladi.</span></div>
+    <p class="cap">Har bir ustun — bitta almashtirish, yiliga 4 marta. Raqamlar shartli: oʻz oʻrtacha chekingiz boʻyicha hisoblang.</p>
+  </div>
+
+  <div class="note case">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#15A35B" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <div><b>Vaziyat</b>Mijoz moyni almashtirib, ketdi. 3 oydan keyin u «10% chegirma» yozuvi bor boshqa shoxobcha yonidan oʻtib qoladi — va oʻsha yerga kiradi. U sizdan norozi emas, shunchaki oxirgi marta qayerda almashtirganini eslamagan. Muddatdan bir hafta oldin Telegramda «Moy almashtirish vaqti keldi, sizni kutamiz» degan bitta xabar bu muammoni hal qiladi.</div>
+  </div>
+
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>Agar yozuvda keyingi probeg va telefon yoki Telegram koʻrsatilgan boʻlsa, keyingi almashtirish haqidagi eslatmalar mijozlarga avtomatik yuboriladi. Yangi va qayta kelgan mijozlar ulushi «Statistika» boʻlimida koʻrinadi.</div>
+  </div>
+</div></section>
+
+<!-- 3 -->
+<section class="part" id="s3"><div class="part-card">
+  <div class="ph"><span class="pn">1.3</span><h2>Oʻrtacha chek nimalardan iborat</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Bitta mijozning oʻzi 285 ming ham, 370 ming ham toʻlashi mumkin — farq ustaning nimani tekshirib, nimani taklif qilganida.</p>
+  <p>Oʻrtacha chek — tushumni pullik tashriflar soniga boʻlganda chiqadigan son. U narxni oshirishdan emas, mijoz mashinasiga haqiqatan kerak boʻlgan hamma narsani bir joyda olishidan oʻsadi.</p>
+
+  <div class="fig">
+    <p class="fig-t">Bitta mashinada ikki xil almashtirish <span class="ex">narxlar — misol</span></p>
+    <div class="stack">
+      <div class="st-row"><div class="st-name">Oddiy<small>285 000 soʻm</small></div>
+        <div class="st-bar" style="width:77%"><span class="c-oil" style="flex:220">Moy</span><span class="c-flt" style="flex:35"></span><span class="c-work" style="flex:30"></span></div></div>
+      <div class="st-row"><div class="st-name">Toʻliq<small>370 000 soʻm</small></div>
+        <div class="st-bar" style="width:100%"><span class="c-oil" style="flex:220">Moy</span><span class="c-flt" style="flex:35"></span><span class="c-work" style="flex:30"></span><span class="c-air" style="flex:45"></span><span class="c-cab" style="flex:40"></span></div></div>
+    </div>
+    <div class="legend">
+      <span><i class="c-oil"></i>Moy 4 l, masalan Mitanol 5W-30</span>
+      <span><i class="c-flt"></i>Moy filtri, masalan ECO FILTER</span>
+      <span><i class="c-work"></i>Ish (xizmat)</span>
+      <span><i class="c-air"></i>Havo filtri</span>
+      <span><i class="c-cab"></i>Salon filtri</span>
+    </div>
+    <p class="cap">Chekka +85 000 soʻm — chegirmasiz va narx oshirmasdan. Mijozga filtr uchun boshqa joyga borish kerak boʻlmaydi.</p>
+  </div>
+
+  <h3>Majburlamasdan qanday taklif qilish kerak</h3>
+  <div class="fig">
+    <div class="say"><div class="say-who">Toʻgʻri — halol va dalil bilan</div><div class="bubble good">«Qarang, bu sizning havo filtringiz — u allaqachon kulrang boʻlib qolgan, probeg boʻyicha almashtirish vaqti keldi. Hozir almashtiraylikmi yoki keyingi safar?»</div></div>
+    <div class="say"><div class="say-who">Notoʻgʻri</div><div class="bubble bad">«Filtrlarni almashtiramizmi? Hamma almashtiradi».</div></div>
+    <p class="cap">Qoida: koʻrsatish — tushuntirish — tanlov berish. Agar filtr yaxshi boʻlsa, shuni ayting. Mijoz sizning aldamasligingizni eslab qoladi va keyingi safar darhol rozi boʻladi.</p>
+  </div>
+
+  <div class="note warn">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg>
+    <div><b>Koʻp uchraydigan xato</b>Mijozni chegirma bilan ushlab qolishga urinish: «arzonroq qilib beraman, faqat ketmasin». Chegirma uchun kelgan mijoz chegirma uchun ketadi. Mijozni narx emas, xizmat va halollik ushlab qoladi.</div>
+  </div>
+  <p class="cap" style="margin-top:0!important">Qoʻshimcha sotuvlar haqida batafsil — 7-modulda.</p>
+</div></section>
+
+<!-- 4 -->
+<section class="part" id="s4"><div class="part-card">
+  <div class="ph"><span class="pn">1.4</span><h2>Tushum — hali foyda emas</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Bir oyda kassaga tushgan 100 million 15 million foydani ham, nolni ham bildirishi mumkin.</p>
+  <p>Tushumdan avval tovar xaridi chiqib ketadi: moy va filtrlarni yetkazib beruvchidan sotib olgansiz. Qolgani — yalpi foyda. Undan shoxobcha xarajatlari chiqadi: ijara, ish haqi, svet, suv, mayda-chuyda. Qolgan qism — sizning sof foydangiz.</p>
+
+  <div class="fig">
+    <p class="fig-t">Shoxobchaning bir oyi: pul qayerga ketadi <span class="ex">misol</span></p>
+    <div class="wf" id="wf" role="img" aria-label="Tushum 100 mln, xarid minus 66, yalpi foyda 34, ijara minus 6, ish haqi minus 13, boshqa xarajatlar minus 3, sof foyda 12 mln"></div>
+    <div class="wf-l"><span>Tushum</span><span>Xarid</span><span>Ijara</span><span>Ish haqi</span><span>Boshqa</span><span>Foyda</span></div>
+    <p class="cap">Mln soʻm. 100 mln tushumdan egaga taxminan 12 mln qoladi. Xarid yoki xarajatlarda yoʻqotilgan har bir million 100 dan emas, aynan shu 12 dan ayriladi.</p>
+  </div>
+
+  <h3>Shoxobcha pulni qayerda sezmasdan yoʻqotadi</h3>
+  <div class="leaks">
+    <div class="leak"><span class="d"><svg width="18" height="24" viewBox="0 0 24 32"><use href="#drop" fill="#E5484D"/></svg></span><div><b>Almashtirish yozilmagan</b>Pul olindi, lekin hisobda yoʻq: haqiqiy tushum koʻrinmaydi, mijozga eslatma bormaydi. <em>Darhol, kelgan kunning oʻzida yozing.</em></div></div>
+    <div class="leak"><span class="d"><svg width="18" height="24" viewBox="0 0 24 32"><use href="#drop" fill="#E5484D"/></svg></span><div><b>Xarid narxi nomaʼlum</b>Tovar sotildi, lekin unga qancha toʻlangani yozilmagan. Foydani hisoblab boʻlmaydi. <em>Xarid narxini omborga kiriting.</em></div></div>
+    <div class="leak"><span class="d"><svg width="18" height="24" viewBox="0 0 24 32"><use href="#drop" fill="#E5484D"/></svg></span><div><b>«Ertagacha» qarzlar</b>Mijozlarning mayda qarzlari millionlarga yigʻilib qoladi. <em>Har bir qarzni sanasi bilan hisobga yozing.</em></div></div>
+    <div class="leak"><span class="d"><svg width="18" height="24" viewBox="0 0 24 32"><use href="#drop" fill="#E5484D"/></svg></span><div><b>Tovar harakatsiz yotibdi</b>Pul hech kim olmayotgan kanistrlarda muzlab qolgan. <em>30 kun sotilmagan tovarlarni kuzatib boring.</em></div></div>
+    <div class="leak"><span class="d"><svg width="18" height="24" viewBox="0 0 24 32"><use href="#drop" fill="#E5484D"/></svg></span><div><b>«Chamalab» hisoblangan xarajatlar</b>Ijara va ish haqi esda turadi, mayda xarajatlar esa yoʻq — vaholanki bir oyda ular sezilarli summa boʻladi. <em>Barcha xarajatlarni yozib boring.</em></div></div>
+  </div>
+
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>Foyda oʻzi hisoblanadi: ombordagi tovarlar (sotish narxi minus xarid narxi) plyus ish va xizmatlar minus xarajatlar. Agar sotuvlarning bir qismini hisoblab boʻlmasa — masalan, tovarning xarid narxi kiritilmagan boʻlsa — summasi bilan sariq ogohlantirish chiqadi.</div>
+  </div>
+</div></section>
+
+<!-- 5 -->
+<section class="part" id="s5"><div class="part-card">
+  <div class="ph"><span class="pn">1.5</span><h2>Usta nimaga taʼsir qiladi</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Usta formulaning uchala soniga ham taʼsir qiladi — hatto bu haqda oʻylamasa ham.</p>
+  <p>Ega butun shoxobcha uchun javob beradi: joy, xarid, narxlar, reklama. Lekin mashina yonida nima boʻlishini usta hal qiladi. Aynan mashina yonida mijoz bu yerga qaytib kelish-kelmasligini hal qiladi.</p>
+
+  <div class="fig">
+    <p class="fig-t">Usta taʼsir qiladigan uchta narsa</p>
+    <div class="three">
+      <div class="tl"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></div><h4>Kuniga mashinalar</h4><ul><li>Tez, lekin ehtiyotkor ish</li><li>Ish joyi ertalabdan tayyor</li><li>Filtr qidirib navbat hosil qilmaslik</li></ul></div>
+      <div class="tl"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1FB5F2" stroke-width="2"><path d="M4 7h16v12H4zM8 7V5h8v2M4 12h16"/></svg></div><h4>Oʻrtacha chek</h4><ul><li>Filtr va suyuqliklarni tekshirish</li><li>Koʻrsatish, tushuntirish, tanlov berish</li><li>Tovarni bilish va savollarga javob bera olish</li></ul></div>
+      <div class="tl"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#15A35B" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg></div><h4>Mijozning qaytishi</h4><ul><li>Kanistrni mijoz oldida ochish</li><li>Ozodalik: mashinada bir tomchi ham moy yoʻq</li><li>Stiker va «… keyin sizni kutamiz»</li></ul></div>
+    </div>
+  </div>
+
+  <h3>Mijoz qaytib kelishi uchun qanday xayrlashish kerak</h3>
+  <div class="fig">
+    <div class="say"><div class="say-who">Usta mashinani topshirayotganda</div><div class="bubble good">«Moy va filtrni almashtirdik. Keyingi almashtirish — 128 000 probegda, stiker oynada. Vaqti kelganda sizga Telegramda yozamiz. Sizni kutamiz!»</div></div>
+    <div class="say"><div class="say-who">Notoʻgʻri</div><div class="bubble bad">Indamay kalitni berib, pulni olish.</div></div>
+  </div>
+
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Egaga maslahat</b>Usta OilBookda statistika va foydani koʻrmaydi — bu atayin shunday qilingan. Haftada bir marta jamoaga ikki raqamni koʻrsating: nechta mashina boʻldi va oʻrtacha chek qancha. Oʻz raqamlarini koʻrgan usta boshqacha ishlaydi.</div>
+  </div>
+</div></section>
+
+<!-- 6 -->
+<section class="part" id="s6"><div class="part-card">
+  <div class="ph"><span class="pn">1.6</span><h2>OilBookda raqamlaringizni qayerdan koʻrish mumkin</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Bu darsdagi barcha raqamlar sizda allaqachon bor — OilBook ularni har bir yozilgan almashtirish boʻyicha hisoblaydi.</p>
+  <div class="fig">
+    <div class="map">
+      <div class="mp"><div class="q">Qancha daromad qildim?</div><svg width="24" height="24" style="color:var(--blue)"><use href="#arr"/></svg><div class="a">Statistika<small>Hafta / Oy / Yil kartochkalari, 30 kunlik tushum</small></div></div>
+      <div class="mp"><div class="q">Oʻrtacha chekim qancha?</div><svg width="24" height="24" style="color:var(--blue)"><use href="#arr"/></svg><div class="a">Statistika<small>davr kartochkalarida oʻrtacha chek</small></div></div>
+      <div class="mp"><div class="q">Mijozlar qaytib kelyaptimi?</div><svg width="24" height="24" style="color:var(--blue)"><use href="#arr"/></svg><div class="a">Statistika<small>«yangi / qayta kelgan» chizigʻi</small></div></div>
+      <div class="mp"><div class="q">Menga qancha qoldi?</div><svg width="24" height="24" style="color:var(--blue)"><use href="#arr"/></svg><div class="a">Statistika → Foyda<small>tovarlar, ish va xizmatlar, xarajatlar</small></div></div>
+      <div class="mp"><div class="q">Pul qayerda muzlab qolgan?</div><svg width="24" height="24" style="color:var(--blue)"><use href="#arr"/></svg><div class="a">Ombor<small>«30 kun sotilmagan», «tugayapti»</small></div></div>
+      <div class="mp"><div class="q">Kim menga qarzdor?</div><svg width="24" height="24" style="color:var(--blue)"><use href="#arr"/></svg><div class="a">Qarzlar<small>qizil raqam — muddati oʻtganlar</small></div></div>
+    </div>
+  </div>
+  <p>Raqamlar faqat har bir almashtirish yozilgan, ombordagi tovarlarning xarid narxi kiritilgan va xarajatlar yozib borilgan boʻlsagina aniq boʻladi. Reklama va taʼmirdan oldin birinchi navbatda shuni yoʻlga qoʻying.</p>
+</div></section>
+
+<!-- task -->
+<section class="part" id="task"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Amaliy topshiriq</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">15 daqiqa: raqamlaringizni toping va bir oyga bitta maqsad tanlang.</p>
+  <ol class="task">
+    <li>OilBookda «Statistika»ni oching va «Oy» davrini tanlang.</li>
+    <li>Quyida 4 ta raqamni yozing. Javoblar shu telefonda saqlanadi.</li>
+    <li>Bu oy nimani yaxshilashingizni tanlang va bitta aniq ishni yozing.</li>
+    <li>Yigʻilishda ustalarga qaysi raqamni birgalikda oshirayotganingizni ayting.</li>
+  </ol>
+  <div class="fig">
+    <div class="sheet" id="sheet">
+      <div class="cell"><label for="t1">Bir oydagi almashtirishlar</label><input id="t1" inputmode="numeric" data-k="t1"></div>
+      <div class="cell"><label for="t2">Oʻrtacha chek, soʻm</label><input id="t2" inputmode="numeric" data-k="t2"></div>
+      <div class="cell"><label for="t3">Qayta kelgan mijozlar, %</label><input id="t3" inputmode="numeric" data-k="t3"></div>
+      <div class="cell"><label for="t4">Sof foyda, soʻm</label><input id="t4" inputmode="numeric" data-k="t4"></div>
+    </div>
+    <p class="fig-t" style="margin-top:16px">Bu oy nimani yaxshilayman</p>
+    <div class="choice" id="lever">
+      <button type="button" data-v="cars" aria-pressed="false">Koʻproq mashina</button>
+      <button type="button" data-v="check" aria-pressed="false">Yuqoriroq oʻrtacha chek</button>
+      <button type="button" data-v="back" aria-pressed="false">Koʻproq qayta kelganlar</button>
+      <button type="button" data-v="leak" aria-pressed="false">Yoʻqotishlarni yopish</button>
+    </div>
+    <div class="cell" style="margin-top:12px"><label for="t5">Qiladigan bitta ishim</label><textarea id="t5" rows="2" data-k="t5" placeholder="Masalan: har bir mashinada havo filtrini tekshirish"></textarea></div>
+    <div class="saved" id="saved" aria-live="polite"></div>
+  </div>
+</div></section>
+
+<!-- quiz -->
+<section class="part" id="quiz"><div class="part-card">
+  <div class="ph"><span class="pn">?</span><h2>Test</h2></div>
+  <p class="kicker">10 ta savol. Modulni topshirish uchun 8 ta toʻgʻri javob kerak.</p>
+  <div id="quizBox"></div>
+  <div class="result" id="result" aria-live="polite"></div>
+</div></section>
+
+<div class="done-card">
+  <small>Keyingi modul</small>
+  <h2>2. Moy: qovushqoqlik, dopusklar, tanlash</h2>
+  <a class="btn" href="#top">Dars boshiga</a>
+</div>
+</div>
+</main>
+<footer>OilBook taʼlimi — moy almashtirish shoxobchalari uchun kurs</footer>
+
+<script>
+(function(){
+  var KEY='oilbook-course-m1-uz-';
+  var store={get:function(k){try{return JSON.parse(localStorage.getItem(KEY+k));}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v));}catch(e){}}};
+  function fmt(n){ return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+  function mln(n){ return (n/1e6).toFixed(1).replace('.',',')+' mln'; }
+
+  /* progress + toc */
+  var bar=document.getElementById('progress');
+  var nav=document.querySelector('.toc');
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  var cur=-2, ticking=false;
+  function update(){
+    ticking=false;
+    var h=document.documentElement;
+    bar.style.transform='scaleX('+(h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight)).toFixed(3)+')';
+    var c=-1; for(var i=0;i<secs.length;i++){ if(secs[i]&&secs[i].getBoundingClientRect().top<150) c=i; else break; }
+    if(c!==cur){
+      cur=c;
+      links.forEach(function(a,i){ a.classList.toggle('on',i===c); });
+      if(c>=0){ var a=links[c]; nav.scrollLeft=a.offsetLeft-(nav.clientWidth-a.offsetWidth)/2; }
+    }
+  }
+  window.addEventListener('scroll',function(){ if(!ticking){ ticking=true; requestAnimationFrame(update); } },{passive:true});
+  update();
+
+  /* calculator */
+  var cC=document.getElementById('cCars'), cK=document.getElementById('cCheck'), cD=document.getElementById('cDays');
+  var saved=store.get('calc'); if(saved){ cC.value=saved[0]; cK.value=saved[1]; cD.value=saved[2]; }
+  function calc(){
+    var c=+cC.value||0, k=+cK.value||0, d=+cD.value||0;
+    store.set('calc',[c,k,d]);
+    var base=c*k*d;
+    document.getElementById('cTotal').textContent = base ? fmt(base)+' soʻm' : '—';
+    var rows=[['Hozir',base],['Kuniga +2 mashina',(c+2)*k*d],['Oʻrtacha chekka +10%',c*k*1.1*d],['Ikkalasi birga',(c+2)*k*1.1*d]];
+    var max=rows[3][1]||1;
+    document.getElementById('levers').innerHTML=rows.map(function(r,i){
+      var diff=i&&base? ' (+'+mln(r[1]-base)+')' : '';
+      return '<div class="lv"><div class="lv-name">'+r[0]+'</div><div class="lv-bar"><div class="lv-fill" style="width:'+(100*r[1]/max).toFixed(1)+'%;'+(i?'':'background:#9DB4D6')+'"></div><span class="lv-val">'+(r[1]?mln(r[1]):'—')+diff+'</span></div></div>';
+    }).join('');
+  }
+  [cC,cK,cD].forEach(function(x){ x.addEventListener('input',calc); }); calc();
+
+  /* waterfall */
+  var W=[['t',0,100,'#1463E6','100'],['d',34,100,'#E5484D','−66'],['d',28,34,'#E5484D','−6'],['d',15,28,'#E5484D','−13'],['d',12,15,'#E5484D','−3'],['t',0,12,'#15A35B','12']];
+  document.getElementById('wf').innerHTML=W.map(function(w){
+    var lo=w[1], hi=w[2];
+    return '<div class="wf-col"><div class="wf-b" style="bottom:'+(lo*0.88)+'%;height:'+((hi-lo)*0.88)+'%;background:'+w[3]+'"></div><div class="wf-v" style="bottom:'+(hi*0.88+2)+'%;color:'+w[3]+'">'+w[4]+'</div></div>';
+  }).join('');
+
+  /* task */
+  var t=store.get('task')||{};
+  var msg=document.getElementById('saved'), timer;
+  document.querySelectorAll('[data-k]').forEach(function(el){
+    if(t[el.dataset.k]) el.value=t[el.dataset.k];
+    el.addEventListener('input',function(){ t[el.dataset.k]=el.value; store.set('task',t); clearTimeout(timer); msg.textContent='Saqlandi'; timer=setTimeout(function(){msg.textContent='';},1500); });
+  });
+  var lev=document.getElementById('lever');
+  function paintLever(){ lev.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed',String(t.lever===b.dataset.v)); }); }
+  lev.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; t.lever=b.dataset.v; store.set('task',t); paintLever(); });
+  paintLever();
+
+  /* quiz */
+  var Q=[
+    {q:'Shoxobcha tushumi qaysi uchta sondan tashkil topadi?',o:['Moy narxi × litr × mijozlar','Kuniga mashinalar × oʻrtacha chek × ish kunlari','Ijara + ish haqi + xarid'],a:1,e:'Bu darsning asosiy formulasi: uchta sondan istalganini oshirsangiz, tushum ham oshadi.'},
+    {q:'Oʻrtacha chek qanday hisoblanadi?',o:['Kun davomida eng koʻp uchragan summa','Tushum pullik tashriflar soniga boʻlinadi','Moy narxi plyus filtr narxi'],a:1,e:'OilBook uni aynan shunday hisoblaydi: narxi 0 boʻlgan tashriflar hisobga olinmaydi.'},
+    {q:'Shoxobcha uchun odatda nima foydaliroq?',o:['Yangi mijoz jalb qilish','Doimiy mijozni qaytarish','Bir xil'],a:1,e:'Doimiy mijoz sizni allaqachon taniydi: uni reklama bilan jalb qilish shart emas va u qoʻshimcha xizmatlarga koʻproq rozi boʻladi.'},
+    {q:'Mijoz koʻpincha nega qaytib kelmaydi?',o:['Arzonroq moy topdi','Qayerda almashtirganini unutdi va hech kim eslatmadi','Yangi mashina oldi'],a:1,e:'Keyingi almashtirish haqidagi eslatma chelakdagi eng katta «teshik»ni yopadi.'},
+    {q:'Bir oylik tushum — 100 mln soʻm. Bu nimani bildiradi?',o:['Foyda — 100 mln','Foyda xarid va xarajatlar ayirilgandan keyin maʼlum boʻladi','Foyda — yarmi, 50 mln'],a:1,e:'Darsdagi misolda 100 mln tushumdan sof foyda taxminan 12 mln.'},
+    {q:'Havo filtrini almashtirishni qanday halol taklif qilish kerak?',o:['«Hamma almashtiradi, almashtiramizmi?»','Filtrni koʻrsatish, tushuntirish, tanlov berish','Soʻramasdan almashtirib, chekka qoʻshish'],a:1,e:'Koʻrsatish — tushuntirish — tanlov berish. Filtr yaxshi boʻlsa, shuni aytish.'},
+    {q:'Usta formulaning qaysi sonlariga taʼsir qiladi?',o:['Faqat kunlik mashinalar soniga','Faqat oʻrtacha chekka','Uchalasiga: mashinalar, chek va mijozning qaytishi'],a:2,e:'Tezlik va tartib, tekshirish va taklif, sifat va xayrlashuv — hammasi usta qoʻlida.'},
+    {q:'Nega xarid narxi kiritilmagan tovar sotuvi OilBookda foydaga kirmaydi?',o:['Bu dastur xatosi','Xarid narxisiz qancha foyda qilinganini hisoblab boʻlmaydi','Bunday sotuvlar kerak emas'],a:1,e:'OilBook bunday summalarni sariq ogohlantirishda koʻrsatadi — ularni omborda toʻgʻrilash kerak.'},
+    {q:'Almashtirishni OilBookga qachon yozish kerak?',o:['Darhol, kelgan kunning oʻzida','Hafta oxirida','Faqat doimiy mijozlarga'],a:0,e:'Yozilmagan almashtirish — hisobdan yoʻqolgan tushum va yuborilmagan eslatma.'},
+    {q:'OilBookda nechta mijoz qaytib kelgani qayerda koʻrinadi?',o:['«Ombor» boʻlimida','«Statistika»da, yangi / qayta kelgan chizigʻi','Hech qayerda'],a:1,e:'Bu raqamni har oy kuzating: u oʻssa, shoxobcha ham oʻsadi.'}
+  ];
+  var box=document.getElementById('quizBox'), res=document.getElementById('result'), ans={};
+  function renderQ(){
+    ans={}; res.className='result'; res.innerHTML='';
+    box.innerHTML=Q.map(function(x,i){
+      return '<div class="q" data-i="'+i+'"><div class="q-n">Savol '+(i+1)+' / 10</div><div class="q-t">'+x.q+'</div><div class="opts">'+x.o.map(function(t,k){return '<button class="opt" type="button" data-k="'+k+'">'+t+'</button>';}).join('')+'</div><div class="q-ex">'+x.e+'</div></div>';
+    }).join('');
+  }
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b) return;
+    var card=b.closest('.q'), i=+card.dataset.i; if(i in ans) return;
+    ans[i]=+b.dataset.k; card.classList.add('done');
+    card.querySelectorAll('.opt').forEach(function(o){ o.disabled=true; if(+o.dataset.k===Q[i].a) o.classList.add('ok'); else if(o===b) o.classList.add('no'); });
+    if(Object.keys(ans).length===Q.length){
+      var ok=Q.filter(function(x,qi){return ans[qi]===x.a;}).length;
+      store.set('quiz',ok);
+      res.innerHTML='<b>'+ok+' / 10</b>'+(ok>=8?'Modul topshirildi. Keyingisi — «Moy».':'10 tadan 8 ta toʻgʻri javob kerak. 1.2–1.4-boʻlimlarni qayta oʻqib, yana urinib koʻring.')+'<div style="margin-top:14px"><button class="btn white" type="button" id="retry">Qaytadan topshirish</button></div>';
+      res.className='result show';
+      document.getElementById('retry').addEventListener('click',function(){ renderQ(); box.scrollIntoView({block:'start'}); });
+    }
+  });
+  renderQ();
+})();
+</script>
+</body>
+</html>

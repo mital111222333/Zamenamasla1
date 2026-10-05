@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>9-modul. Ombor va xaridlar — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Sora:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2350;
+  --ink-2:#3E5479;
+  --muted:#6B7F9E;
+  --bg:#EEF4FB;
+  --card:#FFFFFF;
+  --line:#D9E4F2;
+  --blue:#1463E6;
+  --cyan:#1FB5F2;
+  --soft:#E3EEFD;
+  --red:#E5484D;
+  --amber:#F2A20C;
+  --green:#15A35B;
+  --grad:linear-gradient(135deg,#1FB5F2 0%,#1463E6 100%);
+  --font:'Onest', 'Segoe UI', Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F;
+  }
+}
+:root[data-theme="dark"]{ --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 110px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* app header */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-word{font-family:'Sora',var(--font);font-weight:800;font-size:20px;letter-spacing:-.4px;line-height:1}
+.brand-word .o{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-word .b{color:#0A2A5E}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word .b{color:#E8F0FC} }
+.crumb{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px;line-height:1.25}
+.crumb b{display:block;color:var(--ink);font-weight:700;font-size:14px}
+.progress{height:3px;background:var(--grad);width:100%;transform:scaleX(0);transform-origin:0 50%}
+.toc{max-width:860px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 12px;background:var(--soft);border-radius:999px;white-space:nowrap}
+.toc a.on{color:#fff;background:var(--blue)}
+
+/* hero */
+.hero{background:var(--grad);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;bottom:-90px;width:300px;height:390px;background:rgba(255,255,255,.10);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;transform:rotate(-12deg)}
+.hero .wrap{position:relative;z-index:1;padding-top:34px;padding-bottom:34px}
+.mod-tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.08;font-weight:900;margin:0 0 14px;letter-spacing:-.6px;max-width:640px}
+.hero .lead{font-size:clamp(16px,2.3vw,19px);opacity:.92;max-width:600px;margin:0 0 24px}
+.formula-hero{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(6,30,80,.28);border-radius:18px;padding:14px;max-width:620px}
+.fh{background:#fff;color:var(--blue);border-radius:12px;padding:8px 12px;font-weight:800;font-size:15px;line-height:1.2;text-align:center}
+.fh small{display:block;font-size:11px;font-weight:600;color:#6B7F9E}
+.fop{font-weight:900;font-size:22px;opacity:.9}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.meta span{background:rgba(255,255,255,.16);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+
+/* goals */
+.goals{background:var(--card);border-radius:20px;padding:20px;margin-top:-1px;margin-bottom:8px}
+.goals h2{font-size:18px;margin:0 0 12px}
+.goals ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.goals li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45}
+.goals li i{width:28px;height:28px;border-radius:9px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--blue);font-style:normal;font-weight:800;font-size:14px}
+
+/* section */
+section.part{padding:40px 0 8px}
+.part-card{background:var(--card);border-radius:24px;padding:24px 20px;box-shadow:0 1px 0 var(--line)}
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.part h2{font-size:clamp(22px,4.6vw,30px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.3px}
+.part h3{font-size:18px;margin:28px 0 10px;line-height:1.3}
+.part p{margin:0 0 12px;color:var(--ink-2)}
+.part p b,.part li b{color:var(--ink)}
+.kicker{font-size:19px;font-weight:700;color:var(--ink)!important;line-height:1.4;margin-bottom:16px!important}
+.who{display:inline-flex;gap:6px;margin-bottom:14px}
+.who span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--blue)}
+
+.fig{background:var(--bg);border-radius:18px;padding:18px;margin:18px 0}
+.fig-t{font-weight:800;font-size:15px;margin:0 0 14px;color:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin:12px 0 0!important;line-height:1.45}
+.ex{font-size:12px;font-weight:700;color:var(--amber);background:rgba(242,162,12,.12);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+
+.note{display:grid;grid-template-columns:26px 1fr;gap:12px;border-radius:16px;padding:14px 16px;margin:18px 0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.note b{display:block;color:var(--ink);margin-bottom:3px}
+.note.case{background:rgba(21,163,91,.09)}
+.note.warn{background:rgba(229,72,77,.08)}
+.note.tip{background:var(--soft)}
+.note.app{background:linear-gradient(135deg,rgba(31,181,242,.12),rgba(20,99,230,.12));border:1px solid rgba(20,99,230,.25)}
+
+/* calculator */
+.calc{display:grid;gap:14px}
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+.inp input:focus{border-color:var(--blue);outline:none}
+.total{background:var(--grad);color:#fff;border-radius:16px;padding:16px;text-align:center}
+.total small{display:block;font-size:13px;opacity:.9;font-weight:600}
+.total b{font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:-.5px}
+.levers{display:grid;gap:10px;margin-top:4px}
+.lv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:14px}
+.lv-name{font-weight:700;line-height:1.3}
+.lv-bar{background:var(--card);border-radius:10px;height:34px;position:relative;overflow:hidden}
+.lv-fill{position:absolute;inset:0 auto 0 0;background:var(--grad);border-radius:10px;transition:width .3s}
+.lv-val{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-weight:800;font-size:14px;color:var(--ink)}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} .lv{grid-template-columns:1fr} }
+
+/* bucket */
+.bucket{display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:10px}
+.bk-side{display:grid;gap:8px}
+.bk-chip{border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.3}
+.bk-chip.in{background:rgba(21,163,91,.12);color:var(--green)}
+.bk-chip.out{background:rgba(229,72,77,.1);color:var(--red)}
+.bk-chip small{display:block;font-weight:500;color:var(--ink-2);font-size:12px}
+@media (max-width:600px){ .bucket{grid-template-columns:1fr} .bk-svg{order:-1;max-width:170px;margin:0 auto} }
+
+/* lifetime */
+.life{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px}
+.life div{background:var(--grad);border-radius:6px 6px 2px 2px}
+.life-axis{display:grid;grid-template-columns:repeat(3,1fr);font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;text-align:center}
+.life-axis span{border-top:2px solid var(--line);padding-top:4px}
+.big-num{display:flex;gap:14px;align-items:center;margin-top:14px}
+.big-num b{font-size:30px;font-weight:900;color:var(--blue);letter-spacing:-.5px;line-height:1}
+.big-num span{font-size:14px;color:var(--ink-2);line-height:1.35}
+
+/* stacked check */
+.stack{display:grid;gap:12px}
+.st-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
+.st-name{font-weight:800;font-size:14px;line-height:1.25}
+.st-name small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.st-bar{display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--card)}
+.st-bar span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;padding:0 3px}
+.c-oil{background:#1463E6}.c-flt{background:#1FB5F2}.c-work{background:#0A2A5E}.c-air{background:#15A35B}.c-cab{background:#F2A20C}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+/* waterfall */
+.wf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:220px;align-items:stretch}
+.wf-col{position:relative}
+.wf-b{position:absolute;left:0;right:0;border-radius:8px}
+.wf-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:800}
+.wf-l{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;line-height:1.2;overflow-wrap:anywhere}
+
+/* three levers */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .three{grid-template-columns:1fr} }
+.tl{background:var(--card);border-radius:16px;padding:16px;border-top:4px solid var(--blue)}
+.tl:nth-child(2){border-color:var(--cyan)}.tl:nth-child(3){border-color:var(--green)}
+.tl h4{margin:8px 0 6px;font-size:16px}
+.tl ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.tl .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+/* leaks */
+.leaks{display:grid;gap:8px}
+.leak{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.leak b{color:var(--ink);display:block}
+.leak .d{width:34px;height:34px;border-radius:10px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.leak em{font-style:normal;color:var(--blue);font-weight:700}
+
+/* scripts */
+.say{display:grid;gap:6px;margin-bottom:12px}
+.say-who{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble{background:var(--card);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.45;font-weight:600;border:1px solid var(--line)}
+.bubble.good{border-color:rgba(21,163,91,.5)}
+.bubble.bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--red);font-weight:500}
+
+/* oilbook map */
+.map{display:grid;gap:8px}
+.mp{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+.mp div{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.3}
+.mp .q{background:var(--card);font-weight:700}
+.mp .a{background:var(--grad);color:#fff;font-weight:700}
+.mp .a small{display:block;font-weight:500;opacity:.9;font-size:12px}
+@media (max-width:520px){ .mp{grid-template-columns:1fr} .mp svg{transform:rotate(90deg);margin:0 auto} }
+
+/* task */
+.task{list-style:none;counter-reset:t;margin:0;padding:0;display:grid;gap:8px}
+.task li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--bg);border-radius:14px;padding:12px;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.task li::before{content:counter(t);width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:520px){ .sheet{grid-template-columns:1fr} }
+.cell{background:var(--card);border-radius:14px;padding:12px}
+.cell label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.cell input,.cell textarea{width:100%;border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;font-weight:700;font-size:16px;resize:vertical}
+.cell input:focus,.cell textarea:focus{border-color:var(--blue);outline:none}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.choice button[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+.saved{font-size:13px;color:var(--green);font-weight:700;margin-top:8px;min-height:20px}
+
+/* quiz */
+.q{background:var(--bg);border-radius:16px;padding:16px;margin-bottom:10px}
+.q-n{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.q-t{font-weight:700;font-size:16.5px;margin-bottom:10px;line-height:1.4}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;font-size:15px;line-height:1.4}
+.opt:hover:not([disabled]){border-color:var(--blue)}
+.opt.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.opt.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.opt[disabled]{cursor:default}
+.q-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2)}
+.q.done .q-ex{display:block}
+.result{display:none;background:var(--grad);color:#fff;border-radius:18px;padding:20px;text-align:center;margin-top:6px}
+.result.show{display:block}
+.result b{display:block;font-size:34px;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--blue);color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.white{background:#fff;color:var(--blue)}
+
+.done-card{text-align:center;padding:36px 0 50px}
+.done-card small{color:var(--muted);font-size:14px}
+.done-card h2{font-size:clamp(22px,4.5vw,30px);margin:6px 0 16px;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 34px}
+
+/* module 2 extras */
+.sae{display:flex;align-items:flex-end;gap:2px;font-weight:900;letter-spacing:-1px;line-height:1}
+.sae-big{background:#fff;color:var(--blue);border-radius:20px;padding:16px 18px 12px;display:inline-block;max-width:100%}
+.sae-row{display:flex;align-items:flex-end;gap:4px;font-size:clamp(46px,13vw,76px);font-weight:900;letter-spacing:-2px;line-height:1}
+.sae-row .w{color:#1FB5F2}
+.sae-row .h{color:#0A2A5E}
+.sae-cap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:12px;font-weight:700;color:#3E5479;letter-spacing:0;line-height:1.3}
+.sae-cap span{border-top:3px solid #1FB5F2;padding-top:6px}
+.sae-cap span+span{border-color:#0A2A5E}
+
+.funcs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:640px){ .funcs{grid-template-columns:repeat(2,1fr)} .funcs .fn:last-child{grid-column:1/-1} }
+.fn{background:var(--card);border-radius:14px;padding:14px 10px;text-align:center;font-size:13px;line-height:1.35;color:var(--ink-2)}
+.fn b{display:block;color:var(--ink);font-size:14.5px;margin:8px 0 4px}
+.fn .ico{width:44px;height:44px;margin:0 auto;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+.comp{display:flex;height:54px;border-radius:14px;overflow:hidden;font-weight:800;font-size:14px;color:#fff}
+.comp div{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;padding:0 6px}
+.adds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+@media (max-width:560px){ .adds{grid-template-columns:repeat(2,1fr)} }
+.add{background:var(--card);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.35;color:var(--ink-2);border-left:4px solid var(--cyan)}
+.add b{display:block;color:var(--ink);font-size:14px}
+
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .types{grid-template-columns:1fr} }
+.type{background:var(--card);border-radius:16px;padding:16px;border-top:5px solid #9DB4D6}
+.type:nth-child(2){border-color:var(--cyan)}.type:nth-child(3){border-color:var(--blue)}
+.type h4{margin:0 0 10px;font-size:17px}
+.meter{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.dots{display:flex;gap:4px}
+.dots i{width:16px;height:8px;border-radius:4px;background:var(--line)}
+.dots i.on{background:var(--blue)}
+.type p{font-size:13.5px!important;margin:10px 0 0!important;line-height:1.45}
+
+.thermo{position:relative;padding:6px 0 0}
+.th-axis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.th-col{text-align:center}
+.th-bar{height:120px;border-radius:10px;background:linear-gradient(180deg,var(--soft),var(--card));position:relative;overflow:hidden}
+.th-fill{position:absolute;left:0;right:0;bottom:0;background:var(--grad);border-radius:10px}
+.th-grade{font-weight:900;font-size:18px;margin-top:6px;color:var(--ink)}
+.th-t{font-size:12px;color:var(--muted);font-weight:700}
+.hot{display:grid;gap:8px}
+.hot-row{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
+.hot-row b{font-size:18px;font-weight:900;text-align:right}
+.hot-bar{height:28px;border-radius:8px;background:linear-gradient(90deg,#F2A20C,#E5484D);display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+
+.timeline{display:flex;gap:0;overflow-x:auto;padding-bottom:4px}
+.tm{flex:1 1 0;min-width:52px;text-align:center;position:relative;padding-top:22px}
+.tm::before{content:"";position:absolute;top:8px;left:0;right:0;height:4px;background:var(--line)}
+.tm::after{content:"";position:absolute;top:2px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--card);border:4px solid #9DB4D6}
+.tm.new::after{border-color:var(--blue);background:var(--blue)}
+.tm b{display:block;font-size:17px;font-weight:900}
+.tm span{font-size:12px;color:var(--muted);font-weight:700}
+
+.std{display:grid;gap:10px}
+.sd{display:grid;grid-template-columns:86px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;align-items:start}
+.sd .tag{background:var(--grad);color:#fff;border-radius:10px;padding:8px 6px;text-align:center;font-weight:900;font-size:15px;line-height:1.1}
+.sd .tag small{display:block;font-size:10.5px;font-weight:600;opacity:.9;margin-top:2px}
+.sd div{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.sd div b{color:var(--ink)}
+
+/* label decoder */
+.label{background:linear-gradient(160deg,#0A2A5E,#1463E6);color:#fff;border-radius:22px;padding:22px 18px;max-width:380px;margin:0 auto;box-shadow:0 12px 30px rgba(10,35,80,.25)}
+.lb-brand{font-weight:900;font-size:22px;letter-spacing:-.4px}
+.lb-sub{font-size:12px;opacity:.8;margin-bottom:14px}
+.lb-sae{font-size:44px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:12px}
+.hs{display:inline-block;border:2px dashed rgba(255,255,255,.55);border-radius:10px;padding:4px 8px;margin:0 4px 8px 0;font-weight:800;font-size:14px;cursor:pointer;background:transparent;color:#fff}
+.hs:hover,.hs.on{background:#fff;color:var(--blue);border-style:solid;border-color:#fff}
+.lb-sae .hs{font-size:44px;padding:2px 10px;letter-spacing:-1.5px;font-weight:900}
+.lb-vol{margin-top:6px;font-size:13px;opacity:.85}
+.explain{max-width:520px;margin:14px auto 0;background:var(--card);border-radius:16px;padding:14px 16px;font-size:15px;line-height:1.5;color:var(--ink-2);min-height:92px}
+.explain b{display:block;color:var(--ink);margin-bottom:4px}
+
+/* choose flow */
+.flow{display:grid;gap:0}
+.fstep{display:grid;grid-template-columns:44px 1fr;gap:12px;position:relative;padding-bottom:16px}
+.fstep:not(:last-child)::before{content:"";position:absolute;left:21px;top:44px;bottom:0;width:3px;background:var(--line)}
+.fnum{width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:17px}
+.fcard{background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.fcard b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
+.fcard .stop{display:inline-block;margin-top:6px;background:rgba(229,72,77,.1);color:var(--red);font-weight:700;font-size:13px;border-radius:8px;padding:3px 8px}
+
+/* myths */
+.myth{background:var(--card);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.myth button{width:100%;border:0;background:transparent;text-align:left;padding:14px 16px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-weight:700;font-size:15.5px;line-height:1.4}
+.myth .badge{font-size:12px;font-weight:800;color:var(--red);background:rgba(229,72,77,.1);border-radius:8px;padding:4px 8px;white-space:nowrap}
+.myth .ans{display:none;padding:0 16px 14px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.myth .ans b{color:var(--green)}
+.myth.open .ans{display:block}
+.myth.open .badge{color:var(--green);background:rgba(21,163,91,.1)}
+
+/* trainer */
+.case-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
+.case-card h4{margin:0 0 6px;font-size:16px}
+.req{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.45}
+.req small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.can{display:grid;gap:8px}
+.can button{text-align:left;border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14.5px;line-height:1.4}
+.can button b{display:block;font-size:15px}
+.can button.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.can button.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.can button[disabled]{cursor:default}
+.case-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.case-card.done .case-ex{display:block}
+
+.scale2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sc{background:var(--card);border-radius:16px;padding:14px;font-size:14px;line-height:1.45;color:var(--ink-2)}
+.sc h4{margin:0 0 6px;font-size:16px}
+.sc.lo{border-top:5px solid var(--red)}.sc.hi{border-top:5px solid var(--amber)}
+.sc ul{margin:6px 0 0;padding-left:18px}
+.mid{grid-column:1/-1;text-align:center;background:rgba(21,163,91,.1);color:var(--green);font-weight:800;border-radius:12px;padding:10px;font-size:14.5px}
+
+.abc{display:grid;gap:6px}
+.ab{display:grid;grid-template-columns:120px 1fr 34px;gap:8px;align-items:center;font-size:13px}
+.ab .nm{font-weight:700;line-height:1.25}
+.ab .tr{height:22px;border-radius:7px;background:var(--card);overflow:hidden}
+.ab .fi{height:100%;border-radius:7px}
+.ab .cl{font-weight:900;text-align:center;border-radius:8px;color:#fff;padding:3px 0;font-size:12.5px}
+.cA{background:var(--blue)}.cB{background:var(--cyan)}.cC{background:#9DB4D6}
+.abc-leg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+@media (max-width:560px){ .abc-leg{grid-template-columns:1fr} .ab{grid-template-columns:96px 1fr 30px} }
+.al3{background:var(--card);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.4;color:var(--ink-2)}
+.al3 b{display:block;font-size:14.5px;color:var(--ink)}
+
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} }
+.res3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+@media (max-width:520px){ .res3{grid-template-columns:1fr} }
+.r3{background:var(--grad);color:#fff;border-radius:14px;padding:12px;text-align:center}
+.r3:nth-child(2){background:#0A2A5E}.r3:nth-child(3){background:var(--green)}
+.r3 small{display:block;font-size:12px;opacity:.9;line-height:1.3}
+.r3 b{display:block;font-size:24px;font-weight:900;margin-top:4px}
+.stock-viz{margin-top:14px;background:var(--card);border-radius:14px;padding:12px}
+.stock-viz svg{display:block;width:100%;height:auto}
+
+.order{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+@media (max-width:620px){ .order{grid-template-columns:1fr 1fr} }
+.os{background:var(--card);border-radius:14px;padding:12px;font-size:13px;line-height:1.4;color:var(--ink-2);position:relative}
+.os .n{width:30px;height:30px;border-radius:9px;background:var(--grad);color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.os b{display:block;color:var(--ink);font-size:14.5px;margin:6px 0 2px}
+.os small{display:inline-block;margin-top:6px;font-size:11px;font-weight:800;color:var(--blue);background:var(--soft);border-radius:6px;padding:2px 6px}
+
+.unit{display:grid;gap:10px}
+.uwarn{border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;font-weight:600}
+.uwarn.ok{background:rgba(21,163,91,.1);color:var(--green)}
+.uwarn.bad{background:rgba(229,72,77,.1);color:var(--red)}
+.uwarn.mid{background:rgba(242,162,12,.13);color:#8A5A00}
+
+.mv{display:grid;gap:8px}
+.mvr{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;background:var(--card);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.35;color:var(--ink-2)}
+.mvr i{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:900;color:#fff}
+.mvr b{display:block;color:var(--ink)}
+.mvr em{font-style:normal;font-weight:900;font-size:15px}
+
+.dead{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (max-width:560px){ .dead{grid-template-columns:1fr} }
+.dd2{background:var(--card);border-radius:14px;padding:12px;font-size:14px;line-height:1.4;color:var(--ink-2);display:grid;grid-template-columns:36px 1fr;gap:10px}
+.dd2 i{width:36px;height:36px;border-radius:10px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-style:normal}
+.dd2 b{display:block;color:var(--ink)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1FB5F2"/><stop offset="1" stop-color="#1463E6"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 24 32"><path d="M12 1C12 1 2 13.5 2 20.5a10 10 0 0 0 20 0C22 13.5 12 1 12 1Z"/></symbol>
+  </defs>
+</svg>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top" aria-label="OilBook">
+      <svg width="20" height="26" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+      <span class="brand-word"><span class="o">Oil</span><span class="b">Book</span></span>
+    </a>
+    <div class="crumb"><b>Taʼlim</b>9-modul, jami 12 ta</div>
+  </div>
+  <nav class="toc" aria-label="Dars boʻlimlari">
+    <a href="#s1">Ombor — bu pul</a>
+    <a href="#s2">Nima saqlash</a>
+    <a href="#s3">Qachon buyurtma</a>
+    <a href="#s4">Xarid jarayoni</a>
+    <a href="#s5">Xarid narxi</a>
+    <a href="#s6">Sanash</a>
+    <a href="#s7">Muzlagan tovar</a>
+    <a href="#train">Mashq</a>
+    <a href="#task">Topshiriq</a>
+    <a href="#quiz">Test</a>
+  </nav>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <span class="mod-tag">9-modul · ega uchun</span>
+    <h1>Ombor va xaridlar</h1>
+    <p class="lead">Kerakli tovar doim bor, ortiqchasi esa javonda pul boʻlib yotmaydi: nimani saqlash, qachon va qancha buyurtma qilish, OilBookda xaridni qanday yuritish.</p>
+    <div class="meta"><span>45 daqiqa</span><span>7 ta boʻlim</span><span>Buyurtma kalkulyatori</span><span>Narx tekshirgich</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="goals" style="margin-top:16px">
+    <h2>Darsdan keyin siz:</h2>
+    <ul>
+      <li><i>1</i>Omborni muzlagan pul sifatida koʻrasiz va uni boshqarasiz</li>
+      <li><i>2</i>Qaysi tovar doim boʻlishi, qaysisi buyurtma bilan kelishini ajratasiz</li>
+      <li><i>3</i>Qachon va qancha buyurtma qilishni hisoblaysiz</li>
+      <li><i>4</i>OilBookda xaridni boshidan oxirigacha xatosiz yuritasiz</li>
+    </ul>
+  </div>
+
+<!-- 9.1 -->
+<section class="part" id="s1"><div class="part-card">
+  <div class="ph"><span class="pn">9.1</span><h2>Ombor — bu javondagi pul</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Har bir kanistr — siz toʻlab qoʻygan, lekin hali qaytmagan pul.</p>
+  <p>Omborda ikki xil xato boʻladi, ikkalasi ham pul yoʻqotadi. Tovar yetmasa — mijoz ketadi. Tovar ortiqcha boʻlsa — pul aylanmay, javonda muzlab yotadi. Maqsad — oʻrtasi.</p>
+  <div class="fig">
+    <div class="scale2">
+      <div class="sc lo"><h4>Kam</h4>Kerakli moy yoki filtr yoʻq<ul><li>Mijoz boshqa joyga ketadi</li><li>«Oʻxshash»ini qoʻyish xavfi</li><li>Shoshilinch qimmat xarid</li></ul></div>
+      <div class="sc hi"><h4>Koʻp</h4>Javonda oylab yotgan tovar<ul><li>Pul aylanmaydi</li><li>Joy band, tartib buziladi</li><li>Narx oʻzgarsa — zarar</li></ul></div>
+      <div class="mid">Toʻgʻri ombor: koʻp sotiladigani doim bor, kam sotiladigani — buyurtma bilan</div>
+    </div>
+  </div>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>«Ombor xulosasi» yuqorida koʻrsatadi: xarid narxidagi qoldiq qiymati, hammasi sotilsa qancha ustama boʻlishi, tugayotganlar va 30 kun sotilmaganlar soni.</div>
+  </div>
+</div></section>
+
+<!-- 9.2 -->
+<section class="part" id="s2"><div class="part-card">
+  <div class="ph"><span class="pn">9.2</span><h2>Nimani saqlash kerak: ABC qoidasi</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Koʻp hollarda tovarlarning kichik qismi sotuvning katta qismini beradi. Aynan shular hech qachon tugamasligi kerak.</p>
+  <div class="fig">
+    <p class="fig-t">Bir oylik sotuv boʻyicha tovarlar <span class="ex">misol</span></p>
+    <div class="abc" id="abc"></div>
+    <div class="abc-leg">
+      <div class="al3"><b style="color:var(--blue)">A — doim boʻlsin</b>Eng koʻp sotiladigan moy va filtrlar. Tugashi mumkin emas.</div>
+      <div class="al3"><b style="color:var(--cyan)">B — oz-ozdan</b>Oʻrtacha sotiladi. Kichik zaxira yetadi.</div>
+      <div class="al3"><b style="color:var(--muted)">C — buyurtma bilan</b>Kam soʻraladi. Mijoz soʻrasa, keltiriladi.</div>
+    </div>
+    <p class="cap">Mahsulot nomlari va raqamlar shartli. Oʻz roʻyxatingizni OilBook «Statistika»sidagi brendlar boʻlimi va omborning sotuv tezligidan tuzing.</p>
+  </div>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 32" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 22h6M10 25h4M12 5a6 6 0 0 0-3.5 10.9V18h7v-2.1A6 6 0 0 0 12 5z"/></svg>
+    <div><b>4-moduldagi shpargalka</b>Eng koʻp keladigan 10 ta mashina uchun tuzgan jadvalingiz — A guruhining tayyor roʻyxati: shu moylar va filtrlar doim omborda boʻlsin.</div>
+  </div>
+</div></section>
+
+<!-- 9.3 -->
+<section class="part" id="s3"><div class="part-card">
+  <div class="ph"><span class="pn">9.3</span><h2>Qachon va qancha buyurtma qilish</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Buyurtmani tovar tugaganda emas, yetkazib berish vaqtiga yetadigan qoldiq qolganda berish kerak.</p>
+  <p>Formula oddiy: <b>kunlik sotuv × (yetkazib berish kunlari + zaxira kunlari)</b> — shu miqdorga tushganda buyurtma berasiz. Zaxira — kutilmagan holatlar uchun: yetkazib beruvchi kechiksa yoki sotuv keskin oshsa.</p>
+  <div class="fig">
+    <p class="fig-t">Buyurtma kalkulyatori</p>
+    <div style="display:grid;gap:12px">
+      <div class="inp"><label for="k1">Kuniga sotuv<small>litr yoki dona — OilBookda «/kun»</small></label><input id="k1" type="number" inputmode="decimal" step="0.5" min="0" value="8"></div>
+      <div class="inp"><label for="k2">Yetkazib berish, kun<small>buyurtmadan omborgacha</small></label><input id="k2" type="number" inputmode="numeric" min="0" value="3"></div>
+      <div class="inp"><label for="k3">Zaxira, kun</label><input id="k3" type="number" inputmode="numeric" min="0" value="4"></div>
+      <div class="inp"><label for="k4">Hozirgi qoldiq</label><input id="k4" type="number" inputmode="numeric" min="0" value="90"></div>
+    </div>
+    <div class="res3" aria-live="polite">
+      <div class="r3"><small>Buyurtma nuqtasi</small><b id="kOp">—</b></div>
+      <div class="r3"><small>Qoldiq yetadi</small><b id="kDays">—</b></div>
+      <div class="r3"><small>Bir oyga buyurtma</small><b id="kOrd">—</b></div>
+    </div>
+    <div class="stock-viz"><svg id="kViz" viewBox="0 0 320 120" role="img" aria-label="Qoldiq vaqt oʻtishi bilan kamayadi, buyurtma nuqtasida buyurtma beriladi"></svg></div>
+  </div>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>Har bir tovar kartochkasida oʻzi hisoblanadi: «~8/kun · yetadi: 11 kun · buyurtma: …». «Xarid roʻyxati» esa oxirgi 30 kunlik sotuv tezligiga qarab bir oyga yetadigan miqdorni yigʻib beradi. Prognoz faqat almashtirishda tovar <strong>ombordan tanlangan</strong> sotuvlarni hisoblaydi — qoʻlda yozilgan moy hisobga kirmaydi.</div>
+  </div>
+</div></section>
+
+<!-- 9.4 -->
+<section class="part" id="s4"><div class="part-card">
+  <div class="ph"><span class="pn">9.4</span><h2>Xarid jarayoni OilBookda</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Daftar va xotira oʻrniga — toʻrt bosqichli buyurtma. Har bir buyurtma, narx va qarz yozilib qoladi.</p>
+  <div class="fig">
+    <div class="order">
+      <div class="os"><span class="n">1</span><b>Qoralama</b>«Yangi buyurtma» — roʻyxat prognoz boʻyicha oʻzi yigʻiladi, miqdorni oʻzgartirasiz<small>Qoralama</small></div>
+      <div class="os"><span class="n">2</span><b>Yuborish</b>Yetkazib beruvchiga — Telegram-bot orqali bitta tugma bilan yoki matnni nusxalab<small>Yuborilgan</small></div>
+      <div class="os"><span class="n">3</span><b>Qabul</b>Aslida qancha kelgani va birlik xarid narxi — tovar darhol omborga tushadi<small>Qabul qilindi</small></div>
+      <div class="os"><span class="n">4</span><b>Tarqatish</b>Filiallar boʻlsa — kimga qancha; boʻlmasa — hammasi sizda qoladi<small>Yakunlangan</small></div>
+    </div>
+  </div>
+  <h3>Yetkazib beruvchi kartochkasi</h3>
+  <p>«Yetkazib beruvchilar»da har biri uchun: nomi, telefon (WhatsApp uchun), menejer, yetkazib berish kunlari, toʻlov muddati va undan oladigan tovarlaringiz. Yetkazib beruvchi botga ulansa, buyurtmalar unga avtomatik boradi. Toʻlov muddati kiritilsa — muddati oʻtgan qarz koʻrinadi va bot eslatadi.</p>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 32" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 22h6M10 25h4M12 5a6 6 0 0 0-3.5 10.9V18h7v-2.1A6 6 0 0 0 12 5z"/></svg>
+    <div><b>Omborni tez toʻldirish</b>Tovarlar koʻp boʻlsa, ularni birma-bir kiritmang: «Omborni Excel'dan yuklash» — shablonni yuklab oling, toʻldiring va bir martada yuklang.</div>
+  </div>
+</div></section>
+
+<!-- 9.5 -->
+<section class="part" id="s5"><div class="part-card">
+  <div class="ph"><span class="pn">9.5</span><h2>Xarid narxi — har doim va toʻgʻri birlikda</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Xarid narxi yoʻq tovar — foydasi nomaʼlum tovar. Notoʻgʻri birlikdagi narx — notoʻgʻri foyda.</p>
+  <p>Eng koʻp uchraydigan xato: tovar birligi <b>litr</b> yoki <b>dona</b>, xarid narxi esa <b>butun quti yoki kanistr</b> uchun yoziladi. Natijada OilBook har bir litrni yoki filtrni juda qimmat sotib olingan deb hisoblaydi — statistikada foyda minusga tushadi yoki «sotuv xariddan past» degan ogohlantirish chiqadi.</p>
+  <div class="fig">
+    <p class="fig-t">Birlik narxini tekshiring</p>
+    <div style="display:grid;gap:12px">
+      <div class="inp"><label for="p1">Quti yoki kanistr narxi, soʻm</label><input id="p1" type="number" inputmode="numeric" min="0" step="1000" value="480000"></div>
+      <div class="inp"><label for="p2">Ichida nechta birlik<small>litr yoki dona</small></label><input id="p2" type="number" inputmode="decimal" min="0" step="0.5" value="4"></div>
+      <div class="inp"><label for="p3">Bir birlikni sotish narxi, soʻm</label><input id="p3" type="number" inputmode="numeric" min="0" step="1000" value="150000"></div>
+    </div>
+    <div class="res3" aria-live="polite">
+      <div class="r3"><small>Birlik xarid narxi — shuni yozing</small><b id="pU">—</b></div>
+      <div class="r3"><small>Birlikdan ustama</small><b id="pM">—</b></div>
+      <div class="r3"><small>Ustama, %</small><b id="pP">—</b></div>
+    </div>
+    <div class="uwarn" id="pW" style="margin-top:10px"></div>
+  </div>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>Tovarga xarid narxi birinchi marta kiritilganda, u shu tovarning oldingi sotuvlariga ham avtomatik yoziladi — eski foyda ham hisoblanadi. Narxlarni dollarda yuritsangiz, ombordagi «Dollar kursi»ni kiriting — $ dagi narx soʻmga oʻzi oʻgiriladi.</div>
+  </div>
+</div></section>
+
+<!-- 9.6 -->
+<section class="part" id="s6"><div class="part-card">
+  <div class="ph"><span class="pn">9.6</span><h2>Oyiga bir marta sanash</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Programma ham, odam ham xato qiladi. Oyiga bir marta javondagi tovarni sanab, OilBook bilan solishtiring.</p>
+  <p>Farq chiqsa — sababini toping: almashtirish yozilmaganmi, tovar ombordan tanlanmay qoʻlda yozilganmi, yoki toʻkilgan, shikastlangan. Keyin tovarni oʻzgartirish orqali haqiqiy qoldiqni sababi bilan kiriting — u «Mahsulot harakati»da tuzatish sifatida saqlanadi.</p>
+  <div class="fig">
+    <p class="fig-t">«Mahsulot harakati»da nimalar koʻrinadi</p>
+    <div class="mv">
+      <div class="mvr"><i style="background:var(--green)">+</i><div><b>Toʻldirish</b>Buyurtma qabul qilindi yoki qoʻlda qoʻshildi</div><em style="color:var(--green)">+40</em></div>
+      <div class="mvr"><i style="background:var(--blue)">⇄</i><div><b>Koʻchirish</b>Filialga yuborildi yoki filialdan keldi</div><em style="color:var(--blue)">−12</em></div>
+      <div class="mvr"><i style="background:var(--amber)">✎</i><div><b>Tuzatish</b>Sanashda farq chiqdi, sababi bilan</div><em style="color:var(--amber)">−2</em></div>
+    </div>
+    <p class="cap">Sotuvlar almashtirish yozuvlaridan oʻzi ayriladi — ularni qoʻlda kiritish shart emas.</p>
+  </div>
+</div></section>
+
+<!-- 9.7 -->
+<section class="part" id="s7"><div class="part-card">
+  <div class="ph"><span class="pn">9.7</span><h2>Muzlagan tovar bilan nima qilish</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">«30 kun sotilmagan» roʻyxati — omboringizdagi eng qimmat xato. Uni oyiga bir marta koʻrib chiqing.</p>
+  <div class="fig">
+    <div class="dead">
+      <div class="dd2"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></i><div><b>Paketga qoʻshing</b>7-moduldagi paket takliflariga</div></div>
+      <div class="dd2"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M7 7h10v10M17 7 7 17"/></svg></i><div><b>Filialga koʻchiring</b>Qayerda soʻralsa, oʻsha yerga</div></div>
+      <div class="dd2"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5M18 3v4h-4M6 21v-4h4"/></svg></i><div><b>Yetkazib beruvchi bilan gaplashing</b>Almashtirish yoki qaytarish imkoni</div></div>
+      <div class="dd2"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg></i><div><b>Qayta olmang</b>Tugagach — C guruhiga, faqat buyurtma bilan</div></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- trainer -->
+<section class="part" id="train"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Mashq</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Toʻrtta vaziyat. Toʻgʻri harakatni tanlang.</p>
+  <div id="cases"></div>
+</div></section>
+
+<!-- task -->
+<section class="part" id="task"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Amaliy topshiriq</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Bir hafta ichida bajariladi.</p>
+  <ol class="task">
+    <li><div><b>Xarid narxlari.</b> Ombordagi har bir tovarda birlik xarid narxi borligini va u toʻgʻri birlikda ekanini tekshiring.</div></li>
+    <li><div><b>ABC.</b> A guruhidagi 10–15 tovarni yozing — ular hech qachon tugamasligi kerak.</div></li>
+    <li><div><b>Sanash.</b> Javondagi tovarni sanab, OilBook bilan solishtiring va farqlarni tuzating.</div></li>
+    <li><div><b>Birinchi buyurtma.</b> «Buyurtmalar»da prognoz boʻyicha yangi buyurtma yarating va uni yetkazib beruvchiga yuboring.</div></li>
+  </ol>
+  <div class="fig">
+    <p class="fig-t">Bajarilganini belgilang</p>
+    <div class="choice" id="taskDone">
+      <button type="button" data-v="0" aria-pressed="false">Xarid narxlari</button>
+      <button type="button" data-v="1" aria-pressed="false">A guruhi</button>
+      <button type="button" data-v="2" aria-pressed="false">Sanash</button>
+      <button type="button" data-v="3" aria-pressed="false">Birinchi buyurtma</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- quiz -->
+<section class="part" id="quiz"><div class="part-card">
+  <div class="ph"><span class="pn">?</span><h2>Test</h2></div>
+  <p class="kicker">10 ta savol. Modulni topshirish uchun 8 ta toʻgʻri javob kerak.</p>
+  <div id="quizBox"></div>
+  <div class="result" id="result" aria-live="polite"></div>
+</div></section>
+
+<div class="done-card">
+  <small>Keyingi modul</small>
+  <h2>10. Shoxobcha pullari</h2>
+  <a class="btn" href="#top">Dars boshiga</a>
+</div>
+</div>
+</main>
+<footer>OilBook taʼlimi — moy almashtirish shoxobchalari uchun kurs</footer>
+
+<script>
+(function(){
+  var KEY='oilbook-course-m9-uz-';
+  var store={get:function(k){try{return JSON.parse(localStorage.getItem(KEY+k));}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v));}catch(e){}}};
+  function fmt(n){ return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+
+  var bar=document.getElementById('progress'), nav=document.querySelector('.toc');
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  var cur=-2, ticking=false;
+  function update(){
+    ticking=false;
+    var h=document.documentElement;
+    bar.style.transform='scaleX('+(h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight)).toFixed(3)+')';
+    var c=-1; for(var i=0;i<secs.length;i++){ if(secs[i]&&secs[i].getBoundingClientRect().top<150) c=i; else break; }
+    if(c!==cur){ cur=c; links.forEach(function(a,i){a.classList.toggle('on',i===c);}); if(c>=0){ var a=links[c]; nav.scrollLeft=a.offsetLeft-(nav.clientWidth-a.offsetWidth)/2; } }
+  }
+  window.addEventListener('scroll',function(){ if(!ticking){ticking=true;requestAnimationFrame(update);} },{passive:true});
+  update();
+
+  /* ABC */
+  var A=[['Moy 5W-30',240],['Moy 5W-40',150],['Moy filtri — 1-model',120],['Moy 10W-40',90],['Moy filtri — 2-model',70],['Havo filtri — 1-model',40],['Antifriz',30],['Salon filtri',22],['Moy 0W-20',12],['ATF suyuqligi',6]];
+  var tot=A.reduce(function(s,a){return s+a[1];},0), acc=0, mx=A[0][1];
+  document.getElementById('abc').innerHTML=A.map(function(a){
+    acc+=a[1]; var p=acc/tot, cl=p<=0.8?'A':(p<=0.95?'B':'C');
+    return '<div class="ab"><span class="nm">'+a[0]+'</span><div class="tr"><div class="fi c'+cl+'" style="width:'+(100*a[1]/mx).toFixed(0)+'%"></div></div><span class="cl c'+cl+'">'+cl+'</span></div>';
+  }).join('');
+
+  /* reorder calc */
+  var k=['k1','k2','k3','k4'].map(function(i){return document.getElementById(i);});
+  var sv=store.get('reorder'); if(sv){ k.forEach(function(x,i){ if(sv[i]!=null) x.value=sv[i]; }); }
+  function kc(){
+    var d=+k[0].value||0, l=+k[1].value||0, z=+k[2].value||0, s=+k[3].value||0;
+    store.set('reorder',k.map(function(x){return x.value;}));
+    var op=Math.ceil(d*(l+z)), days=d?Math.floor(s/d):0, ord=Math.ceil(d*30);
+    document.getElementById('kOp').textContent=d?op:'—';
+    document.getElementById('kDays').textContent=d?days+' kun':'—';
+    document.getElementById('kOrd').textContent=d?ord:'—';
+    /* viz */
+    var W=320,H=120,pad=18, T=Math.max(days+l+6,30), ymax=Math.max(s,op,ord+Math.max(0,s-d*(Math.max(0,(s-op)/(d||1))+l)))*1.12||1;
+    function X(t){return pad+(W-2*pad)*t/T;} function Y(v){return H-pad-(H-2*pad)*v/ymax;}
+    var tOp=d?Math.max(0,(s-op)/d):0;
+    var svg='<line x1="'+pad+'" y1="'+Y(op)+'" x2="'+(W-pad)+'" y2="'+Y(op)+'" stroke="#F2A20C" stroke-width="2" stroke-dasharray="5 4"/>';
+    svg+='<text x="'+(W-pad)+'" y="'+(Y(op)-5)+'" text-anchor="end" font-size="10" font-weight="800" fill="#F2A20C" font-family="Onest,sans-serif">buyurtma nuqtasi</text>';
+    if(d){
+      var tEnd=Math.min(T,s/d);
+      svg+='<polyline fill="none" stroke="#1463E6" stroke-width="3" points="'+X(0)+','+Y(s)+' '+X(tEnd)+','+Y(Math.max(0,s-d*tEnd))+'"/>';
+      svg+='<circle cx="'+X(tOp)+'" cy="'+Y(Math.min(s,op))+'" r="5" fill="#F2A20C"/>';
+      var tArr=tOp+l; if(tArr<T){ var lvl=Math.max(0,s-d*tArr); svg+='<line x1="'+X(tArr)+'" y1="'+Y(lvl)+'" x2="'+X(tArr)+'" y2="'+Y(lvl+ord)+'" stroke="#15A35B" stroke-width="3"/><text x="'+(X(tArr)+4)+'" y="'+(Y(lvl+ord)+10)+'" font-size="10" font-weight="800" fill="#15A35B" font-family="Onest,sans-serif">tovar keldi</text>'; }
+    }
+    svg+='<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="var(--line)" stroke-width="2"/><text x="'+pad+'" y="'+(H-4)+'" font-size="10" font-weight="700" fill="var(--muted)" font-family="Onest,sans-serif">bugun</text><text x="'+(W-pad)+'" y="'+(H-4)+'" text-anchor="end" font-size="10" font-weight="700" fill="var(--muted)" font-family="Onest,sans-serif">'+Math.round(T)+' kun</text>';
+    document.getElementById('kViz').innerHTML=svg;
+  }
+  k.forEach(function(x){x.addEventListener('input',kc);}); kc();
+
+  /* unit price */
+  var p=['p1','p2','p3'].map(function(i){return document.getElementById(i);});
+  function pc(){
+    var box=+p[0].value||0, n=+p[1].value||0, sell=+p[2].value||0;
+    var u=n?box/n:0, m=sell-u, pr=u?100*m/u:0;
+    document.getElementById('pU').textContent=u?fmt(u):'—';
+    document.getElementById('pM').textContent=u&&sell?fmt(m):'—';
+    document.getElementById('pP').textContent=u&&sell?Math.round(pr)+'%':'—';
+    var w=document.getElementById('pW');
+    if(!u||!sell){ w.className='uwarn'; w.textContent=''; return; }
+    if(box>sell*1.5){ w.className='uwarn mid'; w.textContent='Diqqat: agar xarid narxiga quti narxini ('+fmt(box)+') yozsangiz, OilBook har bir birlikni sotuv narxidan qimmat olingan deb hisoblaydi va foyda minusga tushadi. Birlik narxini — '+fmt(u)+' soʻm yozing.'; }
+    else if(m<0){ w.className='uwarn bad'; w.textContent='Sotish narxi xarid narxidan past — har bir sotuvda zarar.'; }
+    else { w.className='uwarn ok'; w.textContent='Toʻgʻri: xarid narxi sotish narxidan past, ustama bor.'; }
+  }
+  p.forEach(function(x){x.addEventListener('input',pc);}); pc();
+
+  /* trainer */
+  var CS=[
+    {t:'Eng koʻp soʻraladigan 5W-30 moyidan 2 kunlik qoldiq qoldi, yetkazib berish 3 kun.',o:['Tugaguncha kutish','Darhol buyurtma berish — kech qoldingiz','Hech narsa qilmaslik, mijoz kutadi'],a:1,e:'Qoldiq yetkazib berish vaqtidan kam. Buyurtma nuqtasini zaxira bilan oldindan qoʻying.'},
+    {t:'Yangi filtr partiyasi keldi. Yetkazib beruvchi qutiga (20 dona) narx yozgan.',o:['Quti narxini xarid narxiga yozish','Quti narxini 20 ga boʻlib, dona narxini yozish','Xarid narxini yozmaslik'],a:1,e:'Birlik — dona. Quti narxi yozilsa, foyda notoʻgʻri hisoblanadi.'},
+    {t:'Sanashda 5W-40 dan 3 litr kam chiqdi.',o:['Indamaslik','Sababini topib, tovarni oʻzgartirish orqali haqiqiy qoldiqni sababi bilan kiritish','Keyingi oyga qoldirish'],a:1,e:'Tuzatish «Mahsulot harakati»da saqlanadi — keyingi safar farq qayerdan kelganini koʻrasiz.'},
+    {t:'Bir xil moy 3 oydan beri sotilmayapti, javonda 40 litr.',o:['Yana koʻproq olish','Paketga qoʻshish, filialga koʻchirish yoki yetkazib beruvchi bilan gaplashish','Hech narsa qilmaslik'],a:1,e:'Muzlagan pulni aylanishga qaytaring va bu tovarni C guruhiga oʻtkazing.'}
+  ];
+  var cs=document.getElementById('cases');
+  cs.innerHTML=CS.map(function(c,i){
+    return '<div class="case-card" data-i="'+i+'"><div class="req"><small>Vaziyat</small>'+c.t+'</div><div class="can">'+c.o.map(function(o,k2){return '<button type="button" data-k="'+k2+'"><b>'+o+'</b></button>';}).join('')+'</div><div class="case-ex">'+c.e+'</div></div>';
+  }).join('');
+  cs.addEventListener('click',function(e){
+    var b=e.target.closest('.can button'); if(!b) return;
+    var card=b.closest('.case-card'); if(card.classList.contains('done')) return;
+    var c=CS[+card.dataset.i]; card.classList.add('done');
+    card.querySelectorAll('.can button').forEach(function(x){ x.disabled=true; if(+x.dataset.k===c.a) x.classList.add('ok'); else if(x===b) x.classList.add('no'); });
+  });
+
+  /* task */
+  var td=store.get('task')||{}, tdb=document.getElementById('taskDone');
+  function paint(){ tdb.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed',String(!!td[b.dataset.v])); }); }
+  tdb.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; td[b.dataset.v]=!td[b.dataset.v]; store.set('task',td); paint(); });
+  paint();
+
+  /* quiz */
+  var Q=[
+    {q:'Ombordagi tovar nima?',o:['Shunchaki zaxira','Toʻlab qoʻyilgan, lekin hali qaytmagan pul','Bepul mol'],a:1,e:'Ortiqcha tovar — muzlagan pul.'},
+    {q:'A guruhidagi tovar qanday boshqariladi?',o:['Faqat buyurtma bilan','Hech qachon tugamasligi kerak','Umuman saqlanmaydi'],a:1,e:'Eng koʻp sotiladigan moy va filtrlar.'},
+    {q:'Buyurtma nuqtasi qanday hisoblanadi?',o:['Kunlik sotuv × (yetkazib berish + zaxira kunlari)','Qoldiq ikkiga boʻlinadi','Har doim 10 dona'],a:0,e:'Shu miqdorga tushganda buyurtma beriladi.'},
+    {q:'OilBook prognozi qaysi sotuvlarni hisoblaydi?',o:['Hammasini','Almashtirishda ombordan tanlangan tovarlarni','Faqat filtrlarni'],a:1,e:'Qoʻlda yozilgan moy prognozga kirmaydi.'},
+    {q:'OilBookda buyurtma bosqichlari qaysi tartibda?',o:['Qabul — Qoralama — Yuborish','Qoralama — Yuborish — Qabul — Tarqatish','Faqat Yuborish'],a:1,e:'Qabulda tovar darhol omborga tushadi.'},
+    {q:'Quti narxi 480 000, ichida 4 litr. Xarid narxiga nima yoziladi?',o:['480 000','120 000','4'],a:1,e:'Birlik — litr. 480 000 ÷ 4 = 120 000.'},
+    {q:'Xarid narxi yoʻq tovar sotilsa?',o:['Foyda toʻgʻri hisoblanadi','Sotuvi foydaga kirmaydi','Tovar oʻchiriladi'],a:1,e:'Statistikada sariq ogohlantirish bilan koʻrinadi.'},
+    {q:'Xarid narxi birinchi marta kiritilsa, oldingi sotuvlar bilan nima boʻladi?',o:['Hech narsa','Ularga ham shu narx yoziladi — eski foyda ham hisoblanadi','Ular oʻchiriladi'],a:1,e:'Faqat birinchi marta kiritilganda.'},
+    {q:'Sanashda farq chiqsa?',o:['Indamaslik','Sababini topib, haqiqiy qoldiqni sababi bilan kiritish','Yangi tovar qoʻshish'],a:1,e:'Tuzatish «Mahsulot harakati»da saqlanadi.'},
+    {q:'30 kun sotilmagan tovar bilan nima qilinmaydi?',o:['Paketga qoʻshish','Filialga koʻchirish','Yana koʻproq sotib olish'],a:2,e:'Muzlagan tovarni qayta olmang — C guruhiga oʻtkazing.'}
+  ];
+  var box=document.getElementById('quizBox'), res=document.getElementById('result'), ans={};
+  function renderQ(){
+    ans={}; res.className='result'; res.innerHTML='';
+    box.innerHTML=Q.map(function(x,i){return '<div class="q" data-i="'+i+'"><div class="q-n">Savol '+(i+1)+' / 10</div><div class="q-t">'+x.q+'</div><div class="opts">'+x.o.map(function(t,k2){return '<button class="opt" type="button" data-k="'+k2+'">'+t+'</button>';}).join('')+'</div><div class="q-ex">'+x.e+'</div></div>';}).join('');
+  }
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b) return;
+    var card=b.closest('.q'), i=+card.dataset.i; if(i in ans) return;
+    ans[i]=+b.dataset.k; card.classList.add('done');
+    card.querySelectorAll('.opt').forEach(function(o){ o.disabled=true; if(+o.dataset.k===Q[i].a) o.classList.add('ok'); else if(o===b) o.classList.add('no'); });
+    if(Object.keys(ans).length===Q.length){
+      var ok=Q.filter(function(x,qi){return ans[qi]===x.a;}).length; store.set('quiz',ok);
+      res.innerHTML='<b>'+ok+' / 10</b>'+(ok>=8?'Modul topshirildi. Keyingisi — «Shoxobcha pullari».':'10 tadan 8 ta toʻgʻri javob kerak. 9.3–9.5-boʻlimlarni qayta oʻqib, yana urinib koʻring.')+'<div style="margin-top:14px"><button class="btn white" type="button" id="retry">Qaytadan topshirish</button></div>';
+      res.className='result show';
+      document.getElementById('retry').addEventListener('click',function(){ renderQ(); box.scrollIntoView({block:'start'}); });
+    }
+  });
+  renderQ();
+})();
+</script>
+
+</body>
+</html>

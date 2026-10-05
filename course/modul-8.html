@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>8-modul. Mijozlar bazasi va qayta tashriflar — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Sora:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2350;
+  --ink-2:#3E5479;
+  --muted:#6B7F9E;
+  --bg:#EEF4FB;
+  --card:#FFFFFF;
+  --line:#D9E4F2;
+  --blue:#1463E6;
+  --cyan:#1FB5F2;
+  --soft:#E3EEFD;
+  --red:#E5484D;
+  --amber:#F2A20C;
+  --green:#15A35B;
+  --grad:linear-gradient(135deg,#1FB5F2 0%,#1463E6 100%);
+  --font:'Onest', 'Segoe UI', Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F;
+  }
+}
+:root[data-theme="dark"]{ --ink:#E8F0FC; --ink-2:#B9C9E2; --muted:#8CA0C0; --bg:#0A1730; --card:#11234A; --line:#22396A; --soft:#16305F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 110px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{max-width:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* app header */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-word{font-family:'Sora',var(--font);font-weight:800;font-size:20px;letter-spacing:-.4px;line-height:1}
+.brand-word .o{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-word .b{color:#0A2A5E}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word .b{color:#E8F0FC} }
+.crumb{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px;line-height:1.25}
+.crumb b{display:block;color:var(--ink);font-weight:700;font-size:14px}
+.progress{height:3px;background:var(--grad);width:100%;transform:scaleX(0);transform-origin:0 50%}
+.toc{max-width:860px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 12px;background:var(--soft);border-radius:999px;white-space:nowrap}
+.toc a.on{color:#fff;background:var(--blue)}
+
+/* hero */
+.hero{background:var(--grad);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;bottom:-90px;width:300px;height:390px;background:rgba(255,255,255,.10);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;transform:rotate(-12deg)}
+.hero .wrap{position:relative;z-index:1;padding-top:34px;padding-bottom:34px}
+.mod-tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.08;font-weight:900;margin:0 0 14px;letter-spacing:-.6px;max-width:640px}
+.hero .lead{font-size:clamp(16px,2.3vw,19px);opacity:.92;max-width:600px;margin:0 0 24px}
+.formula-hero{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(6,30,80,.28);border-radius:18px;padding:14px;max-width:620px}
+.fh{background:#fff;color:var(--blue);border-radius:12px;padding:8px 12px;font-weight:800;font-size:15px;line-height:1.2;text-align:center}
+.fh small{display:block;font-size:11px;font-weight:600;color:#6B7F9E}
+.fop{font-weight:900;font-size:22px;opacity:.9}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.meta span{background:rgba(255,255,255,.16);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+
+/* goals */
+.goals{background:var(--card);border-radius:20px;padding:20px;margin-top:-1px;margin-bottom:8px}
+.goals h2{font-size:18px;margin:0 0 12px}
+.goals ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.goals li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45}
+.goals li i{width:28px;height:28px;border-radius:9px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--blue);font-style:normal;font-weight:800;font-size:14px}
+
+/* section */
+section.part{padding:40px 0 8px}
+.part-card{background:var(--card);border-radius:24px;padding:24px 20px;box-shadow:0 1px 0 var(--line)}
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.part h2{font-size:clamp(22px,4.6vw,30px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.3px}
+.part h3{font-size:18px;margin:28px 0 10px;line-height:1.3}
+.part p{margin:0 0 12px;color:var(--ink-2)}
+.part p b,.part li b{color:var(--ink)}
+.kicker{font-size:19px;font-weight:700;color:var(--ink)!important;line-height:1.4;margin-bottom:16px!important}
+.who{display:inline-flex;gap:6px;margin-bottom:14px}
+.who span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--blue)}
+
+.fig{background:var(--bg);border-radius:18px;padding:18px;margin:18px 0}
+.fig-t{font-weight:800;font-size:15px;margin:0 0 14px;color:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin:12px 0 0!important;line-height:1.45}
+.ex{font-size:12px;font-weight:700;color:var(--amber);background:rgba(242,162,12,.12);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+
+.note{display:grid;grid-template-columns:26px 1fr;gap:12px;border-radius:16px;padding:14px 16px;margin:18px 0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.note b{display:block;color:var(--ink);margin-bottom:3px}
+.note.case{background:rgba(21,163,91,.09)}
+.note.warn{background:rgba(229,72,77,.08)}
+.note.tip{background:var(--soft)}
+.note.app{background:linear-gradient(135deg,rgba(31,181,242,.12),rgba(20,99,230,.12));border:1px solid rgba(20,99,230,.25)}
+
+/* calculator */
+.calc{display:grid;gap:14px}
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+.inp input:focus{border-color:var(--blue);outline:none}
+.total{background:var(--grad);color:#fff;border-radius:16px;padding:16px;text-align:center}
+.total small{display:block;font-size:13px;opacity:.9;font-weight:600}
+.total b{font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:-.5px}
+.levers{display:grid;gap:10px;margin-top:4px}
+.lv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:14px}
+.lv-name{font-weight:700;line-height:1.3}
+.lv-bar{background:var(--card);border-radius:10px;height:34px;position:relative;overflow:hidden}
+.lv-fill{position:absolute;inset:0 auto 0 0;background:var(--grad);border-radius:10px;transition:width .3s}
+.lv-val{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-weight:800;font-size:14px;color:var(--ink)}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} .lv{grid-template-columns:1fr} }
+
+/* bucket */
+.bucket{display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:10px}
+.bk-side{display:grid;gap:8px}
+.bk-chip{border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.3}
+.bk-chip.in{background:rgba(21,163,91,.12);color:var(--green)}
+.bk-chip.out{background:rgba(229,72,77,.1);color:var(--red)}
+.bk-chip small{display:block;font-weight:500;color:var(--ink-2);font-size:12px}
+@media (max-width:600px){ .bucket{grid-template-columns:1fr} .bk-svg{order:-1;max-width:170px;margin:0 auto} }
+
+/* lifetime */
+.life{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px}
+.life div{background:var(--grad);border-radius:6px 6px 2px 2px}
+.life-axis{display:grid;grid-template-columns:repeat(3,1fr);font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;text-align:center}
+.life-axis span{border-top:2px solid var(--line);padding-top:4px}
+.big-num{display:flex;gap:14px;align-items:center;margin-top:14px}
+.big-num b{font-size:30px;font-weight:900;color:var(--blue);letter-spacing:-.5px;line-height:1}
+.big-num span{font-size:14px;color:var(--ink-2);line-height:1.35}
+
+/* stacked check */
+.stack{display:grid;gap:12px}
+.st-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
+.st-name{font-weight:800;font-size:14px;line-height:1.25}
+.st-name small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.st-bar{display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--card)}
+.st-bar span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;padding:0 3px}
+.c-oil{background:#1463E6}.c-flt{background:#1FB5F2}.c-work{background:#0A2A5E}.c-air{background:#15A35B}.c-cab{background:#F2A20C}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+/* waterfall */
+.wf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:220px;align-items:stretch}
+.wf-col{position:relative}
+.wf-b{position:absolute;left:0;right:0;border-radius:8px}
+.wf-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:800}
+.wf-l{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;line-height:1.2;overflow-wrap:anywhere}
+
+/* three levers */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .three{grid-template-columns:1fr} }
+.tl{background:var(--card);border-radius:16px;padding:16px;border-top:4px solid var(--blue)}
+.tl:nth-child(2){border-color:var(--cyan)}.tl:nth-child(3){border-color:var(--green)}
+.tl h4{margin:8px 0 6px;font-size:16px}
+.tl ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.tl .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+/* leaks */
+.leaks{display:grid;gap:8px}
+.leak{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.leak b{color:var(--ink);display:block}
+.leak .d{width:34px;height:34px;border-radius:10px;background:rgba(229,72,77,.1);display:flex;align-items:center;justify-content:center}
+.leak em{font-style:normal;color:var(--blue);font-weight:700}
+
+/* scripts */
+.say{display:grid;gap:6px;margin-bottom:12px}
+.say-who{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble{background:var(--card);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.45;font-weight:600;border:1px solid var(--line)}
+.bubble.good{border-color:rgba(21,163,91,.5)}
+.bubble.bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--red);font-weight:500}
+
+/* oilbook map */
+.map{display:grid;gap:8px}
+.mp{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+.mp div{border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.3}
+.mp .q{background:var(--card);font-weight:700}
+.mp .a{background:var(--grad);color:#fff;font-weight:700}
+.mp .a small{display:block;font-weight:500;opacity:.9;font-size:12px}
+@media (max-width:520px){ .mp{grid-template-columns:1fr} .mp svg{transform:rotate(90deg);margin:0 auto} }
+
+/* task */
+.task{list-style:none;counter-reset:t;margin:0;padding:0;display:grid;gap:8px}
+.task li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--bg);border-radius:14px;padding:12px;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.task li::before{content:counter(t);width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sheet{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:520px){ .sheet{grid-template-columns:1fr} }
+.cell{background:var(--card);border-radius:14px;padding:12px}
+.cell label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.cell input,.cell textarea{width:100%;border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;font-weight:700;font-size:16px;resize:vertical}
+.cell input:focus,.cell textarea:focus{border-color:var(--blue);outline:none}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice button{border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.choice button[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+.saved{font-size:13px;color:var(--green);font-weight:700;margin-top:8px;min-height:20px}
+
+/* quiz */
+.q{background:var(--bg);border-radius:16px;padding:16px;margin-bottom:10px}
+.q-n{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.q-t{font-weight:700;font-size:16.5px;margin-bottom:10px;line-height:1.4}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;font-size:15px;line-height:1.4}
+.opt:hover:not([disabled]){border-color:var(--blue)}
+.opt.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.opt.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.opt[disabled]{cursor:default}
+.q-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2)}
+.q.done .q-ex{display:block}
+.result{display:none;background:var(--grad);color:#fff;border-radius:18px;padding:20px;text-align:center;margin-top:6px}
+.result.show{display:block}
+.result b{display:block;font-size:34px;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--blue);color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.white{background:#fff;color:var(--blue)}
+
+.done-card{text-align:center;padding:36px 0 50px}
+.done-card small{color:var(--muted);font-size:14px}
+.done-card h2{font-size:clamp(22px,4.5vw,30px);margin:6px 0 16px;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 34px}
+
+/* module 2 extras */
+.sae{display:flex;align-items:flex-end;gap:2px;font-weight:900;letter-spacing:-1px;line-height:1}
+.sae-big{background:#fff;color:var(--blue);border-radius:20px;padding:16px 18px 12px;display:inline-block;max-width:100%}
+.sae-row{display:flex;align-items:flex-end;gap:4px;font-size:clamp(46px,13vw,76px);font-weight:900;letter-spacing:-2px;line-height:1}
+.sae-row .w{color:#1FB5F2}
+.sae-row .h{color:#0A2A5E}
+.sae-cap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:12px;font-weight:700;color:#3E5479;letter-spacing:0;line-height:1.3}
+.sae-cap span{border-top:3px solid #1FB5F2;padding-top:6px}
+.sae-cap span+span{border-color:#0A2A5E}
+
+.funcs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:640px){ .funcs{grid-template-columns:repeat(2,1fr)} .funcs .fn:last-child{grid-column:1/-1} }
+.fn{background:var(--card);border-radius:14px;padding:14px 10px;text-align:center;font-size:13px;line-height:1.35;color:var(--ink-2)}
+.fn b{display:block;color:var(--ink);font-size:14.5px;margin:8px 0 4px}
+.fn .ico{width:44px;height:44px;margin:0 auto;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center}
+
+.comp{display:flex;height:54px;border-radius:14px;overflow:hidden;font-weight:800;font-size:14px;color:#fff}
+.comp div{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;padding:0 6px}
+.adds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+@media (max-width:560px){ .adds{grid-template-columns:repeat(2,1fr)} }
+.add{background:var(--card);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.35;color:var(--ink-2);border-left:4px solid var(--cyan)}
+.add b{display:block;color:var(--ink);font-size:14px}
+
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .types{grid-template-columns:1fr} }
+.type{background:var(--card);border-radius:16px;padding:16px;border-top:5px solid #9DB4D6}
+.type:nth-child(2){border-color:var(--cyan)}.type:nth-child(3){border-color:var(--blue)}
+.type h4{margin:0 0 10px;font-size:17px}
+.meter{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.dots{display:flex;gap:4px}
+.dots i{width:16px;height:8px;border-radius:4px;background:var(--line)}
+.dots i.on{background:var(--blue)}
+.type p{font-size:13.5px!important;margin:10px 0 0!important;line-height:1.45}
+
+.thermo{position:relative;padding:6px 0 0}
+.th-axis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.th-col{text-align:center}
+.th-bar{height:120px;border-radius:10px;background:linear-gradient(180deg,var(--soft),var(--card));position:relative;overflow:hidden}
+.th-fill{position:absolute;left:0;right:0;bottom:0;background:var(--grad);border-radius:10px}
+.th-grade{font-weight:900;font-size:18px;margin-top:6px;color:var(--ink)}
+.th-t{font-size:12px;color:var(--muted);font-weight:700}
+.hot{display:grid;gap:8px}
+.hot-row{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
+.hot-row b{font-size:18px;font-weight:900;text-align:right}
+.hot-bar{height:28px;border-radius:8px;background:linear-gradient(90deg,#F2A20C,#E5484D);display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+
+.timeline{display:flex;gap:0;overflow-x:auto;padding-bottom:4px}
+.tm{flex:1 1 0;min-width:52px;text-align:center;position:relative;padding-top:22px}
+.tm::before{content:"";position:absolute;top:8px;left:0;right:0;height:4px;background:var(--line)}
+.tm::after{content:"";position:absolute;top:2px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--card);border:4px solid #9DB4D6}
+.tm.new::after{border-color:var(--blue);background:var(--blue)}
+.tm b{display:block;font-size:17px;font-weight:900}
+.tm span{font-size:12px;color:var(--muted);font-weight:700}
+
+.std{display:grid;gap:10px}
+.sd{display:grid;grid-template-columns:86px 1fr;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;align-items:start}
+.sd .tag{background:var(--grad);color:#fff;border-radius:10px;padding:8px 6px;text-align:center;font-weight:900;font-size:15px;line-height:1.1}
+.sd .tag small{display:block;font-size:10.5px;font-weight:600;opacity:.9;margin-top:2px}
+.sd div{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.sd div b{color:var(--ink)}
+
+/* label decoder */
+.label{background:linear-gradient(160deg,#0A2A5E,#1463E6);color:#fff;border-radius:22px;padding:22px 18px;max-width:380px;margin:0 auto;box-shadow:0 12px 30px rgba(10,35,80,.25)}
+.lb-brand{font-weight:900;font-size:22px;letter-spacing:-.4px}
+.lb-sub{font-size:12px;opacity:.8;margin-bottom:14px}
+.lb-sae{font-size:44px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:12px}
+.hs{display:inline-block;border:2px dashed rgba(255,255,255,.55);border-radius:10px;padding:4px 8px;margin:0 4px 8px 0;font-weight:800;font-size:14px;cursor:pointer;background:transparent;color:#fff}
+.hs:hover,.hs.on{background:#fff;color:var(--blue);border-style:solid;border-color:#fff}
+.lb-sae .hs{font-size:44px;padding:2px 10px;letter-spacing:-1.5px;font-weight:900}
+.lb-vol{margin-top:6px;font-size:13px;opacity:.85}
+.explain{max-width:520px;margin:14px auto 0;background:var(--card);border-radius:16px;padding:14px 16px;font-size:15px;line-height:1.5;color:var(--ink-2);min-height:92px}
+.explain b{display:block;color:var(--ink);margin-bottom:4px}
+
+/* choose flow */
+.flow{display:grid;gap:0}
+.fstep{display:grid;grid-template-columns:44px 1fr;gap:12px;position:relative;padding-bottom:16px}
+.fstep:not(:last-child)::before{content:"";position:absolute;left:21px;top:44px;bottom:0;width:3px;background:var(--line)}
+.fnum{width:44px;height:44px;border-radius:14px;background:var(--grad);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:17px}
+.fcard{background:var(--card);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.fcard b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
+.fcard .stop{display:inline-block;margin-top:6px;background:rgba(229,72,77,.1);color:var(--red);font-weight:700;font-size:13px;border-radius:8px;padding:3px 8px}
+
+/* myths */
+.myth{background:var(--card);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.myth button{width:100%;border:0;background:transparent;text-align:left;padding:14px 16px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-weight:700;font-size:15.5px;line-height:1.4}
+.myth .badge{font-size:12px;font-weight:800;color:var(--red);background:rgba(229,72,77,.1);border-radius:8px;padding:4px 8px;white-space:nowrap}
+.myth .ans{display:none;padding:0 16px 14px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.myth .ans b{color:var(--green)}
+.myth.open .ans{display:block}
+.myth.open .badge{color:var(--green);background:rgba(21,163,91,.1)}
+
+/* trainer */
+.case-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
+.case-card h4{margin:0 0 6px;font-size:16px}
+.req{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.45}
+.req small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.can{display:grid;gap:8px}
+.can button{text-align:left;border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14.5px;line-height:1.4}
+.can button b{display:block;font-size:15px}
+.can button.ok{border-color:var(--green);background:rgba(21,163,91,.1)}
+.can button.no{border-color:var(--red);background:rgba(229,72,77,.08)}
+.can button[disabled]{cursor:default}
+.case-ex{display:none;margin-top:10px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.case-card.done .case-ex{display:block}
+
+.fields{display:grid;grid-template-columns:1fr;gap:8px}
+.fld{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--card);border-radius:12px;padding:10px 12px;cursor:pointer;border:2px solid transparent}
+.fld.on{border-color:var(--blue)}
+.fld input{appearance:none;-webkit-appearance:none;width:22px;height:22px;border:2px solid var(--blue);border-radius:6px;margin:0;display:grid;place-items:center}
+.fld input:checked{background:var(--blue)}
+.fld input:checked::after{content:"";width:9px;height:5px;border-left:3px solid #fff;border-bottom:3px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.fld b{font-size:14.5px}
+.fld small{display:block;font-size:12px;color:var(--muted)}
+.fld em{font-style:normal;font-size:11px;font-weight:800;color:var(--red);background:rgba(229,72,77,.08);padding:3px 7px;border-radius:7px;white-space:nowrap}
+.feat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
+@media (max-width:520px){ .feat{grid-template-columns:1fr} }
+.ft{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;border-radius:12px;padding:10px 12px;font-size:13.5px;line-height:1.35;background:var(--card);color:var(--muted);border:2px dashed var(--line)}
+.ft i{width:30px;height:30px;border-radius:50%;background:var(--line);color:#fff;font-style:normal;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ft b{display:block;font-size:14px}
+.ft.on{color:var(--ink-2);border:2px solid rgba(21,163,91,.5);background:rgba(21,163,91,.07)}
+.ft.on b{color:var(--ink)}
+.ft.on i{background:var(--green)}
+
+.link3{display:grid;grid-template-columns:1fr 26px 1fr 26px 1fr;gap:6px;align-items:center}
+@media (max-width:620px){ .link3{grid-template-columns:1fr} .link3 .ar{transform:rotate(90deg);margin:0 auto} }
+.lk{background:var(--card);border-radius:14px;padding:14px;text-align:center;font-size:13.5px;line-height:1.4;color:var(--ink-2)}
+.lk b{display:block;color:var(--ink);font-size:15px;margin:6px 0 4px}
+.lk .tag{display:inline-block;background:rgba(21,163,91,.12);color:var(--green);font-weight:800;font-size:12px;border-radius:8px;padding:3px 8px;margin-top:6px}
+
+.tline{position:relative;padding-left:30px;display:grid;gap:12px}
+.tline::before{content:"";position:absolute;left:11px;top:6px;bottom:6px;width:3px;background:var(--line);border-radius:2px}
+.tp{position:relative;background:var(--card);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;color:var(--ink-2)}
+.tp::before{content:"";position:absolute;left:-26px;top:14px;width:16px;height:16px;border-radius:50%;background:var(--c,var(--blue));box-shadow:0 0 0 4px var(--bg)}
+.tp b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
+.tp .when{font-size:12px;font-weight:800;color:var(--c,var(--blue))}
+.tgmsg{background:#fff;color:#0A2350;border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:14px;line-height:1.45;box-shadow:0 2px 10px rgba(10,35,80,.12);max-width:340px;margin-top:8px;white-space:pre-line}
+.tgbtns{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:340px;margin-top:6px}
+.tgbtns span{background:rgba(20,99,230,.1);color:#1463E6;font-weight:700;font-size:13px;text-align:center;border-radius:10px;padding:8px 4px}
+
+.tpl{display:grid;gap:10px}
+.tc{background:var(--card);border-radius:16px;padding:14px}
+.tc h4{margin:0 0 6px;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tc h4 span{font-size:11.5px;font-weight:800;color:var(--muted)}
+.tc p{background:var(--bg);border-radius:12px;padding:10px 12px;margin:0 0 10px!important;font-size:14px!important;line-height:1.5;color:var(--ink)!important;white-space:pre-line}
+.tc button{border:0;background:var(--blue);color:#fff;border-radius:10px;padding:8px 14px;font-weight:800;font-size:13.5px;cursor:pointer}
+.tc button.done{background:var(--green)}
+
+.pass{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center}
+@media (max-width:620px){ .pass{grid-template-columns:1fr} }
+.phone{background:#fff;border-radius:22px;padding:14px;box-shadow:0 10px 30px rgba(10,35,80,.15);max-width:260px;margin:0 auto;color:#0A2350;border:6px solid #0A2350}
+.phone .ph-h{font-weight:900;font-size:16px;display:flex;align-items:center;gap:6px}
+.phone .plate{display:inline-block;border:2px solid #0A2350;border-radius:6px;padding:2px 8px;font-weight:900;font-size:14px;margin:8px 0}
+.phone .row{display:flex;justify-content:space-between;font-size:12px;border-top:1px solid #E3EEFD;padding:7px 0;gap:8px}
+.phone .row b{font-size:12px}
+.phone .pdf{margin-top:8px;background:#1463E6;color:#fff;border-radius:10px;padding:8px;text-align:center;font-weight:800;font-size:12.5px}
+.uses{display:grid;gap:8px}
+.us{display:grid;grid-template-columns:36px 1fr;gap:10px;background:var(--card);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;color:var(--ink-2);align-items:center}
+.us i{width:36px;height:36px;border-radius:10px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-style:normal}
+.us b{display:block;color:var(--ink)}
+
+.inp{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center}
+.inp label{font-weight:700;font-size:15px;line-height:1.3}
+.inp label small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.inp input{width:100%;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:800;font-size:17px;text-align:right}
+@media (max-width:520px){ .inp{grid-template-columns:1fr 120px} }
+.gauge2{margin-top:14px;background:var(--card);border-radius:16px;padding:16px}
+.g2bar{height:26px;border-radius:13px;background:var(--bg);overflow:hidden;position:relative}
+.g2fill{height:100%;background:var(--grad);border-radius:13px;transition:width .3s}
+.g2goal{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--green);left:70%}
+.g2cap{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--muted);margin-top:6px}
+.g2big{font-size:30px;font-weight:900;color:var(--blue);line-height:1;margin-bottom:10px}
+.g2txt{font-size:14px;color:var(--ink-2);margin-top:10px;line-height:1.45}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1FB5F2"/><stop offset="1" stop-color="#1463E6"/></linearGradient>
+    <symbol id="drop" viewBox="0 0 24 32"><path d="M12 1C12 1 2 13.5 2 20.5a10 10 0 0 0 20 0C22 13.5 12 1 12 1Z"/></symbol>
+  </defs>
+</svg>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top" aria-label="OilBook">
+      <svg width="20" height="26" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+      <span class="brand-word"><span class="o">Oil</span><span class="b">Book</span></span>
+    </a>
+    <div class="crumb"><b>Taʼlim</b>8-modul, jami 12 ta</div>
+  </div>
+  <nav class="toc" aria-label="Dars boʻlimlari">
+    <a href="#s1">Baza — boylik</a>
+    <a href="#s2">Toʻliq yozuv</a>
+    <a href="#s3">Botga bogʻlash</a>
+    <a href="#s4">Eslatmalar</a>
+    <a href="#s5">Xabarnoma</a>
+    <a href="#s6">Servis pasporti</a>
+    <a href="#s7">Bazani yuritish</a>
+    <a href="#train">Mashq</a>
+    <a href="#task">Topshiriq</a>
+    <a href="#quiz">Test</a>
+  </nav>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <span class="mod-tag">8-modul · ega uchun, ustaga — asoslari</span>
+    <h1>Mijozlar bazasi va qayta tashriflar</h1>
+    <p class="lead">Mijozni bir marta emas, yillar davomida qaytarish: toʻliq yozuv, Telegram-botga bogʻlash, avtomatik eslatmalar, xabarnoma va servis pasporti — OilBookda qadamma-qadam.</p>
+    <div class="meta"><span>45 daqiqa</span><span>7 ta boʻlim</span><span>Xabar shablonlari</span><span>Bogʻlanganlar hisoblagichi</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="goals" style="margin-top:16px">
+    <h2>Darsdan keyin siz:</h2>
+    <ul>
+      <li><i>1</i>Har bir almashtirishni eslatma ishlaydigan qilib yozasiz</li>
+      <li><i>2</i>Mijozlarni Telegram-botga bogʻlashni odatga aylantirasiz</li>
+      <li><i>3</i>Eslatma va xabarnoma qanday ishlashini bilasiz</li>
+      <li><i>4</i>Servis pasportidan mijoz ishonchi uchun foydalanasiz</li>
+    </ul>
+  </div>
+
+<!-- 8.1 -->
+<section class="part" id="s1"><div class="part-card">
+  <div class="ph"><span class="pn">8.1</span><h2>Baza — shoxobchaning eng qimmat boyligi</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Koʻtargich, yama, asboblarni sotib olish mumkin. Yillar davomida yigʻilgan mijozlarni — yoʻq.</p>
+  <p>Har bir yozuv — mashina, egasi, telefoni va tarixi. Bu baza ustaga emas, shoxobchaga tegishli: usta ketsa ham, mijoz va uning tarixi qoladi, eslatmalar shoxobcha nomidan boradi. 1-moduldagi «chelak»ni eslang — baza va eslatmalar uning eng katta teshigini yopadi.</p>
+  <div class="note app">
+    <svg width="26" height="32" viewBox="0 0 24 32" aria-hidden="true"><use href="#drop" fill="url(#g)"/></svg>
+    <div><b>OilBookda</b>«Baza» boʻlimida barcha mijozlar, oxirgi va keyingi almashtirish sanasi koʻrinadi. «Statistika»da esa har davr uchun yangi va qaytgan mijozlar soni.</div>
+  </div>
+</div></section>
+
+<!-- 8.2 -->
+<section class="part" id="s2"><div class="part-card">
+  <div class="ph"><span class="pn">8.2</span><h2>Toʻliq yozuv: nima uchun har bir maydon kerak</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Yarim yozuv — yarim ishlaydi. Qaysi maydon toʻldirilsa, OilBookning qaysi imkoniyati ishlashini koʻring.</p>
+  <div class="fig">
+    <p class="fig-t">Yozuvni toʻldiring — imkoniyatlar yonadi</p>
+    <div class="fields" id="fields"></div>
+    <div class="feat" id="feat"></div>
+    <p class="cap">OilBook kamida davlat raqami, egasining ismi va eslatish muddatini talab qiladi. Qolgan maydonlar ixtiyoriy — lekin ular boʻlmasa, imkoniyatlarning yarmi ishlamaydi.</p>
+  </div>
+</div></section>
+
+<!-- 8.3 -->
+<section class="part" id="s3"><div class="part-card">
+  <div class="ph"><span class="pn">8.3</span><h2>Mijozni Telegram-botga bogʻlash</h2></div>
+  <div class="who"><span>Usta</span><span>Ega</span></div>
+  <p class="kicker">Eslatma va xabarnomalar faqat botga bogʻlangan mijozlarga Telegramda boradi. Bogʻlash — 30 soniya.</p>
+  <div class="fig">
+    <div class="link3">
+      <div class="lk"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg><b>Havola yoki QR</b>Mijoz kartochkasida havolani koʻrsating: QR-kod, Telegram yoki WhatsApp orqali yuborish</div>
+      <svg class="ar" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2.5"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>
+      <div class="lk"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/></svg><b>Mijoz «Start» bosadi</b>Havolani ochadi — bot uni salomlashib, mashinasini aytadi</div>
+      <svg class="ar" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2.5"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>
+      <div class="lk"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15A35B" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><b>Bogʻlandi</b>Mijoz kartochkasida belgi paydo boʻladi<span class="tag">bogʻlangan</span></div>
+    </div>
+  </div>
+  <div class="fig">
+    <div class="say"><div class="say-who">Mijozga qanday aytish</div><div class="bubble good">«Telegramingizga bitta havola yuboraman — moy almashtirish vaqti kelganda bot oʻzi eslatadi. Reklama yubormaymiz, faqat foydali narsa. Mana, QR-kodni telefoningiz bilan oching».</div></div>
+  </div>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Eng yaxshi payt</b>Mijoz moy toʻkilishini kutayotgan 5–6 daqiqa. Usta yoki administrator QR-kodni koʻrsatadi — mijoz telefonda boʻsh oʻtiribdi, darhol bogʻlanadi.</div>
+  </div>
+</div></section>
+
+<!-- 8.4 -->
+<section class="part" id="s4"><div class="part-card">
+  <div class="ph"><span class="pn">8.4</span><h2>Eslatmalar qanday ishlaydi</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Siz almashtirishni toʻgʻri yozasiz — qolganini OilBook oʻzi qiladi.</p>
+  <div class="fig">
+    <div class="tline">
+      <div class="tp" style="--c:#1463E6"><span class="when">Almashtirish kuni</span><b>Usta yozuvni saqlaydi</b>Keyingi probeg va «necha vaqtdan keyin eslatish» muddati kiritiladi. Hozirgi va keyingi probegdan OilBook taxminiy sanani ham hisoblab beradi.</div>
+      <div class="tp" style="--c:#1FB5F2"><span class="when">Muddat kelgan kun</span><b>Birinchi eslatma</b>Bot mijozga Telegramda yozadi — faqat kunduzi, 9:00 dan 20:00 gacha.
+        <div class="tgmsg">🔔 Moy almashtirish vaqti!
+
+Avtomobilingiz 01 A 123 BC — navbatdagi moy almashtirish muddati keldi.
+
+Shoxobchangizga yozilmoqchimisiz?</div>
+        <div class="tgbtns"><span>✅ Allaqachon almashtirdim</span><span>📅 Yozilish</span></div>
+      </div>
+      <div class="tp" style="--c:#F2A20C"><span class="when">Har 14 kunda</span><b>Qayta eslatma</b>Mijoz javob bermasa va kelmasa, bot har 14 kunda yana eslatadi — jami 6 martagacha.</div>
+      <div class="tp" style="--c:#15A35B"><span class="when">Mijoz javobi</span><b>«Yozilish» yoki «Allaqachon almashtirdim»</b>«Yozilish» bosilsa — shoxobcha Telegramiga mijoz ismi va telefoni bilan xabar keladi (agar shoxobcha xabarnoma uchun Telegram ulagan boʻlsa). «Allaqachon almashtirdim» bosilsa — eslatmalar toʻxtaydi.</div>
+    </div>
+  </div>
+  <h3>Telegrami yoʻq mijozlar</h3>
+  <p>Agar shoxobchada SMS ulangan boʻlsa (Eskiz.uz orqali, shartnoma oʻz nomingizdan tuziladi), botga bogʻlanmagan, lekin telefoni yozilgan mijozlarga eslatma SMS bilan boradi. Na Telegram, na telefon boʻlmasa — eslatma umuman bormaydi.</p>
+  <div class="note warn">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg>
+    <div><b>Eslatish muddatini toʻgʻri tanlang</b>Eslatma sana boʻyicha boradi. Kuniga 300 km yuradigan taksi uchun «4 oydan keyin» — juda kech; oyiga ming km yuradigan mashina uchun «1 oydan keyin» — juda erta. 4-moduldagi sharoit qoidasini eslang.</div>
+  </div>
+</div></section>
+
+<!-- 8.5 -->
+<section class="part" id="s5"><div class="part-card">
+  <div class="ph"><span class="pn">8.5</span><h2>Xabarnoma: barcha mijozlarga bitta xabar</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">«Xabarnoma» boʻlimidan yozilgan xabar barcha bogʻlangan mijozlarga taxminan 15 soniyada yetib boradi. Bu kuchli vosita — uni ehtiyot qiling.</p>
+  <p>Mijoz koʻp xabar olsa, botni oʻchiradi — va eslatmalar ham kelmay qoladi. Qoida: <b>oyiga 1–2 ta</b>, faqat foydali yoki samimiy xabar.</p>
+  <div class="fig">
+    <p class="fig-t">Tayyor shablonlar — nusxalab, oʻzgartirib ishlating</p>
+    <div class="tpl" id="tpl"></div>
+  </div>
+</div></section>
+
+<!-- 8.6 -->
+<section class="part" id="s6"><div class="part-card">
+  <div class="ph"><span class="pn">8.6</span><h2>Servis pasporti</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Mashinaning butun moy almashtirish tarixi — bitta havolada. Mijoz uni istalgan vaqtda ochadi va PDF qilib saqlay oladi.</p>
+  <div class="fig">
+    <div class="pass">
+      <div class="phone" aria-hidden="true">
+        <div class="ph-h"><svg width="14" height="18" viewBox="0 0 24 32"><use href="#drop" fill="url(#g)"/></svg>Servis pasporti</div>
+        <span class="plate">01 A 123 BC</span>
+        <div class="row"><span>12.09.2026</span><b>124 800 km</b></div>
+        <div class="row"><span>Moy + moy filtri</span><span>5W-30</span></div>
+        <div class="row"><span>08.06.2026</span><b>118 300 km</b></div>
+        <div class="row"><span>Moy + havo filtri</span><span>5W-30</span></div>
+        <div class="row"><span>02.03.2026</span><b>111 900 km</b></div>
+        <div class="pdf">PDF yuklab olish</div>
+      </div>
+      <div class="uses">
+        <div class="us"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></i><div><b>Ishonch</b>Mijoz nima quyilganini oʻzi koʻradi</div></div>
+        <div class="us"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M3 12h18M12 3v18"/></svg></i><div><b>Mashina sotilganda</b>Xaridorga xizmat tarixini koʻrsatish mumkin</div></div>
+        <div class="us"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></i><div><b>Oila va haydovchilar</b>Bir mashinani bir necha kishi haydasa — hamma bir xil maʼlumotni koʻradi</div></div>
+        <div class="us"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M12 2v6M5 9h14l-1 13H6z"/></svg></i><div><b>Sizning reklamangiz</b>Pasportda shoxobchangiz nomi turadi</div></div>
+      </div>
+    </div>
+    <p class="cap">Misoldagi raqam va sanalar shartli. Havola: mijoz kartochkasida «Servis pasporti» tugmasi — havola nusxalanadi, uni mijozga yuboring.</p>
+  </div>
+  <div class="note tip">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1463E6" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/></svg>
+    <div><b>Mashina sotilsa</b>Mijoz kartochkasida egasini almashtiring. Mashina tarixi saqlanadi, eslatmalar esa endi yangi egaga boradi — shoxobcha yangi mijozga ega boʻladi.</div>
+  </div>
+</div></section>
+
+<!-- 8.7 -->
+<section class="part" id="s7"><div class="part-card">
+  <div class="ph"><span class="pn">8.7</span><h2>Bazani yuritish: haftalik odat</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">Haftada 20 daqiqa — va kelmay qolgan mijozlarning bir qismi qaytadi.</p>
+  <ol class="task">
+    <li><div><b>Muddati oʻtganlar.</b> «Baza»da keyingi almashtirish sanasi oʻtib ketgan, lekin kelmagan mijozlarni toping.</div></li>
+    <li><div><b>Bogʻlanmaganlar.</b> Ulardan botga bogʻlanmaganlariga qoʻngʻiroq qiling yoki WhatsApp orqali havola yuboring.</div></li>
+    <li><div><b>Qisqa qoʻngʻiroq.</b> «Assalomu alaykum, Anvar aka! Moy almashtirish vaqti oʻtib ketdi — kutib qolamiz. Qachon qulay?»</div></li>
+    <li><div><b>Tozalik.</b> Notoʻgʻri telefon, xato yozilgan raqam, ikki marta kiritilgan mashinalarni tuzating.</div></li>
+  </ol>
+  <div class="note case">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#15A35B" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <div><b>Vaziyat</b>Mijoz eslatmaga «✅ Allaqachon almashtirdim» deb javob berdi — demak, boshqa joyda almashtirgan. Bu — signal. Qoʻngʻiroq qilib, xotirjam soʻrang: «Bizda biror narsa yoqmadimi?» Javob shoxobchani yaxshilashga yordam beradi.</div>
+  </div>
+</div></section>
+
+<!-- trainer -->
+<section class="part" id="train"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Mashq</h2></div>
+  <div class="who"><span>Ega</span><span>Usta</span></div>
+  <p class="kicker">Toʻrtta vaziyat. Toʻgʻri harakatni tanlang.</p>
+  <div id="cases"></div>
+</div></section>
+
+<!-- task -->
+<section class="part" id="task"><div class="part-card">
+  <div class="ph"><span class="pn">✓</span><h2>Topshiriq: bogʻlanganlar ulushi</h2></div>
+  <div class="who"><span>Ega</span></div>
+  <p class="kicker">«Baza»dan ikki sonni oling va natijangizni koʻring. Maqsad — kamida 70%.</p>
+  <div class="fig">
+    <div class="calc2" style="display:grid;gap:12px">
+      <div class="inp"><label for="b1">Jami mijozlar<small>«Baza»dagi «Jami mijozlar»</small></label><input id="b1" type="number" inputmode="numeric" min="0" value="200"></div>
+      <div class="inp"><label for="b2">Botga bogʻlanganlar<small>«bogʻlangan» belgisi borlar</small></label><input id="b2" type="number" inputmode="numeric" min="0" value="80"></div>
+    </div>
+    <div class="gauge2" aria-live="polite">
+      <div class="g2big" id="g2big">—</div>
+      <div class="g2bar"><div class="g2fill" id="g2fill" style="width:0"></div><span class="g2goal" title="Maqsad 70%"></span></div>
+      <div class="g2cap"><span>0%</span><span style="color:var(--green)">maqsad 70%</span><span>100%</span></div>
+      <div class="g2txt" id="g2txt"></div>
+    </div>
+    <p class="cap">Raqamlar shu telefonda saqlanadi — bir oydan keyin qayta kiritib, oʻsishni koʻring. 70% ham ulgurmasa ham, har oy oʻsish — asosiy.</p>
+  </div>
+</div></section>
+
+<!-- quiz -->
+<section class="part" id="quiz"><div class="part-card">
+  <div class="ph"><span class="pn">?</span><h2>Test</h2></div>
+  <p class="kicker">10 ta savol. Modulni topshirish uchun 8 ta toʻgʻri javob kerak.</p>
+  <div id="quizBox"></div>
+  <div class="result" id="result" aria-live="polite"></div>
+</div></section>
+
+<div class="done-card">
+  <small>Keyingi modul</small>
+  <h2>9. Ombor va xaridlar</h2>
+  <a class="btn" href="#top">Dars boshiga</a>
+</div>
+</div>
+</main>
+<footer>OilBook taʼlimi — moy almashtirish shoxobchalari uchun kurs</footer>
+
+<script>
+(function(){
+  var KEY='oilbook-course-m8-uz-';
+  var store={get:function(k){try{return JSON.parse(localStorage.getItem(KEY+k));}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v));}catch(e){}}};
+
+  var bar=document.getElementById('progress'), nav=document.querySelector('.toc');
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  var cur=-2, ticking=false;
+  function update(){
+    ticking=false;
+    var h=document.documentElement;
+    bar.style.transform='scaleX('+(h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight)).toFixed(3)+')';
+    var c=-1; for(var i=0;i<secs.length;i++){ if(secs[i]&&secs[i].getBoundingClientRect().top<150) c=i; else break; }
+    if(c!==cur){ cur=c; links.forEach(function(a,i){a.classList.toggle('on',i===c);}); if(c>=0){ var a=links[c]; nav.scrollLeft=a.offsetLeft-(nav.clientWidth-a.offsetWidth)/2; } }
+  }
+  window.addEventListener('scroll',function(){ if(!ticking){ticking=true;requestAnimationFrame(update);} },{passive:true});
+  update();
+
+  /* fields -> features */
+  var F=[
+    ['plate','Davlat raqami','mashinani tanish uchun',1],
+    ['name','Egasining ismi','ismi bilan murojaat',1],
+    ['interval','Eslatish muddati','necha vaqtdan keyin',1],
+    ['phone','Telefon','WhatsApp va SMS uchun',0],
+    ['tg','Botga bogʻlangan','Telegram eslatmalar',0],
+    ['km','Probeg va keyingi probeg','stiker va sana hisobi',0],
+    ['items','Moy va filtrlar ombordan','takrorlash va foyda',0]
+  ];
+  var FT=[
+    ['Mijoz tanildi','Davlat raqami kiritilganda kartochka ochiladi',['plate','name']],
+    ['Telegramda eslatma','Muddat kelganda bot yozadi',['plate','name','interval','tg']],
+    ['SMS eslatma','SMS ulangan boʻlsa, Telegrami yoʻqlarga',['plate','name','interval','phone']],
+    ['WhatsAppda havola','Bir bosishda bogʻlash havolasini yuborish',['phone']],
+    ['Xabarnoma','Barcha bogʻlanganlarga bitta xabar',['tg']],
+    ['Taxminiy sana va stiker','Probeg boʻyicha keyingi almashtirish',['km']],
+    ['Oʻtgan almashtirishni takrorlash','Bir bosishda oldingi moy va filtrlar',['items']],
+    ['Toʻgʻri foyda','Statistikada aniq foyda',['items']]
+  ];
+  var st={plate:1,name:1,interval:1};
+  var fe=document.getElementById('fields'), ftb=document.getElementById('feat');
+  fe.innerHTML=F.map(function(f){return '<label class="fld'+(f[3]?' on':'')+'"><input type="checkbox" data-k="'+f[0]+'"'+(f[3]?' checked disabled':'')+'><div><b>'+f[1]+'</b><small>'+f[2]+'</small></div>'+(f[3]?'<em>majburiy</em>':'<span></span>')+'</label>';}).join('');
+  function drawF(){
+    fe.querySelectorAll('input').forEach(function(x){ x.closest('.fld').classList.toggle('on',x.checked); });
+    ftb.innerHTML=FT.map(function(t){ var on=t[2].every(function(k){return st[k];}); return '<div class="ft'+(on?' on':'')+'"><i>'+(on?'✓':'·')+'</i><div><b>'+t[0]+'</b>'+t[1]+'</div></div>'; }).join('');
+  }
+  fe.addEventListener('change',function(e){ var k=e.target.dataset.k; if(!k) return; st[k]=e.target.checked?1:0; drawF(); });
+  drawF();
+
+  /* templates */
+  var TP=[
+    ['Hayit tabrigi','bayram oldidan','Assalomu alaykum! Hayit muborak boʻlsin! Sizga va oilangizga sogʻlik, xotirjamlik va oq yoʻl tilaymiz. Bayram kunlari ish vaqtimiz: [soat].\n— [Shoxobcha nomi]'],
+    ['Qish oldidan','oktyabr–noyabr','Assalomu alaykum! Sovuq kunlar yaqinlashyapti. Moy almashtirishda antifriz darajasini va muzlamaydigan oyna yuvish suyuqligini bepul tekshirib beramiz. Kutamiz!\n— [Shoxobcha nomi]'],
+    ['Ish vaqti oʻzgardi','kerak boʻlganda','Assalomu alaykum! Diqqat: [sana]dan boshlab ish vaqtimiz — [soat]. Yakshanba — dam olish kuni. Tushunganingiz uchun rahmat!\n— [Shoxobcha nomi]'],
+    ['Yangi xizmat','kerak boʻlganda','Assalomu alaykum! Endi shoxobchamizda [xizmat nomi] ham bor. Moy almashtirishga kelganingizda bir joyda hammasini qilib beramiz.\n— [Shoxobcha nomi]']
+  ];
+  var tp=document.getElementById('tpl');
+  tp.innerHTML=TP.map(function(t,i){return '<div class="tc"><h4>'+t[0]+'<span>'+t[1]+'</span></h4><p id="tp'+i+'">'+t[2]+'</p><button type="button" data-i="'+i+'">Nusxalash</button></div>';}).join('');
+  tp.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    var txt=TP[+b.dataset.i][2];
+    function ok(){ b.textContent='Nusxalandi'; b.classList.add('done'); setTimeout(function(){b.textContent='Nusxalash';b.classList.remove('done');},1600); }
+    try{ navigator.clipboard.writeText(txt).then(ok,function(){ fallback(); }); }catch(err){ fallback(); }
+    function fallback(){ var r=document.createRange(); r.selectNodeContents(document.getElementById('tp'+b.dataset.i)); var s=window.getSelection(); s.removeAllRanges(); s.addRange(r); try{document.execCommand('copy'); ok();}catch(e2){} }
+  });
+
+  /* trainer */
+  var CS=[
+    {t:'Mijoz shoshyapti: «Telefonimni yozmang, vaqtim yoʻq».',o:['Yozmasdan qoʻyib yuborish','«Bitta QR — 10 soniya, moy vaqtini oʻzi eslatadi» deb, QR-kodni koʻrsatish','Majburan telefonini soʻrash'],a:1,e:'Foydasini qisqa aytish va eng tez yoʻlni taklif qilish. Rad etsa — hurmat qiling.'},
+    {t:'Taksi haydovchisi, kuniga 250–300 km yuradi. Eslatish muddatini tanlayapsiz.',o:['6 oy','Qisqa muddat — taxminan bir oy atrofida, probegiga qarab','Eslatma kerak emas'],a:1,e:'Eslatma sana boʻyicha boradi. Koʻp yuradigan mashinaga qisqa muddat — aks holda eslatma kech keladi.'},
+    {t:'Bir oyda 6 ta reklama xabarnomasi yubormoqchisiz.',o:['Yuboraman — koʻproq boʻlsa yaxshi','Oyiga 1–2 ta foydali xabar bilan cheklanaman','Hammasini bir kunda'],a:1,e:'Koʻp xabar — mijoz botni oʻchiradi va eslatmalar ham kelmay qoladi.'},
+    {t:'Mijoz mashinasini sotdi, yangi egasi sizga keldi.',o:['Yangi mashina sifatida qaytadan qoʻshish','Mijoz kartochkasida egasini almashtirish — tarix saqlanadi','Eski egasining nomida qoldirish'],a:1,e:'Tarix qoladi, eslatmalar yangi egaga boradi.'}
+  ];
+  var cs=document.getElementById('cases');
+  cs.innerHTML=CS.map(function(c,i){
+    return '<div class="case-card" data-i="'+i+'"><div class="req"><small>Vaziyat</small>'+c.t+'</div><div class="can">'+c.o.map(function(o,k){return '<button type="button" data-k="'+k+'"><b>'+o+'</b></button>';}).join('')+'</div><div class="case-ex">'+c.e+'</div></div>';
+  }).join('');
+  cs.addEventListener('click',function(e){
+    var b=e.target.closest('.can button'); if(!b) return;
+    var card=b.closest('.case-card'); if(card.classList.contains('done')) return;
+    var c=CS[+card.dataset.i]; card.classList.add('done');
+    card.querySelectorAll('.can button').forEach(function(x){ x.disabled=true; if(+x.dataset.k===c.a) x.classList.add('ok'); else if(x===b) x.classList.add('no'); });
+  });
+
+  /* linked share */
+  var b1=document.getElementById('b1'), b2=document.getElementById('b2');
+  var sv=store.get('linked'); if(sv){ b1.value=sv[0]; b2.value=sv[1]; }
+  function g(){
+    var a=+b1.value||0, l=Math.min(+b2.value||0,a); store.set('linked',[b1.value,b2.value]);
+    var p=a?Math.round(100*l/a):0;
+    document.getElementById('g2big').textContent=a?p+'%':'—';
+    document.getElementById('g2fill').style.width=p+'%';
+    var need=Math.max(0,Math.ceil(a*0.7)-l);
+    document.getElementById('g2txt').textContent = !a ? 'Raqamlarni kiriting.' : (need ? '70% ga yetish uchun yana '+need+' ta mijozni bogʻlash kerak. Kuniga 3–4 tadan — taxminan '+Math.ceil(need/3.5)+' ish kuni.' : 'Aʼlo! Maqsadga yetdingiz — endi ushlab turing.');
+  }
+  b1.addEventListener('input',g); b2.addEventListener('input',g); g();
+
+  /* quiz */
+  var Q=[
+    {q:'Mijozlar bazasi kimga tegishli?',o:['Ustaga','Shoxobchaga','Mijozning oʻziga'],a:1,e:'Usta ketsa ham, mijoz va tarixi shoxobchada qoladi.'},
+    {q:'OilBook yozuv uchun kamida nimani talab qiladi?',o:['Faqat telefonni','Davlat raqami, egasining ismi va eslatish muddati','Faqat moy markasini'],a:1,e:'Qolgan maydonlar ixtiyoriy, lekin imkoniyatlarni ochadi.'},
+    {q:'Telegramdagi eslatma kimga boradi?',o:['Barcha mijozlarga','Botga bogʻlangan mijozlarga','Faqat ega uchun'],a:1,e:'Shuning uchun bogʻlash — eng muhim odat.'},
+    {q:'Birinchi eslatma qachon yuboriladi?',o:['Almashtirish kuni','Muddat kelgan kuni, kunduzi','Har kuni'],a:1,e:'9:00 dan 20:00 gacha.'},
+    {q:'Mijoz javob bermasa, bot nima qiladi?',o:['Hech narsa','Har 14 kunda qayta eslatadi, jami 6 martagacha','Har soatda yozadi'],a:1,e:'«Allaqachon almashtirdim» bosilsa — toʻxtaydi.'},
+    {q:'Mijoz «📅 Yozilish» ni bossa?',o:['Hech narsa boʻlmaydi','Shoxobcha Telegramiga mijoz ismi va telefoni bilan xabar keladi','Mijoz pul toʻlaydi'],a:1,e:'Agar shoxobcha xabarnoma uchun Telegram ulagan boʻlsa.'},
+    {q:'Telegrami yoʻq mijozga eslatma qanday boradi?',o:['Hech qanday','SMS ulangan boʻlsa va telefon yozilgan boʻlsa — SMS bilan','Pochta orqali'],a:1,e:'SMS Eskiz.uz orqali, oʻz shartnomangiz bilan.'},
+    {q:'Xabarnomani qanchalik tez-tez yuborish kerak?',o:['Har kuni','Oyiga 1–2 ta foydali xabar','Hech qachon'],a:1,e:'Koʻp xabar — mijoz botni oʻchiradi.'},
+    {q:'Servis pasporti nima?',o:['Mashina texpasporti','Mashinaning moy almashtirish tarixi havolada va PDFda','Ustaning guvohnomasi'],a:1,e:'Mijoz kartochkasidagi «Servis pasporti» tugmasi.'},
+    {q:'Mashina sotilsa, nima qilinadi?',o:['Yangi mashina qoʻshiladi','Kartochkada egasi almashtiriladi — tarix saqlanadi','Mashina oʻchiriladi'],a:1,e:'Eslatmalar yangi egaga boradi.'}
+  ];
+  var box=document.getElementById('quizBox'), res=document.getElementById('result'), ans={};
+  function renderQ(){
+    ans={}; res.className='result'; res.innerHTML='';
+    box.innerHTML=Q.map(function(x,i){return '<div class="q" data-i="'+i+'"><div class="q-n">Savol '+(i+1)+' / 10</div><div class="q-t">'+x.q+'</div><div class="opts">'+x.o.map(function(t,k){return '<button class="opt" type="button" data-k="'+k+'">'+t+'</button>';}).join('')+'</div><div class="q-ex">'+x.e+'</div></div>';}).join('');
+  }
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b) return;
+    var card=b.closest('.q'), i=+card.dataset.i; if(i in ans) return;
+    ans[i]=+b.dataset.k; card.classList.add('done');
+    card.querySelectorAll('.opt').forEach(function(o){ o.disabled=true; if(+o.dataset.k===Q[i].a) o.classList.add('ok'); else if(o===b) o.classList.add('no'); });
+    if(Object.keys(ans).length===Q.length){
+      var ok=Q.filter(function(x,qi){return ans[qi]===x.a;}).length; store.set('quiz',ok);
+      res.innerHTML='<b>'+ok+' / 10</b>'+(ok>=8?'Modul topshirildi. Keyingisi — «Ombor va xaridlar».':'10 tadan 8 ta toʻgʻri javob kerak. 8.2–8.5-boʻlimlarni qayta oʻqib, yana urinib koʻring.')+'<div style="margin-top:14px"><button class="btn white" type="button" id="retry">Qaytadan topshirish</button></div>';
+      res.className='result show';
+      document.getElementById('retry').addEventListener('click',function(){ renderQ(); box.scrollIntoView({block:'start'}); });
+    }
+  });
+  renderQ();
+})();
+</script>
+
+</body>
+</html>
