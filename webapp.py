@@ -26,6 +26,7 @@ from flask import Flask, request, jsonify, render_template_string, Response, ses
 
 import database as db
 import i18n
+import help_content
 
 logger = logging.getLogger(__name__)
 
@@ -1234,6 +1235,119 @@ def logout():
     return redirect(url_for("login_page"))
 
 
+# ---------- Справка (раздел «Справка» / «Yordam») ----------
+# Общие куски для панели точки и для /admin/help. Статьи — в help_content.py.
+HELP_CSS = """
+  #view-help { max-width:760px; }
+  .hp-head { background:var(--darkblue); color:#fff; border-radius:20px; padding:18px 16px 16px; margin-bottom:12px; }
+  .hp-head h2 { margin:0; font-family:var(--font-display); font-size:24px; font-weight:700; letter-spacing:-.01em; }
+  .hp-head .hp-for { font-size:13px; color:#B9CBEA; margin-top:3px; }
+  .hp-search { position:relative; margin-top:14px; }
+  .hp-search i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#64748B; font-size:15px; pointer-events:none; }
+  .hp-search input { width:100%; height:48px; border:0; border-radius:14px; padding:0 14px 0 40px; font-size:16px; font-family:inherit; background:#fff; color:var(--text); }
+  .hp-search input:focus { outline:3px solid #7DB2FF; }
+  .hp-chips { display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .hp-chips::-webkit-scrollbar { display:none; }
+  .hp-chip { flex:none; display:flex; align-items:center; gap:6px; height:36px; padding:0 12px; border-radius:18px; border:1px solid var(--border); background:#fff; color:var(--darkblue); font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; }
+  .hp-chip i { color:var(--blue); font-size:12px; }
+  .hp-sec { margin-bottom:16px; scroll-margin-top:12px; }
+  .hp-sec-h { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#64748B; margin:0 4px 8px; }
+  .hp-sec-h i { color:var(--blue); }
+  .hp-list { background:#fff; border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+  details.hp-art + details.hp-art { border-top:1px solid #EEF2F7; }
+  details.hp-art > summary { list-style:none; display:flex; align-items:center; gap:10px; padding:14px 16px; cursor:pointer; font-weight:600; font-size:15px; line-height:1.35; color:var(--darkblue); -webkit-tap-highlight-color:transparent; }
+  details.hp-art > summary::-webkit-details-marker { display:none; }
+  details.hp-art > summary span { flex:1; min-width:0; }
+  details.hp-art > summary .fa-chevron-down { color:#94A3B8; font-size:12px; transition:transform .2s; }
+  details.hp-art[open] > summary { color:var(--blue); }
+  details.hp-art[open] > summary .fa-chevron-down { transform:rotate(180deg); }
+  .hp-body { padding:0 16px 16px; font-size:14.5px; line-height:1.6; color:#334155; }
+  .hp-body p { margin:0 0 10px; }
+  .hp-body ul { margin:0 0 10px; padding-left:20px; }
+  .hp-body li { margin-bottom:5px; }
+  .hp-body b { color:var(--darkblue); }
+  .hp-body ol.hp-steps { list-style:none; counter-reset:hps; margin:0 0 12px; padding:0; }
+  .hp-body ol.hp-steps > li { counter-increment:hps; position:relative; padding:2px 0 0 36px; margin-bottom:10px; min-height:26px; }
+  .hp-body ol.hp-steps > li::before { content:counter(hps); position:absolute; left:0; top:0; width:26px; height:26px; border-radius:8px; background:#E8F0FD; color:var(--blue); font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .hp-body ol.hp-steps ul { margin-top:6px; }
+  .hp-tip, .hp-warn { border-radius:12px; padding:10px 12px; margin:4px 0 12px; font-size:14px; }
+  .hp-tip { background:#EEF5FF; color:#123E7C; }
+  .hp-warn { background:#FFF6E0; color:#7A4A00; }
+  .hp-tip b, .hp-warn b { color:inherit; }
+  .hp-go { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 14px; border-radius:10px; border:1px solid #C9DBF7; background:#fff; color:var(--blue); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer; }
+  .hp-empty { background:#fff; border:1px solid var(--border); border-radius:16px; padding:18px 16px; color:#64748B; font-size:14px; }
+  .hp-foot { text-align:center; color:#64748B; font-size:13px; padding:6px 0 18px; }
+  .hp-foot a { color:var(--blue); font-weight:600; }
+  .hp-hidden { display:none !important; }
+"""
+
+HELP_VIEW = """
+  <div class="hp-head">
+    <h2>{{ T.tab_help }}</h2>
+    <div class="hp-for">{{ T.help_for }} {{ help_role }}</div>
+    <div class="hp-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input id="hpSearch" type="search" autocomplete="off" spellcheck="false" placeholder="{{ T.help_search_ph }}" oninput="helpSearch(this.value)">
+    </div>
+  </div>
+  <div class="hp-chips" id="hpChips">
+    {% for s in help_sections %}<button type="button" class="hp-chip" onclick="helpJump('{{ s.key }}')"><i class="fa-solid {{ s.icon }}"></i>{{ s.title }}</button>{% endfor %}
+  </div>
+  <div id="hpEmpty" class="hp-empty hp-hidden">{{ T.help_nothing }}</div>
+  {% for s in help_sections %}
+  <div class="hp-sec" id="hp-sec-{{ s.key }}">
+    <div class="hp-sec-h"><i class="fa-solid {{ s.icon }}"></i>{{ s.title }}</div>
+    <div class="hp-list">
+      {% for a in s.articles %}
+      <details class="hp-art" id="hp-{{ a.id }}" data-kw="{{ a.kw }}">
+        <summary><span>{{ a.title }}</span><i class="fa-solid fa-chevron-down"></i></summary>
+        <div class="hp-body">{{ a.body|safe }}
+          {% if a.go %}<button type="button" class="hp-go" onclick="showTab('{{ a.go }}')">{{ T.help_open }} «{{ T['tab_' ~ a.go] }}» <i class="fa-solid fa-arrow-right"></i></button>{% endif %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% if help_support %}<div class="hp-foot">{{ T.help_support }} {% if help_support_url %}<a href="{{ help_support_url }}" target="_blank" rel="noopener">{{ help_support }}</a>{% else %}<b>{{ help_support }}</b>{% endif %}</div>{% endif %}
+"""
+
+HELP_JS = """
+<script>
+function helpNorm(s) { return (s || '').toLowerCase().split('ё').join('е').split('ʻ').join("'").split('‘').join("'").split('’').join("'"); }
+let HELP_INDEX = null;
+function helpBuildIndex() {
+  HELP_INDEX = [];
+  document.querySelectorAll('#view-help details.hp-art').forEach(d => {
+    HELP_INDEX.push({ el: d, text: helpNorm(d.textContent + ' ' + (d.dataset.kw || '')) });
+  });
+}
+function helpSearch(q) {
+  if (!HELP_INDEX) helpBuildIndex();
+  const words = helpNorm(q).trim().split(' ').filter(w => w.length > 0);
+  const active = words.length > 0 && helpNorm(q).trim().length >= 2;
+  let found = 0;
+  HELP_INDEX.forEach(it => {
+    const ok = !active || words.every(w => it.text.indexOf(w) !== -1);
+    it.el.classList.toggle('hp-hidden', !ok);
+    if (ok) found++;
+    if (active) it.el.open = ok && found <= 3;
+  });
+  document.querySelectorAll('#view-help .hp-sec').forEach(sec => {
+    sec.classList.toggle('hp-hidden', !sec.querySelector('details.hp-art:not(.hp-hidden)'));
+  });
+  const chips = document.getElementById('hpChips');
+  if (chips) chips.classList.toggle('hp-hidden', active);
+  document.getElementById('hpEmpty').classList.toggle('hp-hidden', found > 0);
+  if (!active) HELP_INDEX.forEach(it => { it.el.open = false; });
+}
+function helpJump(key) {
+  const sec = document.getElementById('hp-sec-' + key);
+  if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+"""
+
 PAGE = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -2073,7 +2187,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .course-row.done b { background:#15A35B; }
   .course-row span.cr-t { flex:1; min-width:0; }
   .course-row span.cr-s { font-size:12px; font-weight:800; color:#7EE2AE; }
-
+""" + HELP_CSS + """
 </style>
 </head>
 <body>
@@ -2100,6 +2214,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
     <div class="side-item" id="tab-course" data-tab="course" onclick="showTab('course')"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
+    <div class="side-item" id="tab-help" data-tab="help" onclick="showTab('help')"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-staff" data-tab="staff" onclick="showTab('staff')"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
@@ -2143,6 +2258,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
       {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
       <div class="more-item" data-tab="course" data-more-slot="course" onclick="showTab('course'); closeMore();"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
+      <div class="more-item" data-tab="help" data-more-slot="help" onclick="showTab('help'); closeMore();"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
       {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
@@ -2423,6 +2539,10 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="course-map" id="courseMap"></div>
       <div class="course-list" id="courseList"></div>
     </div>
+  </div>
+
+  <div id="view-help" style="display:none;">
+""" + HELP_VIEW + """
   </div>
 
   {% if not is_employee %}
@@ -3254,6 +3374,10 @@ function showTab(t, keepScroll) {
   if (staffView) staffView.style.display = t === 'staff' ? 'block' : 'none';
   if (staffTab) staffTab.classList.toggle('active', t === 'staff');
   if (t === 'staff') loadStaff();
+  const helpView = document.getElementById('view-help');
+  const helpTab = document.getElementById('tab-help');
+  if (helpView) helpView.style.display = t === 'help' ? 'block' : 'none';
+  if (helpTab) helpTab.classList.toggle('active', t === 'help');
 }
 
 // ---------- Сотрудники: владелец точки сам ----------
@@ -3430,6 +3554,10 @@ window.addEventListener('pageshow', e => { if (e.persisted) refreshCurrentView()
 document.addEventListener('DOMContentLoaded', () => {
   if (new URLSearchParams(location.search).get('tab') === 'course') {
     showTab('course');
+    history.replaceState(null, '', '/');
+  }
+  if (new URLSearchParams(location.search).get('tab') === 'help') {
+    showTab('help');
     history.replaceState(null, '', '/');
   }
 });
@@ -9020,6 +9148,7 @@ document.addEventListener('keydown', (e) => {
 """
 
 PAGE = PAGE + MODAL_AND_SCRIPT
+PAGE = PAGE.replace("</body>", HELP_JS + "</body>", 1)
 _ps_i = PAGE.rfind("</body>")
 PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + PAGE[_ps_i:]
 assert PAGE.count(_SW_SNIPPET) == 1
@@ -9045,6 +9174,43 @@ def index():
         usd_rate_head=_head_usd_rate(shop),
         sub_banner=_sub_banner(shop),
         is_sub_owner=_is_sub_owner(),
+        **_help_context(shop),
+    )
+
+
+def _support_contact():
+    """Контакт поддержки из настроек подписки: текст и ссылка (Telegram / телефон)."""
+    try:
+        c = (db.get_platform_settings().get("support_contact") or "").strip()
+    except Exception:
+        return "", ""
+    if not c:
+        return "", ""
+    if c.startswith("@") and len(c) > 1:
+        return c, "https://t.me/" + c[1:]
+    if c.startswith("https://") or c.startswith("http://"):
+        return c, c
+    digits = re.sub(r"[^0-9+]", "", c)
+    return c, ("tel:" + digits if len(digits) >= 7 else "")
+
+
+def _help_context(shop) -> dict:
+    """Справка под роль: главная (есть филиалы), самостоятельная, филиал, сотрудник."""
+    has_branches = False
+    if not g.is_employee and not g.is_branch:
+        try:
+            has_branches = bool(db.get_branches(g.shop_id))
+        except Exception:
+            has_branches = False
+    role = help_content.detect_role(g.is_employee, g.is_branch, has_branches)
+    support, support_url = _support_contact()
+    return dict(
+        help_sections=help_content.build(
+            g.lang, role,
+            warehouse=bool(shop.get("warehouse_enabled")) if shop else False,
+            sms=bool(shop.get("sms_enabled")) if shop else False),
+        help_role=help_content.role_name(g.lang, role),
+        help_support=support, help_support_url=support_url,
     )
 
 
@@ -11155,7 +11321,10 @@ if ('serviceWorker' in navigator) {
         <div class="logo-sub">Админ-панель платформы</div>
       </div>
     </div>
-    <a class="logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти</a>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <a class="logout" href="/admin/help"><i class="fa-solid fa-circle-question"></i> Справка</a>
+      <a class="logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти</a>
+    </div>
   </div>
 
   <div id="msg"></div>
@@ -13391,6 +13560,49 @@ ADMIN_PAGE = ADMIN_PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 @admin_required
 def admin_page():
     return render_template_string(ADMIN_PAGE, T=i18n.get_texts("ru"))
+
+
+ADMIN_HELP_PAGE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Справка администратора — OilBook</title>
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  :root { --bg:#F1F5F9; --text:#1E293B; --hint:#94A3B8; --blue:#0F52BA; --darkblue:#0A2540; --border:#E2E8F0;
+          --font-display:'Space Grotesk', sans-serif; --font-body:'Plus Jakarta Sans', -apple-system, sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:var(--font-body); }
+  .wrap { max-width:760px; margin:0 auto; padding:14px 14px 30px; padding-top:calc(14px + env(safe-area-inset-top, 0px)); }
+  .back { display:inline-flex; align-items:center; gap:8px; color:var(--blue); font-weight:600; text-decoration:none; font-size:14px; margin:2px 0 12px; }
+""" + HELP_CSS + """
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/admin"><i class="fa-solid fa-arrow-left"></i> Назад в админ-панель</a>
+  <div id="view-help">
+""" + HELP_VIEW + """
+  </div>
+</div>
+""" + HELP_JS + """
+</body>
+</html>
+"""
+
+
+@app.route("/admin/help")
+@admin_required
+def admin_help_page():
+    T = dict(i18n.get_texts("ru"))
+    T["tab_help"] = "Справка администратора"
+    return render_template_string(
+        ADMIN_HELP_PAGE, T=T, help_sections=help_content.build_admin(),
+        help_role="администратор платформы", help_support="", help_support_url="")
 
 
 @app.route("/api/admin/shops")
