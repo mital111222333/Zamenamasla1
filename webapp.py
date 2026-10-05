@@ -2034,6 +2034,22 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .sub-banner { display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:12px 14px; border-radius:12px; background:#FEF0DC; color:#7A3A04; font-size:14px; font-weight:700; line-height:1.35; text-decoration:none; border:1.5px solid #F2C27D; }
   .sub-banner span { flex:1; }
   .sub-banner i { flex:none; }
+  #view-staff label[for] { display:block; font-size:13px; font-weight:600; color:var(--text); margin:12px 0 4px; }
+  .staff-err { display:none; color:#B3241C; font-size:13px; margin-top:4px; }
+  .staff-err.on { display:block; }
+  .staff-creds { margin-top:14px; padding:12px; border-radius:12px; background:#ECFDF5; border:1.5px solid #86EFAC; }
+  .staff-creds-t { font-size:13px; font-weight:700; color:#166534; margin-bottom:8px; }
+  .staff-creds-v { white-space:pre-line; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:14px; color:#14532D; background:#fff; border-radius:8px; padding:10px; user-select:all; }
+  .staff-copy { margin-top:8px; border:0; border-radius:8px; padding:8px 14px; background:#16A34A; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+  .staff-row { padding:10px 0; border-bottom:1px dashed var(--border); }
+  .staff-row:last-child { border-bottom:0; }
+  .staff-row.off .staff-who b { opacity:.55; }
+  .staff-who { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; font-size:14px; color:var(--text); }
+  .staff-pill { font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:999px; background:#E2E8F0; color:#475569; }
+  .staff-pill.on { background:#DCFCE7; color:#166534; }
+  .staff-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .staff-btns button { border:1px solid var(--border); background:#F8FAFC; color:var(--text); border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .staff-btns button.del { color:#B3241C; border-color:#F5C2BE; background:#FDECEA; }
 
   /* ---------- Обучение: карта курса ---------- */
   .course-wrap { background:#0A2350; color:#fff; border-radius:22px; padding:18px 16px 22px; position:relative; overflow:hidden; }
@@ -2085,6 +2101,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
     <div class="side-item" id="tab-course" data-tab="course" onclick="showTab('course')"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+    {% if not is_employee %}<div class="side-item" id="tab-staff" data-tab="staff" onclick="showTab('staff')"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
   </nav>
   <div class="side-foot">
@@ -2127,6 +2144,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
       <div class="more-item" data-tab="course" data-more-slot="course" onclick="showTab('course'); closeMore();"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
       <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
@@ -2408,6 +2426,30 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   </div>
 
   {% if not is_employee %}
+  <div id="view-staff" style="display:none;">
+    <div class="card">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:6px;">{{ T.staff_add_title }}</label>
+      <div class="hint-text" style="margin-bottom:12px;">{{ T.staff_intro }}</div>
+      <label for="staff_name">{{ T.staff_name }}</label>
+      <input id="staff_name" maxlength="60" placeholder="{{ T.staff_name_ph }}" autocomplete="off">
+      <div class="staff-err" id="staff_err_full_name"></div>
+      <label for="staff_login">{{ T.staff_login }}</label>
+      <input id="staff_login" maxlength="30" placeholder="{{ T.staff_login_ph }}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <div class="hint-text">{{ T.staff_login_hint }}</div>
+      <div class="staff-err" id="staff_err_username"></div>
+      <label for="staff_pw">{{ T.staff_password }}</label>
+      <input id="staff_pw" maxlength="100" autocomplete="new-password">
+      <div class="hint-text">{{ T.staff_password_hint }}</div>
+      <div class="staff-err" id="staff_err_password"></div>
+      <button class="submit" onclick="createStaff()">{{ T.staff_add_btn }}</button>
+      <div id="staffCreds"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.staff_list_title }}</label>
+      <div id="staffList">{{ T.stats_loading }}</div>
+    </div>
+  </div>
+
   <div id="view-export" class="card" style="display:none;">
     <p style="margin-top:0;">{{ T.export_p1 }}</p>
     <p class="hint-text">{{ T.export_p2 }}</p>
@@ -3207,6 +3249,97 @@ function showTab(t, keepScroll) {
   if (courseView) courseView.style.display = t === 'course' ? 'block' : 'none';
   if (courseTab) courseTab.classList.toggle('active', t === 'course');
   if (t === 'course') loadCourse();
+  const staffView = document.getElementById('view-staff');
+  const staffTab = document.getElementById('tab-staff');
+  if (staffView) staffView.style.display = t === 'staff' ? 'block' : 'none';
+  if (staffTab) staffTab.classList.toggle('active', t === 'staff');
+  if (t === 'staff') loadStaff();
+}
+
+// ---------- Сотрудники: владелец точки сам ----------
+let STAFF_SEQ = 0;
+function staffFmt(s, vars) { return String(s).replace(/{([a-z_]+)}/g, (m, k) => (k in vars ? vars[k] : m)); }
+function staffErr(field, text) {
+  ['full_name', 'username', 'password'].forEach(f => {
+    const el = document.getElementById('staff_err_' + f);
+    if (el) { el.textContent = f === field ? (text || '') : ''; el.classList.toggle('on', f === field && !!text); }
+  });
+}
+function staffShowCreds(title, login, password) {
+  const text = staffFmt(T.staff_creds, { url: location.origin + '/login', login: login, password: password });
+  const box = document.getElementById('staffCreds');
+  box.innerHTML = `<div class="staff-creds"><div class="staff-creds-t">${escapeHtml(title)}</div>
+    <div class="staff-creds-v" id="staffCredsText"></div>
+    <button type="button" class="staff-copy" onclick="copyStaffCreds(this)">${escapeHtml(T.staff_copy)}</button></div>`;
+  document.getElementById('staffCredsText').textContent = text;
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function copyStaffCreds(btn) {
+  const text = document.getElementById('staffCredsText').textContent;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); } catch (e2) {} ta.remove();
+  }
+  btn.textContent = T.staff_copied;
+}
+async function loadStaff() {
+  const seq = ++STAFF_SEQ;
+  let d;
+  try { d = await (await fetch('/api/staff', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (seq !== STAFF_SEQ || !d || !d.ok) return;
+  const box = document.getElementById('staffList');
+  if (!d.employees.length) { box.innerHTML = `<div class="hint-text">${escapeHtml(T.staff_empty)}</div>`; return; }
+  box.innerHTML = d.employees.map(e => {
+    const nm = escapeHtml(JSON.stringify(e.full_name || e.username));
+    return `<div class="staff-row ${e.is_active ? '' : 'off'}">
+      <div class="staff-who"><b>${escapeHtml(e.full_name || e.username)}</b>
+        <span class="hint-text">@${escapeHtml(e.username)}</span>
+        <span class="staff-pill ${e.is_active ? 'on' : ''}">${escapeHtml(e.is_active ? T.staff_active : T.staff_off)}</span></div>
+      <div class="staff-btns">
+        <button type="button" onclick="staffResetPw(${e.id}, ${nm}, ${escapeHtml(JSON.stringify(e.username))})"><i class="fa-solid fa-key"></i> ${escapeHtml(T.staff_btn_pw)}</button>
+        <button type="button" onclick="staffToggle(${e.id}, ${e.is_active ? 0 : 1}, ${nm})">${e.is_active ? '<i class="fa-solid fa-pause"></i> ' + escapeHtml(T.staff_btn_off) : '<i class="fa-solid fa-play"></i> ' + escapeHtml(T.staff_btn_on)}</button>
+        <button type="button" class="del" onclick="staffDelete(${e.id}, ${nm})"><i class="fa-solid fa-trash"></i> ${escapeHtml(T.staff_btn_del)}</button>
+      </div></div>`;
+  }).join('');
+}
+async function createStaff() {
+  staffErr(null);
+  const body = {
+    full_name: document.getElementById('staff_name').value.trim(),
+    username: document.getElementById('staff_login').value.trim(),
+    password: document.getElementById('staff_pw').value,
+  };
+  if (body.full_name.length < 2) return staffErr('full_name', T.staff_err_name);
+  if (!/^[A-Za-z0-9_]{3,30}$/.test(body.username)) return staffErr('username', T.staff_err_login);
+  if (body.password && body.password.length < 6) return staffErr('password', T.staff_err_password);
+  const res = await fetch('/api/staff', { method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+  const d = await res.json();
+  if (!d.ok) { if (d.field) staffErr(d.field, d.error); else alert(d.error || 'Error'); return; }
+  ['staff_name', 'staff_login', 'staff_pw'].forEach(id => { document.getElementById(id).value = ''; });
+  staffShowCreds(T.staff_created, d.username, d.password);
+  loadStaff();
+}
+async function staffResetPw(id, name, login) {
+  if (!confirm(staffFmt(T.staff_confirm_pw, { name: name }))) return;
+  const d = await (await fetch(`/api/staff/${id}/reset_password`, { method: 'POST', credentials: 'same-origin' })).json();
+  if (!d.ok) { alert(d.error); return; }
+  staffShowCreds(T.staff_new_pw, login, d.password);
+}
+async function staffToggle(id, on, name) {
+  if (!on && !confirm(staffFmt(T.staff_confirm_off, { name: name }))) return;
+  const d = await (await fetch(`/api/staff/${id}/active`, { method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ active: !!on }) })).json();
+  if (!d.ok) { alert(d.error); return; }
+  loadStaff();
+}
+async function staffDelete(id, name) {
+  if (!confirm(staffFmt(T.staff_confirm_del, { name: name }))) return;
+  const d = await (await fetch(`/api/staff/${id}`, { method: 'DELETE', credentials: 'same-origin' })).json();
+  if (!d.ok) { alert(d.error); return; }
+  document.getElementById('staffCreds').innerHTML = '';
+  loadStaff();
 }
 
 // ---------- Обучение: карта курса ----------
@@ -8241,7 +8374,8 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
-  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct']);
+  'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct',
+  'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete']);
 </script>
 </body>
 </html>
@@ -11781,9 +11915,9 @@ async function loadEmployees(shopId) {
   const employees = await res.json();
   const list = employees.length ? employees.map(e => `
     <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;">
-      <span>${escapeHtml(e.full_name || e.username)} <span class="hint-text">(${e.username})</span></span>
-      <span style="display:flex; align-items:center; gap:8px;">
-        <span class="hint-text">🔒 скрыт</span>
+      <span style="${e.is_active ? '' : 'opacity:.55;'}">${escapeHtml(e.full_name || e.username)} <span class="hint-text">(${escapeHtml(e.username)})</span>${e.is_active ? '' : ' <span class="hint-text">· выключен</span>'}</span>
+      <span style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="badge" style="background:var(--border);color:var(--hint);" onclick="toggleEmployeeActive(${e.id}, ${shopId}, ${e.is_active ? 0 : 1})">${e.is_active ? 'выключить' : 'включить'}</button>
         <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetEmployeePassword(${e.id}, ${shopId}, ${escapeHtml(JSON.stringify(e.username))})">сбросить</button>
         <button class="badge inactive" onclick="deleteEmployee(${e.id}, ${shopId}, ${escapeHtml(JSON.stringify(e.username))})">удалить</button>
       </span>
@@ -11827,6 +11961,14 @@ async function resetEmployeePassword(employeeId, shopId, username) {
   } else {
     showMsg('Ошибка: ' + data.error, false);
   }
+}
+
+async function toggleEmployeeActive(employeeId, shopId, on) {
+  const res = await fetch(`/api/admin/employees/${employeeId}/active`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({shop_id: shopId, active: !!on})
+  });
+  const data = await res.json();
+  if (data.ok) loadEmployees(shopId); else showMsg('Ошибка: ' + data.error, false);
 }
 
 async function deleteEmployee(employeeId, shopId, username) {
@@ -12264,7 +12406,7 @@ function guardOnce(names) {
     window[name] = wrapped;
   });
 }
-guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'deleteBranch',
+guardOnce(['createShop', 'createBranch', 'createEmployee', 'toggleEmployeeActive', 'saveBranchEdit', 'deleteBranch',
   'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
   'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField',
   'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings',
@@ -14803,6 +14945,79 @@ def api_admin_registration_decide(req_id, action):
     if r.get("shop"):
         out.update(shop_id=r["shop"]["id"], paid_until=r["shop"].get("paid_until"))
     return jsonify(out)
+
+
+# ---------- Сотрудники: владелец точки управляет сам ----------
+# Главная точка — своими, каждый филиал — своими (g.shop_id — сама точка).
+# Сотрудник сюда не попадает (@employee_blocked). Админ платформы — через /api/admin.
+
+_STAFF_LOGIN_RE = re.compile(r"^[A-Za-z0-9_]{3,30}$")
+
+
+@app.route("/api/staff")
+@login_required
+@employee_blocked
+def api_staff_list():
+    return jsonify({"ok": True, "employees": db.list_shop_employees(g.shop_id)})
+
+
+@app.route("/api/staff", methods=["POST"])
+@login_required
+@employee_blocked
+def api_staff_create():
+    data = request.get_json(force=True, silent=True) or {}
+    T = g.T
+    full_name = re.sub(r"\s+", " ", str(data.get("full_name") or "")).strip()[:60]
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "")
+    if len(full_name) < 2:
+        return jsonify({"ok": False, "field": "full_name", "error": T["staff_err_name"]}), 400
+    if not _STAFF_LOGIN_RE.match(username):
+        return jsonify({"ok": False, "field": "username", "error": T["staff_err_login"]}), 400
+    if password and (len(password) < 6 or len(password) > 100):
+        return jsonify({"ok": False, "field": "password", "error": T["staff_err_password"]}), 400
+    result = db.create_shop_employee(g.shop_id, username, password=password or None, full_name=full_name)
+    if not result:
+        return jsonify({"ok": False, "field": "username", "error": T["staff_err_taken"]}), 400
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/staff/<int:employee_id>/reset_password", methods=["POST"])
+@login_required
+@employee_blocked
+def api_staff_reset_password(employee_id):
+    new_password = db.reset_shop_employee_password(employee_id, g.shop_id)
+    if not new_password:
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    return jsonify({"ok": True, "password": new_password})
+
+
+@app.route("/api/staff/<int:employee_id>/active", methods=["POST"])
+@login_required
+@employee_blocked
+def api_staff_set_active(employee_id):
+    active = bool((request.get_json(force=True, silent=True) or {}).get("active"))
+    if not db.set_shop_employee_active(employee_id, g.shop_id, active):
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    return jsonify({"ok": True, "active": active})
+
+
+@app.route("/api/staff/<int:employee_id>", methods=["DELETE"])
+@login_required
+@employee_blocked
+def api_staff_delete(employee_id):
+    if not db.delete_shop_employee(employee_id, g.shop_id):
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/employees/<int:employee_id>/active", methods=["POST"])
+@admin_required
+def api_admin_employee_active(employee_id):
+    data = request.get_json(force=True, silent=True) or {}
+    if not db.set_shop_employee_active(employee_id, data.get("shop_id"), bool(data.get("active"))):
+        return jsonify({"ok": False, "error": "сотрудник не найден"}), 404
+    return jsonify({"ok": True})
 
 
 def run_webapp():

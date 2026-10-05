@@ -922,12 +922,23 @@ def authenticate_shop_employee(username: str, password: str):
 
 @_serialized
 def create_shop_employee(shop_id: int, username: str, password: str = None, full_name: str = None):
-    """Платформенный админ создаёт логин сотрудника для точки — ограниченный
-    доступ (без прибыли, цен закупки, статистики, экспорта). Пароль
-    возвращается один раз в ответе — нигде не сохраняется в расшифровываемом виде."""
+    """Логин сотрудника для точки — создаёт платформенный админ или сам
+    владелец точки (главная или филиал — себе). Ограниченный доступ (без
+    прибыли, цен закупки, статистики, экспорта). Пароль возвращается один раз
+    в ответе — нигде не сохраняется в расшифровываемом виде. None — логин занят
+    (сотрудником, точкой или заявкой на регистрацию)."""
     if not password:
         password = secrets.token_urlsafe(9)
     with get_conn() as conn:
+        # вход сначала проверяет точки — сотрудник с логином точки не смог бы войти
+        if conn.execute("SELECT 1 FROM shops WHERE lower(username)=lower(?)", (username,)).fetchone():
+            return None
+        if conn.execute("SELECT 1 FROM shop_users WHERE lower(username)=lower(?)", (username,)).fetchone():
+            return None
+        reg = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='registration_requests'").fetchone()
+        if reg and conn.execute("SELECT 1 FROM registration_requests WHERE lower(username)=lower(?) "
+                                "AND status IN ('new', 'pending')", (username,)).fetchone():
+            return None
         try:
             conn.execute(
                 "INSERT INTO shop_users (shop_id, username, password_hash, password_plain, full_name, role) "
@@ -958,7 +969,7 @@ def list_shop_employees(shop_id: int):
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, username, full_name, is_active, created_at FROM shop_users "
-            "WHERE shop_id=? ORDER BY created_at DESC", (shop_id,)
+            "WHERE shop_id=? ORDER BY created_at DESC, id DESC", (shop_id,)
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -968,6 +979,17 @@ def delete_shop_employee(employee_id: int, shop_id: int) -> bool:
     """Удаляет логин сотрудника — только если он реально принадлежит этой точке."""
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM shop_users WHERE id=? AND shop_id=?", (employee_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+@_serialized
+def set_shop_employee_active(employee_id: int, shop_id: int, active: bool) -> bool:
+    """Временно выключает (или снова включает) сотрудника — без удаления.
+    Выключенный теряет доступ сразу: вход проверяется при каждом запросе."""
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE shop_users SET is_active=? WHERE id=? AND shop_id=?",
+                           (1 if active else 0, employee_id, shop_id))
         conn.commit()
         return cur.rowcount > 0
 
