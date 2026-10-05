@@ -1739,6 +1739,30 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .sub-banner { display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:12px 14px; border-radius:12px; background:#FEF0DC; color:#7A3A04; font-size:14px; font-weight:700; line-height:1.35; text-decoration:none; border:1.5px solid #F2C27D; }
   .sub-banner span { flex:1; }
   .sub-banner i { flex:none; }
+
+  /* ---------- Обучение: карта курса ---------- */
+  .course-wrap { background:#0A2350; color:#fff; border-radius:22px; padding:18px 16px 22px; position:relative; overflow:hidden; }
+  .course-sub { font-size:13px; font-weight:700; color:#9CC4FF; }
+  .course-head { font-size:22px; font-weight:800; line-height:1.2; margin:4px 0 2px; }
+  .course-note { font-size:12.5px; color:#C9D8F2; margin-top:6px; }
+  .course-map { position:relative; margin:14px auto 0; max-width:520px; }
+  .course-map svg.course-path { position:absolute; left:0; top:0; pointer-events:none; }
+  .cnode { position:absolute; width:48px; height:48px; margin-left:-24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; text-decoration:none; border:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .cnode.done { background:#15A35B; color:#fff; }
+  .cnode.open { background:#1E3F7A; color:#CFE0FF; }
+  .cnode.cur { width:64px; height:64px; margin-left:-32px; background:#fff; color:#1463E6; box-shadow:0 0 0 6px #1FB5F2; font-size:22px; }
+  .cnode .cscore { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); font-size:11px; font-weight:800; color:#7EE2AE; white-space:nowrap; }
+  .ccard { position:absolute; width:140px; box-sizing:border-box; background:#fff; color:#0A2350; border-radius:14px; padding:10px 12px; box-shadow:0 8px 20px rgba(0,0,0,0.25); display:flex; flex-direction:column; gap:6px; }
+  .ccard .cc-meta { font-size:11px; font-weight:800; color:#1463E6; }
+  .ccard .cc-title { font-size:13.5px; font-weight:800; line-height:1.25; }
+  .ccard a { display:block; background:#1463E6; color:#fff; text-decoration:none; text-align:center; border-radius:10px; padding:9px 0; font-weight:800; font-size:13px; }
+  .course-list { margin:14px auto 0; max-width:520px; display:flex; flex-direction:column; gap:6px; }
+  .course-row { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.06); border-radius:12px; padding:10px 12px; color:#fff; text-decoration:none; font-size:14px; font-weight:600; }
+  .course-row b { width:26px; height:26px; border-radius:8px; background:#1E3F7A; display:flex; align-items:center; justify-content:center; font-size:12px; flex:none; }
+  .course-row.done b { background:#15A35B; }
+  .course-row span.cr-t { flex:1; min-width:0; }
+  .course-row span.cr-s { font-size:12px; font-weight:800; color:#7EE2AE; }
+
 </style>
 </head>
 <body>
@@ -1764,6 +1788,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     {% if not is_employee %}<div class="side-item" id="tab-expenses" data-tab="expenses" onclick="showTab('expenses')"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
+    <div class="side-item" id="tab-course" data-tab="course" onclick="showTab('course')"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
   </nav>
@@ -1805,6 +1830,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if not is_employee %}<div class="more-item" data-tab="expenses" data-more-slot="expenses" onclick="showTab('expenses'); closeMore();"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
       <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
       {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
+      <div class="more-item" data-tab="course" data-more-slot="course" onclick="showTab('course'); closeMore();"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
@@ -2073,6 +2099,16 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div style="margin-top:18px;">
       <div class="hint-text" style="margin-bottom:8px;">{{ T.broadcast_history_title }}</div>
       <div id="broadcastHistory"></div>
+    </div>
+  </div>
+
+  <div id="view-course" style="display:none;">
+    <div class="course-wrap">
+      <div class="course-sub">{{ T.course_sub }}</div>
+      <div class="course-head" id="courseHead">&nbsp;</div>
+      {% if lang != 'uz' %}<div class="course-note">{{ T.course_lang_note }}</div>{% endif %}
+      <div class="course-map" id="courseMap"></div>
+      <div class="course-list" id="courseList"></div>
     </div>
   </div>
 
@@ -2871,6 +2907,76 @@ function showTab(t, keepScroll) {
   if (t === 'stats') { ensureChartJs(); loadStats(); }
   if (t === 'warehouse') loadWarehouse();
   if (t === 'suppliers') loadSuppliersTab();
+  const courseView = document.getElementById('view-course');
+  const courseTab = document.getElementById('tab-course');
+  if (courseView) courseView.style.display = t === 'course' ? 'block' : 'none';
+  if (courseTab) courseTab.classList.toggle('active', t === 'course');
+  if (t === 'course') loadCourse();
+}
+
+// ---------- Обучение: карта курса ----------
+let COURSE_SEQ = 0;
+async function loadCourse() {
+  const seq = ++COURSE_SEQ;
+  const map = document.getElementById('courseMap');
+  const list = document.getElementById('courseList');
+  if (!map) return;
+  let d;
+  try {
+    const r = await fetch('/api/course', { credentials: 'same-origin' });
+    d = await r.json();
+  } catch (e) { return; }
+  if (seq !== COURSE_SEQ || !d || !d.ok) return;
+  const mods = d.modules;
+  const done = mods.filter(m => m.passed).length;
+  document.getElementById('courseHead').textContent = done === mods.length
+    ? T.course_all_done
+    : T.course_head.replace('{done}', done).replace('{left}', mods.length - done);
+  let cur = mods.find(m => !m.passed);
+  const W = map.clientWidth || 340;
+  const ROW = 96, TOP = 40;
+  const xs = [0.5, 0.78, 0.5, 0.22];
+  const pts = mods.map((m, i) => ({ x: Math.round(W * xs[i % 4]), y: TOP + i * ROW }));
+  const H = TOP + (mods.length - 1) * ROW + 70;
+  map.style.height = H + 'px';
+  let path = 'M' + pts[0].x + ' ' + pts[0].y;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], my = (a.y + b.y) / 2;
+    path += ' C' + a.x + ' ' + my + ', ' + b.x + ' ' + my + ', ' + b.x + ' ' + b.y;
+  }
+  const curIdx = cur ? mods.indexOf(cur) : mods.length - 1;
+  let donePath = 'M' + pts[0].x + ' ' + pts[0].y;
+  for (let i = 1; i <= curIdx; i++) {
+    const a = pts[i - 1], b = pts[i], my = (a.y + b.y) / 2;
+    donePath += ' C' + a.x + ' ' + my + ', ' + b.x + ' ' + my + ', ' + b.x + ' ' + b.y;
+  }
+  let html = '<svg class="course-path" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">'
+    + '<path d="' + path + '" fill="none" stroke="#1E3F7A" stroke-width="12" stroke-linecap="round"/>'
+    + (curIdx > 0 ? '<path d="' + donePath + '" fill="none" stroke="#1FB5F2" stroke-width="12" stroke-linecap="round"/>' : '')
+    + '</svg>';
+  mods.forEach((m, i) => {
+    const p = pts[i];
+    const isCur = cur && m.n === cur.n;
+    const cls = isCur ? 'cur' : (m.passed ? 'done' : 'open');
+    const sz = isCur ? 32 : 24;
+    html += '<a class="cnode ' + cls + '" href="/course/' + m.n + '" style="left:' + p.x + 'px; top:' + (p.y - sz) + 'px" aria-label="' + escapeHtml(m.n + '. ' + m.title) + '">' + m.n
+      + (m.passed && m.best != null ? '<span class="cscore">' + m.best + '/10</span>' : '') + '</a>';
+  });
+  if (cur) {
+    const p = pts[curIdx];
+    // карточка — на стороне, противоположной следующему кружку, чтобы его не закрывать
+    const k = curIdx % 4;
+    const toRight = (k === 2 || k === 3);
+    const CW = Math.min(140, Math.round(W * 0.4));
+    const left = toRight ? Math.min(p.x + 40, W - CW - 4) : Math.max(p.x - 40 - CW, 4);
+    html += '<div class="ccard" style="left:' + left + 'px; top:' + (p.y - 40) + 'px; width:' + CW + 'px">'
+      + '<span class="cc-meta">' + cur.n + ' · ' + cur.mins + ' ' + T.course_min + '</span>'
+      + '<span class="cc-title">' + escapeHtml(cur.title) + '</span>'
+      + '<a href="/course/' + cur.n + '">' + (cur.opened ? T.course_continue : T.course_start) + '</a></div>';
+  }
+  map.innerHTML = html;
+  list.innerHTML = mods.map(m => '<a class="course-row' + (m.passed ? ' done' : '') + '" href="/course/' + m.n + '"><b>' + m.n + '</b><span class="cr-t">' + escapeHtml(m.title) + '</span>'
+    + (m.best != null ? '<span class="cr-s">' + m.best + '/10</span>' : '') + '</a>').join('');
 }
 
 // Данные на экране не должны «застревать»: если приложение было свёрнуто
@@ -2893,6 +2999,12 @@ document.addEventListener('visibilitychange', () => {
   HIDDEN_AT = 0;
 });
 window.addEventListener('pageshow', e => { if (e.persisted) refreshCurrentView(); });
+document.addEventListener('DOMContentLoaded', () => {
+  if (new URLSearchParams(location.search).get('tab') === 'course') {
+    showTab('course');
+    history.replaceState(null, '', '/');
+  }
+});
 
 function openMore() {
   document.getElementById('moreSheet').classList.add('open');
@@ -8468,6 +8580,131 @@ def index():
         sub_banner=_sub_banner(shop),
         is_sub_owner=_is_sub_owner(),
     )
+
+
+# ---------- Обучение: курс для пунктов замены масла ----------
+# Уроки — готовые страницы в папке course/ (только для вошедших в панель).
+# Сотрудник (мастер) видит модули 1–7, владелец точки и филиал — все 12.
+COURSE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "course")
+COURSE_MODULES = [
+    (1, "Moy almashtirish shoxobchasi qanday daromad qiladi", 40),
+    (2, "Moy: qovushqoqlik, standartlar, tanlash", 50),
+    (3, "Filtrlar va texnik suyuqliklar", 45),
+    (4, "Mashinaga moy va filtr tanlash", 45),
+    (5, "Moy almashtirish texnologiyasi", 45),
+    (6, "Mijozni kutib olish va kuzatib qo\u02bbyish", 40),
+    (7, "Majburlamasdan qo\u02bbshimcha sotish", 40),
+    (8, "Mijozlar bazasi va qayta tashriflar", 45),
+    (9, "Ombor va xaridlar", 45),
+    (10, "Shoxobcha pullari", 50),
+    (11, "Jamoa: ustalarni yollash va rivojlantirish", 45),
+    (12, "Shoxobchani reklama qilish", 45),
+]
+COURSE_EMPLOYEE_MAX = 7
+
+
+def _course_max() -> int:
+    return COURSE_EMPLOYEE_MAX if g.is_employee else len(COURSE_MODULES)
+
+
+def _course_user_key() -> str:
+    if g.is_employee:
+        return "emp:" + (session.get("username") or "")
+    return "owner"
+
+
+_COURSE_HOOK = """<script>
+(function () {
+  var M = %d, MAX = %d, L = %s;
+  function post(ev, score) {
+    try {
+      fetch('/api/course/progress', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: M, event: ev, score: score }) });
+    } catch (e) {}
+  }
+  post('open');
+  try {
+    var orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      orig.apply(this, arguments);
+      try { if (String(k).slice(-5) === '-quiz') post('quiz', parseInt(v, 10)); } catch (e) {}
+    };
+  } catch (e) {}
+  function fix() {
+    var bar = document.querySelector('.bar-in');
+    if (bar && !document.getElementById('obBack')) {
+      var a = document.createElement('a');
+      a.id = 'obBack'; a.href = '/?tab=course';
+      a.textContent = '\u2190 ' + L.back;
+      a.setAttribute('style', 'margin-left:auto;flex:none;font-weight:800;font-size:14px;color:#fff;background:#1463E6;text-decoration:none;border-radius:10px;padding:8px 12px');
+      bar.appendChild(a);
+    }
+    var brand = document.querySelector('.bar .brand');
+    if (brand) brand.setAttribute('href', '/?tab=course');
+    var next = document.querySelector('.done-card a.btn');
+    if (next) {
+      if (M < MAX) { next.href = '/course/' + (M + 1); next.textContent = L.next + ' \u2192'; }
+      else { next.href = '/?tab=course'; next.textContent = L.map; }
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fix); else fix();
+})();
+</script>"""
+
+
+@app.route("/course/<int:n>")
+@login_required
+def course_page(n):
+    if n < 1 or n > _course_max():
+        return redirect("/?tab=course")
+    path = os.path.join(COURSE_DIR, "modul-%d.html" % n)
+    if not os.path.isfile(path):
+        return redirect("/?tab=course")
+    with open(path, encoding="utf-8") as f:
+        html = f.read()
+    labels = json.dumps({"back": g.T["tab_course"], "next": g.T["course_next"], "map": g.T["course_to_map"]})
+    hook = _COURSE_HOOK % (n, _course_max(), labels)
+    i = html.rfind("</body>")
+    html = html[:i] + hook + html[i:] if i != -1 else html + hook
+    return Response(html, mimetype="text/html")
+
+
+@app.route("/api/course")
+@login_required
+def api_course():
+    prog = db.course_progress(g.shop_id, _course_user_key())
+    mods = []
+    for n, title, mins in COURSE_MODULES[:_course_max()]:
+        p = prog.get(n) or {}
+        mods.append({"n": n, "title": title, "mins": mins, "opened": bool(p.get("opened")),
+                     "best": p.get("best"), "passed": bool(p.get("passed"))})
+    return jsonify({"ok": True, "modules": mods})
+
+
+@app.route("/api/course/progress", methods=["POST"])
+@login_required
+def api_course_progress():
+    data = request.get_json(silent=True) or {}
+    try:
+        n = int(data.get("module"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "module"}), 400
+    if n < 1 or n > _course_max():
+        return jsonify({"ok": False, "error": "module"}), 403
+    event = data.get("event")
+    score = None
+    if event == "quiz":
+        try:
+            score = int(data.get("score"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "score"}), 400
+        if score < 0 or score > 10:
+            return jsonify({"ok": False, "error": "score"}), 400
+    elif event != "open":
+        return jsonify({"ok": False, "error": "event"}), 400
+    db.course_mark(g.shop_id, _course_user_key(), n, event, score)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/set_language", methods=["POST"])

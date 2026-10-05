@@ -297,6 +297,7 @@ def init_db():
         _migrate_subscription(conn)
         _migrate_name_aliases(conn)
         _migrate_daily_km(conn)
+        _migrate_course(conn)
         _bootstrap_accounts(conn)
 
 
@@ -5827,3 +5828,64 @@ def set_oil_change_daily_km(oc_id: int, daily_km) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE oil_changes SET daily_km=? WHERE id=?", (daily_km, oc_id))
         conn.commit()
+
+
+# ---------- Обучение (курс для точек): прогресс по модулям ----------
+# user_key: 'owner' — владелец точки/филиала, 'emp:<логин>' — сотрудник.
+# Пройден = лучший результат теста 8 из 10 и выше.
+
+COURSE_PASS_SCORE = 8
+
+
+def _migrate_course(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS course_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        user_key TEXT NOT NULL,
+        module INTEGER NOT NULL,
+        opened_at TEXT,
+        last_open_at TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_score INTEGER,
+        best_score INTEGER,
+        passed_at TEXT,
+        UNIQUE(shop_id, user_key, module)
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_course_progress_shop ON course_progress(shop_id, user_key)")
+    conn.commit()
+
+
+@_serialized
+def course_mark(shop_id: int, user_key: str, module: int, event: str, score=None) -> None:
+    """Отмечает открытие модуля или результат теста (лучший результат сохраняется)."""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO course_progress (shop_id, user_key, module) VALUES (?, ?, ?)",
+            (shop_id, user_key, module))
+        if event == "open":
+            conn.execute("""UPDATE course_progress SET opened_at = COALESCE(opened_at, ?), last_open_at = ?
+                            WHERE shop_id=? AND user_key=? AND module=?""",
+                         (now, now, shop_id, user_key, module))
+        elif event == "quiz" and score is not None:
+            conn.execute("""UPDATE course_progress SET
+                              attempts = attempts + 1,
+                              last_score = ?,
+                              best_score = MAX(COALESCE(best_score, 0), ?),
+                              opened_at = COALESCE(opened_at, ?),
+                              passed_at = CASE WHEN passed_at IS NULL AND ? >= ? THEN ? ELSE passed_at END
+                            WHERE shop_id=? AND user_key=? AND module=?""",
+                         (score, score, now, score, COURSE_PASS_SCORE, now, shop_id, user_key, module))
+        conn.commit()
+
+
+def course_progress(shop_id: int, user_key: str) -> dict:
+    """{модуль: {opened, best, passed, attempts}} для одного человека."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT module, opened_at, best_score, passed_at, attempts FROM course_progress WHERE shop_id=? AND user_key=?",
+            (shop_id, user_key)).fetchall()
+    return {r["module"]: {"opened": bool(r["opened_at"]), "best": r["best_score"],
+                          "passed": bool(r["passed_at"]), "attempts": r["attempts"] or 0} for r in rows}
