@@ -298,6 +298,7 @@ def init_db():
         _migrate_name_aliases(conn)
         _migrate_daily_km(conn)
         _migrate_course(conn)
+        _migrate_registration(conn)
         _bootstrap_accounts(conn)
 
 
@@ -4643,6 +4644,7 @@ def subscription_state(shop: dict) -> dict:
     return {
         "head_id": head.get("id"),
         "lifetime": lifetime,
+        "trial": bool(head.get("trial")) and not lifetime,
         "paid_until": until.strftime("%Y-%m-%d") if until else None,
         "days_left": days_left,
         "expired": expired,
@@ -4791,7 +4793,7 @@ def _extend_head(conn, head_id: int, months: int, from_day):
     until = _parse_day(row["paid_until"]) if row else None
     base = until if (until and until >= from_day) else from_day
     new_until = (base + relativedelta(months=int(months))).strftime("%Y-%m-%d")
-    conn.execute("UPDATE shops SET paid_until=?, last_period_months=?, sub_notice=NULL WHERE id=?",
+    conn.execute("UPDATE shops SET paid_until=?, last_period_months=?, sub_notice=NULL, trial=0 WHERE id=?",
                  (new_until, int(months), head_id))
     return new_until
 
@@ -4865,7 +4867,7 @@ def admin_extend_subscription(head_id: int, months: int, amount=None) -> str:
 def admin_set_paid_until(head_id: int, day: str = None):
     d = _parse_day(day) if day else None
     with get_conn() as conn:
-        conn.execute("UPDATE shops SET paid_until=?, sub_notice=NULL WHERE id=?",
+        conn.execute("UPDATE shops SET paid_until=?, sub_notice=NULL, trial=0 WHERE id=?",
                      (d.strftime("%Y-%m-%d") if d else None, head_id))
         conn.commit()
 
@@ -4875,7 +4877,7 @@ def admin_set_lifetime(head_id: int, on: bool, amount=None):
     """Разовая покупка (∞). Сумму в сумах вписывает админ — она идёт в
     статистику доходов. Снятие ∞ отменяет запись о продаже."""
     with get_conn() as conn:
-        conn.execute("UPDATE shops SET license_type=? WHERE id=?", ("lifetime" if on else "sub", head_id))
+        conn.execute("UPDATE shops SET license_type=?, trial=0 WHERE id=?", ("lifetime" if on else "sub", head_id))
         conn.execute("UPDATE sub_payments SET status='cancelled' WHERE shop_id=? AND kind='lifetime' "
                      "AND status='confirmed'", (head_id,))
         if on:
@@ -5889,3 +5891,259 @@ def course_progress(shop_id: int, user_key: str) -> dict:
             (shop_id, user_key)).fetchall()
     return {r["module"]: {"opened": bool(r["opened_at"]), "best": r["best_score"],
                           "passed": bool(r["passed_at"]), "attempts": r["attempts"] or 0} for r in rows}
+
+
+# ======================================================================
+# САМОСТОЯТЕЛЬНАЯ РЕГИСТРАЦИЯ ТОЧЕК
+# ======================================================================
+# Владелец сам заполняет форму на /register → подтверждает Telegram и номер
+# телефона через бота → админ платформы одобряет кнопкой в Telegram или в
+# админке → создаётся самостоятельная точка с пробным периодом.
+#   status: new      — форма заполнена, Telegram ещё не подтверждён
+#           pending  — Telegram и номер подтверждены, ждёт решения админа
+#           approved — точка создана (shop_id)
+#           rejected — отклонена
+#           expired  — Telegram не подтвердили вовремя
+# Пробный период — это обычная подписка (paid_until) + пометка trial=1:
+# напоминания, блокировка и оплата работают так же, как у всех точек.
+
+REG_TRIAL_DAYS = 14
+REG_CODE_TTL_MIN = 120          # сколько ждём подтверждения Telegram
+REG_MAX_PER_IP_DAY = 3          # защита от массовых заявок
+
+
+def _migrate_registration(conn):
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    for col, ddl in {"trial": "INTEGER DEFAULT 0", "self_registered": "INTEGER DEFAULT 0"}.items():
+        if col not in cols:
+            conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS registration_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token TEXT UNIQUE NOT NULL,
+        code TEXT NOT NULL,
+        shop_name TEXT NOT NULL,
+        owner_name TEXT,
+        city TEXT,
+        phone TEXT,
+        address TEXT,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        language TEXT DEFAULT 'ru',
+        tg_id INTEGER,
+        tg_username TEXT,
+        tg_name TEXT,
+        tg_phone TEXT,
+        status TEXT DEFAULT 'new',
+        ip TEXT,
+        admin_msg_id INTEGER,
+        shop_id INTEGER,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        confirmed_at TEXT,
+        decided_at TEXT
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reg_status ON registration_requests(status, created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reg_code ON registration_requests(code, status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reg_tg ON registration_requests(tg_id, status)")
+    conn.commit()
+
+
+def _phone_digits(phone) -> str:
+    d = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(d) == 9:
+        d = "998" + d
+    return d
+
+
+def _expire_old_registrations(conn):
+    conn.execute(
+        "UPDATE registration_requests SET status='expired' WHERE status='new' "
+        "AND created_at < datetime('now', 'localtime', ?)", (f"-{REG_CODE_TTL_MIN} minutes",))
+
+
+def registration_login_taken(username: str) -> bool:
+    """Логин занят точкой, сотрудником или чужой заявкой, которая ещё в работе."""
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        if conn.execute("SELECT 1 FROM shops WHERE lower(username)=lower(?)", (username,)).fetchone():
+            return True
+        if conn.execute("SELECT 1 FROM shop_users WHERE lower(username)=lower(?)", (username,)).fetchone():
+            return True
+        return conn.execute(
+            "SELECT 1 FROM registration_requests WHERE lower(username)=lower(?) AND status IN ('new', 'pending')",
+            (username,)).fetchone() is not None
+
+
+def registrations_from_ip_today(ip: str) -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) AS c FROM registration_requests WHERE ip=? "
+            "AND created_at > datetime('now', 'localtime', '-1 day')", (ip,)).fetchone()["c"]
+
+
+@_serialized
+def create_registration(shop_name, owner_name, city, phone, address, username, password, language, ip) -> dict:
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        code = None
+        for _ in range(20):
+            c = f"{secrets.randbelow(90000000) + 10000000}"
+            if not conn.execute("SELECT 1 FROM registration_requests WHERE code=? AND status='new'", (c,)).fetchone():
+                code = c
+                break
+        token = secrets.token_urlsafe(18)
+        cur = conn.execute("""
+            INSERT INTO registration_requests (token, code, shop_name, owner_name, city, phone, address,
+                                               username, password_hash, language, ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (token, code, shop_name, owner_name, city, phone, address, username,
+              generate_password_hash(password), language if language in ("ru", "uz") else "ru", ip))
+        conn.commit()
+        row = conn.execute("SELECT * FROM registration_requests WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def get_registration(req_id: int):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM registration_requests WHERE id=?", (req_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_registration_by_token(token: str):
+    if not token:
+        return None
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        row = conn.execute("SELECT * FROM registration_requests WHERE token=?", (token,)).fetchone()
+        return dict(row) if row else None
+
+
+def _tg_already_used(conn, tg_id: int, exclude_id: int) -> bool:
+    """Один Telegram — одна заявка/пробный период (и не владелец уже
+    существующей точки)."""
+    if conn.execute("SELECT 1 FROM registration_requests WHERE tg_id=? AND id!=? "
+                    "AND status IN ('pending', 'approved')", (tg_id, exclude_id)).fetchone():
+        return True
+    return conn.execute("SELECT 1 FROM shops WHERE notify_telegram_id=? AND role IN ('shop', 'branch')",
+                        (str(tg_id),)).fetchone() is not None
+
+
+@_serialized
+def reg_bind_telegram(code: str, tg_id: int, tg_username: str = None, tg_name: str = None) -> dict:
+    """Шаг 1 в боте: человек пришёл по ссылке (или прислал код). Возвращает
+    {"ok": True, "req": ...} или {"ok": False, "error": "invalid" | "tg_used"}."""
+    code = (code or "").strip()
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        row = conn.execute("SELECT * FROM registration_requests WHERE code=? AND status='new'", (code,)).fetchone()
+        if not row:
+            return {"ok": False, "error": "invalid"}
+        if _tg_already_used(conn, tg_id, row["id"]):
+            return {"ok": False, "error": "tg_used", "req": dict(row)}
+        # если этот же человек начинал другую заявку — она больше не нужна
+        conn.execute("UPDATE registration_requests SET status='expired' WHERE tg_id=? AND status='new' AND id!=?",
+                     (tg_id, row["id"]))
+        conn.execute("UPDATE registration_requests SET tg_id=?, tg_username=?, tg_name=? WHERE id=?",
+                     (tg_id, tg_username, tg_name, row["id"]))
+        conn.commit()
+        return {"ok": True, "req": dict(conn.execute("SELECT * FROM registration_requests WHERE id=?",
+                                                     (row["id"],)).fetchone())}
+
+
+@_serialized
+def reg_set_contact(tg_id: int, phone: str) -> dict:
+    """Шаг 2 в боте: человек поделился своим номером → заявка уходит админу.
+    {"ok": True, "req": ...} или {"ok": False, "error": "no_request" | "phone_used" | "tg_used"}."""
+    digits = _phone_digits(phone)
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        row = conn.execute("SELECT * FROM registration_requests WHERE tg_id=? AND status='new' "
+                           "ORDER BY id DESC LIMIT 1", (tg_id,)).fetchone()
+        if not row:
+            return {"ok": False, "error": "no_request"}
+        if _tg_already_used(conn, tg_id, row["id"]):
+            return {"ok": False, "error": "tg_used", "req": dict(row)}
+        for other in conn.execute("SELECT tg_phone FROM registration_requests WHERE id!=? "
+                                  "AND status IN ('pending', 'approved') AND tg_phone IS NOT NULL",
+                                  (row["id"],)).fetchall():
+            if _phone_digits(other["tg_phone"]) == digits:
+                return {"ok": False, "error": "phone_used", "req": dict(row)}
+        conn.execute("UPDATE registration_requests SET tg_phone=?, status='pending', "
+                     "confirmed_at=datetime('now','localtime') WHERE id=?", ("+" + digits, row["id"]))
+        conn.commit()
+        return {"ok": True, "req": dict(conn.execute("SELECT * FROM registration_requests WHERE id=?",
+                                                     (row["id"],)).fetchone())}
+
+
+@_serialized
+def set_registration_admin_msg(req_id: int, message_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE registration_requests SET admin_msg_id=? WHERE id=?", (message_id, req_id))
+        conn.commit()
+
+
+@_serialized
+def approve_registration(req_id: int) -> dict:
+    """Создаёт самостоятельную точку с пробным периодом. Одной транзакцией.
+    {"ok": True, "req": ..., "shop": ...} или {"ok": False, "error": "done" | "username_taken"}."""
+    with get_conn() as conn:
+        req = conn.execute("SELECT * FROM registration_requests WHERE id=?", (req_id,)).fetchone()
+        if not req or req["status"] != "pending":
+            return {"ok": False, "error": "done", "req": dict(req) if req else None}
+        req = dict(req)
+        taken = (conn.execute("SELECT 1 FROM shops WHERE lower(username)=lower(?)", (req["username"],)).fetchone()
+                 or conn.execute("SELECT 1 FROM shop_users WHERE lower(username)=lower(?)",
+                                 (req["username"],)).fetchone())
+        if taken:
+            return {"ok": False, "error": "username_taken", "req": req}
+        until = (_today() + timedelta(days=REG_TRIAL_DAYS - 1)).strftime("%Y-%m-%d")
+        address = ", ".join(x for x in (req.get("city"), req.get("address")) if x) or None
+        cur = conn.execute("""
+            INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
+                               anpr_token, notify_telegram_id, language, is_active, owner_link_token,
+                               warehouse_enabled, sms_enabled, paid_until, license_type, trial, self_registered)
+            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 0, ?, 'sub', 1, 1)
+        """, (req["username"], req["password_hash"], req["shop_name"], req.get("phone"), address,
+              secrets.token_urlsafe(8), str(req["tg_id"]) if req.get("tg_id") else None,
+              req.get("language") or "ru", secrets.token_urlsafe(12), until))
+        shop_id = cur.lastrowid
+        conn.execute("UPDATE registration_requests SET status='approved', shop_id=?, "
+                     "decided_at=datetime('now','localtime') WHERE id=?", (shop_id, req_id))
+        conn.commit()
+        req.update(status="approved", shop_id=shop_id)
+        shop = dict(conn.execute("SELECT * FROM shops WHERE id=?", (shop_id,)).fetchone())
+        return {"ok": True, "req": req, "shop": shop}
+
+
+@_serialized
+def reject_registration(req_id: int) -> dict:
+    with get_conn() as conn:
+        req = conn.execute("SELECT * FROM registration_requests WHERE id=?", (req_id,)).fetchone()
+        if not req or req["status"] != "pending":
+            return {"ok": False, "error": "done", "req": dict(req) if req else None}
+        conn.execute("UPDATE registration_requests SET status='rejected', "
+                     "decided_at=datetime('now','localtime') WHERE id=?", (req_id,))
+        conn.commit()
+        req = dict(req)
+        req["status"] = "rejected"
+        return {"ok": True, "req": req}
+
+
+def list_registrations(limit_done: int = 15) -> dict:
+    """Для админки: ждут решения + последние решённые."""
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        cols = ("id, shop_name, owner_name, city, phone, address, username, language, tg_id, tg_username, "
+                "tg_name, tg_phone, status, shop_id, created_at, confirmed_at, decided_at")
+        pending = [dict(r) for r in conn.execute(
+            f"SELECT {cols} FROM registration_requests WHERE status='pending' ORDER BY id").fetchall()]
+        done = [dict(r) for r in conn.execute(
+            f"SELECT {cols} FROM registration_requests WHERE status IN ('approved', 'rejected') "
+            f"ORDER BY decided_at DESC, id DESC LIMIT ?", (limit_done,)).fetchall()]
+        return {"pending": pending, "done": done}

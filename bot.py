@@ -29,7 +29,8 @@ import asyncio
 import logging
 from datetime import datetime, time as dtime
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton,
+                      ReplyKeyboardRemove)
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes,
     ConversationHandler, filters, CallbackQueryHandler
@@ -122,13 +123,16 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    token = context.args[0] if context.args else None
+
+    if token and token.startswith("reg_"):
+        await registration_bind(update, context, token[len("reg_"):])
+        return ConversationHandler.END
 
     if is_admin(update):
         panel_note = f"\n{i18n.t('bot_panel_note', 'ru')} {webapp.PUBLIC_URL}" if webapp.PUBLIC_URL else ""
         await update.message.reply_text(i18n.t("bot_admin_greeting", "ru") + panel_note)
         return ConversationHandler.END
-
-    token = context.args[0] if context.args else None
 
     if token and token.startswith("sup_"):
         sup = db.link_supplier_by_token(user.id, token[len("sup_"):])
@@ -735,6 +739,88 @@ async def sub_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Чек отклонён")
 
 
+# ============ САМОСТОЯТЕЛЬНАЯ РЕГИСТРАЦИЯ ТОЧКИ ============
+# Владелец заполнил форму на сайте → пришёл сюда по ссылке (или прислал
+# 8-значный код) → делится своим номером → заявка уходит администратору.
+
+def _register_url(lang: str = "ru") -> str:
+    base = (webapp.PUBLIC_URL.rstrip("/") + "/register") if webapp.PUBLIC_URL else "/register"
+    return base + ("?lang=uz" if lang == "uz" else "")
+
+
+async def registration_bind(update: Update, context: ContextTypes.DEFAULT_TYPE, code: str):
+    user = update.effective_user
+    if ADMIN_TELEGRAM_ID and user.id == ADMIN_TELEGRAM_ID:
+        await update.message.reply_text(i18n.t("reg_bot_admin_self", "ru"))
+        return
+    r = await asyncio.to_thread(db.reg_bind_telegram, code, user.id, user.username, user.full_name)
+    lang = ((r.get("req") or {}).get("language")) or "ru"
+    if not r["ok"]:
+        key = "reg_bot_tg_used" if r["error"] == "tg_used" else "reg_bot_invalid"
+        await update.message.reply_text(i18n.t(key, lang, link=_register_url(lang)))
+        return
+    kb = ReplyKeyboardMarkup([[KeyboardButton(i18n.t("reg_bot_share_btn", lang), request_contact=True)]],
+                             resize_keyboard=True, one_time_keyboard=True)
+    await update.message.reply_text(i18n.t("reg_bot_share", lang, shop=r["req"]["shop_name"]), reply_markup=kb)
+
+
+async def registration_code_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запасной путь: ссылка не открылась — человек прислал код с сайта."""
+    await registration_bind(update, context, (update.message.text or "").strip())
+
+
+async def registration_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    contact = update.message.contact
+    if not contact:
+        return
+    if contact.user_id != user.id:
+        await update.message.reply_text(i18n.t("reg_bot_not_own", "ru"))
+        return
+    r = await asyncio.to_thread(db.reg_set_contact, user.id, contact.phone_number)
+    if not r["ok"] and r["error"] == "no_request":
+        return  # номер прислали не в рамках регистрации — молча пропускаем
+    lang = ((r.get("req") or {}).get("language")) or "ru"
+    if not r["ok"]:
+        key = "reg_bot_phone_used" if r["error"] == "phone_used" else "reg_bot_tg_used"
+        await update.message.reply_text(i18n.t(key, lang), reply_markup=ReplyKeyboardRemove())
+        return
+    await update.message.reply_text(i18n.t("reg_bot_sent", lang), reply_markup=ReplyKeyboardRemove())
+    try:
+        await asyncio.to_thread(webapp.reg_notify_admin, r["req"])
+    except Exception as e:
+        logger.error(f"Не удалось отправить заявку {r['req']['id']} администратору: {e}")
+
+
+async def registration_decide_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Кнопки ✅/❌ под заявкой — только администратор платформы."""
+    query = update.callback_query
+    if not ADMIN_TELEGRAM_ID or query.from_user.id != ADMIN_TELEGRAM_ID:
+        await query.answer("Недоступно", show_alert=True)
+        return
+    try:
+        _, action, rid = query.data.split(":")
+        rid = int(rid)
+    except ValueError:
+        await query.answer()
+        return
+    r = await asyncio.to_thread(webapp.reg_decide, rid, action == "ok")
+    if r["ok"]:
+        if action == "ok":
+            await query.answer(f"Точка создана — пробный период до {webapp._fmt_day(r['shop'].get('paid_until'))}")
+        else:
+            await query.answer("Заявка отклонена")
+        return
+    if r.get("error") == "username_taken":
+        await query.answer("Логин уже занят другой точкой — отклоните заявку", show_alert=True)
+        return
+    await query.answer("Эта заявка уже обработана", show_alert=True)
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
 async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
     """Напоминания владельцам: подписка заканчивается через 5, 3, 1 день;
     сообщение о блокировке (и копия администратору платформы)."""
@@ -745,10 +831,11 @@ async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
         shop = item["shop"]
         lang = shop.get("language") or "ru"
         date = webapp._fmt_day(shop.get("paid_until"))
+        trial = bool(shop.get("trial"))
         if item["code"] == "blocked":
-            text = i18n.t("sub_bot_blocked", lang, date=date, link=link)
+            text = i18n.t("trial_bot_blocked" if trial else "sub_bot_blocked", lang, date=date, link=link)
         else:
-            text = i18n.t("sub_bot_d", lang, n=item["days_left"], date=date, link=link)
+            text = i18n.t("trial_bot_d" if trial else "sub_bot_d", lang, n=item["days_left"], date=date, link=link)
         if shop.get("notify_telegram_id"):
             try:
                 await context.bot.send_message(chat_id=shop["notify_telegram_id"], text=text)
@@ -758,8 +845,10 @@ async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(
                     chat_id=ADMIN_TELEGRAM_ID,
-                    text=f"🔒 Точка «{shop.get('shop_name') or shop['username']}» заблокирована за неоплату "
-                         f"(оплачено было до {date}).")
+                    text=(f"🔒 У точки «{shop.get('shop_name') or shop['username']}» закончился пробный период "
+                          f"({date}), оплаты нет." if trial else
+                          f"🔒 Точка «{shop.get('shop_name') or shop['username']}» заблокирована за неоплату "
+                          f"(оплачено было до {date})."))
             except Exception as e:
                 logger.warning(f"Не удалось сообщить администратору о блокировке: {e}")
         db.mark_sub_notice(shop["id"], item["key"])
@@ -889,6 +978,10 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(shop_info_pattern), shop_info_button))
     app.add_handler(CallbackQueryHandler(broadcast_confirm_callback, pattern="^bc_"))
     app.add_handler(CallbackQueryHandler(sub_payment_callback, pattern="^subpay:"))
+    app.add_handler(CallbackQueryHandler(registration_decide_callback, pattern="^reg:"))
+    app.add_handler(MessageHandler(filters.CONTACT, registration_contact))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\s*\d{8}\s*$"),
+                                   registration_code_text))
     app.add_handler(CallbackQueryHandler(reminder_button_callback))
 
     job_queue = app.job_queue

@@ -452,6 +452,7 @@ if ('serviceWorker' in navigator) {
   .lang-link { display:block; text-align:center; margin-top:14px; color:#9a9a9a; font-size:12px; text-decoration:none; }
   .forgot-link { display:block; text-align:center; margin-top:12px; color:#3a86ff; font-size:13px; background:none; border:none; cursor:pointer; padding:0; }
   .hint { font-size:12px; color:#7a7a7a; margin:-8px 0 14px; }
+  .reg-link { display:block; text-align:center; margin-top:16px; padding:11px; border:1px solid #2a2e37; border-radius:10px; color:#e6e6e6; font-size:14px; text-decoration:none; }
 </style>
 </head>
 <body>
@@ -470,6 +471,7 @@ if ('serviceWorker' in navigator) {
     <input name="password" type="password" required>
     <button type="submit">{{ T.login_button }}</button>
     <button type="button" class="forgot-link" onclick="showForgot()">{{ T.forgot_password_link }}</button>
+    <a class="reg-link" href="/register?lang={{ lang }}">{{ T.reg_link_login }}</a>
     <a class="lang-link" href="/login?lang={{ other_lang }}">{{ T.lang_switch }}</a>
   </form>
 
@@ -537,6 +539,288 @@ if ('serviceWorker' in navigator) {
       }
     }
   </script>
+</body>
+</html>
+"""
+
+
+REG_CITIES = {
+    "ru": ["Андижан", "Асака", "Ханабад", "Шахрихан", "Фергана", "Маргилан", "Коканд", "Кувасай",
+           "Наманган", "Чуст", "Чартак", "Ташкент"],
+    "uz": ["Andijon", "Asaka", "Xonobod", "Shahrixon", "Farg'ona", "Marg'ilon", "Qo'qon", "Quvasoy",
+           "Namangan", "Chust", "Chortoq", "Toshkent"],
+}
+
+REGISTER_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ T.reg_title }} — OilBook</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<meta name="theme-color" content="#0A2540">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0f1115; color:#f2f2f2; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+         min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 14px 40px; }
+  .brand { display:flex; align-items:center; gap:10px; margin:0 0 18px; }
+  .brand .wordmark { font-family:'Sora', -apple-system, sans-serif; font-weight:800; font-size:30px; letter-spacing:-1px; line-height:1; }
+  .wm-oil { background:linear-gradient(135deg, #38BDF8 0%, #3B82F6 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .wm-book { color:#fff; }
+  .box { background:#1a1d24; border:1px solid #2a2e37; border-radius:14px; padding:22px 18px; width:100%; max-width:420px; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  .step { font-size:12px; color:#3a86ff; font-weight:600; margin-bottom:6px; }
+  .intro { font-size:14px; color:#a9b0bd; margin:0 0 16px; line-height:1.5; }
+  label { display:block; font-size:14px; font-weight:600; color:#e6e6e6; margin:14px 0 5px; }
+  input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:16px; }
+  input:focus { outline:none; border-color:#3a86ff; }
+  input.bad { border-color:#dc6f6f; }
+  .hint { font-size:12.5px; color:#8b93a3; margin-top:5px; line-height:1.45; }
+  .ferr { font-size:13px; color:#ff8a8a; margin-top:5px; display:none; }
+  .ferr.on { display:block; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row2 label { margin-top:14px; }
+  button, .btn { display:block; width:100%; padding:13px; border:none; border-radius:10px; background:#3a86ff; color:#fff;
+                 font-size:16px; font-weight:600; cursor:pointer; text-align:center; text-decoration:none; margin-top:18px; }
+  button:disabled { opacity:.6; }
+  .btn-tg { background:#229ED9; }
+  .btn-ghost { background:transparent; border:1px solid #2a2e37; color:#cfd5df; }
+  .error { background:#3a1e1e; color:#ff9a9a; padding:10px; border-radius:8px; margin-top:14px; font-size:14px; display:none; }
+  .error.on { display:block; }
+  ol { margin:10px 0 0; padding-left:20px; color:#cfd5df; font-size:14px; line-height:1.7; }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size:26px; letter-spacing:4px; text-align:center;
+          background:#11141a; border:1px dashed #3a86ff; border-radius:10px; padding:10px; margin-top:8px; user-select:all; }
+  .wait { display:flex; align-items:center; gap:10px; margin-top:16px; font-size:14px; color:#cfd5df; }
+  .spin { width:18px; height:18px; border:2px solid #3a86ff; border-top-color:transparent; border-radius:50%; animation:sp 0.9s linear infinite; flex:none; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  .note { background:#16253f; color:#bcd4ff; border-radius:8px; padding:10px; font-size:13.5px; margin-top:14px; line-height:1.5; display:none; }
+  .note.on { display:block; }
+  .big { font-size:44px; text-align:center; margin:4px 0 8px; }
+  .links { text-align:center; margin-top:16px; font-size:13px; }
+  .links a { color:#8b93a3; text-decoration:none; display:block; margin-top:8px; }
+  .links a.pri { color:#3a86ff; }
+  .hp { position:absolute; left:-5000px; width:1px; height:1px; overflow:hidden; }
+</style>
+</head>
+<body>
+  <div class="brand"><div class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></div></div>
+
+  <form class="box" id="regForm" novalidate onsubmit="submitReg(event)">
+    <div class="step">{{ T.reg_step.format(n=1) }}</div>
+    <h1>{{ T.reg_title }}</h1>
+    <p class="intro">{{ T.reg_intro }}</p>
+
+    <label for="f_shop_name">{{ T.reg_shop_name }}</label>
+    <input id="f_shop_name" maxlength="80" placeholder="{{ T.reg_shop_name_ph }}" autocomplete="organization">
+    <div class="hint">{{ T.reg_shop_name_hint }}</div>
+    <div class="ferr" id="e_shop_name"></div>
+
+    <label for="f_owner_name">{{ T.reg_owner_name }}</label>
+    <input id="f_owner_name" maxlength="60" placeholder="{{ T.reg_owner_name_ph }}" autocomplete="name">
+    <div class="hint">{{ T.reg_owner_name_hint }}</div>
+    <div class="ferr" id="e_owner_name"></div>
+
+    <label for="f_city">{{ T.reg_city }}</label>
+    <input id="f_city" maxlength="40" list="cityList" placeholder="{{ T.reg_city_ph }}" autocomplete="off">
+    <datalist id="cityList">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
+    <div class="hint">{{ T.reg_city_hint }}</div>
+    <div class="ferr" id="e_city"></div>
+
+    <label for="f_phone">{{ T.reg_phone }}</label>
+    <input id="f_phone" type="tel" inputmode="tel" maxlength="20" placeholder="+998 90 123 45 67" autocomplete="tel">
+    <div class="hint">{{ T.reg_phone_hint }}</div>
+    <div class="ferr" id="e_phone"></div>
+
+    <label for="f_address">{{ T.reg_address }}</label>
+    <input id="f_address" maxlength="150" placeholder="{{ T.reg_address_ph }}" autocomplete="street-address">
+    <div class="hint">{{ T.reg_address_hint }}</div>
+    <div class="ferr" id="e_address"></div>
+
+    <label for="f_username">{{ T.reg_username }}</label>
+    <input id="f_username" maxlength="30" placeholder="{{ T.reg_username_ph }}" autocomplete="username"
+           autocapitalize="none" autocorrect="off" spellcheck="false">
+    <div class="hint">{{ T.reg_username_hint }}</div>
+    <div class="ferr" id="e_username"></div>
+
+    <label for="f_password">{{ T.reg_password }}</label>
+    <input id="f_password" type="password" maxlength="100" autocomplete="new-password">
+    <div class="hint">{{ T.reg_password_hint }}</div>
+    <div class="ferr" id="e_password"></div>
+
+    <label for="f_password2">{{ T.reg_password2 }}</label>
+    <input id="f_password2" type="password" maxlength="100" autocomplete="new-password">
+    <div class="ferr" id="e_password2"></div>
+
+    <div class="hp" aria-hidden="true"><input id="f_website" tabindex="-1" autocomplete="off"></div>
+
+    <div class="error" id="formErr"></div>
+    <button type="submit" id="submitBtn">{{ T.reg_submit }}</button>
+    <div class="links">
+      <a class="pri" href="/login?lang={{ lang }}">{{ T.reg_back_login }}</a>
+      <a href="/register?lang={{ other_lang }}">{{ T.lang_switch }}</a>
+    </div>
+  </form>
+
+  <div class="box" id="tgBox" style="display:none;">
+    <div class="step">{{ T.reg_step.format(n=2) }}</div>
+    <h1>{{ T.reg_tg_title }}</h1>
+    <p class="intro">{{ T.reg_tg_why }}</p>
+    <ol>
+      <li>{{ T.reg_tg_step1 }}</li>
+      <li>{{ T.reg_tg_step2 }}</li>
+      <li>{{ T.reg_tg_step3 }}</li>
+    </ol>
+    <a class="btn btn-tg" id="tgLink" href="#" target="_blank" rel="noopener">{{ T.reg_tg_btn }}</a>
+    <div class="note" id="tgBound">{{ T.reg_tg_bound }}</div>
+    <div class="wait"><div class="spin"></div><span>{{ T.reg_tg_wait }}</span></div>
+    <p class="hint" style="margin-top:18px;">{{ T.reg_tg_fallback.format(bot=bot_username) }}</p>
+    <div class="code" id="tgCode">—</div>
+    <p class="hint">{{ T.reg_tg_expires }}</p>
+  </div>
+
+  <div class="box" id="doneBox" style="display:none;">
+    <div class="big" id="doneIcon">✅</div>
+    <h1 id="doneTitle" style="text-align:center;"></h1>
+    <p class="intro" id="doneText" style="text-align:center;"></p>
+    <a class="btn" id="doneBtn" href="/login?lang={{ lang }}" style="display:none;">{{ T.reg_approved_btn }}</a>
+    <a class="btn btn-ghost" id="againBtn" href="/register?lang={{ lang }}" style="display:none;">{{ T.reg_again }}</a>
+  </div>
+
+<script>
+const LANG = {{ lang|tojson }};
+const TX = {
+  sent_title: {{ T.reg_sent_title|tojson }}, sent_text: {{ T.reg_sent_text|tojson }},
+  ok_title: {{ T.reg_approved_title|tojson }}, ok_text: {{ T.reg_approved_text|tojson }},
+  no_title: {{ T.reg_rejected_title|tojson }}, no_text: {{ T.reg_rejected_text|tojson }},
+  exp_title: {{ T.reg_expired_title|tojson }}, exp_text: {{ T.reg_expired_text|tojson }},
+  e_shop_name: {{ T.reg_err_shop_name|tojson }}, e_owner_name: {{ T.reg_err_owner_name|tojson }},
+  e_city: {{ T.reg_err_city|tojson }}, e_phone: {{ T.reg_err_phone|tojson }},
+  e_address: {{ T.reg_err_address|tojson }}, e_username: {{ T.reg_err_username|tojson }},
+  e_password: {{ T.reg_err_password|tojson }}, e_password2: {{ T.reg_err_password2|tojson }},
+  e_network: {{ T.reg_err_network|tojson }}
+};
+const FIELDS = ['shop_name', 'owner_name', 'city', 'phone', 'address', 'username', 'password', 'password2'];
+let regToken = null, pollTimer = null, sending = false;
+
+function val(id) { return document.getElementById('f_' + id).value.trim(); }
+function setErr(f, text) {
+  const e = document.getElementById('e_' + f), inp = document.getElementById('f_' + f);
+  if (!e) return;
+  e.textContent = text || '';
+  e.classList.toggle('on', !!text);
+  if (inp) inp.classList.toggle('bad', !!text);
+}
+function phoneDigits(v) {
+  let d = String(v || '').replace(/[^0-9]/g, '');
+  if (d.length === 9) d = '998' + d;
+  return d;
+}
+function checkForm() {
+  const bad = {};
+  const sn = val('shop_name');
+  if (sn.length < 2 || sn.length > 80) bad.shop_name = TX.e_shop_name;
+  if (val('owner_name').length < 2) bad.owner_name = TX.e_owner_name;
+  if (val('city').length < 2) bad.city = TX.e_city;
+  const pd = phoneDigits(val('phone'));
+  if (pd.length !== 12 || pd.slice(0, 3) !== '998') bad.phone = TX.e_phone;
+  if (val('address').length < 3) bad.address = TX.e_address;
+  if (!/^[A-Za-z0-9_]{3,30}$/.test(val('username'))) bad.username = TX.e_username;
+  const pw = document.getElementById('f_password').value;
+  if (pw.length < 6) bad.password = TX.e_password;
+  else if (pw !== document.getElementById('f_password2').value) bad.password2 = TX.e_password2;
+  FIELDS.forEach(f => setErr(f, bad[f]));
+  const first = FIELDS.find(f => bad[f]);
+  if (first) document.getElementById('f_' + first).focus();
+  return !first;
+}
+FIELDS.forEach(f => {
+  const el = document.getElementById('f_' + f);
+  el.addEventListener('input', () => setErr(f, ''));
+  el.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter') return;
+    const i = FIELDS.indexOf(f);
+    if (i < FIELDS.length - 1) { ev.preventDefault(); document.getElementById('f_' + FIELDS[i + 1]).focus(); }
+  });
+});
+
+async function submitReg(ev) {
+  ev.preventDefault();
+  if (sending) return;
+  const err = document.getElementById('formErr');
+  err.classList.remove('on');
+  if (!checkForm()) return;
+  sending = true;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  const body = { lang: LANG, website: document.getElementById('f_website').value };
+  FIELDS.forEach(f => { body[f] = f.indexOf('password') === 0 ? document.getElementById('f_' + f).value : val(f); });
+  try {
+    const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!data.ok) {
+      if (data.field) { setErr(data.field, data.error); document.getElementById('f_' + data.field).focus(); }
+      else { err.textContent = data.error || TX.e_network; err.classList.add('on'); }
+      return;
+    }
+    regToken = data.token;
+    try { history.replaceState(null, '', '/register?lang=' + LANG + '&t=' + encodeURIComponent(regToken)); } catch (e) {}
+    showStatus(data);
+  } catch (e) {
+    err.textContent = TX.e_network; err.classList.add('on');
+  } finally {
+    sending = false; btn.disabled = false;
+  }
+}
+
+function show(id) {
+  ['regForm', 'tgBox', 'doneBox'].forEach(b => { document.getElementById(b).style.display = b === id ? '' : 'none'; });
+  window.scrollTo(0, 0);
+}
+function showDone(icon, title, text, loginBtn, againBtn) {
+  document.getElementById('doneIcon').textContent = icon;
+  document.getElementById('doneTitle').textContent = title;
+  document.getElementById('doneText').textContent = text;
+  document.getElementById('doneBtn').style.display = loginBtn ? '' : 'none';
+  document.getElementById('againBtn').style.display = againBtn ? '' : 'none';
+  show('doneBox');
+}
+function showStatus(d) {
+  const st = d.status;
+  if (st === 'new') {
+    if (d.bot_link) document.getElementById('tgLink').href = d.bot_link;
+    document.getElementById('tgCode').textContent = d.code || '—';
+    document.getElementById('tgBound').classList.toggle('on', !!d.tg_bound);
+    if (document.getElementById('tgBox').style.display === 'none') show('tgBox');
+    startPoll();
+    return;
+  }
+  stopPoll();
+  if (st === 'pending') showDone('📨', TX.sent_title, TX.sent_text, false, false);
+  else if (st === 'approved') showDone('🎉', TX.ok_title, TX.ok_text, true, false);
+  else if (st === 'rejected') showDone('✖️', TX.no_title, TX.no_text, false, false);
+  else showDone('⌛', TX.exp_title, TX.exp_text, false, true);
+}
+async function poll() {
+  if (!regToken) return;
+  try {
+    const res = await fetch('/api/register/status?t=' + encodeURIComponent(regToken));
+    const d = await res.json();
+    if (d.ok) showStatus(d);
+    else if (d.status) showStatus(d);
+  } catch (e) {}
+}
+function startPoll() { if (!pollTimer) pollTimer = setInterval(poll, 3000); }
+function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && regToken) poll(); });
+
+(function init() {
+  const t = new URLSearchParams(location.search).get('t');
+  if (t) { regToken = t; poll(); }
+})();
+</script>
 </body>
 </html>
 """
@@ -10745,6 +11029,20 @@ if ('serviceWorker' in navigator) {
     <div class="adm-stat"><b>—</b><span>клиентов</span></div>
   </div>
 
+  <details class="adm-sec" id="secReg">
+    <summary>
+      <span class="ic" style="background:#EFF6FF; color:#1D4ED8;"><i class="fa-solid fa-user-plus"></i></span>
+      <span>Заявки на регистрацию<span class="sub" id="regSecSub">точки, которые зарегистрировались сами</span></span>
+      <i class="fa-solid fa-chevron-down chev"></i>
+    </summary>
+    <div class="sec-body">
+      <div id="regPending"><div class="hint-text">Загружаю…</div></div>
+      <div style="font-weight:700; font-size:13px; margin:14px 0 8px;">Последние решения</div>
+      <div id="regDone"></div>
+      <div class="hint-text" style="margin-top:10px;">Ссылка для владельцев точек: <b id="regLink"></b></div>
+    </div>
+  </details>
+
   <details class="adm-sec" id="secAdd">
     <summary>
       <span class="ic" style="background:#ECFDF5; color:#059669;"><i class="fa-solid fa-plus"></i></span>
@@ -10879,6 +11177,7 @@ if ('serviceWorker' in navigator) {
     <button data-f="check" onclick="setShopFilter('check')">Чек ждёт</button>
     <button data-f="life" onclick="setShopFilter('life')">∞ Бессрочные</button>
     <button data-f="unset" onclick="setShopFilter('unset')">Без даты</button>
+    <button data-f="trial" onclick="setShopFilter('trial')">🎁 Пробные</button>
   </div>
   <div id="shops-body"></div>
   </div>
@@ -11000,6 +11299,8 @@ function renderSubBlock(s) {
   let pill, cls = '';
   if (u.lifetime) pill = '<span class="sub-pill life">∞ бессрочная</span>';
   else if (!u.paid_until) pill = '<span class="sub-pill unset">без даты — работает</span>';
+  else if (u.trial && u.expired) { pill = `<span class="sub-pill bad">пробный закончился ${fmtDay(u.paid_until)}</span>`; cls = 'bad'; }
+  else if (u.trial) { pill = `<span class="sub-pill warn">🎁 пробный · ${u.days_left === 0 ? 'последний день' : 'осталось ' + (u.days_left + 1) + ' дн.'}</span>`; }
   else if (u.expired) { pill = `<span class="sub-pill bad">заблокирована с ${fmtDay(addDays(u.paid_until, 1))}</span>`; cls = 'bad'; }
   else if (u.days_left <= 5) { pill = `<span class="sub-pill warn">${u.days_left === 0 ? 'сегодня последний день' : 'осталось ' + u.days_left + ' дн.'}</span>`; cls = 'warn'; }
   else pill = '<span class="sub-pill ok">оплачено</span>';
@@ -11031,6 +11332,56 @@ function renderSubBlock(s) {
       ${chk}${br}
       <div class="sc-sub-btns">${btns}</div>
     </div>`;
+}
+
+
+function regCard(r, withButtons) {
+  const tgPh = r.tg_phone || '—';
+  const same = r.tg_phone && r.phone && r.tg_phone.replace(/[^0-9]/g, '') === r.phone.replace(/[^0-9]/g, '');
+  const tg = r.tg_username ? '@' + r.tg_username : 'без @username';
+  const st = r.status === 'approved' ? '<span class="sub-pill ok">одобрена</span>'
+           : r.status === 'rejected' ? '<span class="sub-pill unset">отклонена</span>' : '';
+  const lines = [
+    `<b>${escapeHtml(r.shop_name)}</b> ${st}`,
+    `Владелец: ${escapeHtml(r.owner_name || '—')} · ${escapeHtml(r.city || '')}`,
+    `Адрес: ${escapeHtml(r.address || '—')}`,
+    `Телефон: ${escapeHtml(r.phone || '—')} · в Telegram: ${escapeHtml(tgPh)} ${r.tg_phone ? (same ? '✅' : '⚠️ отличается') : ''}`,
+    `Telegram: ${escapeHtml(tg)} · ${escapeHtml(r.tg_name || '')}`,
+    `Логин: <b>${escapeHtml(r.username)}</b> · язык ${escapeHtml((r.language || 'ru').toUpperCase())}`,
+  ];
+  const when = withButtons ? `подтверждена ${escapeHtml(r.confirmed_at || r.created_at || '')}` : `решение ${escapeHtml(r.decided_at || '')}`;
+  return `<div class="pay-item"><div class="pay-cap" style="white-space:normal; line-height:1.6;">${lines.join('<br>')}</div>
+    <div class="hint-text" style="margin-top:4px;">№${r.id} · ${when}</div>
+    ${withButtons ? `<div class="pay-act">
+      <button class="ok" onclick="decideReg(${r.id}, 1)">✅ Одобрить (14 дней)</button>
+      <button class="no" onclick="decideReg(${r.id}, 0)">❌ Отклонить</button></div>` : ''}
+  </div>`;
+}
+
+async function loadRegs() {
+  try {
+    const res = await fetch('/api/admin/registrations');
+    const d = await res.json();
+    if (!d.ok) return;
+    const pend = d.pending || [], done = d.done || [];
+    document.getElementById('regPending').innerHTML = pend.length ? pend.map(r => regCard(r, true)).join('')
+      : '<div class="hint-text">Новых заявок нет.</div>';
+    document.getElementById('regDone').innerHTML = done.length ? done.map(r => regCard(r, false)).join('')
+      : '<div class="hint-text">Пока пусто.</div>';
+    document.getElementById('regSecSub').textContent = pend.length ? `ждут решения: ${pend.length}` : 'точки, которые зарегистрировались сами';
+    document.getElementById('regLink').textContent = location.origin + '/register';
+    const sec = document.getElementById('secReg');
+    if (pend.length && !sec.dataset.autoOpened) { sec.open = true; sec.dataset.autoOpened = '1'; }
+  } catch (e) {}
+}
+
+async function decideReg(id, ok) {
+  if (!ok && !confirm('Отклонить заявку? Человеку придёт сообщение в Telegram.')) return;
+  const res = await fetch(`/api/admin/registrations/${id}/${ok ? 'approve' : 'reject'}`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) showMsg(ok ? `✅ Точка создана, пробный период до ${fmtDay(data.paid_until)}` : 'Заявка отклонена', true);
+  else showMsg('Ошибка: ' + data.error, false);
+  loadRegs(); loadShops();
 }
 
 function addDays(day, n) {
@@ -11316,7 +11667,8 @@ function filterShops() {
       (shopFilter === 'soon' && s.sub && !s.sub.lifetime && s.sub.days_left !== null && s.sub.days_left >= 0 && s.sub.days_left <= 5) ||
       (shopFilter === 'check' && s.sub && s.sub.pending_payment) ||
       (shopFilter === 'life' && s.sub && s.sub.lifetime) ||
-      (shopFilter === 'unset' && s.sub && !s.sub.lifetime && !s.sub.paid_until))
+      (shopFilter === 'unset' && s.sub && !s.sub.lifetime && !s.sub.paid_until) ||
+      (shopFilter === 'trial' && s.sub && s.sub.trial))
   );
   renderShopsTable(filtered);
 }
@@ -11904,9 +12256,11 @@ guardOnce(['createShop', 'createBranch', 'createEmployee', 'saveBranchEdit', 'de
   'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
   'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField',
   'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings',
-  'subPrice', 'editPayAmount', 'cancelPayment']);
+  'subPrice', 'editPayAmount', 'cancelPayment', 'decideReg']);
 loadShops();
 loadSubPanel();
+loadRegs();
+setInterval(() => { if (!document.hidden) loadRegs(); }, 60000);
 // ---------- Карта точек с аналитикой ----------
 let MAP = null, MAPDATA = null, mapLayer = null, mapDays = 30, mapMetric = 'count', mapFilt = 'all', mapGroupSel = '';
 let mapMarkers = {}, mapPickId = null, mapFitted = false, mapSaving = false, leafletPromise = null;
@@ -13485,6 +13839,13 @@ def _sub_banner(shop):
     T = g.T
     owner = _is_sub_owner()
     n = st.get("days_left")
+    if st.get("trial") and n is not None and n >= 0:
+        # пробный период — плашка видна все 14 дней, владельцу — со ссылкой на оплату
+        if owner:
+            text = T["trial_banner_today"] if n == 0 else T["trial_banner_owner"].format(n=n + 1)
+        else:
+            text = T["trial_banner_staff_today"] if n == 0 else T["trial_banner_staff"].format(n=n + 1)
+        return {"text": text, "link": owner}
     if not st.get("lifetime") and n is not None and 0 <= n <= 5:
         if owner:
             text = T["sub_banner_today"] if n == 0 else T["sub_banner_owner"].format(n=n)
@@ -13786,6 +14147,7 @@ def _admin_sub_summary(shop: dict) -> dict:
         "custom_price": q.get("custom_price"),
         "lifetime_payment": life,
         "lifetime": st["lifetime"], "paid_until": st["paid_until"], "days_left": st["days_left"],
+        "trial": st.get("trial", False), "self_registered": bool(shop.get("self_registered")),
         "expired": st["expired"], "monthly": q["monthly"], "branch_count": q["branch_count"],
         "pending_branches": len(q["pending_branches"]),
         "pending_payment": {"id": pend["id"], "amount": pend["amount"], "kind": pend["kind"],
@@ -14244,6 +14606,177 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 </body>
 </html>
 """
+
+
+# ---------- Самостоятельная регистрация точки ----------
+# Форма /register → подтверждение Telegram и номера в боте (bot.py) →
+# заявка администратору с кнопками ✅/❌ → точка с пробным периодом.
+
+_REG_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,30}$")
+
+
+def _reg_lang():
+    lang = request.args.get("lang") or ""
+    return lang if lang in ("ru", "uz") else "ru"
+
+
+@app.route("/register")
+def register_page():
+    lang = _reg_lang()
+    return render_template_string(
+        REGISTER_PAGE, T=i18n.get_texts(lang), lang=lang, other_lang="uz" if lang == "ru" else "ru",
+        cities=REG_CITIES[lang], bot_username=BOT_USERNAME or "OilBook")
+
+
+def _reg_status_payload(req: dict) -> dict:
+    out = {"ok": True, "status": req["status"], "token": req["token"]}
+    if req["status"] == "new":
+        out["code"] = req["code"]
+        out["bot_link"] = _client_link(f"reg_{req['code']}")
+        out["tg_bound"] = bool(req.get("tg_id"))
+    return out
+
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    data = request.get_json(force=True, silent=True) or {}
+    lang = data.get("lang") if data.get("lang") in ("ru", "uz") else "ru"
+    T = i18n.get_texts(lang)
+
+    def bad(field, key, code=400):
+        return jsonify({"ok": False, "field": field, "error": T[key]}), code
+
+    if not BOT_USERNAME or not BOT_TOKEN:
+        return jsonify({"ok": False, "error": T["reg_err_unavailable"]}), 503
+    if data.get("website"):  # невидимое поле — его заполняют только спам-боты
+        return jsonify({"ok": False, "error": T["reg_err_network"]}), 400
+
+    def s(k, n):
+        return re.sub(r"\s+", " ", str(data.get(k) or "")).strip()[:n]
+
+    shop_name, owner_name, city = s("shop_name", 80), s("owner_name", 60), s("city", 40)
+    address, username = s("address", 150), s("username", 30)
+    password, password2 = str(data.get("password") or ""), str(data.get("password2") or "")
+    digits = "".join(ch for ch in str(data.get("phone") or "") if ch.isdigit())
+    if len(digits) == 9:
+        digits = "998" + digits
+    if len(shop_name) < 2:
+        return bad("shop_name", "reg_err_shop_name")
+    if len(owner_name) < 2:
+        return bad("owner_name", "reg_err_owner_name")
+    if len(city) < 2:
+        return bad("city", "reg_err_city")
+    if len(digits) != 12 or not digits.startswith("998"):
+        return bad("phone", "reg_err_phone")
+    if len(address) < 3:
+        return bad("address", "reg_err_address")
+    if not _REG_USERNAME_RE.match(username):
+        return bad("username", "reg_err_username")
+    if len(password) < 6 or len(password) > 100:
+        return bad("password", "reg_err_password")
+    if password != password2:
+        return bad("password2", "reg_err_password2")
+    ip = _client_ip()
+    if db.registrations_from_ip_today(ip) >= db.REG_MAX_PER_IP_DAY:
+        return jsonify({"ok": False, "error": T["reg_err_limit"]}), 429
+    if db.registration_login_taken(username):
+        return bad("username", "reg_err_username_taken")
+    phone = f"+{digits[:3]} {digits[3:5]} {digits[5:8]} {digits[8:10]} {digits[10:12]}"
+    req = db.create_registration(shop_name, owner_name, city, phone, address, username, password, lang, ip)
+    return jsonify(_reg_status_payload(req))
+
+
+@app.route("/api/register/status")
+def api_register_status():
+    req = db.get_registration_by_token((request.args.get("t") or "").strip())
+    if not req:
+        return jsonify({"ok": False, "status": "expired"}), 404
+    return jsonify(_reg_status_payload(req))
+
+
+def _reg_admin_text(req: dict) -> str:
+    tg = f"@{req['tg_username']}" if req.get("tg_username") else "без @username"
+    same = ""
+    if req.get("tg_phone") and req.get("phone"):
+        same = (" ✅ совпадает" if db._phone_digits(req["tg_phone"]) == db._phone_digits(req["phone"])
+                else " ⚠️ отличается от формы")
+    return "\n".join([
+        f"🆕 Заявка на регистрацию №{req['id']}",
+        "",
+        f"Точка: {req['shop_name']}",
+        f"Владелец: {req.get('owner_name') or '—'}",
+        f"Город: {req.get('city') or '—'}",
+        f"Адрес: {req.get('address') or '—'}",
+        f"Телефон в форме: {req.get('phone') or '—'}",
+        f"Телефон Telegram: {req.get('tg_phone') or '—'}{same}",
+        f"Telegram: {tg} · {req.get('tg_name') or ''} · ID {req.get('tg_id')}",
+        f"Логин: {req['username']}",
+        f"Язык: {(req.get('language') or 'ru').upper()}",
+    ])
+
+
+def reg_notify_admin(req: dict):
+    """Заявка подтверждена в боте — администратору платформы с кнопками."""
+    if not ADMIN_TELEGRAM_ID:
+        return None
+    markup = json.dumps({"inline_keyboard": [[
+        {"text": f"✅ Одобрить ({db.REG_TRIAL_DAYS} дн. бесплатно)", "callback_data": f"reg:ok:{req['id']}"},
+        {"text": "❌ Отклонить", "callback_data": f"reg:no:{req['id']}"},
+    ]]})
+    res = _tg_api("sendMessage", {"chat_id": ADMIN_TELEGRAM_ID, "text": _reg_admin_text(req), "reply_markup": markup})
+    if res and res.get("message_id"):
+        db.set_registration_admin_msg(req["id"], res["message_id"])
+    return res
+
+
+def reg_decide(req_id: int, approve: bool) -> dict:
+    """Единое решение по заявке — и из админки, и из кнопок в Telegram."""
+    r = db.approve_registration(req_id) if approve else db.reject_registration(req_id)
+    req = r.get("req")
+    if not r["ok"]:
+        return r
+    shop = r.get("shop")
+    if req.get("admin_msg_id") and ADMIN_TELEGRAM_ID:
+        mark = (f"✅ Одобрено — точка создана, пробный период до {_fmt_day(shop.get('paid_until'))}"
+                if approve else "❌ Отклонено")
+        _tg_api("editMessageText", {"chat_id": ADMIN_TELEGRAM_ID, "message_id": req["admin_msg_id"],
+                                    "text": _reg_admin_text(req) + "\n\n" + mark})
+    if req.get("tg_id"):
+        lang = req.get("language") or "ru"
+        if approve:
+            link = (PUBLIC_URL.rstrip("/") + "/login") if PUBLIC_URL else "/login"
+            if lang == "uz":
+                link += "?lang=uz"
+            text = i18n.t("reg_bot_approved", lang, shop=req["shop_name"], date=_fmt_day(shop.get("paid_until")),
+                          login=req["username"], link=link)
+        else:
+            text = i18n.t("reg_bot_rejected", lang, shop=req["shop_name"])
+        # убираем кнопку «Поделиться номером», если она ещё висит
+        _tg_api("sendMessage", {"chat_id": req["tg_id"], "text": text,
+                                "reply_markup": json.dumps({"remove_keyboard": True})})
+    return r
+
+
+@app.route("/api/admin/registrations")
+@admin_required
+def api_admin_registrations():
+    return jsonify({"ok": True, **db.list_registrations()})
+
+
+@app.route("/api/admin/registrations/<int:req_id>/<action>", methods=["POST"])
+@admin_required
+def api_admin_registration_decide(req_id, action):
+    if action not in ("approve", "reject"):
+        return jsonify({"ok": False, "error": "неизвестное действие"}), 400
+    r = reg_decide(req_id, action == "approve")
+    if not r["ok"]:
+        err = {"done": "заявка уже обработана",
+               "username_taken": "логин уже занят другой точкой — отклоните заявку"}.get(r.get("error"), "ошибка")
+        return jsonify({"ok": False, "error": err}), 400
+    out = {"ok": True}
+    if r.get("shop"):
+        out.update(shop_id=r["shop"]["id"], paid_until=r["shop"].get("paid_until"))
+    return jsonify(out)
 
 
 def run_webapp():
