@@ -741,7 +741,8 @@ async def sub_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ============ САМОСТОЯТЕЛЬНАЯ РЕГИСТРАЦИЯ ТОЧКИ ============
 # Владелец заполнил форму на сайте → пришёл сюда по ссылке (или прислал
-# 8-значный код) → делится своим номером → заявка уходит администратору.
+# 8-значный код) → делится своим номером → отправляет локацию точки →
+# заявка уходит администратору.
 
 def _register_url(lang: str = "ru") -> str:
     base = (webapp.PUBLIC_URL.rstrip("/") + "/register") if webapp.PUBLIC_URL else "/register"
@@ -785,7 +786,31 @@ async def registration_contact(update: Update, context: ContextTypes.DEFAULT_TYP
         key = "reg_bot_phone_used" if r["error"] == "phone_used" else "reg_bot_tg_used"
         await update.message.reply_text(i18n.t(key, lang), reply_markup=ReplyKeyboardRemove())
         return
-    await update.message.reply_text(i18n.t("reg_bot_sent", lang), reply_markup=ReplyKeyboardRemove())
+    kb = ReplyKeyboardMarkup([[KeyboardButton(i18n.t("reg_bot_location_btn", lang), request_location=True)]],
+                             resize_keyboard=True, one_time_keyboard=True)
+    await update.message.reply_text(i18n.t("reg_bot_location", lang), reply_markup=kb)
+
+
+async def registration_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Локация точки — кнопкой (где человек сейчас) или через 📎 → Геопозиция."""
+    msg = update.message
+    loc = msg.location if msg else None
+    if not loc:
+        return
+    user = update.effective_user
+    r = await asyncio.to_thread(db.reg_set_location, user.id, loc.latitude, loc.longitude)
+    if not r["ok"] and r["error"] in ("no_request", "bad_location"):
+        return  # локацию прислали не в рамках регистрации — молча пропускаем
+    lang = ((r.get("req") or {}).get("language")) or "ru"
+    if not r["ok"]:
+        if r["error"] == "need_phone":
+            kb = ReplyKeyboardMarkup([[KeyboardButton(i18n.t("reg_bot_share_btn", lang), request_contact=True)]],
+                                     resize_keyboard=True, one_time_keyboard=True)
+            await msg.reply_text(i18n.t("reg_bot_need_phone", lang), reply_markup=kb)
+        else:
+            await msg.reply_text(i18n.t("reg_bot_tg_used", lang), reply_markup=ReplyKeyboardRemove())
+        return
+    await msg.reply_text(i18n.t("reg_bot_sent", lang), reply_markup=ReplyKeyboardRemove())
     try:
         await asyncio.to_thread(webapp.reg_notify_admin, r["req"])
     except Exception as e:
@@ -980,6 +1005,7 @@ def main():
     app.add_handler(CallbackQueryHandler(sub_payment_callback, pattern="^subpay:"))
     app.add_handler(CallbackQueryHandler(registration_decide_callback, pattern="^reg:"))
     app.add_handler(MessageHandler(filters.CONTACT, registration_contact))
+    app.add_handler(MessageHandler(filters.LOCATION, registration_location))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\s*\d{8}\s*$"),
                                    registration_code_text))
     app.add_handler(CallbackQueryHandler(reminder_button_callback))

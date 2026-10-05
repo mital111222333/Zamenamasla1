@@ -2136,10 +2136,11 @@ RU.update({
     "reg_submit": "Продолжить",
     "reg_step": "Шаг {n} из 2",
     "reg_tg_title": "Подтвердите через Telegram",
-    "reg_tg_why": "Telegram нужен, чтобы получать уведомления, отчёты и восстанавливать пароль. Искать свой Telegram ID не нужно — бот определит его сам.",
+    "reg_tg_why": "Telegram нужен, чтобы получать уведомления, отчёты и восстанавливать пароль. Искать свой Telegram ID не нужно — бот определит его сам. В нём же вы отправите локацию точки.",
     "reg_tg_step1": "Нажмите кнопку ниже — откроется бот OilBook.",
     "reg_tg_step2": "Нажмите «Старт» (или «Запустить»).",
     "reg_tg_step3": "Нажмите кнопку «📱 Поделиться номером» внизу чата.",
+    "reg_tg_step4": "Отправьте локацию точки: кнопкой «📍 Отправить локацию точки», если вы сейчас на точке, или через 📎 → «Геопозиция», выбрав место на карте.",
     "reg_tg_btn": "Открыть Telegram и подтвердить",
     "reg_tg_fallback": "Кнопка не открыла Telegram? Найдите в Telegram бота @{bot}, нажмите «Старт» и отправьте ему этот код:",
     "reg_tg_wait": "Ждём подтверждения в Telegram…",
@@ -2210,10 +2211,11 @@ UZ.update({
     "reg_submit": "Davom etish",
     "reg_step": "{n}-qadam, jami 2",
     "reg_tg_title": "Telegram orqali tasdiqlang",
-    "reg_tg_why": "Telegram bildirishnomalar, hisobotlar olish va parolni tiklash uchun kerak. Telegram ID'ingizni qidirish shart emas — bot uni o'zi aniqlaydi.",
+    "reg_tg_why": "Telegram bildirishnomalar, hisobotlar olish va parolni tiklash uchun kerak. Telegram ID'ingizni qidirish shart emas — bot uni o'zi aniqlaydi. Nuqta lokatsiyasini ham shu yerda yuborasiz.",
     "reg_tg_step1": "Pastdagi tugmani bosing — OilBook boti ochiladi.",
     "reg_tg_step2": "«Start» (yoki «Boshlash») tugmasini bosing.",
     "reg_tg_step3": "Chat pastidagi «📱 Raqamni yuborish» tugmasini bosing.",
+    "reg_tg_step4": "Nuqta lokatsiyasini yuboring: hozir nuqtada bo'lsangiz — «📍 Nuqta lokatsiyasini yuborish» tugmasi bilan, bo'lmasangiz — 📎 → «Joylashuv» orqali xaritadan joyni tanlab.",
     "reg_tg_btn": "Telegram'ni ochib tasdiqlash",
     "reg_tg_fallback": "Tugma Telegram'ni ochmadimi? Telegram'da @{bot} botini toping, «Start»ni bosing va unga ushbu kodni yuboring:",
     "reg_tg_wait": "Telegram'dagi tasdiqni kutyapmiz…",
@@ -2260,3 +2262,21 @@ RU.update({"reg_tg_bound": "Бот открыт — теперь нажмите 
            "reg_bot_admin_self": "Это ваш аккаунт администратора — для проверки регистрации используйте другой Telegram."})
 UZ.update({"reg_tg_bound": "Bot ochildi — endi Telegram'da «📱 Raqamni yuborish» tugmasini bosing.",
            "reg_bot_admin_self": "Bu administrator akkaunti — ro'yxatdan o'tishni sinash uchun boshqa Telegram'dan foydalaning."})
+
+# --- Регистрация: локация точки через Telegram ---
+RU.update({
+    "reg_location": "Локация точки",
+    "reg_location_hint": "Её вы отправите через Telegram на следующем шаге — так проще всего: можно отправить место, где вы сейчас, или выбрать точку на карте. По локации клиенты найдут вас на карте и смогут построить маршрут.",
+    "reg_tg_phone_ok": "Номер подтверждён ✅ Теперь отправьте в Telegram локацию точки.",
+    "reg_bot_location": "Номер подтверждён ✅\n\nТеперь отправьте локацию точки — по ней клиенты найдут вас на карте.\n\n• Вы сейчас на точке? Нажмите кнопку «📍 Отправить локацию точки» внизу.\n• Вы не на точке? Нажмите 📎 (скрепка) → «Геопозиция» → передвиньте метку на вашу точку → «Отправить».",
+    "reg_bot_location_btn": "📍 Отправить локацию точки",
+    "reg_bot_need_phone": "Сначала нажмите кнопку «📱 Поделиться номером» внизу — потом отправите локацию.",
+})
+UZ.update({
+    "reg_location": "Nuqta lokatsiyasi",
+    "reg_location_hint": "Uni keyingi qadamda Telegram orqali yuborasiz — bu eng oson yo'l: hozir turgan joyingizni yuborishingiz yoki xaritadan nuqtani tanlashingiz mumkin. Lokatsiya bo'yicha mijozlar sizni xaritada topadi va yo'l quradi.",
+    "reg_tg_phone_ok": "Raqam tasdiqlandi ✅ Endi Telegram'da nuqta lokatsiyasini yuboring.",
+    "reg_bot_location": "Raqam tasdiqlandi ✅\n\nEndi nuqta lokatsiyasini yuboring — mijozlar sizni xaritada shu bo'yicha topadi.\n\n• Hozir nuqtadamisiz? Pastdagi «📍 Nuqta lokatsiyasini yuborish» tugmasini bosing.\n• Nuqtada emasmisiz? 📎 (qisqich) → «Joylashuv» → belgini nuqtangizga suring → «Yuborish».",
+    "reg_bot_location_btn": "📍 Nuqta lokatsiyasini yuborish",
+    "reg_bot_need_phone": "Avval pastdagi «📱 Raqamni yuborish» tugmasini bosing — keyin lokatsiyani yuborasiz.",
+})

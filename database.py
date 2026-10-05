@@ -5899,8 +5899,9 @@ def course_progress(shop_id: int, user_key: str) -> dict:
 # Владелец сам заполняет форму на /register → подтверждает Telegram и номер
 # телефона через бота → админ платформы одобряет кнопкой в Telegram или в
 # админке → создаётся самостоятельная точка с пробным периодом.
-#   status: new      — форма заполнена, Telegram ещё не подтверждён
-#           pending  — Telegram и номер подтверждены, ждёт решения админа
+#   status: new      — форма заполнена, в боте ещё не всё подтверждено
+#                      (по шагам: tg_id → tg_phone → lat/lon)
+#           pending  — Telegram, номер и локация есть, ждёт решения админа
 #           approved — точка создана (shop_id)
 #           rejected — отклонена
 #           expired  — Telegram не подтвердили вовремя
@@ -5943,6 +5944,10 @@ def _migrate_registration(conn):
         decided_at TEXT
     )
     """)
+    reg_cols = {row["name"] for row in conn.execute("PRAGMA table_info(registration_requests)").fetchall()}
+    for col in ("lat", "lon"):
+        if col not in reg_cols:
+            conn.execute(f"ALTER TABLE registration_requests ADD COLUMN {col} REAL")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reg_status ON registration_requests(status, created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reg_code ON registration_requests(code, status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reg_tg ON registration_requests(tg_id, status)")
@@ -6056,8 +6061,9 @@ def reg_bind_telegram(code: str, tg_id: int, tg_username: str = None, tg_name: s
 
 @_serialized
 def reg_set_contact(tg_id: int, phone: str) -> dict:
-    """Шаг 2 в боте: человек поделился своим номером → заявка уходит админу.
-    {"ok": True, "req": ...} или {"ok": False, "error": "no_request" | "phone_used" | "tg_used"}."""
+    """Шаг 2 в боте: человек поделился своим номером → дальше бот просит
+    локацию точки. {"ok": True, "req": ...} или
+    {"ok": False, "error": "no_request" | "phone_used" | "tg_used"}."""
     digits = _phone_digits(phone)
     with get_conn() as conn:
         _expire_old_registrations(conn)
@@ -6073,11 +6079,46 @@ def reg_set_contact(tg_id: int, phone: str) -> dict:
                                   (row["id"],)).fetchall():
             if _phone_digits(other["tg_phone"]) == digits:
                 return {"ok": False, "error": "phone_used", "req": dict(row)}
-        conn.execute("UPDATE registration_requests SET tg_phone=?, status='pending', "
-                     "confirmed_at=datetime('now','localtime') WHERE id=?", ("+" + digits, row["id"]))
+        conn.execute("UPDATE registration_requests SET tg_phone=? WHERE id=?", ("+" + digits, row["id"]))
         conn.commit()
         return {"ok": True, "req": dict(conn.execute("SELECT * FROM registration_requests WHERE id=?",
                                                      (row["id"],)).fetchone())}
+
+
+@_serialized
+def reg_set_location(tg_id: int, lat: float, lon: float) -> dict:
+    """Шаг 3 в боте: локация точки → заявка уходит администратору.
+    {"ok": True, "req": ...} или {"ok": False, "error": "no_request" | "need_phone" | "bad_location" | "tg_used"}."""
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad_location"}
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return {"ok": False, "error": "bad_location"}
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        row = conn.execute("SELECT * FROM registration_requests WHERE tg_id=? AND status='new' "
+                           "ORDER BY id DESC LIMIT 1", (tg_id,)).fetchone()
+        if not row:
+            return {"ok": False, "error": "no_request"}
+        if not row["tg_phone"]:
+            return {"ok": False, "error": "need_phone", "req": dict(row)}
+        if _tg_already_used(conn, tg_id, row["id"]):
+            return {"ok": False, "error": "tg_used", "req": dict(row)}
+        conn.execute("UPDATE registration_requests SET lat=?, lon=?, status='pending', "
+                     "confirmed_at=datetime('now','localtime') WHERE id=?", (lat, lon, row["id"]))
+        conn.commit()
+        return {"ok": True, "req": dict(conn.execute("SELECT * FROM registration_requests WHERE id=?",
+                                                     (row["id"],)).fetchone())}
+
+
+def reg_location_in_uz(lat, lon) -> bool:
+    """Грубая рамка Узбекистана — чтобы подсветить админу явно чужую точку."""
+    try:
+        return 37.0 <= float(lat) <= 45.7 and 55.9 <= float(lon) <= 73.2
+    except (TypeError, ValueError):
+        return False
 
 
 @_serialized
@@ -6106,11 +6147,12 @@ def approve_registration(req_id: int) -> dict:
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
                                anpr_token, notify_telegram_id, language, is_active, owner_link_token,
-                               warehouse_enabled, sms_enabled, paid_until, license_type, trial, self_registered)
-            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 0, ?, 'sub', 1, 1)
+                               warehouse_enabled, sms_enabled, paid_until, license_type, trial, self_registered,
+                               lat, lon)
+            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 0, ?, 'sub', 1, 1, ?, ?)
         """, (req["username"], req["password_hash"], req["shop_name"], req.get("phone"), address,
               secrets.token_urlsafe(8), str(req["tg_id"]) if req.get("tg_id") else None,
-              req.get("language") or "ru", secrets.token_urlsafe(12), until))
+              req.get("language") or "ru", secrets.token_urlsafe(12), until, req.get("lat"), req.get("lon")))
         shop_id = cur.lastrowid
         conn.execute("UPDATE registration_requests SET status='approved', shop_id=?, "
                      "decided_at=datetime('now','localtime') WHERE id=?", (shop_id, req_id))
@@ -6140,7 +6182,7 @@ def list_registrations(limit_done: int = 15) -> dict:
         _expire_old_registrations(conn)
         conn.commit()
         cols = ("id, shop_name, owner_name, city, phone, address, username, language, tg_id, tg_username, "
-                "tg_name, tg_phone, status, shop_id, created_at, confirmed_at, decided_at")
+                "tg_name, tg_phone, lat, lon, status, shop_id, created_at, confirmed_at, decided_at")
         pending = [dict(r) for r in conn.execute(
             f"SELECT {cols} FROM registration_requests WHERE status='pending' ORDER BY id").fetchall()]
         done = [dict(r) for r in conn.execute(

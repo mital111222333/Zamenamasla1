@@ -603,6 +603,9 @@ REGISTER_PAGE = """
   .links a { color:#8b93a3; text-decoration:none; display:block; margin-top:8px; }
   .links a.pri { color:#3a86ff; }
   .hp { position:absolute; left:-5000px; width:1px; height:1px; overflow:hidden; }
+  .locrow { display:flex; gap:10px; align-items:flex-start; margin-top:16px; padding:12px; border:1px dashed #3a4456; border-radius:10px; background:#141821; }
+  .locico { font-size:20px; line-height:1; margin-top:1px; }
+  .loct { font-size:14px; font-weight:600; color:#e6e6e6; }
 </style>
 </head>
 <body>
@@ -639,6 +642,11 @@ REGISTER_PAGE = """
     <div class="hint">{{ T.reg_address_hint }}</div>
     <div class="ferr" id="e_address"></div>
 
+    <div class="locrow">
+      <div class="locico">📍</div>
+      <div><div class="loct">{{ T.reg_location }}</div><div class="hint" style="margin-top:3px;">{{ T.reg_location_hint }}</div></div>
+    </div>
+
     <label for="f_username">{{ T.reg_username }}</label>
     <input id="f_username" maxlength="30" placeholder="{{ T.reg_username_ph }}" autocomplete="username"
            autocapitalize="none" autocorrect="off" spellcheck="false">
@@ -672,9 +680,11 @@ REGISTER_PAGE = """
       <li>{{ T.reg_tg_step1 }}</li>
       <li>{{ T.reg_tg_step2 }}</li>
       <li>{{ T.reg_tg_step3 }}</li>
+      <li>{{ T.reg_tg_step4 }}</li>
     </ol>
     <a class="btn btn-tg" id="tgLink" href="#" target="_blank" rel="noopener">{{ T.reg_tg_btn }}</a>
     <div class="note" id="tgBound">{{ T.reg_tg_bound }}</div>
+    <div class="note" id="tgPhoneOk">{{ T.reg_tg_phone_ok }}</div>
     <div class="wait"><div class="spin"></div><span>{{ T.reg_tg_wait }}</span></div>
     <p class="hint" style="margin-top:18px;">{{ T.reg_tg_fallback.format(bot=bot_username) }}</p>
     <div class="code" id="tgCode">—</div>
@@ -792,7 +802,8 @@ function showStatus(d) {
   if (st === 'new') {
     if (d.bot_link) document.getElementById('tgLink').href = d.bot_link;
     document.getElementById('tgCode').textContent = d.code || '—';
-    document.getElementById('tgBound').classList.toggle('on', !!d.tg_bound);
+    document.getElementById('tgBound').classList.toggle('on', !!d.tg_bound && !d.phone_ok);
+    document.getElementById('tgPhoneOk').classList.toggle('on', !!d.phone_ok);
     if (document.getElementById('tgBox').style.display === 'none') show('tgBox');
     startPoll();
     return;
@@ -11347,6 +11358,7 @@ function regCard(r, withButtons) {
     `Адрес: ${escapeHtml(r.address || '—')}`,
     `Телефон: ${escapeHtml(r.phone || '—')} · в Telegram: ${escapeHtml(tgPh)} ${r.tg_phone ? (same ? '✅' : '⚠️ отличается') : ''}`,
     `Telegram: ${escapeHtml(tg)} · ${escapeHtml(r.tg_name || '')}`,
+    `Локация: ${r.lat != null && r.lon != null ? `<a href="https://maps.google.com/?q=${Number(r.lat).toFixed(6)},${Number(r.lon).toFixed(6)}" target="_blank" rel="noopener">📍 открыть на карте</a>` : '—'}`,
     `Логин: <b>${escapeHtml(r.username)}</b> · язык ${escapeHtml((r.language || 'ru').toUpperCase())}`,
   ];
   const when = withButtons ? `подтверждена ${escapeHtml(r.confirmed_at || r.created_at || '')}` : `решение ${escapeHtml(r.decided_at || '')}`;
@@ -14634,6 +14646,7 @@ def _reg_status_payload(req: dict) -> dict:
         out["code"] = req["code"]
         out["bot_link"] = _client_link(f"reg_{req['code']}")
         out["tg_bound"] = bool(req.get("tg_id"))
+        out["phone_ok"] = bool(req.get("tg_phone"))
     return out
 
 
@@ -14710,9 +14723,17 @@ def _reg_admin_text(req: dict) -> str:
         f"Телефон в форме: {req.get('phone') or '—'}",
         f"Телефон Telegram: {req.get('tg_phone') or '—'}{same}",
         f"Telegram: {tg} · {req.get('tg_name') or ''} · ID {req.get('tg_id')}",
+        f"Локация: {_reg_map_link(req)}",
         f"Логин: {req['username']}",
         f"Язык: {(req.get('language') or 'ru').upper()}",
     ])
+
+
+def _reg_map_link(req: dict) -> str:
+    if req.get("lat") is None or req.get("lon") is None:
+        return "—"
+    link = f"https://maps.google.com/?q={req['lat']:.6f},{req['lon']:.6f}"
+    return link if db.reg_location_in_uz(req["lat"], req["lon"]) else link + " ⚠️ вне Узбекистана"
 
 
 def reg_notify_admin(req: dict):
@@ -14723,9 +14744,14 @@ def reg_notify_admin(req: dict):
         {"text": f"✅ Одобрить ({db.REG_TRIAL_DAYS} дн. бесплатно)", "callback_data": f"reg:ok:{req['id']}"},
         {"text": "❌ Отклонить", "callback_data": f"reg:no:{req['id']}"},
     ]]})
-    res = _tg_api("sendMessage", {"chat_id": ADMIN_TELEGRAM_ID, "text": _reg_admin_text(req), "reply_markup": markup})
+    res = _tg_api("sendMessage", {"chat_id": ADMIN_TELEGRAM_ID, "text": _reg_admin_text(req), "reply_markup": markup,
+                                  "disable_web_page_preview": "true"})
     if res and res.get("message_id"):
         db.set_registration_admin_msg(req["id"], res["message_id"])
+        if req.get("lat") is not None and req.get("lon") is not None:
+            # метка на карте прямо под заявкой — видно место без перехода по ссылке
+            _tg_api("sendLocation", {"chat_id": ADMIN_TELEGRAM_ID, "latitude": req["lat"], "longitude": req["lon"],
+                                     "reply_to_message_id": res["message_id"]})
     return res
 
 
@@ -14740,7 +14766,7 @@ def reg_decide(req_id: int, approve: bool) -> dict:
         mark = (f"✅ Одобрено — точка создана, пробный период до {_fmt_day(shop.get('paid_until'))}"
                 if approve else "❌ Отклонено")
         _tg_api("editMessageText", {"chat_id": ADMIN_TELEGRAM_ID, "message_id": req["admin_msg_id"],
-                                    "text": _reg_admin_text(req) + "\n\n" + mark})
+                                    "text": _reg_admin_text(req) + "\n\n" + mark, "disable_web_page_preview": "true"})
     if req.get("tg_id"):
         lang = req.get("language") or "ru"
         if approve:
