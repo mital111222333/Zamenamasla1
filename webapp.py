@@ -1999,7 +1999,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   <div id="view-table" style="display:none;">
     <div id="baseClientCount" style="font-size:13px; color:var(--hint); margin-bottom:8px;"></div>
     <div style="position:relative;">
-      <input class="search" id="search" placeholder="{{ T.search_ph }}" oninput="onBaseSearch(); toggleSearchClearBtn();" style="padding-right:40px;">
+      <input class="search" id="search" type="search" name="oilbook_base_q" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="{{ T.search_ph }}" oninput="onBaseSearch(); toggleSearchClearBtn();" style="padding-right:40px;">
       <button type="button" id="searchClearBtn" onclick="clearSearch()" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--hint); font-size:18px; cursor:pointer; padding:4px 6px;">✕</button>
     </div>
     <div id="clientCardPanel" style="display:none; margin-bottom:12px;"></div>
@@ -2257,11 +2257,11 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <p style="margin-top:0;">{{ T.sms_intro }}</p>
     <div class="field">
       <label>{{ T.sms_email }}</label>
-      <input id="eskiz_email" value="{{ eskiz_email }}" placeholder="you@example.com">
+      <input id="eskiz_email" value="{{ eskiz_email }}" placeholder="you@example.com" autocomplete="off">
     </div>
     <div class="field">
       <label>{{ T.sms_password }}</label>
-      <input id="eskiz_password" type="password" placeholder="{{ T.sms_password_ph }}">
+      <input id="eskiz_password" type="password" autocomplete="new-password" placeholder="{{ T.sms_password_ph }}">
       <div class="hint-text">{{ T.sms_password_hint }}</div>
     </div>
     <button class="submit" onclick="saveSmsSettings()">{{ T.btn_save }}</button>
@@ -7364,6 +7364,43 @@ function clearSearch() {
   renderTable();
 }
 
+// Защита от автозаполнения: браузер (Chrome/Яндекс) иногда вставляет
+// сохранённый логин (например «admin») в поле поиска базы. Принимаем
+// только то, что человек сам набрал/вставил; остальное стираем.
+function guardBaseSearchAutofill() {
+  const s = document.getElementById('search');
+  if (!s || s.dataset.afGuard) return;
+  s.dataset.afGuard = '1';
+  let typed = false;
+  const mark = () => { typed = true; };
+  s.addEventListener('beforeinput', mark);
+  s.addEventListener('keydown', mark);
+  s.addEventListener('paste', mark);
+  s.addEventListener('input', (e) => {
+    if (!typed && s.value) {
+      e.stopImmediatePropagation();
+      s.value = '';
+      toggleSearchClearBtn();
+      BASE_SHOWN = BASE_PAGE;
+      renderTable();
+    }
+    typed = false;
+  }, true);
+  const wipe = () => {
+    if (document.activeElement !== s && s.value && !typed) {
+      s.value = '';
+      toggleSearchClearBtn();
+    }
+  };
+  setTimeout(wipe, 300);
+  setTimeout(wipe, 1500);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', guardBaseSearchAutofill);
+} else {
+  guardBaseSearchAutofill();
+}
+
 // Показываем по 50 карточек — раньше рисовались сразу все (2 500 карточек
 // на каждую букву поиска), и на простом телефоне поиск «тормозил».
 const BASE_PAGE = 50;
@@ -10831,7 +10868,7 @@ if ('serviceWorker' in navigator) {
   <div class="list-head">
     <h2>Все точки</h2>
   </div>
-  <input id="shopSearch" placeholder="🔍 Поиск по названию, логину или телефону..." oninput="filterShops()">
+  <input id="shopSearch" type="search" name="oilbook_shop_q" autocomplete="off" spellcheck="false" placeholder="🔍 Поиск по названию, логину или телефону..." oninput="filterShops()">
   <div class="adm-filters" id="admFilters">
     <button class="on" data-f="all" onclick="setShopFilter('all')">Все</button>
     <button data-f="active" onclick="setShopFilter('active')">Активные</button>
