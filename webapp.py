@@ -7574,11 +7574,22 @@ async function submitCar() {
     if ((nameChanged || phoneChanged) && confirm(T.kc_owner_changed_confirm)) NEW_OWNER = true;
   }
   payload.new_owner = NEW_OWNER;
-  const res = await fetch('/api/add', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-  });
-  const data = await res.json();
+  // номер отправки: при повторном нажатии (после обрыва связи) он тот же,
+  // поэтому сервер не создаст дубль, а ответит «уже сохранено»
+  if (!window.ADD_TOKEN) window.ADD_TOKEN = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+  payload.token = window.ADD_TOKEN;
+  let data;
+  try {
+    const res = await fetch('/api/add', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+    });
+    data = await res.json();
+  } catch (e) {
+    showMsg(T.msg_no_connection, false);
+    return;
+  }
   if (data.ok) {
+    window.ADD_TOKEN = null;
     showMsg(`✅ ${T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     KM.manual = false;
@@ -9581,7 +9592,15 @@ def api_add():
         # весь приём замены — под общим замком записи: два телефона одной точки,
         # одновременно вносящие одну и ту же новую машину, больше не получают
         # ошибку «UNIQUE constraint failed» и не плодят пустых клиентов
+        add_token = str(data.get("token") or "")[:64] or None
         with db.WRITE_LOCK:
+            # повторная отправка той же замены (ответ не дошёл по слабому
+            # интернету, нажали ещё раз) — ничего не пишем, отвечаем «уже сохранено»
+            prev = db.get_add_token_result(g.shop_id, add_token)
+            if prev is not None:
+                prev["ok"] = True
+                prev["duplicate"] = True
+                return jsonify(prev)
             existing_car = db.find_car(g.shop_id, plate)
             if existing_car and data.get("new_owner"):
                 # машину продали: сначала переводим на нового владельца (если
@@ -9611,16 +9630,31 @@ def api_add():
             if debt_amount > 0:
                 db.create_installment_plan(g.shop_id, car_id, debt_amount, installment_amount, interval_days, oil_change_id=oc_id)
 
-        car_after, _ = db.get_car_history(g.shop_id, plate)
+        # с этого места замена УЖЕ сохранена — что бы дальше ни случилось,
+        # человеку нельзя показывать «ошибку» (он нажмёт ещё раз и будет дубль)
         link = None
-        if car_after and not car_after["telegram_id"]:
-            link = _client_link(car_after["link_token"])
-        elif car_after and car_after["telegram_id"]:
-            shop = db.get_shop(g.shop_id)
-            if shop:
-                shop["_receipt_telegram_id"] = car_after["telegram_id"]
-                _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date)
-
+        try:
+            car_after, _ = db.get_car_history(g.shop_id, plate)
+            if car_after and not car_after["telegram_id"]:
+                link = _client_link(car_after["link_token"])
+            elif car_after and car_after["telegram_id"]:
+                shop = db.get_shop(g.shop_id)
+                if shop:
+                    shop["_receipt_telegram_id"] = car_after["telegram_id"]
+                    # чек в Telegram — в фоне: не задерживаем ответ и не держим запрос
+                    def _bg_receipt(shop=shop, plate=plate, items=items, cash=cash_amount, card=card_amount, nd=next_date):
+                        try:
+                            _send_service_receipt(shop, plate, items, cash, card, nd)
+                        except Exception as ex:
+                            logger.warning(f"чек не отправлен: {ex}")
+                    threading.Thread(target=_bg_receipt, daemon=True).start()
+        except Exception as e:
+            logger.warning(f"после сохранения замены: {e}")
+        result = {"ok": True, "next_date": next_date, "client_link": link}
+        try:
+            db.save_add_token_result(g.shop_id, add_token, result)
+        except Exception as e:
+            logger.warning(f"не удалось запомнить номер отправки: {e}")
         return jsonify({"ok": True, "next_date": next_date, "client_link": link})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400

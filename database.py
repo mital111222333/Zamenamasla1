@@ -524,6 +524,15 @@ def _migrate(conn):
     if "order_id" not in rs_cols:
         conn.execute("ALTER TABLE stock_restocks ADD COLUMN order_id INTEGER")
 
+    # --- защита от двойного сохранения замены при повторной отправке ---
+    conn.execute("""CREATE TABLE IF NOT EXISTS add_request_tokens (
+        shop_id INTEGER NOT NULL,
+        token TEXT NOT NULL,
+        result TEXT,
+        created_at TEXT,
+        PRIMARY KEY (shop_id, token)
+    )""")
+
     # --- oil_changes: добавляем недостающие колонки (из более ранних версий) ---
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
     to_add = {
@@ -725,6 +734,33 @@ def _serialized(fn):
         with WRITE_LOCK:
             return fn(*args, **kwargs)
     return wrapped
+
+
+def get_add_token_result(shop_id, token):
+    """Если замена с таким номером уже сохранена — вернуть её ответ (dict), иначе None."""
+    if not token:
+        return None
+    with get_conn() as conn:
+        row = conn.execute("SELECT result FROM add_request_tokens WHERE shop_id=? AND token=?",
+                           (shop_id, str(token)[:64])).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["result"] or "{}")
+    except Exception:
+        return {}
+
+
+def save_add_token_result(shop_id, token, result):
+    """Запоминает номер отправки и ответ; заодно чистит записи старше 3 дней."""
+    if not token:
+        return
+    with WRITE_LOCK, get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO add_request_tokens (shop_id, token, result, created_at) "
+                     "VALUES (?, ?, ?, datetime('now'))",
+                     (shop_id, str(token)[:64], json.dumps(result, ensure_ascii=False)))
+        conn.execute("DELETE FROM add_request_tokens WHERE created_at < datetime('now', '-3 days')")
+        conn.commit()
 
 
 @contextmanager

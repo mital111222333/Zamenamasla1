@@ -499,6 +499,7 @@ RU = {
     "msg_fill_required": "Заполните хотя бы госномер, имя владельца и интервал напоминания.",
     "msg_saved": "Сохранено. Следующая замена ориентировочно:",
     "msg_error": "Ошибка:",
+    "msg_no_connection": "Нет связи с сервером. Запись могла сохраниться — проверьте в «Базе» и нажмите «Сохранить» ещё раз, дубля не будет.",
 
     # --- Таблица «База» ---
     "search_ph": "Поиск по госномеру или имени...",
@@ -1148,6 +1149,7 @@ UZ = {
     "msg_fill_required": "Kamida davlat raqami, egasining ismi va eslatish muddatini kiriting.",
     "msg_saved": "Saqlandi. Keyingi almashtirish taxminan:",
     "msg_error": "Xato:",
+    "msg_no_connection": "Server bilan aloqa yo'q. Yozuv saqlangan bo'lishi mumkin — «Baza»ni tekshiring va «Saqlash»ni yana bosing, dublikat bo'lmaydi.",
 
     "search_ph": "Davlat raqami yoki ism bo'yicha qidirish...",
     "table_empty": "Hech narsa topilmadi.",
