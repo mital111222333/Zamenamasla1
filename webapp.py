@@ -11702,7 +11702,7 @@ function regCard(r, withButtons) {
   return `<div class="pay-item"><div class="pay-cap" style="white-space:normal; line-height:1.6;">${lines.join('<br>')}</div>
     <div class="hint-text" style="margin-top:4px;">№${r.id} · ${when}</div>
     ${withButtons ? `<div class="pay-act">
-      <button class="ok" onclick="decideReg(${r.id}, 1)">✅ Одобрить (14 дней)</button>
+      <button class="ok" onclick="decideReg(${r.id}, 1)">✅ Одобрить (3 дня)</button>
       <button class="no" onclick="decideReg(${r.id}, 0)">❌ Отклонить</button></div>` : ''}
   </div>`;
 }
@@ -14240,7 +14240,7 @@ def _sub_banner(shop):
     owner = _is_sub_owner()
     n = st.get("days_left")
     if st.get("trial") and n is not None and n >= 0:
-        # пробный период — плашка видна все 14 дней, владельцу — со ссылкой на оплату
+        # пробный период — плашка видна все дни пробного периода, владельцу — со ссылкой на оплату
         if owner:
             text = T["trial_banner_today"] if n == 0 else T["trial_banner_owner"].format(n=n + 1)
         else:
@@ -15124,16 +15124,18 @@ def _reg_map_link(req: dict) -> str:
     return link if db.reg_location_in_uz(req["lat"], req["lon"]) else link + " ⚠️ вне Узбекистана"
 
 
-def reg_notify_admin(req: dict):
-    """Заявка подтверждена в боте — администратору платформы с кнопками."""
+def reg_notify_admin(req: dict, auto: bool = False):
+    """Заявка подтверждена в боте — администратору платформы (с кнопками, либо
+    просто уведомление, если точка подключается автоматически)."""
     if not ADMIN_TELEGRAM_ID:
         return None
-    markup = json.dumps({"inline_keyboard": [[
-        {"text": f"✅ Одобрить ({db.REG_TRIAL_DAYS} дн. бесплатно)", "callback_data": f"reg:ok:{req['id']}"},
-        {"text": "❌ Отклонить", "callback_data": f"reg:no:{req['id']}"},
-    ]]})
-    res = _tg_api("sendMessage", {"chat_id": ADMIN_TELEGRAM_ID, "text": _reg_admin_text(req), "reply_markup": markup,
-                                  "disable_web_page_preview": "true"})
+    payload = {"chat_id": ADMIN_TELEGRAM_ID, "text": _reg_admin_text(req), "disable_web_page_preview": "true"}
+    if not auto:
+        payload["reply_markup"] = json.dumps({"inline_keyboard": [[
+            {"text": f"✅ Одобрить ({db.REG_TRIAL_DAYS} дн. бесплатно)", "callback_data": f"reg:ok:{req['id']}"},
+            {"text": "❌ Отклонить", "callback_data": f"reg:no:{req['id']}"},
+        ]]})
+    res = _tg_api("sendMessage", payload)
     if res and res.get("message_id"):
         db.set_registration_admin_msg(req["id"], res["message_id"])
         if req.get("lat") is not None and req.get("lon") is not None:
@@ -15143,7 +15145,7 @@ def reg_notify_admin(req: dict):
     return res
 
 
-def reg_decide(req_id: int, approve: bool) -> dict:
+def reg_decide(req_id: int, approve: bool, auto: bool = False) -> dict:
     """Единое решение по заявке — и из админки, и из кнопок в Telegram."""
     r = db.approve_registration(req_id) if approve else db.reject_registration(req_id)
     req = r.get("req")
@@ -15151,7 +15153,8 @@ def reg_decide(req_id: int, approve: bool) -> dict:
         return r
     shop = r.get("shop")
     if req.get("admin_msg_id") and ADMIN_TELEGRAM_ID:
-        mark = (f"✅ Одобрено — точка создана, пробный период до {_fmt_day(shop.get('paid_until'))}"
+        mark = (f"✅ {'Подключена автоматически' if auto else 'Одобрено'} — точка создана, "
+                f"пробный период до {_fmt_day(shop.get('paid_until'))}"
                 if approve else "❌ Отклонено")
         _tg_api("editMessageText", {"chat_id": ADMIN_TELEGRAM_ID, "message_id": req["admin_msg_id"],
                                     "text": _reg_admin_text(req) + "\n\n" + mark, "disable_web_page_preview": "true"})

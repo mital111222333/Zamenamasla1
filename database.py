@@ -5966,7 +5966,7 @@ def course_progress(shop_id: int, user_key: str) -> dict:
 # Пробный период — это обычная подписка (paid_until) + пометка trial=1:
 # напоминания, блокировка и оплата работают так же, как у всех точек.
 
-REG_TRIAL_DAYS = 14
+REG_TRIAL_DAYS = 3
 REG_CODE_TTL_MIN = 120          # сколько ждём подтверждения Telegram
 REG_MAX_PER_IP_DAY = 3          # защита от массовых заявок
 

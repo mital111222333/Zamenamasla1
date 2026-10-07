@@ -810,11 +810,18 @@ async def registration_location(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             await msg.reply_text(i18n.t("reg_bot_tg_used", lang), reply_markup=ReplyKeyboardRemove())
         return
-    await msg.reply_text(i18n.t("reg_bot_sent", lang), reply_markup=ReplyKeyboardRemove())
+    # Автоподключение: все проверки пройдены (форма, Telegram, номер, локация) —
+    # создаём точку сразу, без ожидания решения администратора.
+    req = r["req"]
     try:
-        await asyncio.to_thread(webapp.reg_notify_admin, r["req"])
+        await asyncio.to_thread(webapp.reg_notify_admin, req, True)
     except Exception as e:
-        logger.error(f"Не удалось отправить заявку {r['req']['id']} администратору: {e}")
+        logger.error(f"Не удалось уведомить администратора о заявке {req['id']}: {e}")
+    dec = await asyncio.to_thread(webapp.reg_decide, req["id"], True, True)
+    if not dec.get("ok"):
+        # например, логин успел занять кто-то другой — заявка остаётся на ручное решение
+        await msg.reply_text(i18n.t("reg_bot_sent", lang), reply_markup=ReplyKeyboardRemove())
+        logger.error(f"Автоподключение заявки {req['id']} не удалось: {dec.get('error')}")
 
 
 async def registration_decide_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
