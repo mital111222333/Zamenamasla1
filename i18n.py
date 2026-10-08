@@ -500,6 +500,9 @@ RU = {
     "msg_saved": "Сохранено. Следующая замена ориентировочно:",
     "msg_error": "Ошибка:",
     "msg_no_connection": "Нет связи с сервером. Запись могла сохраниться — проверьте в «Базе» и нажмите «Сохранить» ещё раз, дубля не будет.",
+    "msg_already_saved": "Эта замена уже была сохранена (связь прерывалась) — второй раз не записана. Следующая замена ориентировочно:",
+    "draft_restored": "Восстановлен незаконченный ввод.",
+    "draft_clear": "Очистить",
 
     # --- Таблица «База» ---
     "search_ph": "Поиск по госномеру или имени...",
@@ -1150,6 +1153,9 @@ UZ = {
     "msg_saved": "Saqlandi. Keyingi almashtirish taxminan:",
     "msg_error": "Xato:",
     "msg_no_connection": "Server bilan aloqa yo'q. Yozuv saqlangan bo'lishi mumkin — «Baza»ni tekshiring va «Saqlash»ni yana bosing, dublikat bo'lmaydi.",
+    "msg_already_saved": "Bu almashtirish avval saqlangan edi (aloqa uzilgan edi) — ikkinchi marta yozilmadi. Keyingi almashtirish taxminan:",
+    "draft_restored": "Tugallanmagan kiritish tiklandi.",
+    "draft_clear": "Tozalash",
 
     "search_ph": "Davlat raqami yoki ism bo'yicha qidirish...",
     "table_empty": "Hech narsa topilmadi.",

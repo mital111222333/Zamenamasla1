@@ -33,15 +33,61 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
+_GZIP_TYPES = ("text/html", "application/json", "text/css", "application/javascript",
+               "text/javascript", "text/plain", "application/manifest+json", "image/svg+xml")
+
+
 @app.after_request
 def _no_stale_cache(resp):
-    """Данные и страницы не кешируем в браузере: иначе при возврате в
-    приложение/кнопке «назад» телефон показывает старые цифры, пока не
-    обновишь страницу вручную. Статика (иконки, шрифты) кешируется как обычно."""
+    """Данные не кешируем в браузере: иначе при возврате в приложение/кнопке
+    «назад» телефон показывает старые цифры. Статика (иконки, шрифты)
+    кешируется как обычно.
+
+    Слабый интернет:
+    - страница приложения (~600 КБ) получает «отпечаток» (ETag): телефон
+      хранит её у себя, но каждый раз сверяется с сервером — если ничего не
+      поменялось, сервер отвечает коротким «не изменилось» (304) вместо
+      повторной загрузки всей страницы;
+    - текст (страницы, данные) отдаётся сжатым (gzip) — в 4–5 раз меньше."""
     path = request.path or ""
-    if path.startswith("/api/") or resp.mimetype == "text/html":
+    is_html = resp.mimetype == "text/html"
+    if is_html and path == "/" and request.method == "GET" and resp.status_code == 200 and not resp.direct_passthrough:
+        resp.headers["Cache-Control"] = "private, no-cache"
+        try:
+            resp.add_etag()
+            resp.make_conditional(request)
+        except Exception:
+            resp.headers["Cache-Control"] = "no-store, max-age=0"
+    elif path.startswith("/api/") or is_html:
         resp.headers["Cache-Control"] = "no-store, max-age=0"
+    try:
+        _gzip_response(resp)
+    except Exception as e:  # сжатие — только ускорение, ответ уйдёт и без него
+        logger.warning(f"gzip: {e}")
     return resp
+
+
+def _gzip_response(resp):
+    if resp.direct_passthrough or resp.is_streamed or resp.status_code in (204, 206, 304) or resp.status_code < 200:
+        return
+    if resp.mimetype not in _GZIP_TYPES or "Content-Encoding" in resp.headers:
+        return
+    if "gzip" not in (request.headers.get("Accept-Encoding") or "").lower():
+        return
+    data = resp.get_data()
+    if len(data) < 1024:
+        return
+    import gzip
+    comp = gzip.compress(data, compresslevel=6)
+    if len(comp) >= len(data):
+        return
+    resp.set_data(comp)
+    resp.headers["Content-Encoding"] = "gzip"
+    resp.headers["Content-Length"] = str(len(comp))
+    resp.vary.add("Accept-Encoding")
+    etag = resp.headers.get("ETag")
+    if etag and not etag.startswith("W/"):
+        resp.headers["ETag"] = "W/" + etag  # сжатый вариант — «слабый» отпечаток
 
 # ---------- Защита от дублей при плохом интернете ----------
 # Приложение отправляет каждое изменение (замена, оплата, склад…) с ключом
@@ -3550,7 +3596,16 @@ document.addEventListener('visibilitychange', () => {
   if (HIDDEN_AT && Date.now() - HIDDEN_AT > 60 * 1000) refreshCurrentView();
   HIDDEN_AT = 0;
 });
-window.addEventListener('pageshow', e => { if (e.persisted) refreshCurrentView(); });
+// страницу вернули из памяти браузера (кнопка «назад»): перезагружаем её —
+// сервер сверит вход (после «Выйти» откроется страница входа, а не старые
+// данные), а неизменённая страница придёт мгновенно (304). Незаконченный
+// ввод замены восстановится из черновика.
+window.addEventListener('pageshow', e => {
+  if (!e.persisted) return;
+  try { saveAddDraft(); } catch (x) {}
+  document.documentElement.style.visibility = 'hidden';
+  location.reload();
+});
 document.addEventListener('DOMContentLoaded', () => {
   if (new URLSearchParams(location.search).get('tab') === 'course') {
     showTab('course');
@@ -6884,7 +6939,48 @@ function clearPick(ctx) {
   PICK[ctx] = [];
 }
 
+// Списки позиций перерисовываются, когда приходит/меняется каталог склада
+// (на слабом интернете — уже после того, как мастер начал вводить; при
+// открытии «Склада»). Раньше это стирало выбранные марки, литры и цены, а
+// «Итого» и сумма оплаты оставались старыми. Теперь введённое сохраняется.
+function snapItemFields(listIds) {
+  const snap = {};
+  listIds.forEach(lid => {
+    const box = document.getElementById(lid);
+    if (!box) return;
+    box.querySelectorAll('input[id], select[id]').forEach(el => {
+      if (String(el.value || '').trim() === '') return;
+      const isSel = el.tagName === 'SELECT';
+      const opt = isSel ? el.options[el.selectedIndex] : null;
+      snap[el.id] = { v: el.value, sel: isSel, name: opt ? (opt.dataset.name || '') : el.value };
+    });
+  });
+  return snap;
+}
+function restoreItemFields(snap) {
+  let n = 0;
+  Object.keys(snap).forEach(id => {
+    const el = document.getElementById(id);
+    const s = snap[id];
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+      const opts = Array.from(el.options);
+      let o = s.sel ? opts.find(x => x.value === s.v) : null;
+      if (!o && s.name) {
+        const want = s.name.trim().toUpperCase();
+        o = opts.find(x => x.value && (x.dataset.name || '').trim().toUpperCase() === want);
+      }
+      if (o) { el.value = o.value; n++; }
+    } else {
+      el.value = (s.sel && id.indexOf('_brand_') >= 0) ? s.name : s.v;
+      n++;
+    }
+  });
+  return n;
+}
+
 function renderItemLists() {
+  const snap = snapItemFields(['fluidsList', 'filtersList']);
   document.getElementById('fluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
     <div class="item-row" id="row_${key}">
       <span class="item-name">${T[key]}</span>
@@ -6906,6 +7002,7 @@ function renderItemLists() {
     </div>
   `;
   }).join('');
+  if (restoreItemFields(snap)) updateTotal();
   syncItemRows();
 }
 
@@ -7517,16 +7614,135 @@ function focusNextEntry() {
   mileage.focus();
 }
 
+// Каталог склада для формы замены. На слабом интернете он может не прийти с
+// первого раза — тогда поля «марка» временно текстовые, а каталог тихо
+// запрашивается ещё несколько раз (и сразу, когда связь вернулась). Уже
+// введённое при этом не стирается (см. renderItemLists).
+let ITEM_CATALOG_OK = !WAREHOUSE_ENABLED;
+let ITEM_CATALOG_TRY = 0;
+async function loadItemCatalog() {
+  if (ITEM_CATALOG_OK) return true;
+  try {
+    const res = await fetch('/api/products');
+    const list = await res.json();
+    if (!Array.isArray(list)) return false;
+    productsCache = list;
+    ITEM_CATALOG_OK = true;
+    renderItemLists();
+    renderSvcItemLists();
+    return true;
+  } catch (e) { return false; }
+}
+function retryItemCatalog() {
+  if (ITEM_CATALOG_OK || ITEM_CATALOG_TRY >= 8) return;
+  const wait = [3, 8, 15, 30, 60, 60, 120, 120][ITEM_CATALOG_TRY++] * 1000;
+  setTimeout(async () => { if (!(await loadItemCatalog())) retryItemCatalog(); }, wait);
+}
+window.addEventListener('online', () => { if (!ITEM_CATALOG_OK) loadItemCatalog(); });
 async function initItemForms() {
-  if (WAREHOUSE_ENABLED) {
-    try {
-      const res = await fetch('/api/products');
-      productsCache = await res.json();
-    } catch (e) { /* остаёмся с пустым каталогом — поля просто будут текстовыми */ }
-  }
   renderItemLists();
   renderSvcItemLists();
+  if (WAREHOUSE_ENABLED && !(await loadItemCatalog())) retryItemCatalog();
+  restoreAddDraft();
 }
+
+// ---- Черновик формы «Внести замену» ----
+// Всё, что мастер успел ввести, сохраняется на этом телефоне. Если страница
+// перезагрузилась (пропал интернет, телефон закрыл приложение в фоне,
+// случайно обновили) — при следующем открытии ввод восстанавливается.
+// После успешного сохранения черновик удаляется. Хранится до 24 часов.
+const ADD_DRAFT_KEY = 'ob_add_draft_' + {{ draft_owner|tojson }};
+const ADD_DRAFT_SKIP = ['plateSuggest', 'pickInput'];
+let ADD_DRAFT_TIMER = null;
+let ADD_DRAFT_READY = false;
+function addDraftFields() {
+  const view = document.getElementById('view-add');
+  if (!view) return [];
+  return Array.from(view.querySelectorAll('input[id], select[id], textarea[id]')).filter(el =>
+    el.type !== 'file' && el.type !== 'hidden' && el.type !== 'button' && !ADD_DRAFT_SKIP.includes(el.id)
+    && !/_stock_(product|price|qty)_/.test(el.id) && !/^pick/.test(el.id));
+}
+function saveAddDraft() {
+  if (!ADD_DRAFT_READY) return;
+  try {
+    const f = {};
+    addDraftFields().forEach(el => {
+      if (el.type === 'checkbox') { if (el.checked) f[el.id] = { c: 1 }; return; }
+      if (String(el.value || '').trim() === '') return;
+      const opt = el.tagName === 'SELECT' ? el.options[el.selectedIndex] : null;
+      f[el.id] = { v: el.value, sel: !!opt, name: opt ? (opt.dataset.name || '') : el.value };
+    });
+    const plate = (f.plate && f.plate.v) || '';
+    const items = collectItems();
+    if (!plate.trim() && !items.length) { localStorage.removeItem(ADD_DRAFT_KEY); return; }
+    localStorage.setItem(ADD_DRAFT_KEY, JSON.stringify({
+      at: Date.now(), f, stock: collectOtherStockItems('other'), pay: typeof PAY_MODE !== 'undefined' ? PAY_MODE : 'cash',
+      touched: !!paymentSplitTouched,
+    }));
+  } catch (e) { /* память телефона недоступна — просто без черновика */ }
+}
+function scheduleAddDraft() {
+  clearTimeout(ADD_DRAFT_TIMER);
+  ADD_DRAFT_TIMER = setTimeout(saveAddDraft, 500);
+}
+function clearAddDraft() {
+  clearTimeout(ADD_DRAFT_TIMER);
+  try { localStorage.removeItem(ADD_DRAFT_KEY); } catch (e) {}
+}
+function discardAddDraft() {
+  clearAddDraft();
+  ['plate', 'owner_name', 'owner_phone', 'car_model', 'mileage', 'next_mileage', 'notes'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  resetItemInputs();
+  setPayMode('cash');
+  document.getElementById('msg').innerHTML = '';
+}
+function restoreAddDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(ADD_DRAFT_KEY) || 'null'); } catch (e) { d = null; }
+  ADD_DRAFT_READY = true;
+  if (!d || !d.f || Date.now() - (d.at || 0) > 24 * 3600 * 1000) { clearAddDraft(); return; }
+  const plateEl = document.getElementById('plate');
+  if (plateEl && plateEl.value.trim()) return;  // в форме уже что-то вводят — не мешаем
+  const pay = new Set(['pay_cash', 'pay_card', 'debt_enabled', 'debt_installment_amount', 'debt_interval_days']);
+  const main = {}, payF = {};
+  Object.keys(d.f).forEach(id => { (pay.has(id) ? payF : main)[id] = d.f[id]; });
+  Object.keys(main).forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.type === 'checkbox') { el.checked = true; delete main[id]; }
+  });
+  restoreItemFields(main);
+  if (d.stock && d.stock.length) {
+    otherStockRows = [];
+    renderOtherStockRows('other');
+    fillOtherStockRowsFrom('other', d.stock);
+  }
+  updateTotal();
+  if (d.pay && d.pay !== 'cash') setPayMode(d.pay);
+  if (payF.debt_enabled) {
+    const cb = document.getElementById('debt_enabled');
+    if (cb && !cb.checked) { cb.checked = true; toggleDebtSection(); }
+  }
+  ['pay_cash', 'pay_card', 'debt_installment_amount', 'debt_interval_days'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && payF[id]) el.value = payF[id].v;
+  });
+  paymentSplitTouched = !!d.touched;
+  updateDebtRemaining();
+  if (typeof checkMileageVsDue === 'function') checkMileageVsDue();
+  showMsg(`<i class="fa-solid fa-clock-rotate-left"></i> ${T.draft_restored} `
+    + `<button type="button" class="draft-clear" onclick="discardAddDraft()">${T.draft_clear}</button>`, true);
+}
+(function () {
+  const view = document.getElementById('view-add');
+  if (!view) return;
+  view.addEventListener('input', scheduleAddDraft);
+  view.addEventListener('change', scheduleAddDraft);
+  view.addEventListener('click', e => { if (e.target.closest('button')) scheduleAddDraft(); });
+  window.addEventListener('pagehide', saveAddDraft);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveAddDraft(); });
+})();
 initItemForms();
 
 async function submitCar() {
@@ -7576,7 +7792,16 @@ async function submitCar() {
   payload.new_owner = NEW_OWNER;
   // номер отправки: при повторном нажатии (после обрыва связи) он тот же,
   // поэтому сервер не создаст дубль, а ответит «уже сохранено»
-  if (!window.ADD_TOKEN) window.ADD_TOKEN = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+  // номер привязан к госномеру и живёт 10 минут: если после обрыва связи
+  // вносят уже ДРУГУЮ машину (или ту же, но намного позже), это новая
+  // замена — ей нужен новый номер, иначе сервер ответил бы «уже сохранено»
+  // и она бы не записалась
+  const tokenPlate = String(payload.plate || '').toUpperCase().replace(/\\s+/g, '');
+  if (!window.ADD_TOKEN || window.ADD_TOKEN_PLATE !== tokenPlate || Date.now() - (window.ADD_TOKEN_AT || 0) > 10 * 60 * 1000) {
+    window.ADD_TOKEN = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+    window.ADD_TOKEN_PLATE = tokenPlate;
+    window.ADD_TOKEN_AT = Date.now();
+  }
   payload.token = window.ADD_TOKEN;
   let data;
   try {
@@ -7590,7 +7815,8 @@ async function submitCar() {
   }
   if (data.ok) {
     window.ADD_TOKEN = null;
-    showMsg(`✅ ${T.msg_saved} ${data.next_date || '—'}.`, true);
+    clearAddDraft();
+    showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     KM.manual = false;
     KNOWN_OWNER = null;
@@ -8194,6 +8420,7 @@ function copyLink() {
 let svcModal = { mode: null, id: null, plate: null };  // mode: 'edit' | 'add'
 
 function renderSvcItemLists() {
+  const snap = snapItemFields(['svcFluidsList', 'svcFiltersList']);
   document.getElementById('svcFluidsList').innerHTML = FLUID_KEYS.map((key, i) => `
     <div class="item-row">
       <span class="item-name">${T[key]}</span>
@@ -8213,6 +8440,7 @@ function renderSvcItemLists() {
     </div>
   `;
   }).join('');
+  if (restoreItemFields(snap) && typeof updateSvcTotal === 'function') updateSvcTotal();
 }
 
 function onSvcFluidProductPicked(i) {
@@ -8533,6 +8761,8 @@ NET_GUARD_JS = """<style>
   #netToast.err { background: #B42318; }
   #netToast.ok { background: #1B8A5A; }
   button.net-busy { opacity: .55; cursor: wait !important; }
+  .draft-clear { margin-left: 8px; padding: 4px 10px; border-radius: 8px; border: 1px solid currentColor; background: transparent;
+    color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
   .base-more { display: block; width: 100%; margin: 6px 0 14px; padding: 13px; border-radius: 12px; border: 1.5px dashed #94A3B8;
     background: transparent; color: #0F52BA; font-weight: 700; font-size: 14px; cursor: pointer; }
 </style>
@@ -8636,7 +8866,14 @@ NET_GUARD_JS = """<style>
         toast(NT.unsure, 'err', 9000);
         throw netError(kind, NT.unsure, true);
       }
-      throw netError(kind, kind === 'timeout' ? NT.timeout : NT.offline, false);
+      // чтение не удалось: многие разделы в этом случае просто оставляют
+      // прежние цифры — сразу говорим, что данные не обновились (если нет
+      // интернета вообще, это уже видно по красной полосе сверху)
+      const msg = kind === 'timeout' ? NT.timeout : NT.offline;
+      const offBar = document.getElementById('netOffline');
+      const barShown = offBar && offBar.style.display === 'block';
+      if (!document.hidden && !barShown) toast(msg, 'err');
+      throw netError(kind, msg, true);
     } finally {
       clearTimeout(timer);
       setBusy(-1);
@@ -9183,6 +9420,7 @@ def index():
         usd_rate=_effective_usd_rate(shop),
         usd_rate_own=shop.get("usd_rate") if shop else None,
         usd_rate_head=_head_usd_rate(shop),
+        draft_owner=f"{g.shop_id}_{session.get('username') or ''}",
         sub_banner=_sub_banner(shop),
         is_sub_owner=_is_sub_owner(),
         **_help_context(shop),
@@ -10953,6 +11191,10 @@ def api_profit_stats():
 def api_export():
     import json
     data = db.export_shop_data(g.shop_id)
+    if g.is_branch:
+        # филиал не видит цену закупки — и в файле копии тоже
+        for car in data.get("cars") or []:
+            _strip_cost_price(car.get("oil_changes") or [])
     body = json.dumps(data, ensure_ascii=False, indent=2)
     filename = f"backup_shop_{g.shop_id}_{data['exported_at'][:10]}.json"
     return Response(
@@ -13604,8 +13846,8 @@ ADMIN_HELP_PAGE = """<!DOCTYPE html>
 <title>Справка администратора — OilBook</title>
 <link rel="icon" href="/static/icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
   :root { --bg:#F1F5F9; --text:#1E293B; --hint:#94A3B8; --blue:#0F52BA; --darkblue:#0A2540; --border:#E2E8F0;
           --font-display:'Space Grotesk', sans-serif; --font-body:'Plus Jakarta Sans', -apple-system, sans-serif; }
@@ -14116,7 +14358,7 @@ DISPLAY_PAGE = """
 <title>{{ T.app_title }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
   body {
@@ -14718,8 +14960,8 @@ SUB_PAGE = r"""<!DOCTYPE html>
 <title>{{ T.sub_title }} · OilBook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
 :root { --line:#E3E8F0; --text:#0B1F3A; --muted:#5B6B82; --blue:#1D6FE0; --blue-bg:#F0F6FF; --green:#0E6B3E; --green-bg:#E3F4EA;
   --warn:#8A4205; --warn-bg:#FEF0DC; --red:#B3122F; --red-bg:#FCE6EA; --mono:'IBM Plex Mono', ui-monospace, monospace; }
