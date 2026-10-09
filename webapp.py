@@ -2376,15 +2376,16 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="row2" style="margin-bottom:-10px;">
         <div class="field">
           <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
-          <select id="car_brand" onchange="specSchedule(0)">
+          <select id="car_brand" onchange="specSchedule(0); renderQuickModels()">
             {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
           </select>
         </div>
         <div class="field">
           <label><i class="fa-solid fa-car-side"></i>{{ T.field_car_model }}</label>
-          <input id="car_model" placeholder="Cobalt, Nexia, Malibu..." oninput="specSchedule()" autocomplete="off">
+          <input id="car_model" placeholder="Cobalt, Nexia, Malibu..." oninput="specSchedule(); renderQuickModels()" autocomplete="off">
         </div>
       </div>
+      <div class="qm-row" id="quickModels"></div>
       <div class="field" style="margin-top:12px;">
         <label><i class="fa-solid fa-barcode"></i>{{ T.vin_label }}</label>
         <div class="plate-wrap vin-wrap">
@@ -7648,6 +7649,7 @@ async function lookupPlate(force) {
     document.getElementById('car_model').value = data.car.car_model || '';
     document.getElementById('vin').value = data.car.vin || '';
     if (typeof renderVinHint === 'function') renderVinHint();
+    if (typeof renderQuickModels === 'function') renderQuickModels();
     specSchedule(0);
 
     const name = data.car.owner_name || T.kc_no_name;
@@ -7845,7 +7847,7 @@ function discardAddDraft() {
   resetItemInputs();
   setPayMode('cash');
   document.getElementById('msg').innerHTML = '';
-  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
+  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint(); renderQuickModels();
 }
 function restoreAddDraft() {
   let d = null;
@@ -7969,6 +7971,7 @@ async function submitCar() {
     showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','vin','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
+    loadQuickModels(true);
     KM.manual = false;
     KNOWN_OWNER = null;
     NEW_OWNER = false;
@@ -9550,23 +9553,25 @@ PAGE = PAGE + MODAL_AND_SCRIPT
 PAGE = PAGE.replace("</body>", HELP_JS + "</body>", 1)
 VIN_SCAN_HTML = r"""<style>
   .vin-wrap #vin { padding-right:58px; font-family:var(--font-mono); letter-spacing:.5px; text-transform:uppercase; }
+  .vin-wrap #vin::placeholder { text-transform:none; letter-spacing:0; font-family:inherit; }
   .vin-hint { margin-top:6px; font-size:12.5px; color:#5b6b8c; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
   .vin-hint.err { color:#b91c1c; }
   .vin-hint button { border:1px solid #cfe0fb; background:#fff; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
-  #vsOverlay { position:fixed; inset:0; z-index:9001; background:#0b0f16; display:none; overflow:hidden; touch-action:none; }
+  .qm-row { display:flex; gap:6px; overflow-x:auto; padding:2px 0 6px; margin:8px 0 0; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .qm-row::-webkit-scrollbar { display:none; }
+  .qm-chip { flex:none; border:1.5px solid var(--border); background:var(--field-bg); color:var(--text); border-radius:999px; padding:7px 13px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .qm-chip.on { border-color:#1d4ed8; background:#eaf1ff; color:#1d4ed8; }
+  #vsOverlay { position:fixed; inset:0; z-index:9001; background:#0b0f16; display:none; overflow:hidden; }
   #vsOverlay.open { display:block; }
-  #vsVideo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#0b0f16; }
-  #vsFrame { position:absolute; left:50%; transform:translateX(-50%); border-radius:10px; box-shadow:0 0 0 200vmax rgba(0,0,0,.5); border:2px solid rgba(34,211,238,.9); }
-  #vsFrame.hit { border-color:#34d399; }
-  #vsHint { position:absolute; left:16px; right:16px; text-align:center; color:#fff; font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.6); }
-  #vsStatus { position:absolute; left:16px; right:16px; text-align:center; }
+  #vsPhotoBox { position:absolute; left:0; right:0; top:calc(64px + env(safe-area-inset-top, 0px)); bottom:0; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
+  #vsImg { max-width:100%; max-height:62vh; object-fit:contain; touch-action:manipulation; }
+  #vsOverlay.tap #vsImg { cursor:crosshair; outline:3px solid #facc15; }
+  #vsStatus { position:absolute; left:16px; right:16px; top:calc(64px + 62vh + 16px); text-align:center; }
   #vsStatus span { display:inline-block; background:rgba(34,211,238,.18); color:#a5f3fc; border:1px solid rgba(34,211,238,.4); font-size:13px; padding:7px 14px; border-radius:20px; font-weight:600; max-width:100%; }
-  #vsStatus.err span { background:rgba(239,68,68,.2); color:#fecaca; border-color:rgba(239,68,68,.5); }
-  #vsRead { position:absolute; left:16px; right:16px; text-align:center; color:#e2e8f0; font-family:var(--font-mono); font-size:13px; letter-spacing:1px; }
-  #vsSheet { position:absolute; left:0; right:0; bottom:0; background:var(--card, #fff); color:var(--text); border-radius:22px 22px 0 0; padding:14px 16px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -8px 24px rgba(0,0,0,.3); display:none; max-width:560px; margin:0 auto; max-height:85vh; overflow-y:auto; }
+  #vsStatus.err span { background:rgba(250,204,21,.18); color:#fde68a; border-color:rgba(250,204,21,.5); }
+  #vsSheet { position:absolute; left:0; right:0; bottom:0; background:var(--card, #fff); color:var(--text); border-radius:22px 22px 0 0; padding:14px 16px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -8px 24px rgba(0,0,0,.3); display:none; max-width:560px; margin:0 auto; max-height:80vh; overflow-y:auto; }
   #vsOverlay.result #vsSheet { display:block; }
-  #vsOverlay.result #vsVideo { filter:blur(4px) brightness(.6); }
-  #vsOverlay.result #vsFrame, #vsOverlay.result #vsHint, #vsOverlay.result #vsStatus, #vsOverlay.result #vsRead, #vsOverlay.result .ps-bottom { display:none; }
+  #vsOverlay.result #vsStatus { display:none; }
   .vs-vin { font-family:var(--font-mono); font-weight:700; font-size:19px; letter-spacing:1px; width:100%; text-transform:uppercase; }
   .vs-info { display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 12px; margin:12px 0; font-size:14px; }
   .vs-info span { color:#64748b; }
@@ -9578,38 +9583,32 @@ VIN_SCAN_HTML = r"""<style>
   .vs-warn { font-size:12.5px; color:#92600a; background:#fff4d6; border-radius:10px; padding:8px 10px; margin-bottom:12px; }
 </style>
 
+<input type="file" id="vsFile" accept="image/*" capture="environment" style="display:none;" onchange="vsOnPhoto(this)">
 <div id="vsOverlay" role="dialog" aria-modal="true">
-  <video id="vsVideo" playsinline muted autoplay></video>
-  <div id="vsFrame"></div>
   <div class="ps-top">
     <button type="button" class="ps-ib" onclick="closeVinScanner()" aria-label="close"><i class="fa-solid fa-xmark"></i></button>
     <div>{{ T.vs_title }}</div>
-    <button type="button" class="ps-ib" id="vsTorch" onclick="vsToggleTorch()" hidden aria-label="{{ T.ps_torch }}"><i class="fa-solid fa-bolt"></i></button>
+    <button type="button" class="ps-ib" onclick="openVinScanner()" aria-label="{{ T.vs_retake }}"><i class="fa-solid fa-camera"></i></button>
   </div>
-  <div id="vsHint">{{ T.vs_hint }}</div>
+  <div id="vsPhotoBox"><img id="vsImg" alt="" onclick="vsOnTap(event)"></div>
   <div id="vsStatus"><span></span></div>
-  <div id="vsRead"></div>
-  <div class="ps-bottom">
-    <button type="button" class="ps-manual" onclick="vsManual()">{{ T.vs_manual }}</button>
-    <div class="ps-priv"><i class="fa-solid fa-lock"></i> {{ T.ps_privacy }}</div>
-  </div>
   <div id="vsSheet"></div>
-  <canvas id="vsCanvas" width="1200" height="200" style="display:none;"></canvas>
+  <canvas id="vsCanvas" style="display:none;"></canvas>
 </div>
 
 <script>
-// ===== Сканер VIN =====
-// Камера телефона читает VIN двумя способами одновременно:
-//  1) штрихкод на наклейке (дверной проём, стойка) — через BarcodeDetector,
-//     если телефон его умеет (Android Chrome), — мгновенно и точно;
-//  2) текст — распознавание Tesseract прямо на телефоне (файлы ~5 МБ
-//     скачиваются с бесплатного CDN один раз, дальше из кэша).
-// Фото никуда не отправляются. Расшифровка VIN — на сервере OilBook (/api/vin/decode).
-const VS = { stream: null, track: null, worker: null, loading: null, detector: null, running: false,
-             gen: 0, hits: {}, result: null, info: null, pick: null, torch: false, startedAt: 0 };
+// ===== VIN по фото =====
+// Мастер делает ОДНО фото обычной камерой телефона (с автофокусом, без
+// наведения рамки). VIN ищется по всему снимку: штрихкод (если телефон умеет
+// BarcodeDetector) + текст (Tesseract на телефоне; ~5 МБ скачиваются с
+// бесплатного CDN один раз). Не нашлось — мастер касается VIN на фото, и
+// читается только эта полоска. Фото никуда не отправляются.
+const VS = { worker: null, loading: null, detector: null, gen: 0, result: null, info: null, pick: null, img: null };
 const VS_OK = /^[A-HJ-NPR-Z0-9]{17}$/;
 const VS_TR = { A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9 };
 const VS_W = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+// известные коды производителей (первые 3 знака VIN) — с сервера
+const VS_WMI = new Set(__VIN_WMI__);
 
 function vsNorm(s) {
   return String(s || '').toUpperCase().replace(/O/g, '0').replace(/Q/g, '0').replace(/I/g, '1').replace(/[^A-Z0-9]/g, '');
@@ -9620,27 +9619,27 @@ function vsCheckOk(v) {
   const r = t % 11;
   return v[8] === (r === 10 ? 'X' : String(r));
 }
-// известные коды производителей (первые 3 знака VIN) — с сервера
-const VS_WMI = new Set(__VIN_WMI__);
-// из распознанного текста — кандидаты на VIN (17 знаков, последние 4 — цифры).
-// Из одной строки берём ОДИН вариант: начинающийся с известного кода
-// производителя, иначе тот, у которого сошлась контрольная цифра, иначе —
-// прижатый к концу строки (перед VIN часто напечатано «VIN:»).
+// из текста — кандидаты на VIN (17 знаков, последние 4 — цифры). Из одной
+// строки берём один вариант: с известным кодом производителя, иначе с
+// верной контрольной цифрой, иначе прижатый к концу строки.
 function vsExtract(text) {
   const out = [];
   String(text || '').split(/\n/).forEach(line => {
     const s = vsNorm(String(line).replace(/\bVIN\b|\bV1N\b/gi, ' '));
-    if (s.length < 17 || s.length > 22) return;
+    if (s.length < 17 || s.length > 24) return;
     const ws = [];
     for (let i = 0; i + 17 <= s.length; i++) {
       const w = s.slice(i, i + 17);
       if (VS_OK.test(w) && /[0-9]{4}$/.test(w)) ws.push(w);
     }
     if (!ws.length) return;
-    const pick = ws.find(w => VS_WMI.has(w.slice(0, 3))) || ws.find(vsCheckOk) || ws[ws.length - 1];
-    out.push(pick);
+    out.push(ws.find(w => VS_WMI.has(w.slice(0, 3))) || ws.find(vsCheckOk) || ws[ws.length - 1]);
   });
   return out;
+}
+function vsBest(cands) {
+  return cands.find(w => VS_WMI.has(w.slice(0, 3)) && vsCheckOk(w)) || cands.find(w => VS_WMI.has(w.slice(0, 3)))
+    || cands.find(vsCheckOk) || cands[0] || null;
 }
 
 function vsSetStatus(text, isErr) {
@@ -9650,25 +9649,13 @@ function vsSetStatus(text, isErr) {
   st.querySelector('span').textContent = text || '';
 }
 
-function vsLayout() {
-  const ov = document.getElementById('vsOverlay');
-  const W = ov.clientWidth, H = ov.clientHeight;
-  const fw = Math.min(W * 0.92, 520), fh = Math.round(fw / 6);
-  const top = Math.round(H * 0.4 - fh / 2);
-  const fr = document.getElementById('vsFrame');
-  fr.style.width = Math.round(fw) + 'px'; fr.style.height = fh + 'px'; fr.style.top = top + 'px';
-  document.getElementById('vsHint').style.top = (top - 64) + 'px';
-  document.getElementById('vsStatus').style.top = (top + fh + 18) + 'px';
-  document.getElementById('vsRead').style.top = (top + fh + 60) + 'px';
-}
-
 function vsLoadOcr() {
   if (VS.worker) return Promise.resolve(VS.worker);
   if (!VS.loading) {
     VS.loading = (async () => {
       if (!window.Tesseract) await psLoadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
       const w = await Tesseract.createWorker('eng', 1);
-      await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789', tessedit_pageseg_mode: '7' });
+      await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789' });
       VS.worker = w;
       return w;
     })().catch(e => { VS.loading = null; throw e; });
@@ -9685,158 +9672,120 @@ async function vsMakeDetector() {
   } catch (e) { VS.detector = false; }
 }
 
-async function openVinScanner() {
-  if (typeof closePlateScanner === 'function') closePlateScanner();
-  const ov = document.getElementById('vsOverlay');
-  VS.gen++; VS.hits = {}; VS.result = null; VS.info = null; VS.pick = null;
-  ov.classList.remove('result');
-  ov.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('vsFrame').classList.remove('hit');
-  document.getElementById('vsHint').textContent = T.vs_hint;
-  document.getElementById('vsRead').textContent = '';
-  vsLayout();
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { vsSetStatus(T.ps_no_camera, true); return; }
-  const gen = VS.gen;
-  vsSetStatus(VS.worker ? T.vs_scanning : T.vs_loading);
-  const ocrP = vsLoadOcr();
-  ocrP.catch(() => {});
-  try { await vsStartCamera(); } catch (e) {
-    if (gen !== VS.gen) return;
-    const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-    vsSetStatus(denied ? T.ps_denied : T.ps_no_camera, true);
-    return;
-  }
-  await vsMakeDetector();
-  if (gen !== VS.gen) return;
-  VS.running = true;
-  VS.startedAt = Date.now();
-  vsTick(gen);
-  ocrP.then(() => { if (gen === VS.gen && VS.running) vsSetStatus(T.vs_scanning); })
-      .catch(() => { if (gen === VS.gen && VS.running) vsSetStatus(VS.detector ? T.vs_barcode_only : T.vs_load_fail, !VS.detector); });
-}
-
-async function vsStartCamera() {
-  if (VS.stream) return;
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-  });
-  if (!document.getElementById('vsOverlay').classList.contains('open')) { stream.getTracks().forEach(t => t.stop()); return; }
-  VS.stream = stream;
-  VS.track = stream.getVideoTracks()[0] || null;
-  const v = document.getElementById('vsVideo');
-  v.srcObject = stream;
-  try { await v.play(); } catch (e) {}
-  VS.torch = false;
-  const tb = document.getElementById('vsTorch');
-  tb.classList.remove('on');
-  let caps = {};
-  try { caps = VS.track && VS.track.getCapabilities ? VS.track.getCapabilities() : {}; } catch (e) {}
-  tb.hidden = !caps.torch;
-}
-
-function vsStopCamera() {
-  VS.running = false;
-  if (VS.stream) VS.stream.getTracks().forEach(t => t.stop());
-  VS.stream = null; VS.track = null;
-  const v = document.getElementById('vsVideo');
-  if (v) v.srcObject = null;
-}
-
-async function vsToggleTorch() {
-  if (!VS.track) return;
-  VS.torch = !VS.torch;
-  try { await VS.track.applyConstraints({ advanced: [{ torch: VS.torch }] }); } catch (e) { VS.torch = false; }
-  document.getElementById('vsTorch').classList.toggle('on', VS.torch);
+// кнопка камеры: сразу открываем камеру телефона, а распознавание
+// загружаем в фоне, пока мастер фотографирует
+function openVinScanner() {
+  vsLoadOcr().catch(() => {});
+  const f = document.getElementById('vsFile');
+  f.value = '';
+  f.click();
 }
 
 function closeVinScanner() {
   VS.gen++;
-  vsStopCamera();
   const ov = document.getElementById('vsOverlay');
-  ov.classList.remove('open', 'result');
+  ov.classList.remove('open', 'result', 'tap');
   document.getElementById('vsSheet').innerHTML = '';
+  const img = document.getElementById('vsImg');
+  if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  img.removeAttribute('src');
+  VS.img = null;
   document.body.style.overflow = '';
 }
 
-function vsManual() {
-  closeVinScanner();
-  const el = document.getElementById('vin');
-  if (el) el.focus();
-}
-
-// часть кадра под рамкой → серая картинка 1200×200 с растянутым контрастом
-function vsCropCanvas() {
-  const v = document.getElementById('vsVideo');
-  const vw = v.videoWidth, vh = v.videoHeight;
-  if (!vw || !vh) return null;
-  const ew = v.clientWidth, eh = v.clientHeight;
-  const scale = Math.max(ew / vw, eh / vh);
-  const offX = (vw * scale - ew) / 2, offY = (vh * scale - eh) / 2;
-  const fr = document.getElementById('vsFrame').getBoundingClientRect();
-  const vr = v.getBoundingClientRect();
-  const fx = fr.left - vr.left, fy = fr.top - vr.top;
-  const sx = (fx + offX) / scale, sy = (fy + offY) / scale, sw = fr.width / scale, sh = fr.height / scale;
+// фото (или его полоска) → серая картинка с растянутым контрастом
+function vsToCanvas(img, sx, sy, sw, sh, maxW) {
+  const k = Math.min(1, maxW / sw);
   const c = document.getElementById('vsCanvas');
+  c.width = Math.round(sw * k); c.height = Math.round(sh * k);
   const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
-  const img = ctx.getImageData(0, 0, c.width, c.height);
-  const d = img.data;
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  const im = ctx.getImageData(0, 0, c.width, c.height), d = im.data;
   let lo = 255, hi = 0;
   for (let i = 0; i < d.length; i += 4) {
     const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
     d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g;
   }
-  const k = hi > lo ? 255 / (hi - lo) : 1;
-  for (let i = 0; i < d.length; i += 4) {
-    const g = Math.max(0, Math.min(255, (d[i] - lo) * k));
-    d[i] = d[i + 1] = d[i + 2] = g;
-  }
-  ctx.putImageData(img, 0, 0);
+  const m = hi > lo ? 255 / (hi - lo) : 1;
+  for (let i = 0; i < d.length; i += 4) { const g = Math.max(0, Math.min(255, (d[i] - lo) * m)); d[i] = d[i + 1] = d[i + 2] = g; }
+  ctx.putImageData(im, 0, 0);
   return c;
 }
 
-function vsAccept(vin) {
-  if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
-  vsShowResult(vin);
+async function vsOcr(canvas, psm) {
+  const w = await vsLoadOcr();
+  await w.setParameters({ tessedit_pageseg_mode: psm });
+  return (await w.recognize(canvas)).data.text || '';
 }
 
-async function vsTick(gen) {
-  if (gen !== VS.gen || !VS.running) return;
-  const v = document.getElementById('vsVideo');
-  // 1) штрихкод — сразу принимаем
-  if (VS.detector && v.videoWidth) {
+async function vsOnPhoto(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const gen = ++VS.gen;
+  const ov = document.getElementById('vsOverlay');
+  ov.classList.remove('result', 'tap');
+  ov.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('vsSheet').innerHTML = '';
+  const img = document.getElementById('vsImg');
+  img.src = URL.createObjectURL(file);
+  try { await img.decode(); } catch (e) {}
+  if (gen !== VS.gen) return;
+  VS.img = img;
+  vsSetStatus(VS.worker ? T.vs_reading : T.vs_loading);
+  // 1) штрихкод на наклейке
+  await vsMakeDetector();
+  if (VS.detector) {
     try {
-      const codes = await VS.detector.detect(v);
+      const codes = await VS.detector.detect(img);
       for (const c of codes) {
         const raw = vsNorm(c.rawValue);
-        const m = raw.length === 17 && VS_OK.test(raw) ? [raw] : vsExtract(c.rawValue);
-        if (m.length) { vsAccept(m[0]); return; }
+        const v = raw.length === 17 && VS_OK.test(raw) ? raw : vsBest(vsExtract(c.rawValue));
+        if (v && gen === VS.gen) { vsShowResult(v); return; }
       }
     } catch (e) {}
   }
-  if (gen !== VS.gen || !VS.running) return;
-  // 2) текст
-  if (VS.worker) {
-    const cv = vsCropCanvas();
-    if (cv) {
-      let text = '';
-      try { text = (await VS.worker.recognize(cv)).data.text || ''; } catch (e) {}
-      if (gen !== VS.gen || !VS.running) return;
-      const cands = vsExtract(text);
-      document.getElementById('vsRead').textContent = cands[0] || vsNorm(text).slice(0, 20);
-      document.getElementById('vsFrame').classList.toggle('hit', cands.length > 0);
-      for (const w of cands) {
-        VS.hits[w] = (VS.hits[w] || 0) + 1;
-        // контрольная цифра сошлась — хватает одного кадра; иначе ждём
-        // два одинаковых прочтения подряд
-        if (vsCheckOk(w) || VS.hits[w] >= 2) { vsAccept(w); return; }
-      }
-    }
+  if (gen !== VS.gen) return;
+  // 2) текст по всему фото
+  const W = img.naturalWidth, H = img.naturalHeight;
+  let found = null;
+  try {
+    const text = await vsOcr(vsToCanvas(img, 0, 0, W, H, 1800), '11');
+    found = vsBest(vsExtract(text));
+  } catch (e) {
+    if (gen === VS.gen) { vsSetStatus(T.vs_load_fail, true); ov.classList.add('tap'); }
+    return;
   }
-  if (Date.now() - VS.startedAt > 10000) document.getElementById('vsHint').textContent = T.vs_hint_slow;
-  setTimeout(() => vsTick(gen), VS.worker ? 60 : 250);
+  if (gen !== VS.gen) return;
+  if (found) { vsShowResult(found); return; }
+  // не нашли — мастер касается VIN на фото
+  ov.classList.add('tap');
+  vsSetStatus(T.vs_tap_hint, true);
+}
+
+// касание по фото: читаем горизонтальную полоску вокруг этого места
+async function vsOnTap(ev) {
+  const ov = document.getElementById('vsOverlay');
+  if (!ov.classList.contains('tap') || !VS.img) return;
+  const img = VS.img, r = img.getBoundingClientRect();
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const y = (ev.clientY - r.top) / r.height * H;
+  const band = Math.max(40, H * 0.09);
+  const gen = VS.gen;
+  vsSetStatus(T.vs_reading);
+  let v = null;
+  try {
+    for (const k of [1, 1.8]) {
+      const h = band * k, sy = Math.max(0, y - h / 2);
+      const text = await vsOcr(vsToCanvas(img, 0, sy, W, Math.min(h, H - sy), 1600), '6');
+      v = vsBest(vsExtract(text));
+      if (v || gen !== VS.gen) break;
+    }
+  } catch (e) { v = null; }
+  if (gen !== VS.gen) return;
+  if (v) { vsShowResult(v); return; }
+  vsSetStatus(T.vs_not_found, true);
+  vsShowResult('');
 }
 
 // ---- результат ----
@@ -9846,15 +9795,18 @@ async function vinDecode(vin) {
 }
 
 async function vsShowResult(vin) {
-  vsStopCamera();
   VS.result = vin; VS.info = null; VS.pick = null;
-  document.getElementById('vsOverlay').classList.add('result');
+  const ov = document.getElementById('vsOverlay');
+  ov.classList.remove('tap');
+  ov.classList.add('result');
+  if (navigator.vibrate && vin) { try { navigator.vibrate(60); } catch (e) {} }
   vsRenderSheet();
+  if (!VS_OK.test(vin)) return;
   const gen = VS.gen;
   const info = await vinDecode(vin);
   if (gen !== VS.gen || VS.result !== vin) return;
   VS.info = info;
-  vsRenderSheet();
+  vsRenderSheet(true);
 }
 
 function vsOnEdit(el) {
@@ -9869,8 +9821,10 @@ function vsOnEdit(el) {
   else vsRenderSheet(true);
 }
 
-function vsInfoHtml(info, pickFn) {
-  if (!info) return `<div class="vs-src">${escapeHtml(T.vs_decoding)}</div>`;
+function vsInfoHtml(info) {
+  if (!VS.result) return `<div class="vs-warn">${escapeHtml(T.vs_not_found)}</div>`;
+  if (!VS_OK.test(VS.result)) return `<div class="vs-src">${VS.result.length}/17</div>`;
+  if (!info) return `<div class="vs-src" style="margin-top:8px;">${escapeHtml(T.vs_decoding)}</div>`;
   if (!info.ok) return `<div class="vs-warn">${escapeHtml(T.vs_invalid)}</div>`;
   const srcLabel = info.model_source === 'learned' ? T.vs_src_learned : (info.model_source === 'vpic' ? T.vs_src_vpic : '');
   let html = `<div class="vs-info">
@@ -9880,30 +9834,9 @@ function vsInfoHtml(info, pickFn) {
     </div>`;
   if (!info.model && (info.choices || []).length) {
     html += `<div class="ps-lbl">${escapeHtml(T.vs_pick_model)}</div><div class="vs-chips">` +
-      info.choices.map(m => `<button type="button" class="${VS.pick === m ? 'on' : ''}" onclick="${pickFn}(${escapeHtml(JSON.stringify(m))})">${escapeHtml(m)}</button>`).join('') + '</div>';
+      info.choices.map(m => `<button type="button" class="${VS.pick === m ? 'on' : ''}" onclick="vsPick(${escapeHtml(JSON.stringify(m))})">${escapeHtml(m)}</button>`).join('') + '</div>';
   }
   return html;
-}
-
-function vsRenderSheet(keepInput) {
-  const sheet = document.getElementById('vsSheet');
-  const info = VS.info;
-  const inp = document.getElementById('vsVinInput');
-  if (keepInput && inp) {
-    document.getElementById('vsInfoBox').innerHTML = vsInfoHtml(info, 'vsPick') + vsCarHtml(info);
-    return;
-  }
-  sheet.innerHTML = `
-    <div class="ps-grab"></div>
-    <div class="ps-lbl">${escapeHtml(T.vs_recognized)}</div>
-    <input id="vsVinInput" class="vs-vin" value="${escapeHtml(VS.result || '')}" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="vsOnEdit(this)">
-    <div class="vs-src" style="margin-top:4px;">${escapeHtml(T.vs_check_hint)}</div>
-    <div id="vsInfoBox">${vsInfoHtml(info, 'vsPick')}${vsCarHtml(info)}</div>
-    <div class="ps-btns">
-      <button type="button" class="ps-bt s" onclick="openVinScanner()"><i class="fa-solid fa-rotate"></i> ${escapeHtml(T.ps_again)}</button>
-      <button type="button" class="ps-bt p" onclick="vsApply()">${escapeHtml(T.vs_apply)}</button>
-    </div>
-    <div class="ps-lock"><i class="fa-solid fa-lock"></i> ${escapeHtml(T.vs_on_phone)}</div>`;
 }
 
 function vsCarHtml(info) {
@@ -9913,6 +9846,27 @@ function vsCarHtml(info) {
       <div class="ps-tag"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(T.vs_in_base)}</div>
       <div class="ps-mt mono">${escapeHtml(psPretty(c.plate_number))}</div>
       <div class="ps-ms">${escapeHtml([c.owner_name, [c.car_brand, c.car_model].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div></div></div>`;
+}
+
+function vsRenderSheet(keepInput) {
+  const sheet = document.getElementById('vsSheet');
+  const info = VS.info;
+  if (keepInput && document.getElementById('vsVinInput')) {
+    document.getElementById('vsInfoBox').innerHTML = vsInfoHtml(info) + vsCarHtml(info);
+    return;
+  }
+  sheet.innerHTML = `
+    <div class="ps-grab"></div>
+    <div class="ps-lbl">${escapeHtml(VS.result ? T.vs_recognized : T.vs_type_vin)}</div>
+    <input id="vsVinInput" class="vs-vin" value="${escapeHtml(VS.result || '')}" maxlength="20" placeholder="XWB…" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="vsOnEdit(this)">
+    <div class="vs-src" style="margin-top:4px;">${escapeHtml(T.vs_check_hint)}</div>
+    <div id="vsInfoBox">${vsInfoHtml(info)}${vsCarHtml(info)}</div>
+    <div class="ps-btns">
+      <button type="button" class="ps-bt s" onclick="openVinScanner()"><i class="fa-solid fa-camera"></i> ${escapeHtml(T.vs_retake)}</button>
+      <button type="button" class="ps-bt p" onclick="vsApply()">${escapeHtml(T.vs_apply)}</button>
+    </div>
+    <div class="ps-lock"><i class="fa-solid fa-lock"></i> ${escapeHtml(T.vs_on_phone)}</div>`;
+  if (!VS.result) setTimeout(() => { const i = document.getElementById('vsVinInput'); if (i) i.focus(); }, 50);
 }
 
 function vsPick(m) { VS.pick = VS.pick === m ? null : m; vsRenderSheet(true); }
@@ -9935,6 +9889,7 @@ function applyVinInfo(vin, info, pickedModel) {
     }
   }
   renderVinHint();
+  renderQuickModels();
   if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
   specSchedule(0);
 }
@@ -9952,14 +9907,12 @@ const VINF = { timer: null, info: null, vin: '' };
 function onVinInput() {
   const el = document.getElementById('vin');
   const v = vsNorm(el.value).slice(0, 17);
-  if (el.value !== v && el.value.toUpperCase() !== v) el.value = v;
   clearTimeout(VINF.timer);
   if (!VS_OK.test(v)) { VINF.info = null; VINF.vin = v; renderVinHint(); return; }
   VINF.timer = setTimeout(async () => {
     const info = await vinDecode(v);
     if (vsNorm(document.getElementById('vin').value) !== v) return;
     VINF.info = info; VINF.vin = v;
-    // модель ещё не вписана — подставляем сразу
     if (info && info.ok && info.model && !(document.getElementById('car_model').value || '').trim()) {
       applyVinInfo(v, info, null);
       return;
@@ -9974,7 +9927,7 @@ function renderVinHint() {
   const v = vsNorm((document.getElementById('vin') || {}).value || '');
   const info = VINF.vin === v ? VINF.info : null;
   if (!v) { box.innerHTML = ''; return; }
-  if (v.length > 0 && v.length < 17) { box.innerHTML = `<div class="vin-hint">${v.length}/17</div>`; return; }
+  if (v.length < 17) { box.innerHTML = `<div class="vin-hint">${v.length}/17</div>`; return; }
   if (!info) { box.innerHTML = ''; return; }
   if (!info.ok) { box.innerHTML = `<div class="vin-hint err">${escapeHtml(T.vs_invalid)}</div>`; return; }
   const line = [info.brand, info.year, info.model].filter(Boolean).join(' · ');
@@ -9984,7 +9937,51 @@ function renderVinHint() {
   const choose = !info.model ? ` · ${escapeHtml(T.vs_model_unknown)}` : '';
   box.innerHTML = `<div class="vin-hint"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(line || T.vs_unknown)}${choose} ${btn}</div>`;
 }
+
+// ---- быстрые кнопки моделей ----
+// Самые частые модели этой точки (из её базы) + популярные в Узбекистане.
+// Одно касание ставит марку и модель — и сразу показывается подбор масла.
+const QM = { list: [], loaded: false };
+const QM_DEFAULT = [['Chevrolet', 'Cobalt'], ['Chevrolet', 'Nexia 3'], ['Chevrolet', 'Gentra'], ['Chevrolet', 'Spark'],
+  ['Chevrolet', 'Malibu'], ['Chevrolet', 'Damas'], ['Chevrolet', 'Tracker'], ['Chevrolet', 'Onix'], ['Chevrolet', 'Lacetti'],
+  ['Chevrolet', 'Captiva'], ['Daewoo', 'Nexia'], ['Daewoo', 'Matiz'], ['Hyundai', 'Elantra'], ['Kia', 'K5'], ['BYD', 'Song Plus'],
+  ['Toyota', 'Camry']];
+async function loadQuickModels(force) {
+  if (QM.loaded && !force) { renderQuickModels(); return; }
+  let top = [];
+  try { top = (await (await fetch('/api/top_models')).json()).models || []; } catch (e) {}
+  const seen = new Set(), list = [];
+  top.concat(QM_DEFAULT.map(([brand, model]) => ({ brand, model }))).forEach(m => {
+    const k = String(m.model || '').trim().toLowerCase();
+    if (!k || seen.has(k)) return;
+    seen.add(k); list.push(m);
+  });
+  QM.list = list.slice(0, 16);
+  QM.loaded = true;
+  renderQuickModels();
+}
+function renderQuickModels() {
+  const box = document.getElementById('quickModels');
+  if (!box) return;
+  const cur = (document.getElementById('car_model').value || '').trim().toLowerCase();
+  box.innerHTML = QM.list.map((m, i) =>
+    `<button type="button" class="qm-chip${String(m.model).toLowerCase() === cur ? ' on' : ''}" onclick="pickQuickModel(${i})">${escapeHtml(m.model)}</button>`).join('');
+}
+function pickQuickModel(i) {
+  const m = QM.list[i];
+  if (!m) return;
+  const brandSel = document.getElementById('car_brand');
+  if (m.brand && Array.from(brandSel.options).some(o => o.value === m.brand)) brandSel.value = m.brand;
+  else if (m.brand) brandSel.value = 'Другое';
+  const inList = brandSel.value === m.brand;
+  document.getElementById('car_model').value = (!inList && m.brand && m.brand !== 'Другое' && String(m.model).toLowerCase().indexOf(String(m.brand).toLowerCase()) < 0)
+    ? m.brand + ' ' + m.model : m.model;
+  renderQuickModels();
+  if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
+  specSchedule(0);
+}
 </script>
+<script>loadQuickModels();</script>
 """
 
 _ps_i = PAGE.rfind("</body>")
@@ -10428,6 +10425,12 @@ def decode_vin(vin, shop_id=None):
         b = out["brand"].lower()
         out["choices"] = _vin_model_choices(b)
     return out
+
+
+@app.route("/api/top_models")
+@login_required
+def api_top_models():
+    return jsonify({"models": db.top_car_models(g.shop_id)})
 
 
 @app.route("/api/vin/decode")

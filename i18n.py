@@ -2472,3 +2472,25 @@ UZ.update({
     "vs_pick_model": "Modelni tanlang — keyingi safar o'zi aniqlanadi",
     "vs_model_unknown": "model aniqlanmadi — yozib qo'ying, OilBook eslab qoladi",
 })
+
+# --- VIN по фото ---
+RU.update({
+    "vs_title": "VIN по фото",
+    "vs_retake": "Переснять",
+    "vs_reading": "Ищем VIN на фото…",
+    "vs_loading": "Загружаем распознавание (только в первый раз, ~5 МБ)…",
+    "vs_tap_hint": "VIN не нашёлся. Коснитесь строки с VIN на фото",
+    "vs_not_found": "Не удалось прочитать VIN. Впишите его вручную или переснимите ближе и ровнее",
+    "vs_type_vin": "Впишите VIN",
+})
+UZ.update({
+    "vs_title": "Rasmdan VIN",
+    "vs_retake": "Qayta suratga olish",
+    "vs_reading": "Rasmdan VIN qidirilmoqda…",
+    "vs_loading": "Tanib olish yuklanmoqda (faqat birinchi marta, ~5 MB)…",
+    "vs_tap_hint": "VIN topilmadi. Rasmdagi VIN qatoriga bosing",
+    "vs_not_found": "VIN o'qilmadi. Qo'lda yozing yoki yaqinroq va to'g'riroq qayta suratga oling",
+    "vs_type_vin": "VIN ni yozing",
+})
+RU.update({"vin_ph": "17 знаков или фото"})
+UZ.update({"vin_ph": "17 belgi yoki rasm"})

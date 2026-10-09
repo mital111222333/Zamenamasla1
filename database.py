@@ -6331,3 +6331,26 @@ def find_car_by_vin(shop_id: int, vin: str):
             WHERE c.shop_id=? AND c.vin=? ORDER BY c.id DESC LIMIT 1
         """, (shop_id, vin)).fetchone()
         return dict(row) if row else None
+
+
+def top_car_models(shop_id: int, limit: int = 12):
+    """Модели, которые чаще всего приезжают к точке — для быстрых кнопок
+    в форме «Замена». Написание берём самое частое в базе точки."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT car_brand, TRIM(car_model) AS model, COUNT(*) AS n
+            FROM cars WHERE shop_id=? AND car_model IS NOT NULL AND TRIM(car_model) <> ''
+            GROUP BY car_brand, TRIM(car_model)
+        """, (shop_id,)).fetchall()
+    best = {}
+    for r in rows:
+        key = r["model"].lower()
+        cur = best.get(key)
+        if cur is None:
+            best[key] = {"brand": r["car_brand"], "model": r["model"], "n": r["n"], "_top": r["n"]}
+        else:
+            cur["n"] += r["n"]
+            if r["n"] > cur["_top"]:
+                cur.update(brand=r["car_brand"], model=r["model"], _top=r["n"])
+    out = sorted(best.values(), key=lambda x: -x["n"])[:limit]
+    return [{"brand": x["brand"], "model": x["model"]} for x in out]
