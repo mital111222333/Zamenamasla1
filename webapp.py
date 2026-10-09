@@ -325,11 +325,66 @@ def _send_telegram_message(chat_id, text) -> bool:
 _display_lock = threading.Lock()
 _display_states = {}
 
-CAR_BRANDS = [
-    "Chevrolet", "Daewoo", "Ravon", "Kia", "Hyundai", "Toyota", "Lexus",
-    "Nissan", "Isuzu", "BMW", "Mercedes-Benz", "Audi", "Volkswagen",
-    "Lada (ВАЗ)", "Datsun", "Honda", "Mazda", "Ford", "Mitsubishi", "Другое",
-]
+# Марки и их модели — для кнопок-подсказок под полем «Модель» (самые
+# частые в Узбекистане — первыми). Названия марок не менять: они уже
+# сохранены у машин в базе.
+CAR_MODELS = {
+    "Chevrolet": ["Cobalt", "Nexia 3", "Gentra", "Spark", "Damas", "Labo", "Lacetti", "Malibu", "Malibu 2",
+                  "Tracker", "Onix", "Captiva", "Equinox", "Monza", "Tahoe", "Traverse", "Trailblazer",
+                  "Aveo", "Cruze", "Orlando", "Epica"],
+    "Daewoo": ["Nexia", "Nexia 2", "Matiz", "Lacetti", "Damas", "Labo", "Tico", "Espero", "Gentra"],
+    "Ravon": ["R2", "R3", "R4", "Gentra", "Nexia R3", "Matiz"],
+    "BYD": ["Song Plus", "Chazor", "Han", "Tang", "Seal", "Song L", "Qin Plus", "Destroyer 05", "Seagull",
+            "Dolphin", "Atto 3", "Yuan Plus", "Leopard 5"],
+    "Kia": ["K5", "Sportage", "Rio", "Cerato", "K3", "Seltos", "Sorento", "Carnival", "K8", "Optima",
+            "Picanto", "Soul", "Sonet", "Mohave"],
+    "Hyundai": ["Elantra", "Sonata", "Tucson", "Santa Fe", "Accent", "Solaris", "Creta", "Palisade", "Kona",
+                "Grandeur", "Ioniq 5", "Starex", "Porter"],
+    "Toyota": ["Camry", "Corolla", "RAV4", "Land Cruiser Prado", "Land Cruiser 200", "Land Cruiser 300",
+               "Hilux", "Fortuner", "Highlander", "C-HR", "Yaris", "Avalon", "Sequoia", "Tundra"],
+    "Lexus": ["LX 570", "LX 600", "RX", "ES", "NX", "GX", "LS"],
+    "Chery": ["Tiggo 2 Pro", "Tiggo 4 Pro", "Tiggo 7 Pro", "Tiggo 8 Pro", "Arrizo 5", "Arrizo 6 Pro", "Arrizo 8",
+              "Omoda C5", "Jaecoo J7", "Exeed TXL", "Exeed LX"],
+    "Haval": ["Jolion", "H6", "Dargo", "M6", "H9"],
+    "Geely": ["Monjaro", "Tugella", "Coolray", "Atlas", "Emgrand", "Okavango", "Geometry C"],
+    "Changan": ["CS35 Plus", "CS55 Plus", "CS75 Plus", "UNI-K", "UNI-V", "Eado", "Alsvin"],
+    "Jetour": ["Dashing", "X70 Plus", "X90 Plus", "T2"],
+    "Li Auto": ["L6", "L7", "L8", "L9"],
+    "Zeekr": ["001", "007", "7X", "X"],
+    "Leapmotor": ["C10", "C11", "C16"],
+    "Hongqi": ["H5", "H9", "HS5", "E-HS9"],
+    "Tesla": ["Model 3", "Model Y", "Model S", "Model X"],
+    "Mercedes-Benz": ["C-Class", "E-Class", "S-Class", "GLA", "GLC", "GLE", "GLS", "G-Class", "ML", "CLS",
+                      "Sprinter", "Vito", "Actros"],
+    "BMW": ["3 Series", "5 Series", "7 Series", "X1", "X3", "X5", "X6", "X7", "M5"],
+    "Audi": ["A4", "A6", "A8", "Q3", "Q5", "Q7", "Q8", "e-tron"],
+    "Volkswagen": ["Polo", "Jetta", "Passat", "Golf", "Tiguan", "Touareg", "Teramont", "ID.4", "ID.6",
+                   "Caddy", "Transporter"],
+    "Skoda": ["Rapid", "Octavia", "Superb", "Kodiaq", "Karoq"],
+    "Porsche": ["Cayenne", "Macan", "Panamera", "911", "Taycan"],
+    "Land Rover": ["Range Rover", "Range Rover Sport", "Velar", "Evoque", "Discovery", "Defender"],
+    "Nissan": ["X-Trail", "Qashqai", "Almera", "Teana", "Patrol", "Juke", "Murano", "Pathfinder", "Sunny"],
+    "Honda": ["Civic", "Accord", "CR-V", "HR-V", "Fit", "Odyssey", "Pilot"],
+    "Mazda": ["3", "6", "CX-5", "CX-30", "CX-9"],
+    "Mitsubishi": ["Lancer", "Outlander", "Pajero", "Pajero Sport", "ASX", "L200"],
+    "Subaru": ["Forester", "Outback", "XV", "Impreza"],
+    "Suzuki": ["Swift", "Vitara", "Jimny", "SX4"],
+    "Ford": ["Focus", "Fusion", "Mondeo", "Explorer", "Escape", "Ranger", "Mustang", "Transit"],
+    "Isuzu": ["NPR", "NQR", "NMR", "ELF", "D-Max"],
+    "JAC": ["J7", "JS4", "S3", "T6", "N35", "N56", "N80", "N120"],
+    "Lada (ВАЗ)": ["Vesta", "Granta", "Largus", "Priora", "Kalina", "Niva", "Niva Travel", "XRAY",
+                   "2107", "2109", "2110", "2114"],
+    "Datsun": ["on-DO", "mi-DO"],
+    "ГАЗ": ["Газель Next", "Газель Бизнес", "ГАЗон Next", "ГАЗ-53", "ГАЗ-3307"],
+    "УАЗ": ["Patriot", "Hunter", "Буханка", "Profi"],
+    "КамАЗ": ["5320", "65115", "5490", "K5"],
+    "MAN": ["TGS", "TGX", "CLA"],
+    "Sinotruk": ["HOWO", "A7", "T7H", "Sitrak C7H"],
+    "Shacman": ["F3000", "X3000"],
+    "Foton": ["Aumark", "Auman"],
+    "Iveco": ["Daily", "Stralis", "Trakker"],
+}
+CAR_BRANDS = list(CAR_MODELS) + ["Другое"]
 SERVICE_TYPES = ["Замена масла", "Замена масла + фильтр", "Полное ТО", "Другое"]
 
 
@@ -2418,7 +2473,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="row2" style="margin-bottom:-10px;">
         <div class="field">
           <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
-          <select id="car_brand" onchange="specSchedule(0); renderQuickModels()">
+          <select id="car_brand" onchange="onBrandChange()">
             {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
           </select>
         </div>
@@ -2428,14 +2483,8 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
         </div>
       </div>
       <div class="qm-row" id="quickModels"></div>
-      <div class="field" style="margin-top:12px;">
-        <label><i class="fa-solid fa-barcode"></i>{{ T.vin_label }}</label>
-        <div class="plate-wrap vin-wrap">
-          <input id="vin" placeholder="{{ T.vin_ph }}" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="onVinInput()" enterkeyhint="next">
-          <button type="button" class="ps-cam-btn" onclick="openVinScanner()" title="{{ T.vs_title }}" aria-label="{{ T.vs_title }}"><i class="fa-solid fa-camera"></i></button>
-        </div>
-        <div id="vinHint"></div>
-      </div>
+      <input id="vin" type="hidden" value="">
+      <div id="vinHint" hidden></div>
       <div id="specCard"></div>
     </div>
 
@@ -3414,6 +3463,7 @@ const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const IS_BRANCH = {{ is_branch|tojson }};
 const IS_EMPLOYEE = {{ is_employee|tojson }};
+const CAR_MODELS = {{ car_models|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
 const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
 const BOT_USERNAME = {{ bot_username|tojson }};
@@ -10167,41 +10217,35 @@ function renderVinHint() {
 // ---- быстрые кнопки моделей ----
 // Самые частые модели этой точки (из её базы) + популярные в Узбекистане.
 // Одно касание ставит марку и модель — и сразу показывается подбор масла.
-const QM = { list: [], loaded: false };
-const QM_DEFAULT = [['Chevrolet', 'Cobalt'], ['Chevrolet', 'Nexia 3'], ['Chevrolet', 'Gentra'], ['Chevrolet', 'Spark'],
-  ['Chevrolet', 'Malibu'], ['Chevrolet', 'Damas'], ['Chevrolet', 'Tracker'], ['Chevrolet', 'Onix'], ['Chevrolet', 'Lacetti'],
-  ['Chevrolet', 'Captiva'], ['Daewoo', 'Nexia'], ['Daewoo', 'Matiz'], ['Hyundai', 'Elantra'], ['Kia', 'K5'], ['BYD', 'Song Plus'],
-  ['Toyota', 'Camry']];
-async function loadQuickModels(force) {
-  if (QM.loaded && !force) { renderQuickModels(); return; }
-  let top = [];
-  try { top = (await (await fetch('/api/top_models')).json()).models || []; } catch (e) {}
-  const seen = new Set(), list = [];
-  top.concat(QM_DEFAULT.map(([brand, model]) => ({ brand, model }))).forEach(m => {
-    const k = String(m.model || '').trim().toLowerCase();
-    if (!k || seen.has(k)) return;
-    seen.add(k); list.push(m);
-  });
-  QM.list = list.slice(0, 16);
-  QM.loaded = true;
+// Кнопки-подсказки под «Моделью»: все модели выбранной марки
+function brandModels() {
+  const sel = document.getElementById('car_brand');
+  return (sel && CAR_MODELS[sel.value]) || [];
+}
+function loadQuickModels() { renderQuickModels(); }
+function onBrandChange() {
+  // сменили марку: модель от прежней марки (выбранная кнопкой) больше не подходит
+  const modelEl = document.getElementById('car_model');
+  const cur = (modelEl.value || '').trim().toLowerCase();
+  if (cur && !brandModels().some(m => m.toLowerCase() === cur)
+      && Object.values(CAR_MODELS).some(list => list.some(m => m.toLowerCase() === cur))) modelEl.value = '';
   renderQuickModels();
+  if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
+  specSchedule(0);
 }
 function renderQuickModels() {
   const box = document.getElementById('quickModels');
   if (!box) return;
+  const models = brandModels();
+  box.hidden = !models.length;
   const cur = (document.getElementById('car_model').value || '').trim().toLowerCase();
-  box.innerHTML = QM.list.map((m, i) =>
-    `<button type="button" class="qm-chip${String(m.model).toLowerCase() === cur ? ' on' : ''}" onclick="pickQuickModel(${i})">${escapeHtml(m.model)}</button>`).join('');
+  box.innerHTML = models.map((m, i) =>
+    `<button type="button" class="qm-chip${String(m).toLowerCase() === cur ? ' on' : ''}" onclick="pickQuickModel(${i})">${escapeHtml(m)}</button>`).join('');
 }
 function pickQuickModel(i) {
-  const m = QM.list[i];
+  const m = brandModels()[i];
   if (!m) return;
-  const brandSel = document.getElementById('car_brand');
-  if (m.brand && Array.from(brandSel.options).some(o => o.value === m.brand)) brandSel.value = m.brand;
-  else if (m.brand) brandSel.value = 'Другое';
-  const inList = brandSel.value === m.brand;
-  document.getElementById('car_model').value = (!inList && m.brand && m.brand !== 'Другое' && String(m.model).toLowerCase().indexOf(String(m.brand).toLowerCase()) < 0)
-    ? m.brand + ' ' + m.model : m.model;
+  document.getElementById('car_model').value = m;
   renderQuickModels();
   if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
   specSchedule(0);
@@ -10222,7 +10266,7 @@ def index():
     import json as _json
     shop = db.get_shop(g.shop_id)
     return render_template_string(
-        PAGE, brands=CAR_BRANDS, service_types=SERVICE_TYPES,
+        PAGE, brands=CAR_BRANDS, car_models=CAR_MODELS, service_types=SERVICE_TYPES,
         shop_name=session.get("shop_name") or "Замена масла",
         T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False), bot_username=BOT_USERNAME,
         sms_enabled=bool(shop.get("sms_enabled")) if shop else False,
