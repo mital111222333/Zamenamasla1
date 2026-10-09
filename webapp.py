@@ -2385,6 +2385,14 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
           <input id="car_model" placeholder="Cobalt, Nexia, Malibu..." oninput="specSchedule()" autocomplete="off">
         </div>
       </div>
+      <div class="field" style="margin-top:12px;">
+        <label><i class="fa-solid fa-barcode"></i>{{ T.vin_label }}</label>
+        <div class="plate-wrap vin-wrap">
+          <input id="vin" placeholder="{{ T.vin_ph }}" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="onVinInput()" enterkeyhint="next">
+          <button type="button" class="ps-cam-btn" onclick="openVinScanner()" title="{{ T.vs_title }}" aria-label="{{ T.vs_title }}"><i class="fa-solid fa-camera"></i></button>
+        </div>
+        <div id="vinHint"></div>
+      </div>
       <div id="specCard"></div>
     </div>
 
@@ -7638,6 +7646,8 @@ async function lookupPlate(force) {
     KNOWN_OWNER = {name: (data.car.owner_name || '').trim(), phone: (data.car.owner_phone || '').trim()};
     if (data.car.car_brand) document.getElementById('car_brand').value = data.car.car_brand;
     document.getElementById('car_model').value = data.car.car_model || '';
+    document.getElementById('vin').value = data.car.vin || '';
+    if (typeof renderVinHint === 'function') renderVinHint();
     specSchedule(0);
 
     const name = data.car.owner_name || T.kc_no_name;
@@ -7829,13 +7839,13 @@ function clearAddDraft() {
 }
 function discardAddDraft() {
   clearAddDraft();
-  ['plate', 'owner_name', 'owner_phone', 'car_model', 'mileage', 'next_mileage', 'notes'].forEach(id => {
+  ['plate', 'owner_name', 'owner_phone', 'car_model', 'vin', 'mileage', 'next_mileage', 'notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   resetItemInputs();
   setPayMode('cash');
   document.getElementById('msg').innerHTML = '';
-  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard();
+  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
 }
 function restoreAddDraft() {
   let d = null;
@@ -7895,6 +7905,7 @@ async function submitCar() {
     owner_phone: document.getElementById('owner_phone').value.trim(),
     car_brand: document.getElementById('car_brand').value,
     car_model: document.getElementById('car_model').value.trim(),
+    vin: vsNorm(document.getElementById('vin').value),
     mileage: document.getElementById('mileage').value,
     next_mileage: document.getElementById('next_mileage').value,
     items: items,
@@ -7956,8 +7967,8 @@ async function submitCar() {
     window.ADD_TOKEN = null;
     clearAddDraft();
     showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
-    ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
-    SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard();
+    ['plate','owner_name','owner_phone','car_model','vin','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
+    SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
     KM.manual = false;
     KNOWN_OWNER = null;
     NEW_OWNER = false;
@@ -9537,8 +9548,447 @@ document.addEventListener('keydown', (e) => {
 
 PAGE = PAGE + MODAL_AND_SCRIPT
 PAGE = PAGE.replace("</body>", HELP_JS + "</body>", 1)
+VIN_SCAN_HTML = r"""<style>
+  .vin-wrap #vin { padding-right:58px; font-family:var(--font-mono); letter-spacing:.5px; text-transform:uppercase; }
+  .vin-hint { margin-top:6px; font-size:12.5px; color:#5b6b8c; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .vin-hint.err { color:#b91c1c; }
+  .vin-hint button { border:1px solid #cfe0fb; background:#fff; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  #vsOverlay { position:fixed; inset:0; z-index:9001; background:#0b0f16; display:none; overflow:hidden; touch-action:none; }
+  #vsOverlay.open { display:block; }
+  #vsVideo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#0b0f16; }
+  #vsFrame { position:absolute; left:50%; transform:translateX(-50%); border-radius:10px; box-shadow:0 0 0 200vmax rgba(0,0,0,.5); border:2px solid rgba(34,211,238,.9); }
+  #vsFrame.hit { border-color:#34d399; }
+  #vsHint { position:absolute; left:16px; right:16px; text-align:center; color:#fff; font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+  #vsStatus { position:absolute; left:16px; right:16px; text-align:center; }
+  #vsStatus span { display:inline-block; background:rgba(34,211,238,.18); color:#a5f3fc; border:1px solid rgba(34,211,238,.4); font-size:13px; padding:7px 14px; border-radius:20px; font-weight:600; max-width:100%; }
+  #vsStatus.err span { background:rgba(239,68,68,.2); color:#fecaca; border-color:rgba(239,68,68,.5); }
+  #vsRead { position:absolute; left:16px; right:16px; text-align:center; color:#e2e8f0; font-family:var(--font-mono); font-size:13px; letter-spacing:1px; }
+  #vsSheet { position:absolute; left:0; right:0; bottom:0; background:var(--card, #fff); color:var(--text); border-radius:22px 22px 0 0; padding:14px 16px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -8px 24px rgba(0,0,0,.3); display:none; max-width:560px; margin:0 auto; max-height:85vh; overflow-y:auto; }
+  #vsOverlay.result #vsSheet { display:block; }
+  #vsOverlay.result #vsVideo { filter:blur(4px) brightness(.6); }
+  #vsOverlay.result #vsFrame, #vsOverlay.result #vsHint, #vsOverlay.result #vsStatus, #vsOverlay.result #vsRead, #vsOverlay.result .ps-bottom { display:none; }
+  .vs-vin { font-family:var(--font-mono); font-weight:700; font-size:19px; letter-spacing:1px; width:100%; text-transform:uppercase; }
+  .vs-info { display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 12px; margin:12px 0; font-size:14px; }
+  .vs-info span { color:#64748b; }
+  .vs-info b { font-weight:700; }
+  .vs-src { font-size:11.5px; color:#64748b; font-weight:400; }
+  .vs-chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 12px; }
+  .vs-chips button { border:1.5px solid var(--border); background:var(--field-bg); color:var(--text); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .vs-chips button.on { border-color:#1d4ed8; background:#eaf1ff; color:#1d4ed8; }
+  .vs-warn { font-size:12.5px; color:#92600a; background:#fff4d6; border-radius:10px; padding:8px 10px; margin-bottom:12px; }
+</style>
+
+<div id="vsOverlay" role="dialog" aria-modal="true">
+  <video id="vsVideo" playsinline muted autoplay></video>
+  <div id="vsFrame"></div>
+  <div class="ps-top">
+    <button type="button" class="ps-ib" onclick="closeVinScanner()" aria-label="close"><i class="fa-solid fa-xmark"></i></button>
+    <div>{{ T.vs_title }}</div>
+    <button type="button" class="ps-ib" id="vsTorch" onclick="vsToggleTorch()" hidden aria-label="{{ T.ps_torch }}"><i class="fa-solid fa-bolt"></i></button>
+  </div>
+  <div id="vsHint">{{ T.vs_hint }}</div>
+  <div id="vsStatus"><span></span></div>
+  <div id="vsRead"></div>
+  <div class="ps-bottom">
+    <button type="button" class="ps-manual" onclick="vsManual()">{{ T.vs_manual }}</button>
+    <div class="ps-priv"><i class="fa-solid fa-lock"></i> {{ T.ps_privacy }}</div>
+  </div>
+  <div id="vsSheet"></div>
+  <canvas id="vsCanvas" width="1200" height="200" style="display:none;"></canvas>
+</div>
+
+<script>
+// ===== Сканер VIN =====
+// Камера телефона читает VIN двумя способами одновременно:
+//  1) штрихкод на наклейке (дверной проём, стойка) — через BarcodeDetector,
+//     если телефон его умеет (Android Chrome), — мгновенно и точно;
+//  2) текст — распознавание Tesseract прямо на телефоне (файлы ~5 МБ
+//     скачиваются с бесплатного CDN один раз, дальше из кэша).
+// Фото никуда не отправляются. Расшифровка VIN — на сервере OilBook (/api/vin/decode).
+const VS = { stream: null, track: null, worker: null, loading: null, detector: null, running: false,
+             gen: 0, hits: {}, result: null, info: null, pick: null, torch: false, startedAt: 0 };
+const VS_OK = /^[A-HJ-NPR-Z0-9]{17}$/;
+const VS_TR = { A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9 };
+const VS_W = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+
+function vsNorm(s) {
+  return String(s || '').toUpperCase().replace(/O/g, '0').replace(/Q/g, '0').replace(/I/g, '1').replace(/[^A-Z0-9]/g, '');
+}
+function vsCheckOk(v) {
+  let t = 0;
+  for (let i = 0; i < 17; i++) t += (/[0-9]/.test(v[i]) ? +v[i] : (VS_TR[v[i]] || 0)) * VS_W[i];
+  const r = t % 11;
+  return v[8] === (r === 10 ? 'X' : String(r));
+}
+// известные коды производителей (первые 3 знака VIN) — с сервера
+const VS_WMI = new Set(__VIN_WMI__);
+// из распознанного текста — кандидаты на VIN (17 знаков, последние 4 — цифры).
+// Из одной строки берём ОДИН вариант: начинающийся с известного кода
+// производителя, иначе тот, у которого сошлась контрольная цифра, иначе —
+// прижатый к концу строки (перед VIN часто напечатано «VIN:»).
+function vsExtract(text) {
+  const out = [];
+  String(text || '').split(/\n/).forEach(line => {
+    const s = vsNorm(String(line).replace(/\bVIN\b|\bV1N\b/gi, ' '));
+    if (s.length < 17 || s.length > 22) return;
+    const ws = [];
+    for (let i = 0; i + 17 <= s.length; i++) {
+      const w = s.slice(i, i + 17);
+      if (VS_OK.test(w) && /[0-9]{4}$/.test(w)) ws.push(w);
+    }
+    if (!ws.length) return;
+    const pick = ws.find(w => VS_WMI.has(w.slice(0, 3))) || ws.find(vsCheckOk) || ws[ws.length - 1];
+    out.push(pick);
+  });
+  return out;
+}
+
+function vsSetStatus(text, isErr) {
+  const st = document.getElementById('vsStatus');
+  st.classList.toggle('err', !!isErr);
+  st.style.display = text ? '' : 'none';
+  st.querySelector('span').textContent = text || '';
+}
+
+function vsLayout() {
+  const ov = document.getElementById('vsOverlay');
+  const W = ov.clientWidth, H = ov.clientHeight;
+  const fw = Math.min(W * 0.92, 520), fh = Math.round(fw / 6);
+  const top = Math.round(H * 0.4 - fh / 2);
+  const fr = document.getElementById('vsFrame');
+  fr.style.width = Math.round(fw) + 'px'; fr.style.height = fh + 'px'; fr.style.top = top + 'px';
+  document.getElementById('vsHint').style.top = (top - 64) + 'px';
+  document.getElementById('vsStatus').style.top = (top + fh + 18) + 'px';
+  document.getElementById('vsRead').style.top = (top + fh + 60) + 'px';
+}
+
+function vsLoadOcr() {
+  if (VS.worker) return Promise.resolve(VS.worker);
+  if (!VS.loading) {
+    VS.loading = (async () => {
+      if (!window.Tesseract) await psLoadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+      const w = await Tesseract.createWorker('eng', 1);
+      await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789', tessedit_pageseg_mode: '7' });
+      VS.worker = w;
+      return w;
+    })().catch(e => { VS.loading = null; throw e; });
+  }
+  return VS.loading;
+}
+
+async function vsMakeDetector() {
+  if (VS.detector !== null || !('BarcodeDetector' in window)) return;
+  try {
+    const sup = await BarcodeDetector.getSupportedFormats();
+    const want = ['code_39', 'code_128', 'data_matrix', 'qr_code', 'pdf417'].filter(f => sup.includes(f));
+    VS.detector = want.length ? new BarcodeDetector({ formats: want }) : false;
+  } catch (e) { VS.detector = false; }
+}
+
+async function openVinScanner() {
+  if (typeof closePlateScanner === 'function') closePlateScanner();
+  const ov = document.getElementById('vsOverlay');
+  VS.gen++; VS.hits = {}; VS.result = null; VS.info = null; VS.pick = null;
+  ov.classList.remove('result');
+  ov.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('vsFrame').classList.remove('hit');
+  document.getElementById('vsHint').textContent = T.vs_hint;
+  document.getElementById('vsRead').textContent = '';
+  vsLayout();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { vsSetStatus(T.ps_no_camera, true); return; }
+  const gen = VS.gen;
+  vsSetStatus(VS.worker ? T.vs_scanning : T.vs_loading);
+  const ocrP = vsLoadOcr();
+  ocrP.catch(() => {});
+  try { await vsStartCamera(); } catch (e) {
+    if (gen !== VS.gen) return;
+    const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+    vsSetStatus(denied ? T.ps_denied : T.ps_no_camera, true);
+    return;
+  }
+  await vsMakeDetector();
+  if (gen !== VS.gen) return;
+  VS.running = true;
+  VS.startedAt = Date.now();
+  vsTick(gen);
+  ocrP.then(() => { if (gen === VS.gen && VS.running) vsSetStatus(T.vs_scanning); })
+      .catch(() => { if (gen === VS.gen && VS.running) vsSetStatus(VS.detector ? T.vs_barcode_only : T.vs_load_fail, !VS.detector); });
+}
+
+async function vsStartCamera() {
+  if (VS.stream) return;
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+  });
+  if (!document.getElementById('vsOverlay').classList.contains('open')) { stream.getTracks().forEach(t => t.stop()); return; }
+  VS.stream = stream;
+  VS.track = stream.getVideoTracks()[0] || null;
+  const v = document.getElementById('vsVideo');
+  v.srcObject = stream;
+  try { await v.play(); } catch (e) {}
+  VS.torch = false;
+  const tb = document.getElementById('vsTorch');
+  tb.classList.remove('on');
+  let caps = {};
+  try { caps = VS.track && VS.track.getCapabilities ? VS.track.getCapabilities() : {}; } catch (e) {}
+  tb.hidden = !caps.torch;
+}
+
+function vsStopCamera() {
+  VS.running = false;
+  if (VS.stream) VS.stream.getTracks().forEach(t => t.stop());
+  VS.stream = null; VS.track = null;
+  const v = document.getElementById('vsVideo');
+  if (v) v.srcObject = null;
+}
+
+async function vsToggleTorch() {
+  if (!VS.track) return;
+  VS.torch = !VS.torch;
+  try { await VS.track.applyConstraints({ advanced: [{ torch: VS.torch }] }); } catch (e) { VS.torch = false; }
+  document.getElementById('vsTorch').classList.toggle('on', VS.torch);
+}
+
+function closeVinScanner() {
+  VS.gen++;
+  vsStopCamera();
+  const ov = document.getElementById('vsOverlay');
+  ov.classList.remove('open', 'result');
+  document.getElementById('vsSheet').innerHTML = '';
+  document.body.style.overflow = '';
+}
+
+function vsManual() {
+  closeVinScanner();
+  const el = document.getElementById('vin');
+  if (el) el.focus();
+}
+
+// часть кадра под рамкой → серая картинка 1200×200 с растянутым контрастом
+function vsCropCanvas() {
+  const v = document.getElementById('vsVideo');
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return null;
+  const ew = v.clientWidth, eh = v.clientHeight;
+  const scale = Math.max(ew / vw, eh / vh);
+  const offX = (vw * scale - ew) / 2, offY = (vh * scale - eh) / 2;
+  const fr = document.getElementById('vsFrame').getBoundingClientRect();
+  const vr = v.getBoundingClientRect();
+  const fx = fr.left - vr.left, fy = fr.top - vr.top;
+  const sx = (fx + offX) / scale, sy = (fy + offY) / scale, sw = fr.width / scale, sh = fr.height / scale;
+  const c = document.getElementById('vsCanvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  let lo = 255, hi = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+    d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g;
+  }
+  const k = hi > lo ? 255 / (hi - lo) : 1;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = Math.max(0, Math.min(255, (d[i] - lo) * k));
+    d[i] = d[i + 1] = d[i + 2] = g;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+function vsAccept(vin) {
+  if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+  vsShowResult(vin);
+}
+
+async function vsTick(gen) {
+  if (gen !== VS.gen || !VS.running) return;
+  const v = document.getElementById('vsVideo');
+  // 1) штрихкод — сразу принимаем
+  if (VS.detector && v.videoWidth) {
+    try {
+      const codes = await VS.detector.detect(v);
+      for (const c of codes) {
+        const raw = vsNorm(c.rawValue);
+        const m = raw.length === 17 && VS_OK.test(raw) ? [raw] : vsExtract(c.rawValue);
+        if (m.length) { vsAccept(m[0]); return; }
+      }
+    } catch (e) {}
+  }
+  if (gen !== VS.gen || !VS.running) return;
+  // 2) текст
+  if (VS.worker) {
+    const cv = vsCropCanvas();
+    if (cv) {
+      let text = '';
+      try { text = (await VS.worker.recognize(cv)).data.text || ''; } catch (e) {}
+      if (gen !== VS.gen || !VS.running) return;
+      const cands = vsExtract(text);
+      document.getElementById('vsRead').textContent = cands[0] || vsNorm(text).slice(0, 20);
+      document.getElementById('vsFrame').classList.toggle('hit', cands.length > 0);
+      for (const w of cands) {
+        VS.hits[w] = (VS.hits[w] || 0) + 1;
+        // контрольная цифра сошлась — хватает одного кадра; иначе ждём
+        // два одинаковых прочтения подряд
+        if (vsCheckOk(w) || VS.hits[w] >= 2) { vsAccept(w); return; }
+      }
+    }
+  }
+  if (Date.now() - VS.startedAt > 10000) document.getElementById('vsHint').textContent = T.vs_hint_slow;
+  setTimeout(() => vsTick(gen), VS.worker ? 60 : 250);
+}
+
+// ---- результат ----
+async function vinDecode(vin) {
+  try { return await (await fetch('/api/vin/decode?vin=' + encodeURIComponent(vin))).json(); }
+  catch (e) { return null; }
+}
+
+async function vsShowResult(vin) {
+  vsStopCamera();
+  VS.result = vin; VS.info = null; VS.pick = null;
+  document.getElementById('vsOverlay').classList.add('result');
+  vsRenderSheet();
+  const gen = VS.gen;
+  const info = await vinDecode(vin);
+  if (gen !== VS.gen || VS.result !== vin) return;
+  VS.info = info;
+  vsRenderSheet();
+}
+
+function vsOnEdit(el) {
+  const v = vsNorm(el.value).slice(0, 17);
+  if (v === VS.result) return;
+  VS.result = v; VS.info = null; VS.pick = null;
+  clearTimeout(VS.editTimer);
+  if (VS_OK.test(v)) VS.editTimer = setTimeout(async () => {
+    const info = await vinDecode(v);
+    if (VS.result === v) { VS.info = info; vsRenderSheet(true); }
+  }, 300);
+  else vsRenderSheet(true);
+}
+
+function vsInfoHtml(info, pickFn) {
+  if (!info) return `<div class="vs-src">${escapeHtml(T.vs_decoding)}</div>`;
+  if (!info.ok) return `<div class="vs-warn">${escapeHtml(T.vs_invalid)}</div>`;
+  const srcLabel = info.model_source === 'learned' ? T.vs_src_learned : (info.model_source === 'vpic' ? T.vs_src_vpic : '');
+  let html = `<div class="vs-info">
+      <span>${escapeHtml(T.field_car_brand)}</span><b>${escapeHtml(info.brand || T.vs_unknown)}</b>
+      ${info.year ? `<span>${escapeHtml(T.vs_year)}</span><b>${info.year}</b>` : ''}
+      <span>${escapeHtml(T.field_car_model)}</span><b>${escapeHtml(VS.pick || info.model || '—')}${srcLabel && !VS.pick ? ` <span class="vs-src">· ${escapeHtml(srcLabel)}</span>` : ''}</b>
+    </div>`;
+  if (!info.model && (info.choices || []).length) {
+    html += `<div class="ps-lbl">${escapeHtml(T.vs_pick_model)}</div><div class="vs-chips">` +
+      info.choices.map(m => `<button type="button" class="${VS.pick === m ? 'on' : ''}" onclick="${pickFn}(${escapeHtml(JSON.stringify(m))})">${escapeHtml(m)}</button>`).join('') + '</div>';
+  }
+  return html;
+}
+
+function vsRenderSheet(keepInput) {
+  const sheet = document.getElementById('vsSheet');
+  const info = VS.info;
+  const inp = document.getElementById('vsVinInput');
+  if (keepInput && inp) {
+    document.getElementById('vsInfoBox').innerHTML = vsInfoHtml(info, 'vsPick') + vsCarHtml(info);
+    return;
+  }
+  sheet.innerHTML = `
+    <div class="ps-grab"></div>
+    <div class="ps-lbl">${escapeHtml(T.vs_recognized)}</div>
+    <input id="vsVinInput" class="vs-vin" value="${escapeHtml(VS.result || '')}" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="vsOnEdit(this)">
+    <div class="vs-src" style="margin-top:4px;">${escapeHtml(T.vs_check_hint)}</div>
+    <div id="vsInfoBox">${vsInfoHtml(info, 'vsPick')}${vsCarHtml(info)}</div>
+    <div class="ps-btns">
+      <button type="button" class="ps-bt s" onclick="openVinScanner()"><i class="fa-solid fa-rotate"></i> ${escapeHtml(T.ps_again)}</button>
+      <button type="button" class="ps-bt p" onclick="vsApply()">${escapeHtml(T.vs_apply)}</button>
+    </div>
+    <div class="ps-lock"><i class="fa-solid fa-lock"></i> ${escapeHtml(T.vs_on_phone)}</div>`;
+}
+
+function vsCarHtml(info) {
+  if (!info || !info.car) return '';
+  const c = info.car;
+  return `<div class="ps-match ok"><div class="ps-av">${escapeHtml(psInitials(c.owner_name))}</div><div style="min-width:0;">
+      <div class="ps-tag"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(T.vs_in_base)}</div>
+      <div class="ps-mt mono">${escapeHtml(psPretty(c.plate_number))}</div>
+      <div class="ps-ms">${escapeHtml([c.owner_name, [c.car_brand, c.car_model].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div></div></div>`;
+}
+
+function vsPick(m) { VS.pick = VS.pick === m ? null : m; vsRenderSheet(true); }
+
+// подставить VIN, марку и модель в форму «Замена»
+function applyVinInfo(vin, info, pickedModel) {
+  document.getElementById('vin').value = vin || '';
+  if (info && info.ok) {
+    const model = pickedModel || info.model;
+    const brandSel = document.getElementById('car_brand');
+    const inList = info.brand && Array.from(brandSel.options).some(o => o.value === info.brand);
+    if (inList) brandSel.value = info.brand;
+    else if (info.brand) brandSel.value = 'Другое';
+    if (model) {
+      document.getElementById('car_model').value = (!inList && info.brand && model.toLowerCase().indexOf(info.brand.toLowerCase()) < 0)
+        ? info.brand + ' ' + model : model;
+    }
+    if (info.car && !(document.getElementById('plate').value || '').trim() && typeof psApply === 'function') {
+      psApply(info.car.plate_number);
+    }
+  }
+  renderVinHint();
+  if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
+  specSchedule(0);
+}
+
+function vsApply() {
+  const v = VS.result;
+  if (!VS_OK.test(v || '')) { showMsg(T.vs_invalid, false); return; }
+  const info = VS.info, pick = VS.pick;
+  closeVinScanner();
+  applyVinInfo(v, info, pick);
+}
+
+// ---- ручной ввод VIN в форме ----
+const VINF = { timer: null, info: null, vin: '' };
+function onVinInput() {
+  const el = document.getElementById('vin');
+  const v = vsNorm(el.value).slice(0, 17);
+  if (el.value !== v && el.value.toUpperCase() !== v) el.value = v;
+  clearTimeout(VINF.timer);
+  if (!VS_OK.test(v)) { VINF.info = null; VINF.vin = v; renderVinHint(); return; }
+  VINF.timer = setTimeout(async () => {
+    const info = await vinDecode(v);
+    if (vsNorm(document.getElementById('vin').value) !== v) return;
+    VINF.info = info; VINF.vin = v;
+    // модель ещё не вписана — подставляем сразу
+    if (info && info.ok && info.model && !(document.getElementById('car_model').value || '').trim()) {
+      applyVinInfo(v, info, null);
+      return;
+    }
+    renderVinHint();
+  }, 350);
+}
+
+function renderVinHint() {
+  const box = document.getElementById('vinHint');
+  if (!box) return;
+  const v = vsNorm((document.getElementById('vin') || {}).value || '');
+  const info = VINF.vin === v ? VINF.info : null;
+  if (!v) { box.innerHTML = ''; return; }
+  if (v.length > 0 && v.length < 17) { box.innerHTML = `<div class="vin-hint">${v.length}/17</div>`; return; }
+  if (!info) { box.innerHTML = ''; return; }
+  if (!info.ok) { box.innerHTML = `<div class="vin-hint err">${escapeHtml(T.vs_invalid)}</div>`; return; }
+  const line = [info.brand, info.year, info.model].filter(Boolean).join(' · ');
+  const curModel = (document.getElementById('car_model').value || '').trim();
+  const btn = info.model && curModel.toLowerCase() !== String(info.model).toLowerCase()
+    ? `<button type="button" onclick="applyVinInfo(VINF.vin, VINF.info, null)">${escapeHtml(T.vs_apply)}</button>` : '';
+  const choose = !info.model ? ` · ${escapeHtml(T.vs_model_unknown)}` : '';
+  box.innerHTML = `<div class="vin-hint"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(line || T.vs_unknown)}${choose} ${btn}</div>`;
+}
+</script>
+"""
+
 _ps_i = PAGE.rfind("</body>")
-PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + PAGE[_ps_i:]
+PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + VIN_SCAN_HTML + PAGE[_ps_i:]
 assert PAGE.count(_SW_SNIPPET) == 1
 PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
@@ -9846,6 +10296,146 @@ def match_car_specs(brand, model, limit=4):
     return [{k: f[2].get(k) for k in _SPEC_PUBLIC} for f in found[:limit]]
 
 
+# ---- VIN: расшифровка без платных сервисов ----
+# 1) производитель — по первым 3 знакам (WMI, таблица ниже);
+# 2) модель — из опыта всех точек OilBook (db.vin_models: мастер один раз
+#    выбрал модель для такого начала VIN — дальше она подставляется сама);
+# 3) если не знаем — бесплатный справочник NHTSA (vPIC), он хорошо знает
+#    машины американского/корейского/японского рынка, для узбекских Chevrolet
+#    обычно молчит — тогда мастер выбирает модель кнопкой, и мы её запоминаем.
+_VIN_WMI = {
+    "XWB": "Chevrolet", "KL1": "Chevrolet", "KL3": "Chevrolet", "KL4": "Chevrolet", "KL7": "Chevrolet",
+    "KL8": "Chevrolet", "KLA": "Daewoo", "KLY": "Daewoo", "1G1": "Chevrolet", "1GN": "Chevrolet",
+    "1GC": "Chevrolet", "3G1": "Chevrolet", "3GN": "Chevrolet", "X9L": "Chevrolet",
+    "KMH": "Hyundai", "KMF": "Hyundai", "KMJ": "Hyundai", "KM8": "Hyundai", "5NP": "Hyundai", "5NM": "Hyundai",
+    "KNA": "Kia", "KNB": "Kia", "KNC": "Kia", "KND": "Kia", "KNE": "Kia", "U5Y": "Kia", "U6Y": "Kia",
+    "5XY": "Kia", "5XX": "Kia",
+    "JTD": "Toyota", "JTE": "Toyota", "JTF": "Toyota", "JTK": "Toyota", "JTM": "Toyota", "JTN": "Toyota",
+    "JT1": "Toyota", "JT2": "Toyota", "JT3": "Toyota", "SB1": "Toyota", "NMT": "Toyota", "4T1": "Toyota",
+    "4T3": "Toyota", "5TD": "Toyota", "5TF": "Toyota", "MR0": "Toyota", "AHT": "Toyota",
+    "JTH": "Lexus", "JTJ": "Lexus", "2T2": "Lexus",
+    "JN1": "Nissan", "JN8": "Nissan", "SJN": "Nissan", "VSK": "Nissan", "1N4": "Nissan", "3N1": "Nissan",
+    "5N1": "Nissan", "JHM": "Honda", "JHL": "Honda", "SHH": "Honda", "SHS": "Honda", "1HG": "Honda",
+    "2HG": "Honda", "5J6": "Honda", "19X": "Honda",
+    "WDB": "Mercedes-Benz", "WDD": "Mercedes-Benz", "WDC": "Mercedes-Benz", "WDF": "Mercedes-Benz",
+    "W1K": "Mercedes-Benz", "W1N": "Mercedes-Benz", "W1V": "Mercedes-Benz",
+    "WBA": "BMW", "WBS": "BMW", "WBX": "BMW", "WBY": "BMW", "5UX": "BMW", "5YM": "BMW",
+    "WAU": "Audi", "WA1": "Audi", "TRU": "Audi", "WUA": "Audi",
+    "WVW": "Volkswagen", "WVG": "Volkswagen", "WV1": "Volkswagen", "WV2": "Volkswagen", "3VW": "Volkswagen",
+    "1VW": "Volkswagen", "XW8": "Volkswagen", "TMB": "Skoda", "WP0": "Porsche", "WP1": "Porsche",
+    "XTA": "Lada (ВАЗ)", "XTT": "УАЗ", "X96": "ГАЗ", "XTC": "КамАЗ",
+    "JAA": "Isuzu", "JAL": "Isuzu", "JM1": "Mazda", "JMZ": "Mazda", "JA3": "Mitsubishi", "JA4": "Mitsubishi",
+    "JMB": "Mitsubishi", "WF0": "Ford", "NM0": "Ford", "1FA": "Ford", "1FM": "Ford", "1FT": "Ford",
+    "LVV": "Chery", "LGW": "Haval", "L6T": "Geely", "LS5": "Changan", "LS4": "Changan", "LGX": "BYD",
+    "LC0": "BYD", "LZZ": "Sinotruk", "LZG": "Shacman", "LFW": "FAW", "WMA": "MAN", "YV2": "Volvo",
+    "YS2": "Scania", "XLR": "DAF", "ZCF": "Iveco",
+}
+# коды производителей нужны и сканеру на телефоне (выбор варианта VIN)
+PAGE = PAGE.replace("__VIN_WMI__", json.dumps(sorted(_VIN_WMI)), 1)
+_VIN_YEAR_CODES = "ABCDEFGHJKLMNPRSTVWXY123456789"
+_VIN_TRANSLIT = {**{c: i + 1 for i, c in enumerate("ABCDEFGH")}, **{c: i + 1 for i, c in enumerate("JKLMN")},
+                 "P": 7, "R": 9, **{c: i + 2 for i, c in enumerate("STUVWXYZ")}}
+_VIN_WEIGHTS = (8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2)
+_vpic_cache = {}
+
+
+def _vin_check_ok(vin):
+    total = sum((int(c) if c.isdigit() else _VIN_TRANSLIT.get(c, 0)) * w for c, w in zip(vin, _VIN_WEIGHTS))
+    r = total % 11
+    return vin[8] == ("X" if r == 10 else str(r))
+
+
+def _vin_year(vin):
+    i = _VIN_YEAR_CODES.find(vin[9])
+    if i < 0:
+        return None
+    now = datetime.now().year
+    years = [y for y in (1980 + i, 2010 + i) if y <= now + 1]
+    return max(years) if years else None
+
+
+def _vin_vpic(vin):
+    if vin in _vpic_cache:
+        return _vpic_cache[vin]
+    res = None
+    try:
+        r = requests.get(f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{vin}?format=json", timeout=4)
+        row = (r.json().get("Results") or [{}])[0]
+        make, model = (row.get("Make") or "").strip(), (row.get("Model") or "").strip()
+        if model:
+            res = {"brand": make.title(), "model": model}
+    except Exception:
+        res = None
+    if len(_vpic_cache) > 2000:
+        _vpic_cache.clear()
+    _vpic_cache[vin] = res
+    return res
+
+
+_BRAND_WORDS = ("kia", "hyundai", "toyota", "lexus", "ravon", "chevrolet", "daewoo", "skoda", "volkswagen",
+                "lada", "mercedes-benz", "bmw", "audi", "porsche", "byd", "chery", "haval", "geely", "isuzu", "gaz", "uaz")
+
+
+def _vin_model_choices(brand_lower):
+    """Короткие названия моделей марки из справочника — для кнопок выбора."""
+    out = []
+    for sp in _CAR_SPECS:
+        sb = (sp.get("brand") or "").lower()
+        bw = (brand_lower.split() or [""])[0]
+        if (sb != brand_lower and not (brand_lower == "chevrolet" and sb == "daewoo")
+                and bw + " " not in (sp.get("model") or "").lower()):
+            continue
+        same = sb == brand_lower or (brand_lower == "chevrolet" and sb == "daewoo")
+        own = (bw, sb.split()[0] if (sb and same) else "")
+        for part in re.sub(r"\s*\(.*?\)", "", sp.get("model") or "").split(" / "):
+            name = part.strip()
+            low = name.lower()
+            pref = next((w for w in own if w and low.startswith(w + " ")), None)
+            if pref:
+                name = name[len(pref) + 1:].strip()
+            elif any(low.startswith(w + " ") for w in _BRAND_WORDS):
+                continue
+            name = re.sub(r"\s+1$", "", name)
+            if len(name) < 2 or name.isdigit() or name in out:
+                continue
+            out.append(name)
+    return out[:18]
+
+
+def decode_vin(vin, shop_id=None):
+    v = db.normalize_vin(vin)
+    if not v:
+        return {"ok": False}
+    brand = _VIN_WMI.get(v[:3])
+    out = {"ok": True, "vin": v, "brand": brand, "year": _vin_year(v), "check_ok": _vin_check_ok(v),
+           "model": None, "model_source": None}
+    learned = db.vin_lookup_model(v)
+    if learned:
+        out["model"], out["model_source"] = learned["model"], "learned"
+        out["brand"] = out["brand"] or learned.get("brand")
+    elif v[0] in "12345JKW":
+        vp = _vin_vpic(v)
+        if vp:
+            out["model"], out["model_source"] = vp["model"], "vpic"
+            out["brand"] = out["brand"] or vp["brand"]
+    if shop_id:
+        out["car"] = db.find_car_by_vin(shop_id, v)
+    out["brand_in_list"] = out["brand"] in CAR_BRANDS
+    q = " ".join(x for x in [out["model"]] if x)
+    out["specs"] = match_car_specs(out["brand"] or "", q) if q else []
+    # модели из справочника этой марки — кнопки «выберите модель»
+    if not out["model"] and out["brand"]:
+        b = out["brand"].lower()
+        out["choices"] = _vin_model_choices(b)
+    return out
+
+
+@app.route("/api/vin/decode")
+@login_required
+def api_vin_decode():
+    return jsonify(decode_vin(request.args.get("vin", ""), g.shop_id))
+
+
 @app.route("/api/car_specs")
 @login_required
 def api_car_specs():
@@ -10018,6 +10608,7 @@ def api_add():
         owner_phone = data.get("owner_phone") or None
         car_brand = data.get("car_brand") or None
         car_model = data.get("car_model") or None
+        vin = db.normalize_vin(data.get("vin"))
         mileage = int(data["mileage"]) if data.get("mileage") else None
         next_mileage = int(data["next_mileage"]) if data.get("next_mileage") else None
         items = data.get("items") or []
@@ -10066,16 +10657,21 @@ def api_add():
                 existing_car = db.find_car(g.shop_id, plate)
             if existing_car:
                 client_id = existing_car["client_id"]
-                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
+                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model, vin=vin)
             else:
                 client = db.get_or_create_client(g.shop_id, owner_name, owner_phone)
                 client_id = client["id"]
-                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
+                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model, vin=vin)
 
             oc_id, next_date = db.add_oil_change(
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
             )
+            if vin and car_model:
+                try:
+                    db.vin_learn(vin, car_brand, car_model)
+                except Exception as e:
+                    logger.warning(f"vin_learn: {e}")
             if daily_km:
                 try:
                     db.set_oil_change_daily_km(oc_id, daily_km)

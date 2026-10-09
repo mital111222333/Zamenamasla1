@@ -299,6 +299,7 @@ def init_db():
         _migrate_daily_km(conn)
         _migrate_course(conn)
         _migrate_registration(conn)
+        _migrate_vin(conn)
         _bootstrap_accounts(conn)
 
 
@@ -1515,23 +1516,27 @@ def delete_car_completely(shop_id: int, plate: str) -> bool:
 
 
 @_serialized
-def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_brand: str = None, car_model: str = None):
+def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_brand: str = None, car_model: str = None,
+                         vin: str = None):
     plate_number = normalize_plate(plate_number)
+    vin = normalize_vin(vin)
     with get_conn() as conn:
         existing = conn.execute(
             "SELECT id FROM cars WHERE shop_id=? AND plate_number=?", (shop_id, plate_number)
         ).fetchone()
         if existing:
             conn.execute(
-                "UPDATE cars SET car_brand=COALESCE(?, car_brand), car_model=COALESCE(?, car_model) WHERE id=?",
-                (car_brand, car_model, existing["id"])
+                "UPDATE cars SET car_brand=COALESCE(?, car_brand), car_model=COALESCE(?, car_model), "
+                "vin=COALESCE(?, vin) WHERE id=?",
+                (car_brand, car_model, vin, existing["id"])
             )
             conn.commit()
             return existing["id"]
         else:
             cur = conn.execute(
-                "INSERT INTO cars (shop_id, plate_number, client_id, car_brand, car_model, passport_token) VALUES (?, ?, ?, ?, ?, ?)",
-                (shop_id, plate_number, client_id, car_brand, car_model, secrets.token_urlsafe(16))
+                "INSERT INTO cars (shop_id, plate_number, client_id, car_brand, car_model, passport_token, vin) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (shop_id, plate_number, client_id, car_brand, car_model, secrets.token_urlsafe(16), vin)
             )
             conn.commit()
             return cur.lastrowid
@@ -6247,3 +6252,82 @@ def list_registrations(limit_done: int = 15) -> dict:
             f"SELECT {cols} FROM registration_requests WHERE status IN ('approved', 'rejected') "
             f"ORDER BY decided_at DESC, id DESC LIMIT ?", (limit_done,)).fetchall()]
         return {"pending": pending, "done": done}
+
+
+# ======================================================================
+# VIN: номер кузова машины
+# ======================================================================
+# cars.vin — VIN машины (необязательно). vin_models — чему соответствует
+# начало VIN (первые 8 знаков: производитель + описание модели) по опыту
+# ВСЕХ точек платформы: мастер один раз указал модель для такого VIN —
+# в следующий раз любая точка получит модель сразу. Хранятся только
+# начало VIN и название модели, без номеров машин и владельцев.
+
+_VIN_ALPHABET = set("ABCDEFGHJKLMNPRSTUVWXYZ0123456789")
+
+
+def normalize_vin(vin):
+    v = _re.sub(r"[^A-Za-z0-9]", "", vin or "").upper()
+    return v if len(v) == 17 and set(v) <= _VIN_ALPHABET else None
+
+
+def _migrate_vin(conn):
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(cars)").fetchall()}
+    if "vin" not in cols:
+        conn.execute("ALTER TABLE cars ADD COLUMN vin TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cars_shop_vin ON cars(shop_id, vin)")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS vin_models (
+        prefix TEXT NOT NULL,
+        model TEXT NOT NULL,
+        brand TEXT,
+        hits INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (prefix, model)
+    )
+    """)
+
+
+def _vin_model_key(model):
+    return _re.sub(r"\s+", " ", (model or "").strip())[:60]
+
+
+def vin_learn(vin, brand, model):
+    """Запоминаем: машины с таким началом VIN — это такая модель."""
+    vin = normalize_vin(vin)
+    model = _vin_model_key(model)
+    if not vin or len(model) < 2:
+        return
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO vin_models (prefix, model, brand, hits) VALUES (?, ?, ?, 1)
+            ON CONFLICT(prefix, model) DO UPDATE SET hits = hits + 1,
+                brand = COALESCE(excluded.brand, brand), updated_at = datetime('now')
+        """, (vin[:8], model, (brand or None)))
+        conn.commit()
+
+
+def vin_lookup_model(vin):
+    """Самая частая модель для такого начала VIN (по всем точкам) или None."""
+    vin = normalize_vin(vin)
+    if not vin:
+        return None
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT model, brand, hits FROM vin_models WHERE prefix=? ORDER BY hits DESC, updated_at DESC LIMIT 1",
+            (vin[:8],)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def find_car_by_vin(shop_id: int, vin: str):
+    vin = normalize_vin(vin)
+    if not vin:
+        return None
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT c.plate_number, c.car_brand, c.car_model, cl.full_name AS owner_name
+            FROM cars c JOIN clients cl ON cl.id = c.client_id
+            WHERE c.shop_id=? AND c.vin=? ORDER BY c.id DESC LIMIT 1
+        """, (shop_id, vin)).fetchone()
+        return dict(row) if row else None
