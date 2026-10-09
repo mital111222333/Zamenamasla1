@@ -2485,7 +2485,8 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="qm-row" id="quickModels"></div>
       <input id="vin" type="hidden" value="">
       <div id="vinHint" hidden></div>
-      <div id="specCard"></div>
+      <div id="specCard" hidden></div>
+      <a class="oil-lesson" href="/course/4"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.oil_lesson_link }}</span><i class="fa-solid fa-chevron-right"></i></a>
     </div>
 
     <div class="af-sec">
@@ -7363,10 +7364,8 @@ function startNewOwner() {
 // брендов — только то, что есть у самой точки). «Заполнить масло» ставит
 // товар, цену и литры в строку «Моторное масло».
 const SPEC = { timer: null, seq: 0, list: [], cur: 0, hiddenFor: '' };
-function specSchedule(delay) {
-  clearTimeout(SPEC.timer);
-  SPEC.timer = setTimeout(loadSpecs, delay === undefined ? 400 : delay);
-}
+// Подбор масла отключён: карточка не показывается и справочник не запрашивается
+function specSchedule(delay) { clearTimeout(SPEC.timer); }
 async function loadSpecs() {
   const model = (document.getElementById('car_model').value || '').trim();
   const brand = document.getElementById('car_brand').value || '';
@@ -9833,6 +9832,9 @@ VIN_SCAN_HTML = r"""<style>
   .vin-hint { margin-top:6px; font-size:12.5px; color:#5b6b8c; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
   .vin-hint.err { color:#b91c1c; }
   .vin-hint button { border:1px solid #cfe0fb; background:#fff; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .oil-lesson { display:flex; align-items:center; gap:10px; margin-top:10px; padding:10px 12px; border-radius:12px; background:#EEF4FF; border:1px solid #CFE0FB; color:#1D4ED8; font-size:13.5px; font-weight:600; text-decoration:none; }
+  .oil-lesson span { flex:1; }
+  .oil-lesson .fa-chevron-right { font-size:11px; opacity:.7; }
   .qm-row { display:flex; gap:6px; overflow-x:auto; padding:2px 0 6px; margin:8px 0 0; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   .qm-row::-webkit-scrollbar { display:none; }
   .qm-chip { flex:none; border:1.5px solid var(--border); background:var(--field-bg); color:var(--text); border-radius:999px; padding:7px 13px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }

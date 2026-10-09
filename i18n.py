@@ -2570,3 +2570,5 @@ UZ.update({
     "debt_status_written_off": "{sum} so'm hisobdan chiqarildi · {date}",
     "entry_has_debt": "Bu almashtirish bo'yicha to'lovlari bor bo'lib to'lash yoki hisobdan chiqarilgan qarz bor. Avval «Qarzlar» bo'limida to'lovlarni bekor qiling, keyin almashtirishni o'chiring.",
 })
+RU.update({"oil_lesson_link": "Как подобрать масло и фильтр — урок 4 в «Обучении»"})
+UZ.update({"oil_lesson_link": "Moy va filtrni qanday tanlash — «Ta'lim»dagi 4-dars"})
