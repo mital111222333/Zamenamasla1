@@ -1726,6 +1726,27 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .af-h { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#0F172A; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
   .af-h i { width:28px; height:28px; border-radius:9px; background:#EFF6FF; color:var(--blue); display:inline-flex; align-items:center; justify-content:center; font-size:13px; }
   .af-sub { font-size:12px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; margin:12px 0 6px; }
+  .sp-card { margin-top:12px; border:1px solid #cfe0fb; background:#f4f8ff; border-radius:14px; padding:12px 14px; font-size:13px; color:#1e2a44; }
+  .sp-head { display:flex; align-items:flex-start; gap:8px; }
+  .sp-head b { font-size:14px; flex:1; line-height:1.35; }
+  .sp-head small { display:block; font-weight:400; color:#5b6b8c; font-size:12px; }
+  .sp-x { border:none; background:none; color:#7a89a8; font-size:16px; padding:0 2px; cursor:pointer; }
+  .sp-alt { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; align-items:center; color:#5b6b8c; font-size:12px; }
+  .sp-alt button { border:1px solid #cfe0fb; background:#fff; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; }
+  .sp-grid { display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 10px; margin-top:8px; }
+  .sp-grid span { color:#5b6b8c; }
+  .sp-grid div { font-weight:600; white-space:pre-line; overflow-wrap:anywhere; }
+  .sp-grid div i { font-weight:400; font-style:normal; color:#5b6b8c; }
+  .sp-stock { margin-top:10px; border-top:1px dashed #cfe0fb; padding-top:8px; }
+  .sp-prod { display:flex; justify-content:space-between; gap:8px; padding:3px 0; }
+  .sp-prod em { font-style:normal; color:#15803d; white-space:nowrap; }
+  .sp-badge { display:inline-block; font-size:11px; border-radius:6px; padding:0 6px; margin-left:4px; background:#e7f6ec; color:#15803d; font-weight:600; }
+  .sp-badge.hot { background:#fff4d6; color:#92600a; }
+  .sp-fill { margin-top:10px; width:100%; border:none; border-radius:10px; padding:10px; background:#1d4ed8; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+  .sp-more { margin-top:8px; }
+  .sp-more summary { cursor:pointer; color:#1d4ed8; font-weight:600; }
+  .sp-note { margin-top:8px; font-size:12px; color:#5b6b8c; }
+  .sp-note.warn { color:#92600a; background:#fff4d6; border-radius:8px; padding:6px 8px; }
   .mil-grid { display:grid; grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr); gap:6px; align-items:end; }
   .mil-arrow { text-align:center; color:#94A3B8; padding-bottom:14px; font-size:13px; }
   .mil-l { font-size:12px; color:var(--hint); margin-bottom:5px; }
@@ -2355,15 +2376,16 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="row2" style="margin-bottom:-10px;">
         <div class="field">
           <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
-          <select id="car_brand">
+          <select id="car_brand" onchange="specSchedule(0)">
             {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
           </select>
         </div>
         <div class="field">
           <label><i class="fa-solid fa-car-side"></i>{{ T.field_car_model }}</label>
-          <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
+          <input id="car_model" placeholder="Cobalt, Nexia, Malibu..." oninput="specSchedule()" autocomplete="off">
         </div>
       </div>
+      <div id="specCard"></div>
     </div>
 
     <div class="af-sec">
@@ -7196,6 +7218,121 @@ function startNewOwner() {
   setTimeout(() => nameEl.focus(), 300);
 }
 
+// ---- Подбор масла по модели машины (справочник car_specs.py) ----
+// Карточка под полями «Марка/Модель». Показывает вязкость, допуск и объём
+// из справочника и масла со склада точки нужной вязкости (без продвижения
+// брендов — только то, что есть у самой точки). «Заполнить масло» ставит
+// товар, цену и литры в строку «Моторное масло».
+const SPEC = { timer: null, seq: 0, list: [], cur: 0, hiddenFor: '' };
+function specSchedule(delay) {
+  clearTimeout(SPEC.timer);
+  SPEC.timer = setTimeout(loadSpecs, delay === undefined ? 400 : delay);
+}
+async function loadSpecs() {
+  const model = (document.getElementById('car_model').value || '').trim();
+  const brand = document.getElementById('car_brand').value || '';
+  const seq = ++SPEC.seq;
+  if (model.length < 2) { SPEC.list = []; renderSpecCard(); return; }
+  let data = null;
+  try {
+    data = await (await fetch('/api/car_specs?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model))).json();
+  } catch (e) { return; }
+  if (seq !== SPEC.seq) return;
+  SPEC.list = (data && data.matches) || [];
+  SPEC.cur = 0;
+  renderSpecCard();
+}
+function specVisc(name) {
+  const m = String(name || '').match(/(\\d{1,2})\\s*w\\s*-?\\s*(\\d{2})/i);
+  return m ? (m[1] + 'W-' + m[2]) : null;
+}
+function specApprovalTokens(text) {
+  const t = String(text || '').toLowerCase();
+  const out = new Set();
+  (t.match(/dexos\\s*[12]/g) || []).forEach(x => out.add(x.replace(/\\s+/g, '')));
+  (t.match(/\\b\\d{3}\\s?\\d{2}\\b/g) || []).forEach(x => out.add(x.replace(/\\s+/g, '')));
+  (t.match(/22[89]\\.\\d{1,2}/g) || []).forEach(x => out.add(x.replace('.', '')));
+  (t.match(/ll-?\\d{2}/g) || []).forEach(x => out.add(x.replace('-', '')));
+  (t.match(/rbs0-2ae/g) || []).forEach(x => out.add('rbs02ae'));
+  return out;
+}
+function specProducts(s) {
+  const prods = productsForCategory('fluid_0');
+  const need = new Set(s.visc_list || []), hot = new Set(s.visc_hot || []);
+  const tokens = specApprovalTokens(s.approval);
+  return prods.map(p => {
+    const v = specVisc(p.name);
+    if (!v || (!need.has(v) && !hot.has(v))) return null;
+    const nm = String(p.name).toLowerCase().replace(/[\\s\\.\\-]/g, '');
+    const appr = [...tokens].some(tk => nm.indexOf(tk) >= 0);
+    return { p, hot: !need.has(v), appr };
+  }).filter(Boolean).sort((a, b) =>
+    (a.hot - b.hot) || (b.appr - a.appr) || ((b.p.stock_qty || 0) - (a.p.stock_qty || 0)));
+}
+function renderSpecCard() {
+  const box = document.getElementById('specCard');
+  if (!box) return;
+  const s = SPEC.list[SPEC.cur];
+  const model = (document.getElementById('car_model').value || '').trim().toLowerCase();
+  if (!s || SPEC.hiddenFor === model + '|' + s.id) { box.innerHTML = ''; return; }
+  const alts = SPEC.list.map((x, i) => i === SPEC.cur ? '' :
+    `<button type="button" onclick="SPEC.cur=${i}; renderSpecCard()">${escapeHtml(x.model)}</button>`).join('');
+  const matches = specProducts(s);
+  const unit = T.unit_l;
+  const stock = matches.length ? matches.slice(0, 4).map(m => `
+      <div class="sp-prod"><span>${escapeHtml(m.p.name)}${m.appr ? `<span class="sp-badge">${T.sp_appr_badge}</span>` : ''}${m.hot ? `<span class="sp-badge hot">${T.sp_hot_badge}</span>` : ''}</span><em>${m.p.stock_qty} ${unit}</em></div>`).join('')
+    : `<div class="sp-note">${T.sp_stock_none}</div>`;
+  const hot = (s.visc_hot || []).length ? `<span>${T.sp_hot}</span><div>${escapeHtml(s.visc_hot.join(' / '))} <i>— ${T.sp_hot_note}</i></div>` : '';
+  const row = (label, val) => val ? `<span>${label}</span><div>${escapeHtml(val)}</div>` : '';
+  box.innerHTML = `<div class="sp-card">
+    <div class="sp-head"><i class="fa-solid fa-book-open" style="color:#1d4ed8;margin-top:2px;"></i>
+      <b>${T.sp_title}: ${escapeHtml(s.model)}<small>${escapeHtml(s.engine)}</small></b>
+      <button type="button" class="sp-x" onclick="hideSpecCard()" aria-label="${T.sp_hide}">✕</button></div>
+    ${alts ? `<div class="sp-alt">${T.sp_other} ${alts}</div>` : ''}
+    <div class="sp-grid">
+      ${row(T.sp_oil, s.visc)}
+      ${row(T.sp_approval, s.approval)}
+      ${row(T.sp_volume, s.oil_vol)}
+      ${hot}
+    </div>
+    ${WAREHOUSE_ENABLED ? `<div class="sp-stock"><div style="font-weight:600;margin-bottom:2px;">${T.sp_stock}</div>${stock}</div>` : ''}
+    <button type="button" class="sp-fill" onclick="fillFromSpec()"><i class="fa-solid fa-wand-magic-sparkles"></i> ${T.sp_fill}</button>
+    <details class="sp-more"><summary>${T.sp_more}</summary>
+      <div class="sp-grid">${row(T.sp_trans, [s.trans, s.trans_spec].filter(Boolean).join('\\n'))}${row(T.sp_brake, s.brake)}${row(T.sp_coolant, s.coolant)}</div>
+    </details>
+    <div class="sp-note${s.approx ? ' warn' : ''}">${s.approx ? T.sp_approx : T.sp_note}</div>
+  </div>`;
+}
+function hideSpecCard() {
+  const s = SPEC.list[SPEC.cur];
+  if (s) SPEC.hiddenFor = (document.getElementById('car_model').value || '').trim().toLowerCase() + '|' + s.id;
+  renderSpecCard();
+}
+function fillFromSpec() {
+  const s = SPEC.list[SPEC.cur];
+  if (!s) return;
+  const best = specProducts(s).find(m => !m.hot);
+  const brandEl = document.getElementById('fluid_brand_0');
+  let filledProduct = false;
+  if (best && brandEl && brandEl.tagName === 'SELECT') {
+    const opt = Array.from(brandEl.options).find(o => o.value === String(best.p.id));
+    if (opt) {
+      brandEl.value = opt.value;
+      document.getElementById('fluid_price_0').value = opt.dataset.price || '';
+      filledProduct = true;
+    }
+  }
+  if (s.liters) document.getElementById('fluid_liters_0').value = s.liters;
+  ROW_OPEN.add('fluid_0');
+  syncItemRows();
+  paymentSplitTouched = false;
+  updateTotal();
+  const multi = /\\)\\s*\\n|\\)\\s+[≈\\d]/.test(s.oil_vol || '');
+  showMsg((filledProduct ? T.sp_filled : T.sp_filled_liters) + (multi ? ' ' + T.sp_volume_check : ''), true);
+  const row = document.getElementById('row_fluid_0');
+  if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 function repeatLastVisit() {
   // «Как в прошлый раз»: те же масло/фильтры/литры, цены — текущие со склада
   // (если товар есть на складе), иначе цена прошлого визита.
@@ -7501,6 +7638,7 @@ async function lookupPlate(force) {
     KNOWN_OWNER = {name: (data.car.owner_name || '').trim(), phone: (data.car.owner_phone || '').trim()};
     if (data.car.car_brand) document.getElementById('car_brand').value = data.car.car_brand;
     document.getElementById('car_model').value = data.car.car_model || '';
+    specSchedule(0);
 
     const name = data.car.owner_name || T.kc_no_name;
     const initials = name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
@@ -7697,6 +7835,7 @@ function discardAddDraft() {
   resetItemInputs();
   setPayMode('cash');
   document.getElementById('msg').innerHTML = '';
+  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard();
 }
 function restoreAddDraft() {
   let d = null;
@@ -7818,6 +7957,7 @@ async function submitCar() {
     clearAddDraft();
     showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
+    SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard();
     KM.manual = false;
     KNOWN_OWNER = null;
     NEW_OWNER = false;
@@ -9633,6 +9773,83 @@ def api_set_usd_rate():
                     "head_rate": _head_usd_rate(shop)})
 
 
+
+
+# ---- Подбор масла по модели машины ----
+# Справочник лежит в car_specs.py (сгенерирован из Excel-справочника).
+# Поиск по тексту модели: «Cobalt», «кобальт», «Nexia 3», «R4»… Марка из
+# списка только помогает при равенстве. Отдаём 1 основной вариант и до 3
+# альтернатив (например «Nexia» → Nexia 1/2, а Nexia 3 — кнопкой).
+from car_specs import CAR_SPECS as _CAR_SPECS
+
+
+def _spec_norm(s):
+    s = (s or "").lower().replace("ё", "е")
+    return re.sub(r"[^0-9a-zа-яўқғҳ]+", " ", s).strip()
+
+
+def _spec_phrases(spec):
+    out = set()
+    for a in (spec.get("aliases") or "").split(","):
+        if _spec_norm(a):
+            out.add(_spec_norm(a))
+    for part in re.split(r"[/()]", spec.get("model") or ""):
+        if len(_spec_norm(part)) >= 3:
+            out.add(_spec_norm(part))
+    return out
+
+
+_SPEC_INDEX = [(sp, _spec_phrases(sp)) for sp in _CAR_SPECS]
+_SPEC_PUBLIC = ("id", "brand", "model", "engine", "oil_vol", "liters", "approval", "visc",
+                "visc_list", "visc_hot", "trans", "trans_spec", "brake", "coolant", "approx")
+
+
+def match_car_specs(brand, model, limit=4):
+    q = _spec_norm(model)
+    if len(q) < 2:
+        return []
+    qc = q.replace(" ", "")
+    qt = set(q.split())
+    b = _spec_norm(brand)
+    if b == "ravon":
+        b = "chevrolet"
+    found = []
+    for sp, phrases in _SPEC_INDEX:
+        best, best_pc = 0, ""
+        for p in phrases:
+            pc = p.replace(" ", "")
+            if len(pc) <= 3:
+                sc = 100 if (p in qt or pc == qc) else 0
+            elif pc == qc:
+                sc = 100
+            elif pc in qc:
+                sc = 60 + len(pc)
+            elif len(qc) >= 3 and qc in pc:
+                sc = 30 + len(qc)
+            else:
+                sc = 0
+            if sc > best:
+                best, best_pc = sc, pc
+        if best:
+            sb = _spec_norm(sp.get("brand"))
+            if b and b not in ("другое",) and (sb.startswith(b) or b.startswith(sb)):
+                best += 5
+            found.append((best, best_pc, sp))
+    if not found:
+        return []
+    # «nexia» внутри «nexia3»: если найдено более длинное совпадение,
+    # короткое (другой модели) не предлагаем
+    full = [f for f in found if f[0] >= 60]
+    found = [f for f in found if not (f[0] >= 60 and any(
+        o is not f and o[0] >= 60 and f[1] != o[1] and f[1] in o[1] for o in full))]
+    found.sort(key=lambda f: -f[0])
+    return [{k: f[2].get(k) for k in _SPEC_PUBLIC} for f in found[:limit]]
+
+
+@app.route("/api/car_specs")
+@login_required
+def api_car_specs():
+    return jsonify({"matches": match_car_specs(request.args.get("brand", ""), request.args.get("model", ""))})
 
 
 @app.route("/api/cars")
