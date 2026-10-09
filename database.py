@@ -299,8 +299,6 @@ def init_db():
         _migrate_daily_km(conn)
         _migrate_course(conn)
         _migrate_registration(conn)
-        _migrate_vin(conn)
-        _migrate_debts(conn)
         _bootstrap_accounts(conn)
 
 
@@ -1517,27 +1515,23 @@ def delete_car_completely(shop_id: int, plate: str) -> bool:
 
 
 @_serialized
-def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_brand: str = None, car_model: str = None,
-                         vin: str = None):
+def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_brand: str = None, car_model: str = None):
     plate_number = normalize_plate(plate_number)
-    vin = normalize_vin(vin)
     with get_conn() as conn:
         existing = conn.execute(
             "SELECT id FROM cars WHERE shop_id=? AND plate_number=?", (shop_id, plate_number)
         ).fetchone()
         if existing:
             conn.execute(
-                "UPDATE cars SET car_brand=COALESCE(?, car_brand), car_model=COALESCE(?, car_model), "
-                "vin=COALESCE(?, vin) WHERE id=?",
-                (car_brand, car_model, vin, existing["id"])
+                "UPDATE cars SET car_brand=COALESCE(?, car_brand), car_model=COALESCE(?, car_model) WHERE id=?",
+                (car_brand, car_model, existing["id"])
             )
             conn.commit()
             return existing["id"]
         else:
             cur = conn.execute(
-                "INSERT INTO cars (shop_id, plate_number, client_id, car_brand, car_model, passport_token, vin) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (shop_id, plate_number, client_id, car_brand, car_model, secrets.token_urlsafe(16), vin)
+                "INSERT INTO cars (shop_id, plate_number, client_id, car_brand, car_model, passport_token) VALUES (?, ?, ?, ?, ?, ?)",
+                (shop_id, plate_number, client_id, car_brand, car_model, secrets.token_urlsafe(16))
             )
             conn.commit()
             return cur.lastrowid
@@ -1822,43 +1816,11 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
     if not fields:
         return True
 
-    def _debt_of(cost_v, cash_v, card_v):
-        return max(0, (cost_v or 0) - (cash_v or 0) - (card_v or 0))
-    old_debt = _debt_of(existing.get("cost"), existing.get("cash_amount"), existing.get("card_amount"))
-    new_debt = _debt_of(fields.get("cost", existing.get("cost")),
-                        fields.get("cash_amount", existing.get("cash_amount")),
-                        fields.get("card_amount", existing.get("card_amount")))
-
     set_clause = ", ".join(f"{k}=?" for k in fields)
     with get_conn() as conn:
         conn.execute(f"UPDATE oil_changes SET {set_clause} WHERE id=?", (*fields.values(), oc_id))
-        if new_debt != old_debt:
-            _sync_debt_after_edit(conn, oc_id, shop_id, new_debt - old_debt)
         conn.commit()
     return True
-
-
-def _sync_debt_after_edit(conn, oc_id: int, shop_id: int, delta: int):
-    """Сумму замены (или оплату при ней) исправили — долг по этой замене
-    меняется на ту же разницу. Например, цену исправили с 500 000 на 450 000
-    при оплате 200 000 — долг станет 250 000 вместо 300 000. Списанные долги
-    не трогаем: их сумма уже ушла в расходы."""
-    plan = conn.execute("""SELECT * FROM installment_plans WHERE oil_change_id=? AND shop_id=?
-                            AND status IN ('active', 'completed') ORDER BY id DESC LIMIT 1""",
-                        (oc_id, shop_id)).fetchone()
-    if not plan:
-        return
-    new_total = plan["total_amount"] + delta
-    paid = plan["paid_amount"]
-    if new_total <= 0 and paid == 0:
-        conn.execute("DELETE FROM installment_payments WHERE plan_id=?", (plan["id"],))
-        conn.execute("DELETE FROM installment_plans WHERE id=?", (plan["id"],))
-        return
-    new_total = max(new_total, paid)
-    done = paid >= new_total
-    conn.execute("""UPDATE installment_plans SET total_amount=?, status=?,
-                    closed_at=CASE WHEN ? THEN COALESCE(closed_at, ?) ELSE NULL END WHERE id=?""",
-                 (new_total, "completed" if done else "active", 1 if done else 0, _now_str(), plan["id"]))
 
 
 @_serialized
@@ -1880,22 +1842,9 @@ def delete_oil_change(oc_id: int, shop_id: int):
                 returns.append((pid, item.get("qty") or 0))
 
     with get_conn() as conn:
-        # рассрочка по этой замене: пока по ней не было денег — удаляется вместе
-        # с заменой (иначе клиенту шли бы напоминания о несуществующем долге);
-        # если платежи уже были или долг списан — сначала разобраться с долгом
-        plans = conn.execute("""SELECT ip.id, ip.status,
-                                   (SELECT COUNT(*) FROM installment_payments p
-                                    WHERE p.plan_id = ip.id AND p.status='active') as paid_cnt
-                                 FROM installment_plans ip WHERE ip.oil_change_id=? AND ip.shop_id=?""",
-                              (oc_id, shop_id)).fetchall()
-        if any(p["paid_cnt"] or p["status"] == "written_off" for p in plans):
-            return "has_debt"
         cur = conn.execute("DELETE FROM oil_changes WHERE id=?", (oc_id,))
         if cur.rowcount == 0:
             return False  # уже удалена (например, нажали «удалить» с двух телефонов)
-        for p in plans:
-            conn.execute("DELETE FROM installment_payments WHERE plan_id=?", (p["id"],))
-            conn.execute("DELETE FROM installment_plans WHERE id=?", (p["id"],))
         for pid, qty in returns:
             conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (qty, pid))
         if existing["status"] == "active":
@@ -1940,13 +1889,10 @@ def get_active_debts(shop_id: int):
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT ip.*, c.plate_number, c.car_brand, c.car_model,
-                   cl.full_name as owner_name, cl.phone as owner_phone, cl.telegram_id,
-                   oc.change_date as sale_date,
-                   (SELECT COUNT(*) FROM installment_payments p WHERE p.plan_id = ip.id) as payments_count
+                   cl.full_name as owner_name, cl.phone as owner_phone, cl.telegram_id
             FROM installment_plans ip
             JOIN cars c ON c.id = ip.car_id
             JOIN clients cl ON cl.id = c.client_id
-            LEFT JOIN oil_changes oc ON oc.id = ip.oil_change_id
             WHERE ip.shop_id=? AND ip.status='active'
             ORDER BY ip.next_due_date ASC
         """, (shop_id,)).fetchall()
@@ -2209,63 +2155,15 @@ def get_low_stock_products(shop_id: int, threshold: float = 50):
     return sorted(low, key=lambda p: p["stock_qty"])
 
 
-DEBT_WRITEOFF_CATEGORY = "Списанные долги"
-DEBT_WRITEOFF_REASONS = ("not_paying", "discount", "input_error", "other")
-
-
-def _migrate_debts(conn):
-    """Долги клиентов: отмена ошибочного платежа, списание безнадёжного долга,
-    дата закрытия (для вкладки «Закрытые»)."""
-    pay_cols = {r[1] for r in conn.execute("PRAGMA table_info(installment_payments)").fetchall()}
-    if "status" not in pay_cols:
-        conn.execute("ALTER TABLE installment_payments ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
-    if "cancelled_at" not in pay_cols:
-        conn.execute("ALTER TABLE installment_payments ADD COLUMN cancelled_at TEXT")
-    plan_cols = {r[1] for r in conn.execute("PRAGMA table_info(installment_plans)").fetchall()}
-    for col, ddl in (("closed_at", "TEXT"), ("written_off_amount", "INTEGER"),
-                     ("writeoff_reason", "TEXT"), ("writeoff_expense_id", "INTEGER")):
-        if col not in plan_cols:
-            conn.execute(f"ALTER TABLE installment_plans ADD COLUMN {col} {ddl}")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_installment_payments_date ON installment_payments(paid_date)")
-    conn.commit()
-
-
-def _debt_flow(conn, shop_id: int, date_from: str, date_to: str) -> dict:
-    """Движение денег по долгам клиентов за период:
-    • repaid — сколько клиенты погасили старых долгов (по дате платежа);
-    • debt_out — сколько выручки за период ушло в долг (рассрочка, оформленная
-      при замене в эти дни).
-    Пришло денег = нал + карта за замены + repaid."""
-    repaid = conn.execute("""
-        SELECT COALESCE(SUM(p.amount), 0) FROM installment_payments p
-        JOIN installment_plans ip ON ip.id = p.plan_id
-        WHERE ip.shop_id=? AND p.status='active' AND p.paid_date >= ? AND p.paid_date <= ?
-    """, (shop_id, date_from, date_to)).fetchone()[0]
-    debt_out = conn.execute("""
-        SELECT COALESCE(SUM(ip.total_amount), 0) FROM installment_plans ip
-        LEFT JOIN oil_changes oc ON oc.id = ip.oil_change_id
-        WHERE ip.shop_id=?
-          AND COALESCE(oc.change_date, date(ip.created_at, 'localtime')) >= ?
-          AND COALESCE(oc.change_date, date(ip.created_at, 'localtime')) <= ?
-    """, (shop_id, date_from, date_to)).fetchone()[0]
-    return {"repaid": repaid or 0, "debt_out": debt_out or 0}
-
-
 @_serialized
 def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None):
     """Отмечает поступивший платёж по долгу — увеличивает paid_amount,
     сдвигает следующую дату на interval_days вперёд, и закрывает план,
-    если долг полностью погашен. Возвращает обновлённый план, None — если
-    план не найден (или принадлежит другой точке), или {"error": ...} —
-    если долг уже закрыт или платёж больше остатка."""
+    если долг полностью погашен. Возвращает обновлённый план или None,
+    если план не найден (или принадлежит другой точке)."""
     plan = get_installment_plan(plan_id, shop_id)
     if not plan:
         return None
-    if plan["status"] != "active":
-        return {"error": "closed"}
-    remaining = plan["total_amount"] - plan["paid_amount"]
-    if amount > remaining:
-        return {"error": "overpay", "remaining": remaining}
     paid_date = paid_date or datetime.now().strftime("%Y-%m-%d")
     new_paid = plan["paid_amount"] + amount
     new_status = "completed" if new_paid >= plan["total_amount"] else "active"
@@ -2276,73 +2174,16 @@ def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: 
             (plan_id, amount, paid_date)
         )
         conn.execute(
-            "UPDATE installment_plans SET paid_amount=paid_amount+?, next_due_date=?, status=?, closed_at=? "
-            "WHERE id=? AND shop_id=?",
-            (amount, next_due, new_status, _now_str() if new_status == "completed" else None, plan_id, shop_id)
+            "UPDATE installment_plans SET paid_amount=paid_amount+?, next_due_date=?, status=? WHERE id=? AND shop_id=?",
+            (amount, next_due, new_status, plan_id, shop_id)
         )
-        conn.commit()
-    return get_installment_plan(plan_id, shop_id)
-
-
-@_serialized
-def cancel_installment_payment(plan_id: int, shop_id: int, payment_id: int):
-    """Отменяет ошибочно внесённый платёж: остаток долга снова растёт, дата
-    следующего платежа возвращается на шаг назад, закрытый долг снова
-    становится активным. Сама запись платежа остаётся в истории как
-    «отменён». У списанного долга платежи не отменяются."""
-    plan = get_installment_plan(plan_id, shop_id)
-    if not plan:
-        return None
-    if plan["status"] == "written_off":
-        return {"error": "written_off"}
-    with get_conn() as conn:
-        pay = conn.execute("SELECT * FROM installment_payments WHERE id=? AND plan_id=? AND status='active'",
-                           (payment_id, plan_id)).fetchone()
-        if not pay:
-            return {"error": "not_found"}
-        prev_due = (datetime.strptime(plan["next_due_date"], "%Y-%m-%d")
-                    - timedelta(days=plan["interval_days"])).strftime("%Y-%m-%d")
-        conn.execute("UPDATE installment_payments SET status='cancelled', cancelled_at=? WHERE id=?",
-                     (_now_str(), payment_id))
-        conn.execute("""UPDATE installment_plans SET paid_amount=MAX(0, paid_amount-?), next_due_date=?,
-                        status='active', closed_at=NULL WHERE id=? AND shop_id=?""",
-                     (pay["amount"], prev_due, plan_id, shop_id))
-        conn.commit()
-    return get_installment_plan(plan_id, shop_id)
-
-
-@_serialized
-def write_off_installment(plan_id: int, shop_id: int, reason: str = None):
-    """Списывает остаток безнадёжного долга: долг закрывается, напоминания
-    прекращаются, а сумма записывается в расходы (категория «Списанные
-    долги») сегодняшним днём — так чистая прибыль честно уменьшается."""
-    plan = get_installment_plan(plan_id, shop_id)
-    if not plan:
-        return None
-    if plan["status"] != "active":
-        return {"error": "closed"}
-    remaining = plan["total_amount"] - plan["paid_amount"]
-    if remaining <= 0:
-        return {"error": "closed"}
-    reason = reason if reason in DEBT_WRITEOFF_REASONS else "other"
-    with get_conn() as conn:
-        car = conn.execute("""SELECT c.plate_number, cl.full_name FROM cars c JOIN clients cl ON cl.id = c.client_id
-                              WHERE c.id=?""", (plan["car_id"],)).fetchone()
-        name = " · ".join(x for x in ((car["full_name"] if car else None), (car["plate_number"] if car else None)) if x)
-        cur = conn.execute("""
-            INSERT INTO expense_entries (shop_id, recurring_expense_id, category, name, amount, expense_date)
-            VALUES (?, NULL, ?, ?, ?, ?)
-        """, (shop_id, DEBT_WRITEOFF_CATEGORY, name or "—", remaining, datetime.now().strftime("%Y-%m-%d")))
-        conn.execute("""UPDATE installment_plans SET status='written_off', written_off_amount=?, writeoff_reason=?,
-                        writeoff_expense_id=?, closed_at=? WHERE id=? AND shop_id=? AND status='active'""",
-                     (remaining, reason, cur.lastrowid, _now_str(), plan_id, shop_id))
         conn.commit()
     return get_installment_plan(plan_id, shop_id)
 
 
 def get_installment_payments(plan_id: int, shop_id: int):
     """История платежей по конкретному плану — только если план
-    принадлежит указанной точке. Отменённые тоже в списке (status)."""
+    принадлежит указанной точке."""
     if not get_installment_plan(plan_id, shop_id):
         return []
     with get_conn() as conn:
@@ -2350,38 +2191,6 @@ def get_installment_payments(plan_id: int, shop_id: int):
             "SELECT * FROM installment_payments WHERE plan_id=? ORDER BY paid_date DESC, id DESC", (plan_id,)
         ).fetchall()
         return [dict(r) for r in rows]
-
-
-def get_closed_debts(shop_id: int, limit: int = 100):
-    """Погашенные и списанные долги — для вкладки «Закрытые»."""
-    with get_conn() as conn:
-        rows = conn.execute("""
-            SELECT ip.*, c.plate_number, cl.full_name as owner_name, cl.phone as owner_phone,
-                   oc.change_date as sale_date
-            FROM installment_plans ip
-            JOIN cars c ON c.id = ip.car_id
-            JOIN clients cl ON cl.id = c.client_id
-            LEFT JOIN oil_changes oc ON oc.id = ip.oil_change_id
-            WHERE ip.shop_id=? AND ip.status IN ('completed', 'written_off')
-            ORDER BY COALESCE(ip.closed_at, ip.created_at) DESC, ip.id DESC
-            LIMIT ?
-        """, (shop_id, limit)).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_debts_overview(shop_id: int) -> dict:
-    """Сводка для вкладки «Долги»: сколько должны всего, сколько из этого
-    просрочено и сколько погашено в этом месяце."""
-    debts = get_active_debts(shop_id)
-    now = datetime.now()
-    with get_conn() as conn:
-        flow = _debt_flow(conn, shop_id, now.strftime("%Y-%m-01"), now.strftime("%Y-%m-%d"))
-    return {
-        "total_remaining": sum(d["remaining"] for d in debts),
-        "overdue_remaining": sum(d["remaining"] for d in debts if d["is_overdue"]),
-        "count": len(debts),
-        "repaid_month": flow["repaid"],
-    }
 
 
 def get_due_installment_reminders():
@@ -2819,7 +2628,6 @@ def get_revenue_stats(shop_id: int) -> dict:
             "year": (year_start, far_future),
         }.items():
             result[key]["clients"] = _client_split(conn, shop_id, d_from, d_to)
-            result[key].update(_debt_flow(conn, shop_id, d_from, d_to))
         return result
 
 
@@ -2919,7 +2727,6 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
         result = _with_avg({"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"],
                             "paid_count": row["paid_cnt"] or 0})
         result["clients"] = _client_split(conn, shop_id, date_from, date_to)
-        result.update(_debt_flow(conn, shop_id, date_from, date_to))
         return result
 
 
@@ -3043,13 +2850,13 @@ def get_aggregated_revenue_stats(parent_shop_id: int) -> dict:
     """Выручка главного аккаунта, сложенная со всеми его филиалами — по тем
     же периодам, что и обычная статистика."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
-    combined = {p: {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0, "repaid": 0, "debt_out": 0}
+    combined = {p: {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0}
                 for p in ("today", "yesterday", "week", "month", "year")}
     client_parts = {p: [] for p in combined}
     for sid in shop_ids:
         stats = get_revenue_stats(sid)
         for period in combined:
-            for k in ("total", "count", "cash", "card", "paid_count", "repaid", "debt_out"):
+            for k in ("total", "count", "cash", "card", "paid_count"):
                 combined[period][k] += stats[period][k]
             client_parts[period].append(stats[period]["clients"])
     for period in combined:
@@ -3095,15 +2902,17 @@ def get_aggregated_revenue_range(parent_shop_id: int, date_from: str, date_to: s
     """Выручка за произвольный период, сложенная по главному аккаунту и всем
     его филиалам вместе."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
-    keys = ("total", "count", "cash", "card", "paid_count", "repaid", "debt_out")
-    result = {k: 0 for k in keys}
+    total, count, cash, card, paid = 0, 0, 0, 0, 0
     client_parts = []
     for sid in shop_ids:
         r = get_revenue_range(sid, date_from, date_to)
-        for k in keys:
-            result[k] += r.get(k) or 0
+        total += r["total"]
+        count += r["count"]
+        cash += r["cash"]
+        card += r["card"]
+        paid += r["paid_count"]
         client_parts.append(r["clients"])
-    _with_avg(result)
+    result = _with_avg({"total": total, "count": count, "cash": cash, "card": card, "paid_count": paid})
     result["clients"] = _sum_client_splits(client_parts)
     return result
 
@@ -3272,7 +3081,7 @@ def network_shops(parent_shop_id: int):
 
 
 def _sum_revenue_period(parts) -> dict:
-    out = {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0, "repaid": 0, "debt_out": 0}
+    out = {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0}
     for p in parts:
         for k in out:
             out[k] += p.get(k) or 0
@@ -6438,105 +6247,3 @@ def list_registrations(limit_done: int = 15) -> dict:
             f"SELECT {cols} FROM registration_requests WHERE status IN ('approved', 'rejected') "
             f"ORDER BY decided_at DESC, id DESC LIMIT ?", (limit_done,)).fetchall()]
         return {"pending": pending, "done": done}
-
-
-# ======================================================================
-# VIN: номер кузова машины
-# ======================================================================
-# cars.vin — VIN машины (необязательно). vin_models — чему соответствует
-# начало VIN (первые 8 знаков: производитель + описание модели) по опыту
-# ВСЕХ точек платформы: мастер один раз указал модель для такого VIN —
-# в следующий раз любая точка получит модель сразу. Хранятся только
-# начало VIN и название модели, без номеров машин и владельцев.
-
-_VIN_ALPHABET = set("ABCDEFGHJKLMNPRSTUVWXYZ0123456789")
-
-
-def normalize_vin(vin):
-    v = _re.sub(r"[^A-Za-z0-9]", "", vin or "").upper()
-    return v if len(v) == 17 and set(v) <= _VIN_ALPHABET else None
-
-
-def _migrate_vin(conn):
-    cols = {row["name"] for row in conn.execute("PRAGMA table_info(cars)").fetchall()}
-    if "vin" not in cols:
-        conn.execute("ALTER TABLE cars ADD COLUMN vin TEXT")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_cars_shop_vin ON cars(shop_id, vin)")
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS vin_models (
-        prefix TEXT NOT NULL,
-        model TEXT NOT NULL,
-        brand TEXT,
-        hits INTEGER NOT NULL DEFAULT 1,
-        updated_at TEXT DEFAULT (datetime('now')),
-        PRIMARY KEY (prefix, model)
-    )
-    """)
-
-
-def _vin_model_key(model):
-    return _re.sub(r"\s+", " ", (model or "").strip())[:60]
-
-
-def vin_learn(vin, brand, model):
-    """Запоминаем: машины с таким началом VIN — это такая модель."""
-    vin = normalize_vin(vin)
-    model = _vin_model_key(model)
-    if not vin or len(model) < 2:
-        return
-    with get_conn() as conn:
-        conn.execute("""
-            INSERT INTO vin_models (prefix, model, brand, hits) VALUES (?, ?, ?, 1)
-            ON CONFLICT(prefix, model) DO UPDATE SET hits = hits + 1,
-                brand = COALESCE(excluded.brand, brand), updated_at = datetime('now')
-        """, (vin[:8], model, (brand or None)))
-        conn.commit()
-
-
-def vin_lookup_model(vin):
-    """Самая частая модель для такого начала VIN (по всем точкам) или None."""
-    vin = normalize_vin(vin)
-    if not vin:
-        return None
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT model, brand, hits FROM vin_models WHERE prefix=? ORDER BY hits DESC, updated_at DESC LIMIT 1",
-            (vin[:8],)
-        ).fetchone()
-        return dict(row) if row else None
-
-
-def find_car_by_vin(shop_id: int, vin: str):
-    vin = normalize_vin(vin)
-    if not vin:
-        return None
-    with get_conn() as conn:
-        row = conn.execute("""
-            SELECT c.plate_number, c.car_brand, c.car_model, cl.full_name AS owner_name
-            FROM cars c JOIN clients cl ON cl.id = c.client_id
-            WHERE c.shop_id=? AND c.vin=? ORDER BY c.id DESC LIMIT 1
-        """, (shop_id, vin)).fetchone()
-        return dict(row) if row else None
-
-
-def top_car_models(shop_id: int, limit: int = 12):
-    """Модели, которые чаще всего приезжают к точке — для быстрых кнопок
-    в форме «Замена». Написание берём самое частое в базе точки."""
-    with get_conn() as conn:
-        rows = conn.execute("""
-            SELECT car_brand, TRIM(car_model) AS model, COUNT(*) AS n
-            FROM cars WHERE shop_id=? AND car_model IS NOT NULL AND TRIM(car_model) <> ''
-            GROUP BY car_brand, TRIM(car_model)
-        """, (shop_id,)).fetchall()
-    best = {}
-    for r in rows:
-        key = r["model"].lower()
-        cur = best.get(key)
-        if cur is None:
-            best[key] = {"brand": r["car_brand"], "model": r["model"], "n": r["n"], "_top": r["n"]}
-        else:
-            cur["n"] += r["n"]
-            if r["n"] > cur["_top"]:
-                cur.update(brand=r["car_brand"], model=r["model"], _top=r["n"])
-    out = sorted(best.values(), key=lambda x: -x["n"])[:limit]
-    return [{"brand": x["brand"], "model": x["model"]} for x in out]

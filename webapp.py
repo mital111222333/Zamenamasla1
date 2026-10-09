@@ -1726,27 +1726,6 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .af-h { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#0F172A; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
   .af-h i { width:28px; height:28px; border-radius:9px; background:#EFF6FF; color:var(--blue); display:inline-flex; align-items:center; justify-content:center; font-size:13px; }
   .af-sub { font-size:12px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; margin:12px 0 6px; }
-  .sp-card { margin-top:12px; border:1px solid #cfe0fb; background:#f4f8ff; border-radius:14px; padding:12px 14px; font-size:13px; color:#1e2a44; }
-  .sp-head { display:flex; align-items:flex-start; gap:8px; }
-  .sp-head b { font-size:14px; flex:1; line-height:1.35; }
-  .sp-head small { display:block; font-weight:400; color:#5b6b8c; font-size:12px; }
-  .sp-x { border:none; background:none; color:#7a89a8; font-size:16px; padding:0 2px; cursor:pointer; }
-  .sp-alt { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; align-items:center; color:#5b6b8c; font-size:12px; }
-  .sp-alt button { border:1px solid #cfe0fb; background:#fff; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; }
-  .sp-grid { display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 10px; margin-top:8px; }
-  .sp-grid span { color:#5b6b8c; }
-  .sp-grid div { font-weight:600; white-space:pre-line; overflow-wrap:anywhere; }
-  .sp-grid div i { font-weight:400; font-style:normal; color:#5b6b8c; }
-  .sp-stock { margin-top:10px; border-top:1px dashed #cfe0fb; padding-top:8px; }
-  .sp-prod { display:flex; justify-content:space-between; gap:8px; padding:3px 0; }
-  .sp-prod em { font-style:normal; color:#15803d; white-space:nowrap; }
-  .sp-badge { display:inline-block; font-size:11px; border-radius:6px; padding:0 6px; margin-left:4px; background:#e7f6ec; color:#15803d; font-weight:600; }
-  .sp-badge.hot { background:#fff4d6; color:#92600a; }
-  .sp-fill { margin-top:10px; width:100%; border:none; border-radius:10px; padding:10px; background:#1d4ed8; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
-  .sp-more { margin-top:8px; }
-  .sp-more summary { cursor:pointer; color:#1d4ed8; font-weight:600; }
-  .sp-note { margin-top:8px; font-size:12px; color:#5b6b8c; }
-  .sp-note.warn { color:#92600a; background:#fff4d6; border-radius:8px; padding:6px 8px; }
   .mil-grid { display:grid; grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr); gap:6px; align-items:end; }
   .mil-arrow { text-align:center; color:#94A3B8; padding-bottom:14px; font-size:13px; }
   .mil-l { font-size:12px; color:var(--hint); margin-bottom:5px; }
@@ -1877,48 +1856,6 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .st-legend { display:flex; justify-content:space-between; gap:8px; font-size:11.5px; margin-top:5px; }
   .st-legend span::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--dot); }
   .st-row.profit b { color:#15803D; }
-  .st-money { display:grid; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); gap:8px; margin:6px 0 6px; }
-  .st-money > div { background:#F8FAFC; border-radius:12px; padding:8px 10px; min-width:0; }
-  .st-money-k { font-size:11.5px; font-weight:600; color:#64748B; }
-  .st-money-v { font-size:20px; font-weight:800; font-family:var(--font-display); line-height:1.2; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .st-money-v small { font-size:.55em; font-weight:600; color:#64748B; margin-left:3px; }
-  .st-money-v.rev { color:var(--blue); }
-  .st-money-v.got { color:#15803D; }
-  .st-card.orange .st-money > div { background:#FFF7ED; }
-  .st-card.orange .st-money-v.rev { color:#9A3412; }
-  .st-money-note { font-size:12px; color:#92400E; background:#FEF3C7; border-radius:10px; padding:6px 9px; margin-bottom:6px; line-height:1.35; }
-  .dsum { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px; }
-  .dsum > div { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px 10px; min-width:0; }
-  .dsum .k { font-size:11px; color:var(--hint); font-weight:600; }
-  .dsum .v { font-size:16px; font-weight:800; font-family:var(--font-display); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .dsum .v.bad { color:#B3241C; } .dsum .v.ok { color:#15803D; }
-  .dtabs { display:flex; gap:6px; margin-bottom:10px; }
-  .dtabs button { font:inherit; font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
-  .dtabs button.on { background:var(--text); border-color:var(--text); color:#fff; }
-  .debt-card .dc-prog { margin-top:10px; }
-  .debt-card .dc-prog .bar { height:6px; background:#F1F5F9; border-radius:4px; overflow:hidden; }
-  .debt-card .dc-prog .bar i { display:block; height:100%; background:#0EA5E9; }
-  .debt-card .dc-prog .t { display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--hint); margin-top:4px; font-variant-numeric:tabular-nums; }
-  .debt-card .dc-actions { display:flex; gap:6px; margin-top:8px; }
-  .debt-card .dc-actions button { flex:1; font:inherit; font-size:12.5px; font-weight:600; padding:7px 8px; border-radius:10px; border:0; background:#F1F5F9; color:var(--text); cursor:pointer; }
-  .debt-card .dc-actions button.danger { background:#FEF2F2; color:#B3241C; }
-  .debt-card .dc-hist { margin-top:8px; padding-top:6px; border-top:1px dashed var(--border); }
-  .debt-card .dh-row { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:5px 0; }
-  .debt-card .dh-row .dh-date { color:var(--hint); flex:1; }
-  .debt-card .dh-row b { font-variant-numeric:tabular-nums; }
-  .debt-card .dh-row.cancelled b, .debt-card .dh-row.cancelled .dh-date { text-decoration:line-through; color:var(--hint); }
-  .debt-card .dh-row .dh-x { font:inherit; font-size:11.5px; font-weight:700; color:#B3241C; background:#FEF2F2; border:0; border-radius:7px; padding:3px 8px; cursor:pointer; }
-  .debt-card .dh-tag { font-size:11px; color:var(--hint); }
-  .debt-card.closed { background:#FAFBFC; }
-  .debt-card .dc-status { font-size:12px; font-weight:600; margin-top:6px; }
-  .debt-card .dc-status.ok { color:#15803D; } .debt-card .dc-status.wo { color:#B3241C; }
-  .wo-reasons { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
-  .wo-reasons button { font:inherit; font-size:12.5px; padding:6px 11px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; margin:0; }
-  .wo-reasons button.on { border-color:#B3241C; background:#FEF2F2; color:#B3241C; font-weight:700; }
-  .wo-warn { background:#FEF3C7; color:#92400E; border-radius:10px; padding:8px 10px; font-size:12.5px; line-height:1.4; margin-bottom:10px; }
-  .wo-btns { display:flex; gap:8px; }
-  .wo-btns button { flex:1; }
-  .wo-btns .wo-go { background:#B3241C; color:#fff; border:0; border-radius:12px; padding:12px; font:inherit; font-weight:700; cursor:pointer; }
   .rv-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-bottom:14px; }
   .rv-box { background:#F8FAFC; border-radius:12px; padding:10px 12px; }
   .rv-box b { display:block; font-size:17px; font-family:var(--font-display); color:var(--text); line-height:1.2; }
@@ -2418,25 +2355,15 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="row2" style="margin-bottom:-10px;">
         <div class="field">
           <label><i class="fa-solid fa-car"></i>{{ T.field_car_brand }}</label>
-          <select id="car_brand" onchange="specSchedule(0); renderQuickModels()">
+          <select id="car_brand">
             {% for b in brands %}<option value="{{b}}">{{b}}</option>{% endfor %}
           </select>
         </div>
         <div class="field">
           <label><i class="fa-solid fa-car-side"></i>{{ T.field_car_model }}</label>
-          <input id="car_model" placeholder="Cobalt, Nexia, Malibu..." oninput="specSchedule(); renderQuickModels()" autocomplete="off">
+          <input id="car_model" placeholder="Cobalt, Nexia, Malibu...">
         </div>
       </div>
-      <div class="qm-row" id="quickModels"></div>
-      <div class="field" style="margin-top:12px;">
-        <label><i class="fa-solid fa-barcode"></i>{{ T.vin_label }}</label>
-        <div class="plate-wrap vin-wrap">
-          <input id="vin" placeholder="{{ T.vin_ph }}" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="onVinInput()" enterkeyhint="next">
-          <button type="button" class="ps-cam-btn" onclick="openVinScanner()" title="{{ T.vs_title }}" aria-label="{{ T.vs_title }}"><i class="fa-solid fa-camera"></i></button>
-        </div>
-        <div id="vinHint"></div>
-      </div>
-      <div id="specCard"></div>
     </div>
 
     <div class="af-sec">
@@ -2555,11 +2482,6 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   </div>
 
   <div id="view-debts" style="display:none;">
-    <div id="debtsSummary" class="dsum"></div>
-    <div class="dtabs">
-      <button type="button" id="dtab_active" class="on" onclick="setDebtTab('active')">{{ T.debts_tab_active }}</button>
-      <button type="button" id="dtab_closed" onclick="setDebtTab('closed')">{{ T.debts_tab_closed }}</button>
-    </div>
     <div id="debtsList"></div>
   </div>
 
@@ -3305,20 +3227,6 @@ MODAL_AND_SCRIPT = """
   </div>
 </div>
 
-<div class="modal-overlay" id="writeoffModal">
-  <div class="modal" style="text-align:left; max-width:400px;">
-    <h3 id="woTitle" style="margin-top:0;"></h3>
-    <div id="woText" class="hint-text" style="font-size:13px; line-height:1.45; margin-bottom:10px;"></div>
-    <div style="font-size:12px; font-weight:600; color:var(--hint);">{{ T.wo_reason }}</div>
-    <div class="wo-reasons" id="woReasons"></div>
-    <div class="wo-warn" id="woWarn" style="display:none;">{{ T.wo_input_error_hint }}</div>
-    <div class="wo-btns">
-      <button type="button" class="close-btn" onclick="closeWriteoff()">{{ T.wo_cancel }}</button>
-      <button type="button" class="wo-go" onclick="confirmWriteoff()">{{ T.wo_confirm }}</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="editModal">
   <div class="modal modal-wide" style="text-align:left;">
     <h3 style="text-align:center;" id="svcModalTitle">{{ T.entry_edit_title }}</h3>
@@ -3413,7 +3321,6 @@ const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const IS_BRANCH = {{ is_branch|tojson }};
-const IS_EMPLOYEE = {{ is_employee|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
 const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
 const BOT_USERNAME = {{ bot_username|tojson }};
@@ -6208,37 +6115,21 @@ function stBadge(pct, extraClass) {
   return `<span class="st-badge ${up ? 'up' : 'down'} ${extraClass || ''}">${up ? '↑' : '↓'} ${up ? '+' : ''}${String(pct).replace('.', ',')}%</span>`;
 }
 
-function stMoneyNote(d) {
-  const parts = [];
-  if (d.debt_out) parts.push(T.st_m_debt_out.replace('{sum}', fmtShort(d.debt_out)));
-  if (d.repaid) parts.push(T.st_m_repaid.replace('{sum}', fmtShort(d.repaid)));
-  if (!parts.length) return '';
-  const txt = parts.join(' · ');
-  return txt.charAt(0).toUpperCase() + txt.slice(1);
-}
-
 function renderStatCard(o) {
-  // o = { label, d: {total,count,avg,paid_count,cash,card,repaid,debt_out,clients}, cmp, cmpNote, profit, orange }
+  // o = { label, d: {total,count,avg,paid_count,cash,card,clients}, cmp, cmpNote, profit, orange }
   const d = o.d || {};
   const cmp = o.cmp || null;
   const cl = d.clients || { total: 0, new: 0, returning: 0 };
-  const cash = d.cash || 0, card = d.card || 0, debtOut = d.debt_out || 0, repaid = d.repaid || 0;
-  const received = cash + card + repaid;
-  const paySum = (cash + card + debtOut) || 1;
+  const cash = d.cash || 0, card = d.card || 0, paySum = (cash + card) || 1;
   const clSum = cl.total || 1;
   const badgeLine = cmp && cmp.pct !== null && cmp.pct !== undefined
     ? `${stBadge(cmp.pct)}<span class="st-badge-note">${o.cmpNote || ''}</span>` : '';
   const empty = !d.count;
-  const note = stMoneyNote(d);
   return `
     <div class="st-card ${o.orange ? 'orange' : ''}">
       <div class="st-label">${o.label}</div>
-      <div class="st-money">
-        <div><div class="st-money-k">${T.st_m_revenue}</div><div class="st-money-v rev">${fmtNum(d.total)}<small>${T.currency}</small></div></div>
-        <div><div class="st-money-k">${T.st_m_received}</div><div class="st-money-v got">${fmtNum(received)}<small>${T.currency}</small></div></div>
-      </div>
-      ${badgeLine ? `<div class="st-badge-line" style="min-height:0;">${badgeLine}</div>` : ''}
-      ${note ? `<div class="st-money-note">${note}</div>` : ''}
+      <div class="st-amount">${fmtNum(d.total)}<small>${T.currency}</small></div>
+      <div class="st-badge-line">${badgeLine}</div>
       ${empty ? `<div class="st-empty">${T.st_no_visits}</div>` : `
       <div class="st-row"><span>${T.st_services}</span><b>${d.count}</b></div>
       ${d.paid_count ? `<div class="st-row"><span>${T.st_avg}</span><b>${fmtNum(d.avg)} ${T.currency}${cmp ? stBadge(cmp.avg_pct) : ''}</b></div>` : ''}
@@ -6248,11 +6139,11 @@ function renderStatCard(o) {
         <div class="st-split"><i style="width:${cl.new / clSum * 100}%; background:#3B82F6;"></i><i style="width:${cl.returning / clSum * 100}%; background:#14B8A6;"></i></div>
         <div class="st-legend"><span style="--dot:#3B82F6;">${cl.new} ${T.st_new}</span><span style="--dot:#14B8A6;">${cl.returning} ${T.st_returning}</span></div>
       </div>` : ''}
-      ${(cash || card || debtOut) ? `
+      ${(cash || card) ? `
       <div class="st-block">
         <div class="st-block-head"><span>${T.st_payment}</span></div>
-        <div class="st-split"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i>${debtOut ? `<i style="width:${debtOut / paySum * 100}%; background:#F59E0B;"></i>` : ''}</div>
-        <div class="st-legend"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span>${debtOut ? `<span style="--dot:#F59E0B;">${T.st_debt_part} ${fmtShort(debtOut)}</span>` : ''}</div>
+        <div class="st-split"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i></div>
+        <div class="st-legend"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span></div>
       </div>` : ''}
       ${o.profit !== null && o.profit !== undefined ? `<div class="st-row profit"><span>${T.st_profit}</span><b>${fmtNum(o.profit)} ${T.currency}</b></div>` : ''}
       `}
@@ -6268,8 +6159,6 @@ function renderTodayStrip(d, profit) {
       ${d.paid_count ? `<span class="st-chip">${T.st_avg}: <b>${fmtShort(d.avg)}</b></span>` : ''}
       ${cl.total ? `<span class="st-chip">${T.st_clients}: <b>${cl.total}</b> (${cl.new} ${T.st_new})</span>` : ''}
       ${profit !== null && profit !== undefined ? `<span class="st-chip" style="background:#DCFCE7;">${T.st_profit}: <b style="color:#15803D;">${fmtShort(profit)}</b></span>` : ''}
-      ${(d.debt_out || d.repaid) ? `<span class="st-chip">${T.st_m_received}: <b style="color:#15803D;">${fmtShort((d.cash || 0) + (d.card || 0) + (d.repaid || 0))}</b></span>` : ''}
-      ${d.debt_out ? `<span class="st-chip" style="background:#FEF3C7;">${T.st_debt_part}: <b style="color:#92400E;">${fmtShort(d.debt_out)}</b></span>` : ''}
     </div>` : `<div class="st-empty">${T.st_today_empty}</div>`;
   return `
     <div class="st-today">
@@ -7307,121 +7196,6 @@ function startNewOwner() {
   setTimeout(() => nameEl.focus(), 300);
 }
 
-// ---- Подбор масла по модели машины (справочник car_specs.py) ----
-// Карточка под полями «Марка/Модель». Показывает вязкость, допуск и объём
-// из справочника и масла со склада точки нужной вязкости (без продвижения
-// брендов — только то, что есть у самой точки). «Заполнить масло» ставит
-// товар, цену и литры в строку «Моторное масло».
-const SPEC = { timer: null, seq: 0, list: [], cur: 0, hiddenFor: '' };
-function specSchedule(delay) {
-  clearTimeout(SPEC.timer);
-  SPEC.timer = setTimeout(loadSpecs, delay === undefined ? 400 : delay);
-}
-async function loadSpecs() {
-  const model = (document.getElementById('car_model').value || '').trim();
-  const brand = document.getElementById('car_brand').value || '';
-  const seq = ++SPEC.seq;
-  if (model.length < 2) { SPEC.list = []; renderSpecCard(); return; }
-  let data = null;
-  try {
-    data = await (await fetch('/api/car_specs?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model))).json();
-  } catch (e) { return; }
-  if (seq !== SPEC.seq) return;
-  SPEC.list = (data && data.matches) || [];
-  SPEC.cur = 0;
-  renderSpecCard();
-}
-function specVisc(name) {
-  const m = String(name || '').match(/(\\d{1,2})\\s*w\\s*-?\\s*(\\d{2})/i);
-  return m ? (m[1] + 'W-' + m[2]) : null;
-}
-function specApprovalTokens(text) {
-  const t = String(text || '').toLowerCase();
-  const out = new Set();
-  (t.match(/dexos\\s*[12]/g) || []).forEach(x => out.add(x.replace(/\\s+/g, '')));
-  (t.match(/\\b\\d{3}\\s?\\d{2}\\b/g) || []).forEach(x => out.add(x.replace(/\\s+/g, '')));
-  (t.match(/22[89]\\.\\d{1,2}/g) || []).forEach(x => out.add(x.replace('.', '')));
-  (t.match(/ll-?\\d{2}/g) || []).forEach(x => out.add(x.replace('-', '')));
-  (t.match(/rbs0-2ae/g) || []).forEach(x => out.add('rbs02ae'));
-  return out;
-}
-function specProducts(s) {
-  const prods = productsForCategory('fluid_0');
-  const need = new Set(s.visc_list || []), hot = new Set(s.visc_hot || []);
-  const tokens = specApprovalTokens(s.approval);
-  return prods.map(p => {
-    const v = specVisc(p.name);
-    if (!v || (!need.has(v) && !hot.has(v))) return null;
-    const nm = String(p.name).toLowerCase().replace(/[\\s\\.\\-]/g, '');
-    const appr = [...tokens].some(tk => nm.indexOf(tk) >= 0);
-    return { p, hot: !need.has(v), appr };
-  }).filter(Boolean).sort((a, b) =>
-    (a.hot - b.hot) || (b.appr - a.appr) || ((b.p.stock_qty || 0) - (a.p.stock_qty || 0)));
-}
-function renderSpecCard() {
-  const box = document.getElementById('specCard');
-  if (!box) return;
-  const s = SPEC.list[SPEC.cur];
-  const model = (document.getElementById('car_model').value || '').trim().toLowerCase();
-  if (!s || SPEC.hiddenFor === model + '|' + s.id) { box.innerHTML = ''; return; }
-  const alts = SPEC.list.map((x, i) => i === SPEC.cur ? '' :
-    `<button type="button" onclick="SPEC.cur=${i}; renderSpecCard()">${escapeHtml(x.model)}</button>`).join('');
-  const matches = specProducts(s);
-  const unit = T.unit_l;
-  const stock = matches.length ? matches.slice(0, 4).map(m => `
-      <div class="sp-prod"><span>${escapeHtml(m.p.name)}${m.appr ? `<span class="sp-badge">${T.sp_appr_badge}</span>` : ''}${m.hot ? `<span class="sp-badge hot">${T.sp_hot_badge}</span>` : ''}</span><em>${m.p.stock_qty} ${unit}</em></div>`).join('')
-    : `<div class="sp-note">${T.sp_stock_none}</div>`;
-  const hot = (s.visc_hot || []).length ? `<span>${T.sp_hot}</span><div>${escapeHtml(s.visc_hot.join(' / '))} <i>— ${T.sp_hot_note}</i></div>` : '';
-  const row = (label, val) => val ? `<span>${label}</span><div>${escapeHtml(val)}</div>` : '';
-  box.innerHTML = `<div class="sp-card">
-    <div class="sp-head"><i class="fa-solid fa-book-open" style="color:#1d4ed8;margin-top:2px;"></i>
-      <b>${T.sp_title}: ${escapeHtml(s.model)}<small>${escapeHtml(s.engine)}</small></b>
-      <button type="button" class="sp-x" onclick="hideSpecCard()" aria-label="${T.sp_hide}">✕</button></div>
-    ${alts ? `<div class="sp-alt">${T.sp_other} ${alts}</div>` : ''}
-    <div class="sp-grid">
-      ${row(T.sp_oil, s.visc)}
-      ${row(T.sp_approval, s.approval)}
-      ${row(T.sp_volume, s.oil_vol)}
-      ${hot}
-    </div>
-    ${WAREHOUSE_ENABLED ? `<div class="sp-stock"><div style="font-weight:600;margin-bottom:2px;">${T.sp_stock}</div>${stock}</div>` : ''}
-    <button type="button" class="sp-fill" onclick="fillFromSpec()"><i class="fa-solid fa-wand-magic-sparkles"></i> ${T.sp_fill}</button>
-    <details class="sp-more"><summary>${T.sp_more}</summary>
-      <div class="sp-grid">${row(T.sp_trans, [s.trans, s.trans_spec].filter(Boolean).join('\\n'))}${row(T.sp_brake, s.brake)}${row(T.sp_coolant, s.coolant)}</div>
-    </details>
-    <div class="sp-note${s.approx ? ' warn' : ''}">${s.approx ? T.sp_approx : T.sp_note}</div>
-  </div>`;
-}
-function hideSpecCard() {
-  const s = SPEC.list[SPEC.cur];
-  if (s) SPEC.hiddenFor = (document.getElementById('car_model').value || '').trim().toLowerCase() + '|' + s.id;
-  renderSpecCard();
-}
-function fillFromSpec() {
-  const s = SPEC.list[SPEC.cur];
-  if (!s) return;
-  const best = specProducts(s).find(m => !m.hot);
-  const brandEl = document.getElementById('fluid_brand_0');
-  let filledProduct = false;
-  if (best && brandEl && brandEl.tagName === 'SELECT') {
-    const opt = Array.from(brandEl.options).find(o => o.value === String(best.p.id));
-    if (opt) {
-      brandEl.value = opt.value;
-      document.getElementById('fluid_price_0').value = opt.dataset.price || '';
-      filledProduct = true;
-    }
-  }
-  if (s.liters) document.getElementById('fluid_liters_0').value = s.liters;
-  ROW_OPEN.add('fluid_0');
-  syncItemRows();
-  paymentSplitTouched = false;
-  updateTotal();
-  const multi = /\\)\\s*\\n|\\)\\s+[≈\\d]/.test(s.oil_vol || '');
-  showMsg((filledProduct ? T.sp_filled : T.sp_filled_liters) + (multi ? ' ' + T.sp_volume_check : ''), true);
-  const row = document.getElementById('row_fluid_0');
-  if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-}
-
 function repeatLastVisit() {
   // «Как в прошлый раз»: те же масло/фильтры/литры, цены — текущие со склада
   // (если товар есть на складе), иначе цена прошлого визита.
@@ -7727,10 +7501,6 @@ async function lookupPlate(force) {
     KNOWN_OWNER = {name: (data.car.owner_name || '').trim(), phone: (data.car.owner_phone || '').trim()};
     if (data.car.car_brand) document.getElementById('car_brand').value = data.car.car_brand;
     document.getElementById('car_model').value = data.car.car_model || '';
-    document.getElementById('vin').value = data.car.vin || '';
-    if (typeof renderVinHint === 'function') renderVinHint();
-    if (typeof renderQuickModels === 'function') renderQuickModels();
-    specSchedule(0);
 
     const name = data.car.owner_name || T.kc_no_name;
     const initials = name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
@@ -7921,13 +7691,12 @@ function clearAddDraft() {
 }
 function discardAddDraft() {
   clearAddDraft();
-  ['plate', 'owner_name', 'owner_phone', 'car_model', 'vin', 'mileage', 'next_mileage', 'notes'].forEach(id => {
+  ['plate', 'owner_name', 'owner_phone', 'car_model', 'mileage', 'next_mileage', 'notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   resetItemInputs();
   setPayMode('cash');
   document.getElementById('msg').innerHTML = '';
-  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint(); renderQuickModels();
 }
 function restoreAddDraft() {
   let d = null;
@@ -7987,7 +7756,6 @@ async function submitCar() {
     owner_phone: document.getElementById('owner_phone').value.trim(),
     car_brand: document.getElementById('car_brand').value,
     car_model: document.getElementById('car_model').value.trim(),
-    vin: vsNorm(document.getElementById('vin').value),
     mileage: document.getElementById('mileage').value,
     next_mileage: document.getElementById('next_mileage').value,
     items: items,
@@ -8049,9 +7817,7 @@ async function submitCar() {
     window.ADD_TOKEN = null;
     clearAddDraft();
     showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
-    ['plate','owner_name','owner_phone','car_model','vin','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
-    SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
-    loadQuickModels(true);
+    ['plate','owner_name','owner_phone','car_model','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     KM.manual = false;
     KNOWN_OWNER = null;
     NEW_OWNER = false;
@@ -8111,32 +7877,11 @@ async function loadCars() {
   if (await fetchCars()) renderTable(true);
 }
 
-const DEBTS = { tab: 'active', seq: 0, list: [], woId: null, woReason: 'not_paying' };
-const WO_REASONS = ['not_paying', 'discount', 'input_error', 'other'];
-
-function debtDate(v) {
-  if (!v) return '';
-  const p = String(v).slice(0, 10).split('-');
-  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(v);
-}
-
-function setDebtTab(tab) {
-  DEBTS.tab = tab;
-  loadDebts();
-}
-
-function renderDebtSummary(ov) {
-  const el = document.getElementById('debtsSummary');
-  if (!el || !ov) return;
-  el.innerHTML = `
-    <div><div class="k">${T.debts_sum_total}</div><div class="v">${fmtShort(ov.total_remaining)}</div></div>
-    <div><div class="k">${T.debts_sum_overdue}</div><div class="v ${ov.overdue_remaining ? 'bad' : ''}">${fmtShort(ov.overdue_remaining)}</div></div>
-    <div><div class="k">${T.debts_sum_repaid}</div><div class="v ok">${fmtShort(ov.repaid_month)}</div></div>`;
-}
-
-function renderActiveDebt(d) {
-  const pct = d.total_amount ? Math.min(100, Math.round(d.paid_amount / d.total_amount * 100)) : 0;
-  return `
+async function loadDebts() {
+  const debts = await (await fetch('/api/debts')).json();
+  const list = document.getElementById('debtsList');
+  if (!debts.length) { list.innerHTML = `<div class="hint-text" style="text-align:center; padding:24px;">${T.debts_empty}</div>`; return; }
+  list.innerHTML = debts.map(d => `
     <div class="debt-card ${d.is_overdue ? 'overdue' : ''}">
       <div class="dc-top">
         <div>
@@ -8144,87 +7889,16 @@ function renderActiveDebt(d) {
           <div class="dc-meta">${escapeHtml(d.plate_number)}${d.owner_phone ? ' · ' + escapeHtml(d.owner_phone) : ''}</div>
         </div>
         <div>
-          <div class="dc-remaining">${fmtNum(d.remaining)} ${T.currency}</div>
-          <div class="dc-due ${d.is_overdue ? 'overdue-text' : ''}">${d.is_overdue ? T.debt_overdue : T.debt_next_due} ${debtDate(d.next_due_date)}</div>
+          <div class="dc-remaining">${d.remaining.toLocaleString('ru-RU')} ${T.currency}</div>
+          <div class="dc-due ${d.is_overdue ? 'overdue-text' : ''}">${d.is_overdue ? T.debt_overdue : T.debt_next_due} ${d.next_due_date}</div>
         </div>
-      </div>
-      <div class="dc-prog">
-        <div class="bar"><i style="width:${pct}%"></i></div>
-        <div class="t"><span>${T.debt_paid_of.replace('{paid}', fmtNum(d.paid_amount)).replace('{total}', fmtNum(d.total_amount))}</span><span>${d.sale_date ? T.debt_since.replace('{date}', debtDate(d.sale_date)) : ''}</span></div>
       </div>
       <div class="dc-pay-row">
-        <input id="debt_pay_${d.id}" type="number" inputmode="numeric" placeholder="${T.debt_pay_placeholder}" style="flex:1;">
+        <input id="debt_pay_${d.id}" type="number" placeholder="${T.debt_pay_placeholder}" style="flex:1;">
         <button class="badge active" style="flex:none;" onclick="payDebt(${d.id})">${T.debt_pay_btn}</button>
       </div>
-      ${(d.payments_count || !IS_EMPLOYEE) ? `
-      <div class="dc-actions">
-        ${d.payments_count ? `<button type="button" onclick="toggleDebtHistory(${d.id})">${T.debt_history} · ${d.payments_count}</button>` : ''}
-        ${!IS_EMPLOYEE ? `<button type="button" class="danger" onclick="openWriteoff(${d.id})">${T.debt_writeoff_btn}</button>` : ''}
-      </div>` : ''}
-      <div class="dc-hist" id="debt_hist_${d.id}" style="display:none;"></div>
-    </div>`;
-}
-
-function renderClosedDebt(d) {
-  const status = d.status === 'written_off'
-    ? `<div class="dc-status wo">${T.debt_status_written_off.replace('{sum}', fmtNum(d.written_off_amount)).replace('{date}', debtDate(d.closed_at))}${d.writeoff_reason ? ' · ' + (T['wo_r_' + d.writeoff_reason] || '') : ''}</div>`
-    : `<div class="dc-status ok">${T.debt_status_completed.replace('{date}', debtDate(d.closed_at || d.next_due_date))}</div>`;
-  return `
-    <div class="debt-card closed">
-      <div class="dc-top">
-        <div>
-          <div class="dc-owner">${escapeHtml(d.owner_name || T.kc_no_name)}</div>
-          <div class="dc-meta">${escapeHtml(d.plate_number)}${d.sale_date ? ' · ' + T.debt_since.replace('{date}', debtDate(d.sale_date)) : ''}</div>
-        </div>
-        <div><div class="dc-remaining" style="color:var(--text);">${fmtNum(d.total_amount)} ${T.currency}</div></div>
-      </div>
-      ${status}
-      <div class="dc-actions"><button type="button" onclick="toggleDebtHistory(${d.id})">${T.debt_history}</button></div>
-      <div class="dc-hist" id="debt_hist_${d.id}" style="display:none;"></div>
-    </div>`;
-}
-
-async function loadDebts() {
-  const seq = ++DEBTS.seq;
-  ['active', 'closed'].forEach(t => {
-    const b = document.getElementById('dtab_' + t);
-    if (b) b.classList.toggle('on', DEBTS.tab === t);
-  });
-  let ov, list;
-  try {
-    [ov, list] = await Promise.all([
-      fetch('/api/debts/overview').then(r => r.json()),
-      fetch(DEBTS.tab === 'closed' ? '/api/debts/closed' : '/api/debts').then(r => r.json()),
-    ]);
-  } catch (e) { return; }
-  if (seq !== DEBTS.seq) return;  // пока грузилось, переключили вкладку
-  renderDebtSummary(ov);
-  DEBTS.list = Array.isArray(list) ? list : [];
-  const el = document.getElementById('debtsList');
-  if (!DEBTS.list.length) {
-    el.innerHTML = `<div class="hint-text" style="text-align:center; padding:24px;">${DEBTS.tab === 'closed' ? T.debts_closed_empty : T.debts_empty}</div>`;
-    return;
-  }
-  el.innerHTML = DEBTS.list.map(DEBTS.tab === 'closed' ? renderClosedDebt : renderActiveDebt).join('');
-}
-
-async function toggleDebtHistory(planId, forceOpen) {
-  const box = document.getElementById('debt_hist_' + planId);
-  if (!box) return;
-  if (box.style.display !== 'none' && !forceOpen) { box.style.display = 'none'; return; }
-  let rows = [];
-  try { rows = await (await fetch(`/api/debts/${planId}/payments`)).json(); } catch (e) { return; }
-  const plan = DEBTS.list.find(x => x.id === planId) || {};
-  const canCancel = !IS_EMPLOYEE && plan.status !== 'written_off';
-  box.innerHTML = rows.length ? rows.map(p => {
-    const cancelled = p.status === 'cancelled';
-    return `<div class="dh-row ${cancelled ? 'cancelled' : ''}">
-      <span class="dh-date">${debtDate(p.paid_date)}</span><b>${fmtNum(p.amount)} ${T.currency}</b>
-      ${cancelled ? `<span class="dh-tag">${T.debt_pay_cancelled}</span>`
-        : (canCancel ? `<button type="button" class="dh-x" onclick="cancelDebtPayment(${planId}, ${p.id}, ${p.amount}, '${p.paid_date}')">${T.debt_pay_cancel}</button>` : '')}
-    </div>`;
-  }).join('') : `<div class="hint-text" style="font-size:12.5px;">${T.debt_hist_empty}</div>`;
-  box.style.display = 'block';
+    </div>
+  `).join('');
 }
 
 async function payDebt(planId) {
@@ -8237,58 +7911,6 @@ async function payDebt(planId) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.debt_pay_success, true);
-    loadDebts();
-  } else if (data.error === 'overpay') {
-    showMsg(T.debt_overpay.replace('{sum}', fmtNum(data.remaining)), false);
-  } else {
-    showMsg(T.msg_error + ' ' + data.error, false);
-  }
-}
-
-async function cancelDebtPayment(planId, paymentId, amount, date) {
-  if (!confirm(T.debt_cancel_confirm.replace('{sum}', fmtNum(amount)).replace('{date}', debtDate(date)))) return;
-  const res = await fetch(`/api/debts/${planId}/payments/${paymentId}/cancel`, { method: 'POST' });
-  const data = await res.json();
-  if (data.ok) {
-    showMsg(T.debt_cancel_done, true);
-    // долг мог снова стать активным — показываем его там
-    if (DEBTS.tab === 'closed' && data.plan && data.plan.status === 'active') DEBTS.tab = 'active';
-    await loadDebts();
-    toggleDebtHistory(planId, true);
-  } else {
-    showMsg(T.msg_error + ' ' + data.error, false);
-  }
-}
-
-function renderWoReasons() {
-  document.getElementById('woReasons').innerHTML = WO_REASONS.map(r =>
-    `<button type="button" class="${DEBTS.woReason === r ? 'on' : ''}" onclick="pickWoReason('${r}')">${T['wo_r_' + r]}</button>`).join('');
-  document.getElementById('woWarn').style.display = DEBTS.woReason === 'input_error' ? 'block' : 'none';
-}
-function pickWoReason(r) { DEBTS.woReason = r; renderWoReasons(); }
-
-function openWriteoff(planId) {
-  const d = DEBTS.list.find(x => x.id === planId);
-  if (!d) return;
-  DEBTS.woId = planId;
-  DEBTS.woReason = 'not_paying';
-  document.getElementById('woTitle').textContent = T.wo_title.replace('{sum}', fmtNum(d.remaining));
-  document.getElementById('woText').textContent = T.wo_text.replace('{client}', [d.owner_name, d.plate_number].filter(Boolean).join(' · '));
-  renderWoReasons();
-  document.getElementById('writeoffModal').classList.add('open');
-}
-function closeWriteoff() { document.getElementById('writeoffModal').classList.remove('open'); }
-
-async function confirmWriteoff() {
-  if (!DEBTS.woId) return;
-  const res = await fetch(`/api/debts/${DEBTS.woId}/writeoff`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ reason: DEBTS.woReason })
-  });
-  const data = await res.json();
-  if (data.ok) {
-    closeWriteoff();
-    DEBTS.woId = null;
-    showMsg(T.wo_done, true);
     loadDebts();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -9082,8 +8704,6 @@ async function deleteEntry(id, plate) {
     openHistoryRow = null;
     toggleHistory(plate);
     loadCars();
-  } else if (data.error === 'has_debt') {
-    showMsg(T.entry_has_debt, false);
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
   }
@@ -9116,7 +8736,7 @@ function guardOnce(names) {
   });
 }
 guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarCompletely',
-  'payDebt', 'cancelDebtPayment', 'confirmWriteoff', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
+  'payDebt', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
   'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveUsdRate',
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice',
@@ -9777,441 +9397,8 @@ document.addEventListener('keydown', (e) => {
 
 PAGE = PAGE + MODAL_AND_SCRIPT
 PAGE = PAGE.replace("</body>", HELP_JS + "</body>", 1)
-VIN_SCAN_HTML = r"""<style>
-  .vin-wrap #vin { padding-right:58px; font-family:var(--font-mono); letter-spacing:.5px; text-transform:uppercase; }
-  .vin-wrap #vin::placeholder { text-transform:none; letter-spacing:0; font-family:inherit; }
-  .vin-hint { margin-top:6px; font-size:12.5px; color:#5b6b8c; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .vin-hint.err { color:#b91c1c; }
-  .vin-hint button { border:1px solid #cfe0fb; background:#fff; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
-  .qm-row { display:flex; gap:6px; overflow-x:auto; padding:2px 0 6px; margin:8px 0 0; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
-  .qm-row::-webkit-scrollbar { display:none; }
-  .qm-chip { flex:none; border:1.5px solid var(--border); background:var(--field-bg); color:var(--text); border-radius:999px; padding:7px 13px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
-  .qm-chip.on { border-color:#1d4ed8; background:#eaf1ff; color:#1d4ed8; }
-  #vsOverlay { position:fixed; inset:0; z-index:9001; background:#0b0f16; display:none; overflow:hidden; }
-  #vsOverlay.open { display:block; }
-  #vsPhotoBox { position:absolute; left:0; right:0; top:calc(64px + env(safe-area-inset-top, 0px)); bottom:0; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
-  #vsImg { max-width:100%; max-height:62vh; object-fit:contain; touch-action:manipulation; }
-  #vsOverlay.tap #vsImg { cursor:crosshair; outline:3px solid #facc15; }
-  #vsStatus { position:absolute; left:16px; right:16px; top:calc(64px + 62vh + 16px); text-align:center; }
-  #vsStatus span { display:inline-block; background:rgba(34,211,238,.18); color:#a5f3fc; border:1px solid rgba(34,211,238,.4); font-size:13px; padding:7px 14px; border-radius:20px; font-weight:600; max-width:100%; }
-  #vsStatus.err span { background:rgba(250,204,21,.18); color:#fde68a; border-color:rgba(250,204,21,.5); }
-  #vsSheet { position:absolute; left:0; right:0; bottom:0; background:var(--card, #fff); color:var(--text); border-radius:22px 22px 0 0; padding:14px 16px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -8px 24px rgba(0,0,0,.3); display:none; max-width:560px; margin:0 auto; max-height:80vh; overflow-y:auto; }
-  #vsOverlay.result #vsSheet { display:block; }
-  #vsOverlay.result #vsStatus { display:none; }
-  .vs-vin { font-family:var(--font-mono); font-weight:700; font-size:19px; letter-spacing:1px; width:100%; text-transform:uppercase; }
-  .vs-info { display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 12px; margin:12px 0; font-size:14px; }
-  .vs-info span { color:#64748b; }
-  .vs-info b { font-weight:700; }
-  .vs-src { font-size:11.5px; color:#64748b; font-weight:400; }
-  .vs-chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 12px; }
-  .vs-chips button { border:1.5px solid var(--border); background:var(--field-bg); color:var(--text); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
-  .vs-chips button.on { border-color:#1d4ed8; background:#eaf1ff; color:#1d4ed8; }
-  .vs-warn { font-size:12.5px; color:#92600a; background:#fff4d6; border-radius:10px; padding:8px 10px; margin-bottom:12px; }
-</style>
-
-<input type="file" id="vsFile" accept="image/*" capture="environment" style="display:none;" onchange="vsOnPhoto(this)">
-<div id="vsOverlay" role="dialog" aria-modal="true">
-  <div class="ps-top">
-    <button type="button" class="ps-ib" onclick="closeVinScanner()" aria-label="close"><i class="fa-solid fa-xmark"></i></button>
-    <div>{{ T.vs_title }}</div>
-    <button type="button" class="ps-ib" onclick="openVinScanner()" aria-label="{{ T.vs_retake }}"><i class="fa-solid fa-camera"></i></button>
-  </div>
-  <div id="vsPhotoBox"><img id="vsImg" alt="" onclick="vsOnTap(event)"></div>
-  <div id="vsStatus"><span></span></div>
-  <div id="vsSheet"></div>
-  <canvas id="vsCanvas" style="display:none;"></canvas>
-</div>
-
-<script>
-// ===== VIN по фото =====
-// Мастер делает ОДНО фото обычной камерой телефона (с автофокусом, без
-// наведения рамки). VIN ищется по всему снимку: штрихкод (если телефон умеет
-// BarcodeDetector) + текст (Tesseract на телефоне; ~5 МБ скачиваются с
-// бесплатного CDN один раз). Не нашлось — мастер касается VIN на фото, и
-// читается только эта полоска. Фото никуда не отправляются.
-const VS = { worker: null, loading: null, detector: null, gen: 0, result: null, info: null, pick: null, img: null };
-const VS_OK = /^[A-HJ-NPR-Z0-9]{17}$/;
-const VS_TR = { A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9 };
-const VS_W = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
-// известные коды производителей (первые 3 знака VIN) — с сервера
-const VS_WMI = new Set(__VIN_WMI__);
-
-function vsNorm(s) {
-  return String(s || '').toUpperCase().replace(/O/g, '0').replace(/Q/g, '0').replace(/I/g, '1').replace(/[^A-Z0-9]/g, '');
-}
-function vsCheckOk(v) {
-  let t = 0;
-  for (let i = 0; i < 17; i++) t += (/[0-9]/.test(v[i]) ? +v[i] : (VS_TR[v[i]] || 0)) * VS_W[i];
-  const r = t % 11;
-  return v[8] === (r === 10 ? 'X' : String(r));
-}
-// из текста — кандидаты на VIN (17 знаков, последние 4 — цифры). Из одной
-// строки берём один вариант: с известным кодом производителя, иначе с
-// верной контрольной цифрой, иначе прижатый к концу строки.
-function vsExtract(text) {
-  const out = [];
-  String(text || '').split(/\n/).forEach(line => {
-    const s = vsNorm(String(line).replace(/\bVIN\b|\bV1N\b/gi, ' '));
-    if (s.length < 17 || s.length > 24) return;
-    const ws = [];
-    for (let i = 0; i + 17 <= s.length; i++) {
-      const w = s.slice(i, i + 17);
-      if (VS_OK.test(w) && /[0-9]{4}$/.test(w)) ws.push(w);
-    }
-    if (!ws.length) return;
-    out.push(ws.find(w => VS_WMI.has(w.slice(0, 3))) || ws.find(vsCheckOk) || ws[ws.length - 1]);
-  });
-  return out;
-}
-function vsBest(cands) {
-  return cands.find(w => VS_WMI.has(w.slice(0, 3)) && vsCheckOk(w)) || cands.find(w => VS_WMI.has(w.slice(0, 3)))
-    || cands.find(vsCheckOk) || cands[0] || null;
-}
-
-function vsSetStatus(text, isErr) {
-  const st = document.getElementById('vsStatus');
-  st.classList.toggle('err', !!isErr);
-  st.style.display = text ? '' : 'none';
-  st.querySelector('span').textContent = text || '';
-}
-
-function vsLoadOcr() {
-  if (VS.worker) return Promise.resolve(VS.worker);
-  if (!VS.loading) {
-    VS.loading = (async () => {
-      if (!window.Tesseract) await psLoadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-      const w = await Tesseract.createWorker('eng', 1);
-      await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789' });
-      VS.worker = w;
-      return w;
-    })().catch(e => { VS.loading = null; throw e; });
-  }
-  return VS.loading;
-}
-
-async function vsMakeDetector() {
-  if (VS.detector !== null || !('BarcodeDetector' in window)) return;
-  try {
-    const sup = await BarcodeDetector.getSupportedFormats();
-    const want = ['code_39', 'code_128', 'data_matrix', 'qr_code', 'pdf417'].filter(f => sup.includes(f));
-    VS.detector = want.length ? new BarcodeDetector({ formats: want }) : false;
-  } catch (e) { VS.detector = false; }
-}
-
-// кнопка камеры: сразу открываем камеру телефона, а распознавание
-// загружаем в фоне, пока мастер фотографирует
-function openVinScanner() {
-  vsLoadOcr().catch(() => {});
-  const f = document.getElementById('vsFile');
-  f.value = '';
-  f.click();
-}
-
-function closeVinScanner() {
-  VS.gen++;
-  const ov = document.getElementById('vsOverlay');
-  ov.classList.remove('open', 'result', 'tap');
-  document.getElementById('vsSheet').innerHTML = '';
-  const img = document.getElementById('vsImg');
-  if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
-  img.removeAttribute('src');
-  VS.img = null;
-  document.body.style.overflow = '';
-}
-
-// фото (или его полоска) → серая картинка с растянутым контрастом
-function vsToCanvas(img, sx, sy, sw, sh, maxW) {
-  const k = Math.min(1, maxW / sw);
-  const c = document.getElementById('vsCanvas');
-  c.width = Math.round(sw * k); c.height = Math.round(sh * k);
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
-  const im = ctx.getImageData(0, 0, c.width, c.height), d = im.data;
-  let lo = 255, hi = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
-    d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g;
-  }
-  const m = hi > lo ? 255 / (hi - lo) : 1;
-  for (let i = 0; i < d.length; i += 4) { const g = Math.max(0, Math.min(255, (d[i] - lo) * m)); d[i] = d[i + 1] = d[i + 2] = g; }
-  ctx.putImageData(im, 0, 0);
-  return c;
-}
-
-async function vsOcr(canvas, psm) {
-  const w = await vsLoadOcr();
-  await w.setParameters({ tessedit_pageseg_mode: psm });
-  return (await w.recognize(canvas)).data.text || '';
-}
-
-async function vsOnPhoto(input) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  const gen = ++VS.gen;
-  const ov = document.getElementById('vsOverlay');
-  ov.classList.remove('result', 'tap');
-  ov.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('vsSheet').innerHTML = '';
-  const img = document.getElementById('vsImg');
-  img.src = URL.createObjectURL(file);
-  try { await img.decode(); } catch (e) {}
-  if (gen !== VS.gen) return;
-  VS.img = img;
-  vsSetStatus(VS.worker ? T.vs_reading : T.vs_loading);
-  // 1) штрихкод на наклейке
-  await vsMakeDetector();
-  if (VS.detector) {
-    try {
-      const codes = await VS.detector.detect(img);
-      for (const c of codes) {
-        const raw = vsNorm(c.rawValue);
-        const v = raw.length === 17 && VS_OK.test(raw) ? raw : vsBest(vsExtract(c.rawValue));
-        if (v && gen === VS.gen) { vsShowResult(v); return; }
-      }
-    } catch (e) {}
-  }
-  if (gen !== VS.gen) return;
-  // 2) текст по всему фото
-  const W = img.naturalWidth, H = img.naturalHeight;
-  let found = null;
-  try {
-    const text = await vsOcr(vsToCanvas(img, 0, 0, W, H, 1800), '11');
-    found = vsBest(vsExtract(text));
-  } catch (e) {
-    if (gen === VS.gen) { vsSetStatus(T.vs_load_fail, true); ov.classList.add('tap'); }
-    return;
-  }
-  if (gen !== VS.gen) return;
-  if (found) { vsShowResult(found); return; }
-  // не нашли — мастер касается VIN на фото
-  ov.classList.add('tap');
-  vsSetStatus(T.vs_tap_hint, true);
-}
-
-// касание по фото: читаем горизонтальную полоску вокруг этого места
-async function vsOnTap(ev) {
-  const ov = document.getElementById('vsOverlay');
-  if (!ov.classList.contains('tap') || !VS.img) return;
-  const img = VS.img, r = img.getBoundingClientRect();
-  const W = img.naturalWidth, H = img.naturalHeight;
-  const y = (ev.clientY - r.top) / r.height * H;
-  const band = Math.max(40, H * 0.09);
-  const gen = VS.gen;
-  vsSetStatus(T.vs_reading);
-  let v = null;
-  try {
-    for (const k of [1, 1.8]) {
-      const h = band * k, sy = Math.max(0, y - h / 2);
-      const text = await vsOcr(vsToCanvas(img, 0, sy, W, Math.min(h, H - sy), 1600), '6');
-      v = vsBest(vsExtract(text));
-      if (v || gen !== VS.gen) break;
-    }
-  } catch (e) { v = null; }
-  if (gen !== VS.gen) return;
-  if (v) { vsShowResult(v); return; }
-  vsSetStatus(T.vs_not_found, true);
-  vsShowResult('');
-}
-
-// ---- результат ----
-async function vinDecode(vin) {
-  try { return await (await fetch('/api/vin/decode?vin=' + encodeURIComponent(vin))).json(); }
-  catch (e) { return null; }
-}
-
-async function vsShowResult(vin) {
-  VS.result = vin; VS.info = null; VS.pick = null;
-  const ov = document.getElementById('vsOverlay');
-  ov.classList.remove('tap');
-  ov.classList.add('result');
-  if (navigator.vibrate && vin) { try { navigator.vibrate(60); } catch (e) {} }
-  vsRenderSheet();
-  if (!VS_OK.test(vin)) return;
-  const gen = VS.gen;
-  const info = await vinDecode(vin);
-  if (gen !== VS.gen || VS.result !== vin) return;
-  VS.info = info;
-  vsRenderSheet(true);
-}
-
-function vsOnEdit(el) {
-  const v = vsNorm(el.value).slice(0, 17);
-  if (v === VS.result) return;
-  VS.result = v; VS.info = null; VS.pick = null;
-  clearTimeout(VS.editTimer);
-  if (VS_OK.test(v)) VS.editTimer = setTimeout(async () => {
-    const info = await vinDecode(v);
-    if (VS.result === v) { VS.info = info; vsRenderSheet(true); }
-  }, 300);
-  else vsRenderSheet(true);
-}
-
-function vsInfoHtml(info) {
-  if (!VS.result) return `<div class="vs-warn">${escapeHtml(T.vs_not_found)}</div>`;
-  if (!VS_OK.test(VS.result)) return `<div class="vs-src">${VS.result.length}/17</div>`;
-  if (!info) return `<div class="vs-src" style="margin-top:8px;">${escapeHtml(T.vs_decoding)}</div>`;
-  if (!info.ok) return `<div class="vs-warn">${escapeHtml(T.vs_invalid)}</div>`;
-  const srcLabel = info.model_source === 'learned' ? T.vs_src_learned : (info.model_source === 'vpic' ? T.vs_src_vpic : '');
-  let html = `<div class="vs-info">
-      <span>${escapeHtml(T.field_car_brand)}</span><b>${escapeHtml(info.brand || T.vs_unknown)}</b>
-      ${info.year ? `<span>${escapeHtml(T.vs_year)}</span><b>${info.year}</b>` : ''}
-      <span>${escapeHtml(T.field_car_model)}</span><b>${escapeHtml(VS.pick || info.model || '—')}${srcLabel && !VS.pick ? ` <span class="vs-src">· ${escapeHtml(srcLabel)}</span>` : ''}</b>
-    </div>`;
-  if (!info.model && (info.choices || []).length) {
-    html += `<div class="ps-lbl">${escapeHtml(T.vs_pick_model)}</div><div class="vs-chips">` +
-      info.choices.map(m => `<button type="button" class="${VS.pick === m ? 'on' : ''}" onclick="vsPick(${escapeHtml(JSON.stringify(m))})">${escapeHtml(m)}</button>`).join('') + '</div>';
-  }
-  return html;
-}
-
-function vsCarHtml(info) {
-  if (!info || !info.car) return '';
-  const c = info.car;
-  return `<div class="ps-match ok"><div class="ps-av">${escapeHtml(psInitials(c.owner_name))}</div><div style="min-width:0;">
-      <div class="ps-tag"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(T.vs_in_base)}</div>
-      <div class="ps-mt mono">${escapeHtml(psPretty(c.plate_number))}</div>
-      <div class="ps-ms">${escapeHtml([c.owner_name, [c.car_brand, c.car_model].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div></div></div>`;
-}
-
-function vsRenderSheet(keepInput) {
-  const sheet = document.getElementById('vsSheet');
-  const info = VS.info;
-  if (keepInput && document.getElementById('vsVinInput')) {
-    document.getElementById('vsInfoBox').innerHTML = vsInfoHtml(info) + vsCarHtml(info);
-    return;
-  }
-  sheet.innerHTML = `
-    <div class="ps-grab"></div>
-    <div class="ps-lbl">${escapeHtml(VS.result ? T.vs_recognized : T.vs_type_vin)}</div>
-    <input id="vsVinInput" class="vs-vin" value="${escapeHtml(VS.result || '')}" maxlength="20" placeholder="XWB…" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="vsOnEdit(this)">
-    <div class="vs-src" style="margin-top:4px;">${escapeHtml(T.vs_check_hint)}</div>
-    <div id="vsInfoBox">${vsInfoHtml(info)}${vsCarHtml(info)}</div>
-    <div class="ps-btns">
-      <button type="button" class="ps-bt s" onclick="openVinScanner()"><i class="fa-solid fa-camera"></i> ${escapeHtml(T.vs_retake)}</button>
-      <button type="button" class="ps-bt p" onclick="vsApply()">${escapeHtml(T.vs_apply)}</button>
-    </div>
-    <div class="ps-lock"><i class="fa-solid fa-lock"></i> ${escapeHtml(T.vs_on_phone)}</div>`;
-  if (!VS.result) setTimeout(() => { const i = document.getElementById('vsVinInput'); if (i) i.focus(); }, 50);
-}
-
-function vsPick(m) { VS.pick = VS.pick === m ? null : m; vsRenderSheet(true); }
-
-// подставить VIN, марку и модель в форму «Замена»
-function applyVinInfo(vin, info, pickedModel) {
-  document.getElementById('vin').value = vin || '';
-  if (info && info.ok) {
-    const model = pickedModel || info.model;
-    const brandSel = document.getElementById('car_brand');
-    const inList = info.brand && Array.from(brandSel.options).some(o => o.value === info.brand);
-    if (inList) brandSel.value = info.brand;
-    else if (info.brand) brandSel.value = 'Другое';
-    if (model) {
-      document.getElementById('car_model').value = (!inList && info.brand && model.toLowerCase().indexOf(info.brand.toLowerCase()) < 0)
-        ? info.brand + ' ' + model : model;
-    }
-    if (info.car && !(document.getElementById('plate').value || '').trim() && typeof psApply === 'function') {
-      psApply(info.car.plate_number);
-    }
-  }
-  renderVinHint();
-  renderQuickModels();
-  if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
-  specSchedule(0);
-}
-
-function vsApply() {
-  const v = VS.result;
-  if (!VS_OK.test(v || '')) { showMsg(T.vs_invalid, false); return; }
-  const info = VS.info, pick = VS.pick;
-  closeVinScanner();
-  applyVinInfo(v, info, pick);
-}
-
-// ---- ручной ввод VIN в форме ----
-const VINF = { timer: null, info: null, vin: '' };
-function onVinInput() {
-  const el = document.getElementById('vin');
-  const v = vsNorm(el.value).slice(0, 17);
-  clearTimeout(VINF.timer);
-  if (!VS_OK.test(v)) { VINF.info = null; VINF.vin = v; renderVinHint(); return; }
-  VINF.timer = setTimeout(async () => {
-    const info = await vinDecode(v);
-    if (vsNorm(document.getElementById('vin').value) !== v) return;
-    VINF.info = info; VINF.vin = v;
-    if (info && info.ok && info.model && !(document.getElementById('car_model').value || '').trim()) {
-      applyVinInfo(v, info, null);
-      return;
-    }
-    renderVinHint();
-  }, 350);
-}
-
-function renderVinHint() {
-  const box = document.getElementById('vinHint');
-  if (!box) return;
-  const v = vsNorm((document.getElementById('vin') || {}).value || '');
-  const info = VINF.vin === v ? VINF.info : null;
-  if (!v) { box.innerHTML = ''; return; }
-  if (v.length < 17) { box.innerHTML = `<div class="vin-hint">${v.length}/17</div>`; return; }
-  if (!info) { box.innerHTML = ''; return; }
-  if (!info.ok) { box.innerHTML = `<div class="vin-hint err">${escapeHtml(T.vs_invalid)}</div>`; return; }
-  const line = [info.brand, info.year, info.model].filter(Boolean).join(' · ');
-  const curModel = (document.getElementById('car_model').value || '').trim();
-  const btn = info.model && curModel.toLowerCase() !== String(info.model).toLowerCase()
-    ? `<button type="button" onclick="applyVinInfo(VINF.vin, VINF.info, null)">${escapeHtml(T.vs_apply)}</button>` : '';
-  const choose = !info.model ? ` · ${escapeHtml(T.vs_model_unknown)}` : '';
-  box.innerHTML = `<div class="vin-hint"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(line || T.vs_unknown)}${choose} ${btn}</div>`;
-}
-
-// ---- быстрые кнопки моделей ----
-// Самые частые модели этой точки (из её базы) + популярные в Узбекистане.
-// Одно касание ставит марку и модель — и сразу показывается подбор масла.
-const QM = { list: [], loaded: false };
-const QM_DEFAULT = [['Chevrolet', 'Cobalt'], ['Chevrolet', 'Nexia 3'], ['Chevrolet', 'Gentra'], ['Chevrolet', 'Spark'],
-  ['Chevrolet', 'Malibu'], ['Chevrolet', 'Damas'], ['Chevrolet', 'Tracker'], ['Chevrolet', 'Onix'], ['Chevrolet', 'Lacetti'],
-  ['Chevrolet', 'Captiva'], ['Daewoo', 'Nexia'], ['Daewoo', 'Matiz'], ['Hyundai', 'Elantra'], ['Kia', 'K5'], ['BYD', 'Song Plus'],
-  ['Toyota', 'Camry']];
-async function loadQuickModels(force) {
-  if (QM.loaded && !force) { renderQuickModels(); return; }
-  let top = [];
-  try { top = (await (await fetch('/api/top_models')).json()).models || []; } catch (e) {}
-  const seen = new Set(), list = [];
-  top.concat(QM_DEFAULT.map(([brand, model]) => ({ brand, model }))).forEach(m => {
-    const k = String(m.model || '').trim().toLowerCase();
-    if (!k || seen.has(k)) return;
-    seen.add(k); list.push(m);
-  });
-  QM.list = list.slice(0, 16);
-  QM.loaded = true;
-  renderQuickModels();
-}
-function renderQuickModels() {
-  const box = document.getElementById('quickModels');
-  if (!box) return;
-  const cur = (document.getElementById('car_model').value || '').trim().toLowerCase();
-  box.innerHTML = QM.list.map((m, i) =>
-    `<button type="button" class="qm-chip${String(m.model).toLowerCase() === cur ? ' on' : ''}" onclick="pickQuickModel(${i})">${escapeHtml(m.model)}</button>`).join('');
-}
-function pickQuickModel(i) {
-  const m = QM.list[i];
-  if (!m) return;
-  const brandSel = document.getElementById('car_brand');
-  if (m.brand && Array.from(brandSel.options).some(o => o.value === m.brand)) brandSel.value = m.brand;
-  else if (m.brand) brandSel.value = 'Другое';
-  const inList = brandSel.value === m.brand;
-  document.getElementById('car_model').value = (!inList && m.brand && m.brand !== 'Другое' && String(m.model).toLowerCase().indexOf(String(m.brand).toLowerCase()) < 0)
-    ? m.brand + ' ' + m.model : m.model;
-  renderQuickModels();
-  if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
-  specSchedule(0);
-}
-</script>
-<script>loadQuickModels();</script>
-"""
-
 _ps_i = PAGE.rfind("</body>")
-PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + VIN_SCAN_HTML + PAGE[_ps_i:]
+PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + PAGE[_ps_i:]
 assert PAGE.count(_SW_SNIPPET) == 1
 PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
@@ -10448,229 +9635,6 @@ def api_set_usd_rate():
 
 
 
-# ---- Подбор масла по модели машины ----
-# Справочник лежит в car_specs.py (сгенерирован из Excel-справочника).
-# Поиск по тексту модели: «Cobalt», «кобальт», «Nexia 3», «R4»… Марка из
-# списка только помогает при равенстве. Отдаём 1 основной вариант и до 3
-# альтернатив (например «Nexia» → Nexia 1/2, а Nexia 3 — кнопкой).
-from car_specs import CAR_SPECS as _CAR_SPECS
-
-
-def _spec_norm(s):
-    s = (s or "").lower().replace("ё", "е")
-    return re.sub(r"[^0-9a-zа-яўқғҳ]+", " ", s).strip()
-
-
-def _spec_phrases(spec):
-    out = set()
-    for a in (spec.get("aliases") or "").split(","):
-        if _spec_norm(a):
-            out.add(_spec_norm(a))
-    for part in re.split(r"[/()]", spec.get("model") or ""):
-        if len(_spec_norm(part)) >= 3:
-            out.add(_spec_norm(part))
-    return out
-
-
-_SPEC_INDEX = [(sp, _spec_phrases(sp)) for sp in _CAR_SPECS]
-_SPEC_PUBLIC = ("id", "brand", "model", "engine", "oil_vol", "liters", "approval", "visc",
-                "visc_list", "visc_hot", "trans", "trans_spec", "brake", "coolant", "approx")
-
-
-def match_car_specs(brand, model, limit=4):
-    q = _spec_norm(model)
-    if len(q) < 2:
-        return []
-    qc = q.replace(" ", "")
-    qt = set(q.split())
-    b = _spec_norm(brand)
-    if b == "ravon":
-        b = "chevrolet"
-    found = []
-    for sp, phrases in _SPEC_INDEX:
-        best, best_pc = 0, ""
-        for p in phrases:
-            pc = p.replace(" ", "")
-            if len(pc) <= 3:
-                sc = 100 if (p in qt or pc == qc) else 0
-            elif pc == qc:
-                sc = 100
-            elif pc in qc:
-                sc = 60 + len(pc)
-            elif len(qc) >= 3 and qc in pc:
-                sc = 30 + len(qc)
-            else:
-                sc = 0
-            if sc > best:
-                best, best_pc = sc, pc
-        if best:
-            sb = _spec_norm(sp.get("brand"))
-            if b and b not in ("другое",) and (sb.startswith(b) or b.startswith(sb)):
-                best += 5
-            found.append((best, best_pc, sp))
-    if not found:
-        return []
-    # «nexia» внутри «nexia3»: если найдено более длинное совпадение,
-    # короткое (другой модели) не предлагаем
-    full = [f for f in found if f[0] >= 60]
-    found = [f for f in found if not (f[0] >= 60 and any(
-        o is not f and o[0] >= 60 and f[1] != o[1] and f[1] in o[1] for o in full))]
-    found.sort(key=lambda f: -f[0])
-    return [{k: f[2].get(k) for k in _SPEC_PUBLIC} for f in found[:limit]]
-
-
-# ---- VIN: расшифровка без платных сервисов ----
-# 1) производитель — по первым 3 знакам (WMI, таблица ниже);
-# 2) модель — из опыта всех точек OilBook (db.vin_models: мастер один раз
-#    выбрал модель для такого начала VIN — дальше она подставляется сама);
-# 3) если не знаем — бесплатный справочник NHTSA (vPIC), он хорошо знает
-#    машины американского/корейского/японского рынка, для узбекских Chevrolet
-#    обычно молчит — тогда мастер выбирает модель кнопкой, и мы её запоминаем.
-_VIN_WMI = {
-    "XWB": "Chevrolet", "KL1": "Chevrolet", "KL3": "Chevrolet", "KL4": "Chevrolet", "KL7": "Chevrolet",
-    "KL8": "Chevrolet", "KLA": "Daewoo", "KLY": "Daewoo", "1G1": "Chevrolet", "1GN": "Chevrolet",
-    "1GC": "Chevrolet", "3G1": "Chevrolet", "3GN": "Chevrolet", "X9L": "Chevrolet",
-    "KMH": "Hyundai", "KMF": "Hyundai", "KMJ": "Hyundai", "KM8": "Hyundai", "5NP": "Hyundai", "5NM": "Hyundai",
-    "KNA": "Kia", "KNB": "Kia", "KNC": "Kia", "KND": "Kia", "KNE": "Kia", "U5Y": "Kia", "U6Y": "Kia",
-    "5XY": "Kia", "5XX": "Kia",
-    "JTD": "Toyota", "JTE": "Toyota", "JTF": "Toyota", "JTK": "Toyota", "JTM": "Toyota", "JTN": "Toyota",
-    "JT1": "Toyota", "JT2": "Toyota", "JT3": "Toyota", "SB1": "Toyota", "NMT": "Toyota", "4T1": "Toyota",
-    "4T3": "Toyota", "5TD": "Toyota", "5TF": "Toyota", "MR0": "Toyota", "AHT": "Toyota",
-    "JTH": "Lexus", "JTJ": "Lexus", "2T2": "Lexus",
-    "JN1": "Nissan", "JN8": "Nissan", "SJN": "Nissan", "VSK": "Nissan", "1N4": "Nissan", "3N1": "Nissan",
-    "5N1": "Nissan", "JHM": "Honda", "JHL": "Honda", "SHH": "Honda", "SHS": "Honda", "1HG": "Honda",
-    "2HG": "Honda", "5J6": "Honda", "19X": "Honda",
-    "WDB": "Mercedes-Benz", "WDD": "Mercedes-Benz", "WDC": "Mercedes-Benz", "WDF": "Mercedes-Benz",
-    "W1K": "Mercedes-Benz", "W1N": "Mercedes-Benz", "W1V": "Mercedes-Benz",
-    "WBA": "BMW", "WBS": "BMW", "WBX": "BMW", "WBY": "BMW", "5UX": "BMW", "5YM": "BMW",
-    "WAU": "Audi", "WA1": "Audi", "TRU": "Audi", "WUA": "Audi",
-    "WVW": "Volkswagen", "WVG": "Volkswagen", "WV1": "Volkswagen", "WV2": "Volkswagen", "3VW": "Volkswagen",
-    "1VW": "Volkswagen", "XW8": "Volkswagen", "TMB": "Skoda", "WP0": "Porsche", "WP1": "Porsche",
-    "XTA": "Lada (ВАЗ)", "XTT": "УАЗ", "X96": "ГАЗ", "XTC": "КамАЗ",
-    "JAA": "Isuzu", "JAL": "Isuzu", "JM1": "Mazda", "JMZ": "Mazda", "JA3": "Mitsubishi", "JA4": "Mitsubishi",
-    "JMB": "Mitsubishi", "WF0": "Ford", "NM0": "Ford", "1FA": "Ford", "1FM": "Ford", "1FT": "Ford",
-    "LVV": "Chery", "LGW": "Haval", "L6T": "Geely", "LS5": "Changan", "LS4": "Changan", "LGX": "BYD",
-    "LC0": "BYD", "LZZ": "Sinotruk", "LZG": "Shacman", "LFW": "FAW", "WMA": "MAN", "YV2": "Volvo",
-    "YS2": "Scania", "XLR": "DAF", "ZCF": "Iveco",
-}
-# коды производителей нужны и сканеру на телефоне (выбор варианта VIN)
-PAGE = PAGE.replace("__VIN_WMI__", json.dumps(sorted(_VIN_WMI)), 1)
-_VIN_YEAR_CODES = "ABCDEFGHJKLMNPRSTVWXY123456789"
-_VIN_TRANSLIT = {**{c: i + 1 for i, c in enumerate("ABCDEFGH")}, **{c: i + 1 for i, c in enumerate("JKLMN")},
-                 "P": 7, "R": 9, **{c: i + 2 for i, c in enumerate("STUVWXYZ")}}
-_VIN_WEIGHTS = (8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2)
-_vpic_cache = {}
-
-
-def _vin_check_ok(vin):
-    total = sum((int(c) if c.isdigit() else _VIN_TRANSLIT.get(c, 0)) * w for c, w in zip(vin, _VIN_WEIGHTS))
-    r = total % 11
-    return vin[8] == ("X" if r == 10 else str(r))
-
-
-def _vin_year(vin):
-    i = _VIN_YEAR_CODES.find(vin[9])
-    if i < 0:
-        return None
-    now = datetime.now().year
-    years = [y for y in (1980 + i, 2010 + i) if y <= now + 1]
-    return max(years) if years else None
-
-
-def _vin_vpic(vin):
-    if vin in _vpic_cache:
-        return _vpic_cache[vin]
-    res = None
-    try:
-        r = requests.get(f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{vin}?format=json", timeout=4)
-        row = (r.json().get("Results") or [{}])[0]
-        make, model = (row.get("Make") or "").strip(), (row.get("Model") or "").strip()
-        if model:
-            res = {"brand": make.title(), "model": model}
-    except Exception:
-        res = None
-    if len(_vpic_cache) > 2000:
-        _vpic_cache.clear()
-    _vpic_cache[vin] = res
-    return res
-
-
-_BRAND_WORDS = ("kia", "hyundai", "toyota", "lexus", "ravon", "chevrolet", "daewoo", "skoda", "volkswagen",
-                "lada", "mercedes-benz", "bmw", "audi", "porsche", "byd", "chery", "haval", "geely", "isuzu", "gaz", "uaz")
-
-
-def _vin_model_choices(brand_lower):
-    """Короткие названия моделей марки из справочника — для кнопок выбора."""
-    out = []
-    for sp in _CAR_SPECS:
-        sb = (sp.get("brand") or "").lower()
-        bw = (brand_lower.split() or [""])[0]
-        if (sb != brand_lower and not (brand_lower == "chevrolet" and sb == "daewoo")
-                and bw + " " not in (sp.get("model") or "").lower()):
-            continue
-        same = sb == brand_lower or (brand_lower == "chevrolet" and sb == "daewoo")
-        own = (bw, sb.split()[0] if (sb and same) else "")
-        for part in re.sub(r"\s*\(.*?\)", "", sp.get("model") or "").split(" / "):
-            name = part.strip()
-            low = name.lower()
-            pref = next((w for w in own if w and low.startswith(w + " ")), None)
-            if pref:
-                name = name[len(pref) + 1:].strip()
-            elif any(low.startswith(w + " ") for w in _BRAND_WORDS):
-                continue
-            name = re.sub(r"\s+1$", "", name)
-            if len(name) < 2 or name.isdigit() or name in out:
-                continue
-            out.append(name)
-    return out[:18]
-
-
-def decode_vin(vin, shop_id=None):
-    v = db.normalize_vin(vin)
-    if not v:
-        return {"ok": False}
-    brand = _VIN_WMI.get(v[:3])
-    out = {"ok": True, "vin": v, "brand": brand, "year": _vin_year(v), "check_ok": _vin_check_ok(v),
-           "model": None, "model_source": None}
-    learned = db.vin_lookup_model(v)
-    if learned:
-        out["model"], out["model_source"] = learned["model"], "learned"
-        out["brand"] = out["brand"] or learned.get("brand")
-    elif v[0] in "12345JKW":
-        vp = _vin_vpic(v)
-        if vp:
-            out["model"], out["model_source"] = vp["model"], "vpic"
-            out["brand"] = out["brand"] or vp["brand"]
-    if shop_id:
-        out["car"] = db.find_car_by_vin(shop_id, v)
-    out["brand_in_list"] = out["brand"] in CAR_BRANDS
-    q = " ".join(x for x in [out["model"]] if x)
-    out["specs"] = match_car_specs(out["brand"] or "", q) if q else []
-    # модели из справочника этой марки — кнопки «выберите модель»
-    if not out["model"] and out["brand"]:
-        b = out["brand"].lower()
-        out["choices"] = _vin_model_choices(b)
-    return out
-
-
-@app.route("/api/top_models")
-@login_required
-def api_top_models():
-    return jsonify({"models": db.top_car_models(g.shop_id)})
-
-
-@app.route("/api/vin/decode")
-@login_required
-def api_vin_decode():
-    return jsonify(decode_vin(request.args.get("vin", ""), g.shop_id))
-
-
-@app.route("/api/car_specs")
-@login_required
-def api_car_specs():
-    return jsonify({"matches": match_car_specs(request.args.get("brand", ""), request.args.get("model", ""))})
-
-
 @app.route("/api/cars")
 @login_required
 def api_cars():
@@ -10753,8 +9717,6 @@ def api_update_oil_change(oc_id):
 @login_required
 def api_delete_oil_change(oc_id):
     ok = db.delete_oil_change(oc_id, g.shop_id)
-    if ok == "has_debt":
-        return jsonify({"ok": False, "error": "has_debt"}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
     return jsonify({"ok": True})
@@ -10839,7 +9801,6 @@ def api_add():
         owner_phone = data.get("owner_phone") or None
         car_brand = data.get("car_brand") or None
         car_model = data.get("car_model") or None
-        vin = db.normalize_vin(data.get("vin"))
         mileage = int(data["mileage"]) if data.get("mileage") else None
         next_mileage = int(data["next_mileage"]) if data.get("next_mileage") else None
         items = data.get("items") or []
@@ -10888,21 +9849,16 @@ def api_add():
                 existing_car = db.find_car(g.shop_id, plate)
             if existing_car:
                 client_id = existing_car["client_id"]
-                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model, vin=vin)
+                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
             else:
                 client = db.get_or_create_client(g.shop_id, owner_name, owner_phone)
                 client_id = client["id"]
-                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model, vin=vin)
+                car_id = db.create_or_update_car(g.shop_id, plate, client_id, car_brand, car_model)
 
             oc_id, next_date = db.add_oil_change(
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
             )
-            if vin and car_model:
-                try:
-                    db.vin_learn(vin, car_brand, car_model)
-                except Exception as e:
-                    logger.warning(f"vin_learn: {e}")
             if daily_km:
                 try:
                     db.set_oil_change_daily_km(oc_id, daily_km)
@@ -10946,18 +9902,6 @@ def api_add():
 @login_required
 def api_list_debts():
     return jsonify(db.get_active_debts(g.shop_id))
-
-
-@app.route("/api/debts/overview")
-@login_required
-def api_debts_overview():
-    return jsonify(db.get_debts_overview(g.shop_id))
-
-
-@app.route("/api/debts/closed")
-@login_required
-def api_debts_closed():
-    return jsonify(db.get_closed_debts(g.shop_id))
 
 
 @app.route("/api/dashboard")
@@ -11134,37 +10078,6 @@ def api_pay_debt(plan_id):
     plan = db.log_installment_payment(plan_id, g.shop_id, amount, data.get("paid_date"))
     if not plan:
         return jsonify({"ok": False, "error": "долг не найден"}), 404
-    if plan.get("error") == "overpay":
-        return jsonify({"ok": False, "error": "overpay", "remaining": plan["remaining"]}), 400
-    if plan.get("error"):
-        return jsonify({"ok": False, "error": "долг уже закрыт"}), 400
-    return jsonify({"ok": True, "plan": plan})
-
-
-@app.route("/api/debts/<int:plan_id>/payments/<int:payment_id>/cancel", methods=["POST"])
-@login_required
-@employee_blocked
-def api_cancel_debt_payment(plan_id, payment_id):
-    plan = db.cancel_installment_payment(plan_id, g.shop_id, payment_id)
-    if not plan:
-        return jsonify({"ok": False, "error": "долг не найден"}), 404
-    if plan.get("error") == "written_off":
-        return jsonify({"ok": False, "error": "долг списан — платежи по нему не отменяются"}), 400
-    if plan.get("error"):
-        return jsonify({"ok": False, "error": "платёж не найден или уже отменён"}), 404
-    return jsonify({"ok": True, "plan": plan})
-
-
-@app.route("/api/debts/<int:plan_id>/writeoff", methods=["POST"])
-@login_required
-@employee_blocked
-def api_writeoff_debt(plan_id):
-    data = request.get_json(silent=True) or {}
-    plan = db.write_off_installment(plan_id, g.shop_id, data.get("reason"))
-    if not plan:
-        return jsonify({"ok": False, "error": "долг не найден"}), 404
-    if plan.get("error"):
-        return jsonify({"ok": False, "error": "долг уже закрыт"}), 400
     return jsonify({"ok": True, "plan": plan})
 
 
