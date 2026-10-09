@@ -1877,6 +1877,48 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .st-legend { display:flex; justify-content:space-between; gap:8px; font-size:11.5px; margin-top:5px; }
   .st-legend span::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--dot); }
   .st-row.profit b { color:#15803D; }
+  .st-money { display:grid; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); gap:8px; margin:6px 0 6px; }
+  .st-money > div { background:#F8FAFC; border-radius:12px; padding:8px 10px; min-width:0; }
+  .st-money-k { font-size:11.5px; font-weight:600; color:#64748B; }
+  .st-money-v { font-size:20px; font-weight:800; font-family:var(--font-display); line-height:1.2; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .st-money-v small { font-size:.55em; font-weight:600; color:#64748B; margin-left:3px; }
+  .st-money-v.rev { color:var(--blue); }
+  .st-money-v.got { color:#15803D; }
+  .st-card.orange .st-money > div { background:#FFF7ED; }
+  .st-card.orange .st-money-v.rev { color:#9A3412; }
+  .st-money-note { font-size:12px; color:#92400E; background:#FEF3C7; border-radius:10px; padding:6px 9px; margin-bottom:6px; line-height:1.35; }
+  .dsum { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px; }
+  .dsum > div { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px 10px; min-width:0; }
+  .dsum .k { font-size:11px; color:var(--hint); font-weight:600; }
+  .dsum .v { font-size:16px; font-weight:800; font-family:var(--font-display); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dsum .v.bad { color:#B3241C; } .dsum .v.ok { color:#15803D; }
+  .dtabs { display:flex; gap:6px; margin-bottom:10px; }
+  .dtabs button { font:inherit; font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
+  .dtabs button.on { background:var(--text); border-color:var(--text); color:#fff; }
+  .debt-card .dc-prog { margin-top:10px; }
+  .debt-card .dc-prog .bar { height:6px; background:#F1F5F9; border-radius:4px; overflow:hidden; }
+  .debt-card .dc-prog .bar i { display:block; height:100%; background:#0EA5E9; }
+  .debt-card .dc-prog .t { display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--hint); margin-top:4px; font-variant-numeric:tabular-nums; }
+  .debt-card .dc-actions { display:flex; gap:6px; margin-top:8px; }
+  .debt-card .dc-actions button { flex:1; font:inherit; font-size:12.5px; font-weight:600; padding:7px 8px; border-radius:10px; border:0; background:#F1F5F9; color:var(--text); cursor:pointer; }
+  .debt-card .dc-actions button.danger { background:#FEF2F2; color:#B3241C; }
+  .debt-card .dc-hist { margin-top:8px; padding-top:6px; border-top:1px dashed var(--border); }
+  .debt-card .dh-row { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:5px 0; }
+  .debt-card .dh-row .dh-date { color:var(--hint); flex:1; }
+  .debt-card .dh-row b { font-variant-numeric:tabular-nums; }
+  .debt-card .dh-row.cancelled b, .debt-card .dh-row.cancelled .dh-date { text-decoration:line-through; color:var(--hint); }
+  .debt-card .dh-row .dh-x { font:inherit; font-size:11.5px; font-weight:700; color:#B3241C; background:#FEF2F2; border:0; border-radius:7px; padding:3px 8px; cursor:pointer; }
+  .debt-card .dh-tag { font-size:11px; color:var(--hint); }
+  .debt-card.closed { background:#FAFBFC; }
+  .debt-card .dc-status { font-size:12px; font-weight:600; margin-top:6px; }
+  .debt-card .dc-status.ok { color:#15803D; } .debt-card .dc-status.wo { color:#B3241C; }
+  .wo-reasons { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+  .wo-reasons button { font:inherit; font-size:12.5px; padding:6px 11px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; margin:0; }
+  .wo-reasons button.on { border-color:#B3241C; background:#FEF2F2; color:#B3241C; font-weight:700; }
+  .wo-warn { background:#FEF3C7; color:#92400E; border-radius:10px; padding:8px 10px; font-size:12.5px; line-height:1.4; margin-bottom:10px; }
+  .wo-btns { display:flex; gap:8px; }
+  .wo-btns button { flex:1; }
+  .wo-btns .wo-go { background:#B3241C; color:#fff; border:0; border-radius:12px; padding:12px; font:inherit; font-weight:700; cursor:pointer; }
   .rv-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-bottom:14px; }
   .rv-box { background:#F8FAFC; border-radius:12px; padding:10px 12px; }
   .rv-box b { display:block; font-size:17px; font-family:var(--font-display); color:var(--text); line-height:1.2; }
@@ -2513,6 +2555,11 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   </div>
 
   <div id="view-debts" style="display:none;">
+    <div id="debtsSummary" class="dsum"></div>
+    <div class="dtabs">
+      <button type="button" id="dtab_active" class="on" onclick="setDebtTab('active')">{{ T.debts_tab_active }}</button>
+      <button type="button" id="dtab_closed" onclick="setDebtTab('closed')">{{ T.debts_tab_closed }}</button>
+    </div>
     <div id="debtsList"></div>
   </div>
 
@@ -3258,6 +3305,20 @@ MODAL_AND_SCRIPT = """
   </div>
 </div>
 
+<div class="modal-overlay" id="writeoffModal">
+  <div class="modal" style="text-align:left; max-width:400px;">
+    <h3 id="woTitle" style="margin-top:0;"></h3>
+    <div id="woText" class="hint-text" style="font-size:13px; line-height:1.45; margin-bottom:10px;"></div>
+    <div style="font-size:12px; font-weight:600; color:var(--hint);">{{ T.wo_reason }}</div>
+    <div class="wo-reasons" id="woReasons"></div>
+    <div class="wo-warn" id="woWarn" style="display:none;">{{ T.wo_input_error_hint }}</div>
+    <div class="wo-btns">
+      <button type="button" class="close-btn" onclick="closeWriteoff()">{{ T.wo_cancel }}</button>
+      <button type="button" class="wo-go" onclick="confirmWriteoff()">{{ T.wo_confirm }}</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editModal">
   <div class="modal modal-wide" style="text-align:left;">
     <h3 style="text-align:center;" id="svcModalTitle">{{ T.entry_edit_title }}</h3>
@@ -3352,6 +3413,7 @@ const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const IS_BRANCH = {{ is_branch|tojson }};
+const IS_EMPLOYEE = {{ is_employee|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
 const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
 const BOT_USERNAME = {{ bot_username|tojson }};
@@ -6146,21 +6208,37 @@ function stBadge(pct, extraClass) {
   return `<span class="st-badge ${up ? 'up' : 'down'} ${extraClass || ''}">${up ? '↑' : '↓'} ${up ? '+' : ''}${String(pct).replace('.', ',')}%</span>`;
 }
 
+function stMoneyNote(d) {
+  const parts = [];
+  if (d.debt_out) parts.push(T.st_m_debt_out.replace('{sum}', fmtShort(d.debt_out)));
+  if (d.repaid) parts.push(T.st_m_repaid.replace('{sum}', fmtShort(d.repaid)));
+  if (!parts.length) return '';
+  const txt = parts.join(' · ');
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
 function renderStatCard(o) {
-  // o = { label, d: {total,count,avg,paid_count,cash,card,clients}, cmp, cmpNote, profit, orange }
+  // o = { label, d: {total,count,avg,paid_count,cash,card,repaid,debt_out,clients}, cmp, cmpNote, profit, orange }
   const d = o.d || {};
   const cmp = o.cmp || null;
   const cl = d.clients || { total: 0, new: 0, returning: 0 };
-  const cash = d.cash || 0, card = d.card || 0, paySum = (cash + card) || 1;
+  const cash = d.cash || 0, card = d.card || 0, debtOut = d.debt_out || 0, repaid = d.repaid || 0;
+  const received = cash + card + repaid;
+  const paySum = (cash + card + debtOut) || 1;
   const clSum = cl.total || 1;
   const badgeLine = cmp && cmp.pct !== null && cmp.pct !== undefined
     ? `${stBadge(cmp.pct)}<span class="st-badge-note">${o.cmpNote || ''}</span>` : '';
   const empty = !d.count;
+  const note = stMoneyNote(d);
   return `
     <div class="st-card ${o.orange ? 'orange' : ''}">
       <div class="st-label">${o.label}</div>
-      <div class="st-amount">${fmtNum(d.total)}<small>${T.currency}</small></div>
-      <div class="st-badge-line">${badgeLine}</div>
+      <div class="st-money">
+        <div><div class="st-money-k">${T.st_m_revenue}</div><div class="st-money-v rev">${fmtNum(d.total)}<small>${T.currency}</small></div></div>
+        <div><div class="st-money-k">${T.st_m_received}</div><div class="st-money-v got">${fmtNum(received)}<small>${T.currency}</small></div></div>
+      </div>
+      ${badgeLine ? `<div class="st-badge-line" style="min-height:0;">${badgeLine}</div>` : ''}
+      ${note ? `<div class="st-money-note">${note}</div>` : ''}
       ${empty ? `<div class="st-empty">${T.st_no_visits}</div>` : `
       <div class="st-row"><span>${T.st_services}</span><b>${d.count}</b></div>
       ${d.paid_count ? `<div class="st-row"><span>${T.st_avg}</span><b>${fmtNum(d.avg)} ${T.currency}${cmp ? stBadge(cmp.avg_pct) : ''}</b></div>` : ''}
@@ -6170,11 +6248,11 @@ function renderStatCard(o) {
         <div class="st-split"><i style="width:${cl.new / clSum * 100}%; background:#3B82F6;"></i><i style="width:${cl.returning / clSum * 100}%; background:#14B8A6;"></i></div>
         <div class="st-legend"><span style="--dot:#3B82F6;">${cl.new} ${T.st_new}</span><span style="--dot:#14B8A6;">${cl.returning} ${T.st_returning}</span></div>
       </div>` : ''}
-      ${(cash || card) ? `
+      ${(cash || card || debtOut) ? `
       <div class="st-block">
         <div class="st-block-head"><span>${T.st_payment}</span></div>
-        <div class="st-split"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i></div>
-        <div class="st-legend"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span></div>
+        <div class="st-split"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i>${debtOut ? `<i style="width:${debtOut / paySum * 100}%; background:#F59E0B;"></i>` : ''}</div>
+        <div class="st-legend"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span>${debtOut ? `<span style="--dot:#F59E0B;">${T.st_debt_part} ${fmtShort(debtOut)}</span>` : ''}</div>
       </div>` : ''}
       ${o.profit !== null && o.profit !== undefined ? `<div class="st-row profit"><span>${T.st_profit}</span><b>${fmtNum(o.profit)} ${T.currency}</b></div>` : ''}
       `}
@@ -6190,6 +6268,8 @@ function renderTodayStrip(d, profit) {
       ${d.paid_count ? `<span class="st-chip">${T.st_avg}: <b>${fmtShort(d.avg)}</b></span>` : ''}
       ${cl.total ? `<span class="st-chip">${T.st_clients}: <b>${cl.total}</b> (${cl.new} ${T.st_new})</span>` : ''}
       ${profit !== null && profit !== undefined ? `<span class="st-chip" style="background:#DCFCE7;">${T.st_profit}: <b style="color:#15803D;">${fmtShort(profit)}</b></span>` : ''}
+      ${(d.debt_out || d.repaid) ? `<span class="st-chip">${T.st_m_received}: <b style="color:#15803D;">${fmtShort((d.cash || 0) + (d.card || 0) + (d.repaid || 0))}</b></span>` : ''}
+      ${d.debt_out ? `<span class="st-chip" style="background:#FEF3C7;">${T.st_debt_part}: <b style="color:#92400E;">${fmtShort(d.debt_out)}</b></span>` : ''}
     </div>` : `<div class="st-empty">${T.st_today_empty}</div>`;
   return `
     <div class="st-today">
@@ -8031,11 +8111,32 @@ async function loadCars() {
   if (await fetchCars()) renderTable(true);
 }
 
-async function loadDebts() {
-  const debts = await (await fetch('/api/debts')).json();
-  const list = document.getElementById('debtsList');
-  if (!debts.length) { list.innerHTML = `<div class="hint-text" style="text-align:center; padding:24px;">${T.debts_empty}</div>`; return; }
-  list.innerHTML = debts.map(d => `
+const DEBTS = { tab: 'active', seq: 0, list: [], woId: null, woReason: 'not_paying' };
+const WO_REASONS = ['not_paying', 'discount', 'input_error', 'other'];
+
+function debtDate(v) {
+  if (!v) return '';
+  const p = String(v).slice(0, 10).split('-');
+  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(v);
+}
+
+function setDebtTab(tab) {
+  DEBTS.tab = tab;
+  loadDebts();
+}
+
+function renderDebtSummary(ov) {
+  const el = document.getElementById('debtsSummary');
+  if (!el || !ov) return;
+  el.innerHTML = `
+    <div><div class="k">${T.debts_sum_total}</div><div class="v">${fmtShort(ov.total_remaining)}</div></div>
+    <div><div class="k">${T.debts_sum_overdue}</div><div class="v ${ov.overdue_remaining ? 'bad' : ''}">${fmtShort(ov.overdue_remaining)}</div></div>
+    <div><div class="k">${T.debts_sum_repaid}</div><div class="v ok">${fmtShort(ov.repaid_month)}</div></div>`;
+}
+
+function renderActiveDebt(d) {
+  const pct = d.total_amount ? Math.min(100, Math.round(d.paid_amount / d.total_amount * 100)) : 0;
+  return `
     <div class="debt-card ${d.is_overdue ? 'overdue' : ''}">
       <div class="dc-top">
         <div>
@@ -8043,16 +8144,87 @@ async function loadDebts() {
           <div class="dc-meta">${escapeHtml(d.plate_number)}${d.owner_phone ? ' · ' + escapeHtml(d.owner_phone) : ''}</div>
         </div>
         <div>
-          <div class="dc-remaining">${d.remaining.toLocaleString('ru-RU')} ${T.currency}</div>
-          <div class="dc-due ${d.is_overdue ? 'overdue-text' : ''}">${d.is_overdue ? T.debt_overdue : T.debt_next_due} ${d.next_due_date}</div>
+          <div class="dc-remaining">${fmtNum(d.remaining)} ${T.currency}</div>
+          <div class="dc-due ${d.is_overdue ? 'overdue-text' : ''}">${d.is_overdue ? T.debt_overdue : T.debt_next_due} ${debtDate(d.next_due_date)}</div>
         </div>
       </div>
+      <div class="dc-prog">
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="t"><span>${T.debt_paid_of.replace('{paid}', fmtNum(d.paid_amount)).replace('{total}', fmtNum(d.total_amount))}</span><span>${d.sale_date ? T.debt_since.replace('{date}', debtDate(d.sale_date)) : ''}</span></div>
+      </div>
       <div class="dc-pay-row">
-        <input id="debt_pay_${d.id}" type="number" placeholder="${T.debt_pay_placeholder}" style="flex:1;">
+        <input id="debt_pay_${d.id}" type="number" inputmode="numeric" placeholder="${T.debt_pay_placeholder}" style="flex:1;">
         <button class="badge active" style="flex:none;" onclick="payDebt(${d.id})">${T.debt_pay_btn}</button>
       </div>
-    </div>
-  `).join('');
+      ${(d.payments_count || !IS_EMPLOYEE) ? `
+      <div class="dc-actions">
+        ${d.payments_count ? `<button type="button" onclick="toggleDebtHistory(${d.id})">${T.debt_history} · ${d.payments_count}</button>` : ''}
+        ${!IS_EMPLOYEE ? `<button type="button" class="danger" onclick="openWriteoff(${d.id})">${T.debt_writeoff_btn}</button>` : ''}
+      </div>` : ''}
+      <div class="dc-hist" id="debt_hist_${d.id}" style="display:none;"></div>
+    </div>`;
+}
+
+function renderClosedDebt(d) {
+  const status = d.status === 'written_off'
+    ? `<div class="dc-status wo">${T.debt_status_written_off.replace('{sum}', fmtNum(d.written_off_amount)).replace('{date}', debtDate(d.closed_at))}${d.writeoff_reason ? ' · ' + (T['wo_r_' + d.writeoff_reason] || '') : ''}</div>`
+    : `<div class="dc-status ok">${T.debt_status_completed.replace('{date}', debtDate(d.closed_at || d.next_due_date))}</div>`;
+  return `
+    <div class="debt-card closed">
+      <div class="dc-top">
+        <div>
+          <div class="dc-owner">${escapeHtml(d.owner_name || T.kc_no_name)}</div>
+          <div class="dc-meta">${escapeHtml(d.plate_number)}${d.sale_date ? ' · ' + T.debt_since.replace('{date}', debtDate(d.sale_date)) : ''}</div>
+        </div>
+        <div><div class="dc-remaining" style="color:var(--text);">${fmtNum(d.total_amount)} ${T.currency}</div></div>
+      </div>
+      ${status}
+      <div class="dc-actions"><button type="button" onclick="toggleDebtHistory(${d.id})">${T.debt_history}</button></div>
+      <div class="dc-hist" id="debt_hist_${d.id}" style="display:none;"></div>
+    </div>`;
+}
+
+async function loadDebts() {
+  const seq = ++DEBTS.seq;
+  ['active', 'closed'].forEach(t => {
+    const b = document.getElementById('dtab_' + t);
+    if (b) b.classList.toggle('on', DEBTS.tab === t);
+  });
+  let ov, list;
+  try {
+    [ov, list] = await Promise.all([
+      fetch('/api/debts/overview').then(r => r.json()),
+      fetch(DEBTS.tab === 'closed' ? '/api/debts/closed' : '/api/debts').then(r => r.json()),
+    ]);
+  } catch (e) { return; }
+  if (seq !== DEBTS.seq) return;  // пока грузилось, переключили вкладку
+  renderDebtSummary(ov);
+  DEBTS.list = Array.isArray(list) ? list : [];
+  const el = document.getElementById('debtsList');
+  if (!DEBTS.list.length) {
+    el.innerHTML = `<div class="hint-text" style="text-align:center; padding:24px;">${DEBTS.tab === 'closed' ? T.debts_closed_empty : T.debts_empty}</div>`;
+    return;
+  }
+  el.innerHTML = DEBTS.list.map(DEBTS.tab === 'closed' ? renderClosedDebt : renderActiveDebt).join('');
+}
+
+async function toggleDebtHistory(planId, forceOpen) {
+  const box = document.getElementById('debt_hist_' + planId);
+  if (!box) return;
+  if (box.style.display !== 'none' && !forceOpen) { box.style.display = 'none'; return; }
+  let rows = [];
+  try { rows = await (await fetch(`/api/debts/${planId}/payments`)).json(); } catch (e) { return; }
+  const plan = DEBTS.list.find(x => x.id === planId) || {};
+  const canCancel = !IS_EMPLOYEE && plan.status !== 'written_off';
+  box.innerHTML = rows.length ? rows.map(p => {
+    const cancelled = p.status === 'cancelled';
+    return `<div class="dh-row ${cancelled ? 'cancelled' : ''}">
+      <span class="dh-date">${debtDate(p.paid_date)}</span><b>${fmtNum(p.amount)} ${T.currency}</b>
+      ${cancelled ? `<span class="dh-tag">${T.debt_pay_cancelled}</span>`
+        : (canCancel ? `<button type="button" class="dh-x" onclick="cancelDebtPayment(${planId}, ${p.id}, ${p.amount}, '${p.paid_date}')">${T.debt_pay_cancel}</button>` : '')}
+    </div>`;
+  }).join('') : `<div class="hint-text" style="font-size:12.5px;">${T.debt_hist_empty}</div>`;
+  box.style.display = 'block';
 }
 
 async function payDebt(planId) {
@@ -8065,6 +8237,58 @@ async function payDebt(planId) {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.debt_pay_success, true);
+    loadDebts();
+  } else if (data.error === 'overpay') {
+    showMsg(T.debt_overpay.replace('{sum}', fmtNum(data.remaining)), false);
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+async function cancelDebtPayment(planId, paymentId, amount, date) {
+  if (!confirm(T.debt_cancel_confirm.replace('{sum}', fmtNum(amount)).replace('{date}', debtDate(date)))) return;
+  const res = await fetch(`/api/debts/${planId}/payments/${paymentId}/cancel`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) {
+    showMsg(T.debt_cancel_done, true);
+    // долг мог снова стать активным — показываем его там
+    if (DEBTS.tab === 'closed' && data.plan && data.plan.status === 'active') DEBTS.tab = 'active';
+    await loadDebts();
+    toggleDebtHistory(planId, true);
+  } else {
+    showMsg(T.msg_error + ' ' + data.error, false);
+  }
+}
+
+function renderWoReasons() {
+  document.getElementById('woReasons').innerHTML = WO_REASONS.map(r =>
+    `<button type="button" class="${DEBTS.woReason === r ? 'on' : ''}" onclick="pickWoReason('${r}')">${T['wo_r_' + r]}</button>`).join('');
+  document.getElementById('woWarn').style.display = DEBTS.woReason === 'input_error' ? 'block' : 'none';
+}
+function pickWoReason(r) { DEBTS.woReason = r; renderWoReasons(); }
+
+function openWriteoff(planId) {
+  const d = DEBTS.list.find(x => x.id === planId);
+  if (!d) return;
+  DEBTS.woId = planId;
+  DEBTS.woReason = 'not_paying';
+  document.getElementById('woTitle').textContent = T.wo_title.replace('{sum}', fmtNum(d.remaining));
+  document.getElementById('woText').textContent = T.wo_text.replace('{client}', [d.owner_name, d.plate_number].filter(Boolean).join(' · '));
+  renderWoReasons();
+  document.getElementById('writeoffModal').classList.add('open');
+}
+function closeWriteoff() { document.getElementById('writeoffModal').classList.remove('open'); }
+
+async function confirmWriteoff() {
+  if (!DEBTS.woId) return;
+  const res = await fetch(`/api/debts/${DEBTS.woId}/writeoff`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ reason: DEBTS.woReason })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    closeWriteoff();
+    DEBTS.woId = null;
+    showMsg(T.wo_done, true);
     loadDebts();
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
@@ -8858,6 +9082,8 @@ async function deleteEntry(id, plate) {
     openHistoryRow = null;
     toggleHistory(plate);
     loadCars();
+  } else if (data.error === 'has_debt') {
+    showMsg(T.entry_has_debt, false);
   } else {
     showMsg(T.msg_error + ' ' + data.error, false);
   }
@@ -8890,7 +9116,7 @@ function guardOnce(names) {
   });
 }
 guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarCompletely',
-  'payDebt', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
+  'payDebt', 'cancelDebtPayment', 'confirmWriteoff', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
   'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveUsdRate',
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice',
@@ -10527,6 +10753,8 @@ def api_update_oil_change(oc_id):
 @login_required
 def api_delete_oil_change(oc_id):
     ok = db.delete_oil_change(oc_id, g.shop_id)
+    if ok == "has_debt":
+        return jsonify({"ok": False, "error": "has_debt"}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
     return jsonify({"ok": True})
@@ -10720,6 +10948,18 @@ def api_list_debts():
     return jsonify(db.get_active_debts(g.shop_id))
 
 
+@app.route("/api/debts/overview")
+@login_required
+def api_debts_overview():
+    return jsonify(db.get_debts_overview(g.shop_id))
+
+
+@app.route("/api/debts/closed")
+@login_required
+def api_debts_closed():
+    return jsonify(db.get_closed_debts(g.shop_id))
+
+
 @app.route("/api/dashboard")
 @login_required
 def api_dashboard():
@@ -10894,6 +11134,37 @@ def api_pay_debt(plan_id):
     plan = db.log_installment_payment(plan_id, g.shop_id, amount, data.get("paid_date"))
     if not plan:
         return jsonify({"ok": False, "error": "долг не найден"}), 404
+    if plan.get("error") == "overpay":
+        return jsonify({"ok": False, "error": "overpay", "remaining": plan["remaining"]}), 400
+    if plan.get("error"):
+        return jsonify({"ok": False, "error": "долг уже закрыт"}), 400
+    return jsonify({"ok": True, "plan": plan})
+
+
+@app.route("/api/debts/<int:plan_id>/payments/<int:payment_id>/cancel", methods=["POST"])
+@login_required
+@employee_blocked
+def api_cancel_debt_payment(plan_id, payment_id):
+    plan = db.cancel_installment_payment(plan_id, g.shop_id, payment_id)
+    if not plan:
+        return jsonify({"ok": False, "error": "долг не найден"}), 404
+    if plan.get("error") == "written_off":
+        return jsonify({"ok": False, "error": "долг списан — платежи по нему не отменяются"}), 400
+    if plan.get("error"):
+        return jsonify({"ok": False, "error": "платёж не найден или уже отменён"}), 404
+    return jsonify({"ok": True, "plan": plan})
+
+
+@app.route("/api/debts/<int:plan_id>/writeoff", methods=["POST"])
+@login_required
+@employee_blocked
+def api_writeoff_debt(plan_id):
+    data = request.get_json(silent=True) or {}
+    plan = db.write_off_installment(plan_id, g.shop_id, data.get("reason"))
+    if not plan:
+        return jsonify({"ok": False, "error": "долг не найден"}), 404
+    if plan.get("error"):
+        return jsonify({"ok": False, "error": "долг уже закрыт"}), 400
     return jsonify({"ok": True, "plan": plan})
 
 
