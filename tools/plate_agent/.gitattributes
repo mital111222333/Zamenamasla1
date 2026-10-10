@@ -1,0 +1,2 @@
+# .bat в Windows надёжно работают только с CRLF (иначе ломаются goto/метки)
+*.bat text eol=crlf

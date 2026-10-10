@@ -4088,6 +4088,8 @@ async function loadMyShop() {
         <div class="hint-text" style="margin:0 0 6px;">${escapeHtml(T.myshop_display_hint)}</div>
         ${myShopLinkRow(T.myshop_display_tv, '/display/' + encodeURIComponent(s.anpr_token))}
         ${myShopLinkRow(T.myshop_display_scanner, '/scanner/' + encodeURIComponent(s.anpr_token))}
+        <div class="hint-text" style="margin:12px 0 6px;">${escapeHtml(T.myshop_agent_hint)}</div>
+        <a href="/download/plate-agent.zip" style="display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#fff; color:var(--blue); font-weight:600; font-size:14px; text-decoration:none;"><i class="fa-solid fa-download"></i> ${escapeHtml(T.myshop_agent_btn)}</a>
       </div>` : ''}
     </div>`).join('');
 }
@@ -16531,6 +16533,31 @@ async function tick() {
 </body>
 </html>
 """
+
+
+# Программа для IP-камеры (tools/plate_agent): отдаём архивом прямо из панели,
+# чтобы владельцу не ходить на GitHub. .bat — всегда с CRLF, иначе Windows
+# ломается на метках/goto, как бы файлы ни лежали на сервере.
+PLATE_AGENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "plate_agent")
+PLATE_AGENT_FILES = ("plate_agent.py", "requirements.txt", "install.bat", "setup.bat", "start.bat", "README.md")
+
+
+@app.route("/download/plate-agent.zip")
+@login_required
+@employee_blocked
+def download_plate_agent():
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name in PLATE_AGENT_FILES:
+            with open(os.path.join(PLATE_AGENT_DIR, name), "rb") as f:
+                data = f.read()
+            if name.endswith(".bat"):
+                data = data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+            zf.writestr("OilBook-camera/" + name, data)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="OilBook-camera.zip")
 
 
 @app.route("/scanner/<anpr_token>")
