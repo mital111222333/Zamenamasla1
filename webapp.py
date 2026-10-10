@@ -4078,6 +4078,9 @@ async function loadMyShop() {
         <div class="hint-text">${escapeHtml(T.myshop_loc_hint)}</div>
         <button type="button" style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#fff; color:var(--blue); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer;" onclick="myShopLocate(${s.id}, this)"><i class="fa-solid fa-location-crosshairs"></i> ${escapeHtml(T.myshop_locate_btn)}</button>
       </div>
+      <div class="field"><label>${escapeHtml(T.myshop_offer)}</label><input id="ms_offer_${s.id}" type="number" inputmode="numeric" min="0" max="50" step="1" value="${escapeHtml(s.offer_pct || 0)}">
+        <div class="hint-text">${escapeHtml(T.myshop_offer_hint)}</div>
+      </div>
       <button class="submit" onclick="saveMyShop(${s.id})">${escapeHtml(T.btn_save)}</button>
       <div id="ms_msg_${s.id}"></div>
       ${s.anpr_token ? `<div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
@@ -4118,7 +4121,8 @@ function myShopLocate(id, btn) {
 async function saveMyShop(id) {
   const val = k => document.getElementById(`ms_${k}_${id}`).value.trim();
   const msg = document.getElementById('ms_msg_' + id);
-  const body = { phone: val('phone'), address: val('address'), hours: val('hours'), lat: '', lon: '' };
+  const body = { phone: val('phone'), address: val('address'), hours: val('hours'), lat: '', lon: '',
+                 offer_pct: val('offer') || 0 };
   const loc = val('loc');
   if (loc) {
     const parts = loc.split(',').map(p => p.trim()).filter(Boolean);
@@ -10306,6 +10310,59 @@ function psApply(plate) {
   lookupPlate(true);
 }
 
+// ---------- Карточка мастера: машина у въезда (сканер / камера табло) ----------
+// Сканер у въезда узнал номер — мастер сразу видит, кто подъехал и что
+// предложить, и одним нажатием открывает клиента в форме замены.
+let ARRIVAL_LAST = null;  // at последней показанной машины; null — ещё не спрашивали
+async function pollArrival() {
+  if (document.visibilityState === 'visible') {
+    try {
+      const d = await (await fetch('/api/arrival?after=' + (ARRIVAL_LAST || 0), { credentials: 'same-origin' })).json();
+      const a = d && d.ok ? d.arrival : null;
+      // первый ответ после открытия панели не показываем — это могла быть
+      // машина, которая подъехала до того, как панель открыли
+      if (ARRIVAL_LAST === null) ARRIVAL_LAST = a ? a.at : 0;
+      else if (a && a.at > ARRIVAL_LAST) { ARRIVAL_LAST = a.at; showArrival(a); }
+    } catch (e) {}
+  }
+  setTimeout(pollArrival, 5000);
+}
+function showArrival(a) {
+  let box = document.getElementById('arrivalCard');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'arrivalCard';
+    box.style.cssText = 'position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:9999; width:min(560px, calc(100% - 24px)); background:#0A2540; color:#fff; border-radius:16px; padding:14px 16px; box-shadow:0 12px 32px rgba(0,0,0,.28); font-size:15px; line-height:1.4;';
+    document.body.appendChild(box);
+  }
+  const who = a.found ? escapeHtml(a.owner_name || T.kc_no_name) : escapeHtml(T.arr_new_client);
+  const rec = a.rec_item
+    ? `<div style="margin-top:6px; color:#FFD23F;">💡 ${escapeHtml(T.arr_rec)} <b>${escapeHtml(a.rec_item)}</b>${a.offer_pct ? ' · ' + escapeHtml(T.arr_offer.replace('{pct}', a.offer_pct)) : ''}</div>`
+    : '';
+  box.innerHTML = `<div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+      <div style="min-width:0;">
+        <div style="font-weight:700;">🚗 ${escapeHtml(T.arr_title)} <span style="font-family:ui-monospace, Menlo, Consolas, monospace; letter-spacing:1px;">${escapeHtml(psPretty(a.plate))}</span></div>
+        <div style="opacity:.85; margin-top:2px;">${who}</div>${rec}
+      </div>
+      <button type="button" onclick="hideArrival()" aria-label="close" style="flex:none; background:none; border:none; color:#fff; font-size:22px; line-height:1; cursor:pointer;">×</button>
+    </div>
+    <button type="button" onclick="openArrival(${escapeHtml(JSON.stringify(a.plate))})" style="margin-top:10px; height:40px; padding:0 16px; border-radius:10px; border:none; background:#3FBE7E; color:#00140A; font-weight:700; font-size:14px; font-family:inherit; cursor:pointer;">${escapeHtml(T.arr_open)}</button>`;
+  box.style.display = 'block';
+  if (navigator.vibrate) { try { navigator.vibrate([80, 60, 80]); } catch (e) {} }
+  clearTimeout(window.ARRIVAL_TIMER);
+  window.ARRIVAL_TIMER = setTimeout(hideArrival, 90000);
+}
+function hideArrival() {
+  const b = document.getElementById('arrivalCard');
+  if (b) b.style.display = 'none';
+}
+function openArrival(plate) {
+  hideArrival();
+  showTab('add');
+  psApply(plate);
+}
+setTimeout(pollArrival, 1500);
+
 // заранее, в фоне, загружаем распознавание — к нажатию 📷 оно уже готово
 // (файлы берутся из кэша телефона, интернет тратится только первый раз)
 window.addEventListener('load', () => {
@@ -15976,13 +16033,43 @@ def api_display_state(anpr_token):
         return jsonify({"active": True, "found": False, "plate": state["plate"]})
 
     last = history[0] if history else None
+    rec = db.service_recommendation(history)
+    T = i18n.get_texts(shop.get("language") or "ru")
     return jsonify({
         "active": True, "found": True, "plate": state["plate"],
-        "owner_name": car["owner_name"],
+        # табло видят все в зале ожидания — только имя, без фамилии
+        "owner_name": ((car["owner_name"] or "").split() or [""])[0],
         "last_service_date": last["change_date"] if last else None,
         "oil_brand": last["oil_brand"] if last else None,
         "service_type": last["service_type"] if last else None,
+        "rec_item": T.get(rec) if rec else None,
+        "offer_pct": int(shop.get("offer_pct") or 0) if rec else 0,
     })
+
+
+@app.route("/api/arrival")
+@login_required
+def api_arrival():
+    """Карточка мастера в панели: последняя машина, которую узнал сканер или
+    камера у въезда этой точки (за последние 10 минут), — кто это и что
+    предложить. Панель спрашивает раз в несколько секунд с after=<прошлое at>."""
+    try:
+        after = float(request.args.get("after") or 0)
+    except ValueError:
+        after = 0.0
+    with _display_lock:
+        state = _display_states.get(g.shop_id)
+    if not state or not state.get("plate") or state["shown_at"] <= after or time.time() - state["shown_at"] > 600:
+        return jsonify({"ok": True, "arrival": None})
+    car, history = db.get_car_history(g.shop_id, state["plate"])
+    rec = db.service_recommendation(history) if car else None
+    shop = db.get_shop(g.shop_id) or {}
+    return jsonify({"ok": True, "arrival": {
+        "at": state["shown_at"], "plate": state["plate"], "found": bool(car),
+        "owner_name": car["owner_name"] if car else None,
+        "rec_item": g.T.get(rec) if rec else None,
+        "offer_pct": int(shop.get("offer_pct") or 0) if rec else 0,
+    }})
 
 
 DISPLAY_PAGE = """
@@ -16012,6 +16099,9 @@ DISPLAY_PAGE = """
     border: 4px solid #F5F5F2; border-radius: 6px; display:inline-block; }
   .active .info { font-size: 2.4vw; opacity:.85; line-height:1.7; margin-top:2vh; }
   .active .notfound { font-size: 3vw; opacity:.8; margin-top:3vh; }
+  .active .rec { display:inline-block; margin-top:4vh; padding: 1.6vh 3vw; border-radius: 14px; background: rgba(255,210,63,.14);
+    border: 2px solid #FFD23F; color:#FFD23F; font-size: 3.2vw; font-weight:600; line-height:1.35; }
+  .active .rec .off { display:block; color:#F5F5F2; font-size: 2.6vw; margin-top: .6vh; }
   @keyframes fadein { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
 </style>
 </head>
@@ -16052,11 +16142,16 @@ function renderActive(d) {
   const last = d.last_service_date
     ? `${T.display_last_service} ${esc(d.last_service_date)}${d.service_type ? ' — ' + esc(d.service_type) : ''}${d.oil_brand ? ' (' + esc(d.oil_brand) + ')' : ''}`
     : T.display_no_history;
+  // совет «пора менять …» и скидка точки — то, ради чего табло стоит у входа
+  const rec = d.rec_item
+    ? `<div class="rec">💡 ${esc(T.display_rec_due)} ${esc(d.rec_item)}${d.offer_pct ? `<span class="off">${esc(T.display_rec_discount.replace('{pct}', d.offer_pct))}</span>` : ''}</div>`
+    : '';
   document.getElementById('screen').innerHTML = `
     <div class="active">
       <div class="greet">${T.display_greeting} ${esc(d.owner_name)}!</div>
       <div class="plate">${esc(d.plate)}</div>
       <div class="info">${last}</div>
+      ${rec}
     </div>`;
 }
 
@@ -17514,7 +17609,8 @@ def _shop_contacts(shop: dict) -> dict:
             "phone": shop.get("phone") or "", "address": shop.get("address") or "",
             "hours": shop.get("hours") or "", "lat": shop.get("lat"), "lon": shop.get("lon"),
             # токен табло/сканера — только своей точке и её владельцу
-            "anpr_token": shop.get("anpr_token") or ""}
+            "anpr_token": shop.get("anpr_token") or "",
+            "offer_pct": int(shop.get("offer_pct") or 0)}
 
 
 def _can_edit_contacts(shop_id: int) -> bool:
@@ -17553,8 +17649,14 @@ def api_my_shop_save(shop_id):
         if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
             return jsonify({"ok": False, "error": g.T["myshop_bad_location"]}), 400
         lat, lon = round(lat, 6), round(lon, 6)
+    try:
+        offer_pct = int(data.get("offer_pct") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": g.T["myshop_bad_offer"]}), 400
+    if not 0 <= offer_pct <= 50:
+        return jsonify({"ok": False, "error": g.T["myshop_bad_offer"]}), 400
     ok = db.update_shop_contacts(shop_id, phone=text("phone", 40), address=text("address", 200),
-                                 hours=text("hours", 80), lat=lat, lon=lon)
+                                 hours=text("hours", 80), lat=lat, lon=lon, offer_pct=offer_pct)
     if not ok:
         return jsonify({"ok": False, "error": "точка не найдена"}), 404
     return jsonify({"ok": True, "shop": _shop_contacts(db.get_shop(shop_id))})

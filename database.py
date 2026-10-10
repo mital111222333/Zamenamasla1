@@ -339,6 +339,8 @@ def _migrate(conn):
         "usd_rate": "REAL",
         "card_number": "TEXT",
         "owner_link_token": "TEXT",
+        # скидка (%) на расходник, который табло у входа советует поменять
+        "offer_pct": "INTEGER DEFAULT 0",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
@@ -1615,6 +1617,76 @@ def get_car_history(shop_id: int, plate_number: str):
             (row["id"],)
         ).fetchall()
         return dict(row), [dict(h) for h in history]
+
+
+# Интервалы замены расходников (км, месяцев) — для подсказки «пора менять»
+# на табло у входа и мастеру. Моторное масло и масляный фильтр сюда не входят:
+# их срок уже посчитан в самой записи (next_change_date / next_mileage).
+SERVICE_INTERVALS = {
+    "filter_1": (15000, 12),  # воздушный фильтр
+    "filter_2": (15000, 12),  # салонный фильтр
+    "filter_3": (30000, 24),  # топливный фильтр
+    "fluid_3": (40000, 24),   # тормозная жидкость
+    "fluid_2": (60000, 36),   # антифриз
+    "fluid_1": (60000, 48),   # масло КПП
+    "fluid_4": (60000, 48),   # масло редуктора
+}
+
+
+def service_recommendation(history, today=None):
+    """Что этой машине больше всего пора поменять — ключ позиции (filter_1,
+    fluid_3…) или None. history — записи из get_car_history (свежие первыми).
+    Пробег на сегодня оценивается по последней записи и пробегу в день; если
+    его нет — считаем только по времени. Позицию, которую на этой точке ещё
+    не меняли, отсчитываем от первого визита. Если из дополнительного ничего
+    не просрочено, но вышел срок масла — советуем масло (fluid_0)."""
+    if not history:
+        return None
+    today = today or datetime.now().date()
+
+    def day(s):
+        try:
+            return datetime.strptime(str(s or "")[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    def keys(h):
+        try:
+            items = json.loads(h.get("items_json") or "[]") or []
+        except (TypeError, ValueError):
+            return set()
+        return {i.get("key") for i in items if isinstance(i, dict)}
+
+    last = history[0]
+    daily = next((h.get("daily_km") for h in history if h.get("daily_km")), None)
+    last_day = day(last.get("change_date"))
+    est_km = None
+    if last.get("mileage") and daily and last_day:
+        est_km = last["mileage"] + daily * max(0, (today - last_day).days)
+
+    first = history[-1]
+    best, best_ratio = None, 0.0
+    for key, (km_int, months_int) in SERVICE_INTERVALS.items():
+        done = next((h for h in history if key in keys(h)), None)
+        d = day((done or first).get("change_date"))
+        if not d:
+            continue
+        ratio = ((today - d).days / 30.4) / months_int
+        if est_km is not None and (done or first).get("mileage"):
+            ratio = max(ratio, (est_km - (done or first)["mileage"]) / km_int)
+        if done is None:
+            # на этой точке ещё не меняли — возможно, меняли в другом месте:
+            # советуем с запасом, а не ровно по сроку от первого визита
+            ratio *= 0.85
+        if ratio >= 1.0 and ratio > best_ratio:
+            best, best_ratio = key, ratio
+    if best:
+        return best
+    next_day = day(last.get("next_change_date"))
+    if (next_day and next_day <= today) or (
+            est_km is not None and last.get("next_mileage") and est_km >= last["next_mileage"]):
+        return "fluid_0"
+    return None
 
 
 def get_cross_network_history(plate: str, exclude_shop_id: int):
@@ -3650,14 +3722,17 @@ def update_branch_details(branch_id: int, shop_name: str, username: str, phone=N
         return cur.rowcount > 0
 
 
-def update_shop_contacts(shop_id: int, phone=None, address=None, hours=None, lat=None, lon=None) -> bool:
+def update_shop_contacts(shop_id: int, phone=None, address=None, hours=None, lat=None, lon=None,
+                         offer_pct: int = 0) -> bool:
     """Контакты, которые клиент видит в боте («О пункте»): телефон, адрес,
-    часы, локация. Меняет сама точка (или главная — у своего филиала) в
-    разделе «Моя точка»; права проверяются в webapp.py."""
+    часы, локация — и скидка на расходник, который советует табло у входа.
+    Меняет сама точка (или главная — у своего филиала) в разделе «Моя точка»;
+    права проверяются в webapp.py."""
     with get_conn() as conn:
         cur = conn.execute(
-            "UPDATE shops SET phone=?, address=?, hours=?, lat=?, lon=? WHERE id=? AND role IN ('shop', 'branch')",
-            (phone, address, hours, lat, lon, shop_id))
+            "UPDATE shops SET phone=?, address=?, hours=?, lat=?, lon=?, offer_pct=? "
+            "WHERE id=? AND role IN ('shop', 'branch')",
+            (phone, address, hours, lat, lon, offer_pct, shop_id))
         conn.commit()
         return cur.rowcount > 0
 
