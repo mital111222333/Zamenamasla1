@@ -2762,6 +2762,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div class="side-item" id="tab-help" data-tab="help" onclick="showTab('help')"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-staff" data-tab="staff" onclick="showTab('staff')"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
+    {% if not is_employee %}<div class="side-item" id="tab-myshop" data-tab="myshop" onclick="showTab('myshop')"><i class="fa-solid fa-store"></i><span>{{ T.tab_myshop }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
   </nav>
   <div class="side-foot">
@@ -2806,6 +2807,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div class="more-item" data-tab="help" data-more-slot="help" onclick="showTab('help'); closeMore();"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
       {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="myshop" data-more-slot="myshop" onclick="showTab('myshop'); closeMore();"><i class="fa-solid fa-store"></i><span>{{ T.tab_myshop }}</span></div>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
       <a class="more-item more-install" href="/app?lang={{ lang }}"><i class="fa-solid fa-mobile-screen-button"></i><span>{{ T.inst_menu }}</span></a>
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
@@ -3124,6 +3126,11 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.staff_list_title }}</label>
       <div id="staffList">{{ T.stats_loading }}</div>
     </div>
+  </div>
+
+  <div id="view-myshop" style="display:none;">
+    <div class="card"><div class="hint-text" style="margin:0;">{{ T.myshop_intro }}</div></div>
+    <div id="myshopList">{{ T.stats_loading }}</div>
   </div>
 
   <div id="view-export" class="card" style="display:none;">
@@ -3946,6 +3953,11 @@ function showTab(t, keepScroll) {
   if (staffView) staffView.style.display = t === 'staff' ? 'block' : 'none';
   if (staffTab) staffTab.classList.toggle('active', t === 'staff');
   if (t === 'staff') loadStaff();
+  const myshopView = document.getElementById('view-myshop');
+  const myshopTab = document.getElementById('tab-myshop');
+  if (myshopView) myshopView.style.display = t === 'myshop' ? 'block' : 'none';
+  if (myshopTab) myshopTab.classList.toggle('active', t === 'myshop');
+  if (t === 'myshop') loadMyShop();
   const helpView = document.getElementById('view-help');
   const helpTab = document.getElementById('tab-help');
   if (helpView) helpView.style.display = t === 'help' ? 'block' : 'none';
@@ -4036,6 +4048,71 @@ async function staffDelete(id, name) {
   if (!d.ok) { alert(d.error); return; }
   document.getElementById('staffCreds').innerHTML = '';
   loadStaff();
+}
+
+// ---------- Моя точка: телефон, адрес, часы, локация — то, что клиент видит в боте ----------
+let MYSHOP_SEQ = 0;
+function myShopLocText(s) { return (s.lat != null && s.lon != null) ? `${s.lat}, ${s.lon}` : ''; }
+function myShopStatusHtml(s) {
+  const miss = [];
+  if (!s.phone) miss.push(T.myshop_phone);
+  if (!s.address) miss.push(T.myshop_address);
+  if (s.lat == null || s.lon == null) miss.push(T.myshop_location);
+  return miss.length
+    ? `<div class="msg err" style="margin:0 0 10px;">${escapeHtml(staffFmt(T.myshop_missing, { fields: miss.join(', ') }))}</div>`
+    : `<div class="msg ok" style="margin:0 0 10px;">${escapeHtml(T.myshop_all_set)}</div>`;
+}
+async function loadMyShop() {
+  const seq = ++MYSHOP_SEQ;
+  let d;
+  try { d = await (await fetch('/api/my_shop', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (seq !== MYSHOP_SEQ || !d || !d.ok) return;
+  document.getElementById('myshopList').innerHTML = d.shops.map(s => `
+    <div class="card" style="margin-top:16px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">${escapeHtml(s.name || '')}${s.is_branch ? ` <span class="hint-text">· ${escapeHtml(T.myshop_branch)}</span>` : ''}</label>
+      <div id="ms_status_${s.id}">${myShopStatusHtml(s)}</div>
+      <div class="field"><label>${escapeHtml(T.myshop_phone)}</label><input id="ms_phone_${s.id}" maxlength="40" inputmode="tel" placeholder="+998 90 111 22 33" value="${escapeHtml(s.phone)}"></div>
+      <div class="field"><label>${escapeHtml(T.myshop_address)}</label><input id="ms_address_${s.id}" maxlength="200" value="${escapeHtml(s.address)}"></div>
+      <div class="field"><label>${escapeHtml(T.myshop_hours)}</label><input id="ms_hours_${s.id}" maxlength="80" placeholder="09:00–19:00" value="${escapeHtml(s.hours)}"></div>
+      <div class="field"><label>${escapeHtml(T.myshop_location)}</label><input id="ms_loc_${s.id}" placeholder="40.782123, 72.344567" value="${escapeHtml(myShopLocText(s))}">
+        <div class="hint-text">${escapeHtml(T.myshop_loc_hint)}</div>
+        <button type="button" style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#fff; color:var(--blue); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer;" onclick="myShopLocate(${s.id}, this)"><i class="fa-solid fa-location-crosshairs"></i> ${escapeHtml(T.myshop_locate_btn)}</button>
+      </div>
+      <button class="submit" onclick="saveMyShop(${s.id})">${escapeHtml(T.btn_save)}</button>
+      <div id="ms_msg_${s.id}"></div>
+    </div>`).join('');
+}
+function myShopLocate(id, btn) {
+  if (!navigator.geolocation) { alert(T.myshop_loc_failed); return; }
+  const label = btn.innerHTML;
+  btn.disabled = true; btn.textContent = T.myshop_locating;
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('ms_loc_' + id).value = pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6);
+    btn.disabled = false; btn.innerHTML = label;
+  }, () => { btn.disabled = false; btn.innerHTML = label; alert(T.myshop_loc_failed); },
+  { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+}
+async function saveMyShop(id) {
+  const val = k => document.getElementById(`ms_${k}_${id}`).value.trim();
+  const msg = document.getElementById('ms_msg_' + id);
+  const body = { phone: val('phone'), address: val('address'), hours: val('hours'), lat: '', lon: '' };
+  const loc = val('loc');
+  if (loc) {
+    const parts = loc.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
+      msg.innerHTML = `<div class="msg err">${escapeHtml(T.myshop_bad_location)}</div>`;
+      return;
+    }
+    body.lat = parts[0]; body.lon = parts[1];
+  }
+  let d;
+  try {
+    d = await (await fetch('/api/my_shop/' + id, { method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })).json();
+  } catch (e) { d = { ok: false, error: T.bot_error }; }
+  if (!d || !d.ok) { msg.innerHTML = `<div class="msg err">${escapeHtml((d && d.error) || 'Error')}</div>`; return; }
+  document.getElementById('ms_status_' + id).innerHTML = myShopStatusHtml(d.shop);
+  msg.innerHTML = `<div class="msg ok">${escapeHtml(T.myshop_saved)}</div>`;
 }
 
 // ---------- Обучение: карта курса ----------
@@ -17022,6 +17099,60 @@ def api_staff_delete(employee_id):
     if not db.delete_shop_employee(employee_id, g.shop_id):
         return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
     return jsonify({"ok": True})
+
+
+# ---------- «Моя точка»: контакты и локация для клиентов в боте ----------
+# Главная точка правит себя и свои филиалы, филиал — только себя,
+# сотрудник — ничего (employee_blocked).
+
+def _shop_contacts(shop: dict) -> dict:
+    return {"id": shop["id"], "name": shop.get("shop_name") or shop.get("username"),
+            "is_branch": shop.get("role") == "branch",
+            "phone": shop.get("phone") or "", "address": shop.get("address") or "",
+            "hours": shop.get("hours") or "", "lat": shop.get("lat"), "lon": shop.get("lon")}
+
+
+def _can_edit_contacts(shop_id: int) -> bool:
+    if shop_id == g.shop_id:
+        return True
+    return not g.is_branch and db.is_branch_of(shop_id, g.shop_id)
+
+
+@app.route("/api/my_shop")
+@login_required
+@employee_blocked
+def api_my_shop():
+    shops = [db.get_shop(g.shop_id)]
+    if not g.is_branch:
+        shops += db.get_branches(g.shop_id)
+    return jsonify({"ok": True, "shops": [_shop_contacts(s) for s in shops if s]})
+
+
+@app.route("/api/my_shop/<int:shop_id>", methods=["POST"])
+@login_required
+@employee_blocked
+def api_my_shop_save(shop_id):
+    if not _can_edit_contacts(shop_id):
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    data = request.get_json(force=True, silent=True) or {}
+
+    def text(key, limit):
+        return re.sub(r"\s+", " ", str(data.get(key) or "")).strip()[:limit] or None
+
+    lat = lon = None
+    if data.get("lat") not in (None, "") or data.get("lon") not in (None, ""):
+        try:
+            lat, lon = float(data.get("lat")), float(data.get("lon"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": g.T["myshop_bad_location"]}), 400
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
+            return jsonify({"ok": False, "error": g.T["myshop_bad_location"]}), 400
+        lat, lon = round(lat, 6), round(lon, 6)
+    ok = db.update_shop_contacts(shop_id, phone=text("phone", 40), address=text("address", 200),
+                                 hours=text("hours", 80), lat=lat, lon=lon)
+    if not ok:
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    return jsonify({"ok": True, "shop": _shop_contacts(db.get_shop(shop_id))})
 
 
 @app.route("/api/admin/employees/<int:employee_id>/active", methods=["POST"])

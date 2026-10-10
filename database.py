@@ -3650,6 +3650,18 @@ def update_branch_details(branch_id: int, shop_name: str, username: str, phone=N
         return cur.rowcount > 0
 
 
+def update_shop_contacts(shop_id: int, phone=None, address=None, hours=None, lat=None, lon=None) -> bool:
+    """Контакты, которые клиент видит в боте («О пункте»): телефон, адрес,
+    часы, локация. Меняет сама точка (или главная — у своего филиала) в
+    разделе «Моя точка»; права проверяются в webapp.py."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE shops SET phone=?, address=?, hours=?, lat=?, lon=? WHERE id=? AND role IN ('shop', 'branch')",
+            (phone, address, hours, lat, lon, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
 def branch_data_counts(branch_id: int) -> dict:
     """Что пропадёт вместе с филиалом — показываем перед удалением."""
     with get_conn() as conn:

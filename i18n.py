@@ -2642,3 +2642,44 @@ UZ.update({
     "inst_menu": "Ilovani o'rnatish",
     "inst_login_link": "📲 Ilovani telefonga yuklab olish",
 })
+
+
+# --- «Моя точка»: контакты и локация, которые клиент видит в боте ---
+RU.update({
+    "tab_myshop": "Моя точка",
+    "myshop_intro": "Эти данные клиенты видят в Telegram-боте по кнопке «ℹ️ О пункте»: телефон, адрес, часы работы и точку на карте.",
+    "myshop_branch": "филиал",
+    "myshop_phone": "Телефон",
+    "myshop_address": "Адрес",
+    "myshop_hours": "Часы работы",
+    "myshop_location": "Локация (широта, долгота)",
+    "myshop_loc_hint": "Нажмите кнопку, стоя в своей точке, — или вставьте координаты из Google Карт: «40.782123, 72.344567».",
+    "myshop_locate_btn": "Определить моё местоположение",
+    "myshop_locating": "Определяю…",
+    "myshop_loc_failed": "Не удалось определить местоположение — разрешите доступ к геолокации или вставьте координаты вручную.",
+    "myshop_bad_location": "Локация — два числа через запятую: широта, долгота.",
+    "myshop_saved": "Сохранено — клиенты уже видят новые данные в боте.",
+    "myshop_missing": "Не заполнено: {fields}. Клиенты в боте этого не видят.",
+    "myshop_all_set": "Всё заполнено — клиенты видят эти данные в боте.",
+    "bot_shop_info_missing": "Точка пока не указала адрес, телефон и локацию. Уточните их у мастера.",
+    "bot_error": "Что-то пошло не так. Попробуйте ещё раз чуть позже.",
+})
+UZ.update({
+    "tab_myshop": "Mening nuqtam",
+    "myshop_intro": "Bu ma'lumotlarni mijozlar Telegram-botda «ℹ️ Nuqta haqida» tugmasi orqali ko'radi: telefon, manzil, ish vaqti va xaritadagi joy.",
+    "myshop_branch": "filial",
+    "myshop_phone": "Telefon",
+    "myshop_address": "Manzil",
+    "myshop_hours": "Ish vaqti",
+    "myshop_location": "Joylashuv (kenglik, uzunlik)",
+    "myshop_loc_hint": "Nuqtangizda turib tugmani bosing — yoki Google Xaritadan koordinatalarni qo'ying: «40.782123, 72.344567».",
+    "myshop_locate_btn": "Joylashuvimni aniqlash",
+    "myshop_locating": "Aniqlanmoqda…",
+    "myshop_loc_failed": "Joylashuvni aniqlab bo'lmadi — geolokatsiyaga ruxsat bering yoki koordinatalarni qo'lda kiriting.",
+    "myshop_bad_location": "Joylashuv — vergul bilan ikki son: kenglik, uzunlik.",
+    "myshop_saved": "Saqlandi — mijozlar botda yangi ma'lumotlarni ko'rmoqda.",
+    "myshop_missing": "To'ldirilmagan: {fields}. Mijozlar botda buni ko'rmaydi.",
+    "myshop_all_set": "Hammasi to'ldirilgan — mijozlar bu ma'lumotlarni botda ko'radi.",
+    "bot_shop_info_missing": "Nuqta hali manzil, telefon va joylashuvni ko'rsatmagan. Ularni ustadan so'rang.",
+    "bot_error": "Nimadir xato ketdi. Birozdan keyin qayta urinib ko'ring.",
+})
