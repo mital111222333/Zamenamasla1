@@ -233,6 +233,10 @@ async def shop_info_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"{i18n.t('bot_shop_phone_label', lang)} {shop['phone']}")
     if shop.get("hours"):
         lines.append(f"{i18n.t('bot_shop_hours_label', lang)} {shop['hours']}")
+    if not (shop.get("address") or shop.get("phone") or (shop.get("lat") and shop.get("lon"))):
+        # раньше клиент видел одно название и думал, что бот сломался
+        lines.append("")
+        lines.append(i18n.t("bot_shop_info_missing", lang))
     await update.message.reply_text("\n".join(lines))
     if shop.get("lat") and shop.get("lon"):
         try:
@@ -958,6 +962,23 @@ async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
                 os.remove(pth)
 
 
+async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
+    """Ошибка в любом обработчике: пишем в лог и отвечаем человеку, а не
+    молчим (раньше клиент нажимал кнопку и не видел вообще ничего)."""
+    logger.error("Ошибка в обработчике бота", exc_info=context.error)
+    msg = update.effective_message if isinstance(update, Update) else None
+    if msg is None:
+        return
+    try:
+        lang = get_client_lang(update.effective_user.id) if update.effective_user else "ru"
+    except Exception:
+        lang = "ru"
+    try:
+        await msg.reply_text(i18n.t("bot_error", lang))
+    except Exception:
+        pass
+
+
 def main():
     db.init_db()
     webapp.run_webapp_in_thread()  # веб-панель поднимается в этом же процессе
@@ -1001,6 +1022,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("myid", myid))
+    app.add_handler(CommandHandler("info", shop_info_button))  # то же, что кнопка «О пункте», если кнопок нет
     app.add_handler(add_conv)
     app.add_handler(find_conv)
     app.add_handler(broadcast_conv)
@@ -1027,6 +1049,8 @@ def main():
     # 4:00 UTC = 9:00 по Ташкенту; внутри проверяется, что сегодня понедельник
     job_queue.run_daily(send_weekly_data_check, time=dtime(hour=4, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)
+
+    app.add_error_handler(on_error)
 
     logger.info("Бот и веб-панель запущены...")
     app.run_polling()
