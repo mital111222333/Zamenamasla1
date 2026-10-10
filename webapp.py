@@ -16034,16 +16034,31 @@ def api_display_state(anpr_token):
     if not car:
         return jsonify({"active": True, "found": False, "plate": state["plate"]})
 
-    last = history[0] if history else None
-    rec = db.service_recommendation(history)
+    health = db.car_health(history)
+    rec = db.service_recommendation(history, health=health)
     T = i18n.get_texts(shop.get("language") or "ru")
+
+    def pct(ratio):
+        return max(0, min(150, round(ratio * 100)))
+
+    # шкалы «Состояние машины»: масло + то, что эта точка уже меняла (и совет,
+    # даже если его здесь не меняли) — без «нет данных» по остальному
+    bars = []
+    if health["oil"] is not None:
+        bars.append({"name": T.get("fluid_0"), "pct": pct(health["oil"])})
+    extra = sorted(((k, r) for k, (r, here) in health["items"].items() if here or k == rec),
+                   key=lambda kr: -kr[1])[:4]
+    bars += [{"name": T.get(k) or k, "pct": pct(r)} for k, r in extra]
+    last = history[0] if history else {}
     return jsonify({
         "active": True, "found": True, "plate": state["plate"],
         # табло видят все в зале ожидания — только имя, без фамилии
         "owner_name": ((car["owner_name"] or "").split() or [""])[0],
-        "last_service_date": last["change_date"] if last else None,
-        "oil_brand": last["oil_brand"] if last else None,
-        "service_type": last["service_type"] if last else None,
+        "car": " ".join(x for x in (car.get("car_brand"), car.get("car_model")) if x),
+        "est_km": health["est_km"] or last.get("mileage"),
+        "health": bars,
+        # прошлая замена — без цен
+        "last": db.last_service_summary(history),
         "rec_item": T.get(rec) if rec else None,
         "offer_pct": int(shop.get("offer_pct") or 0) if rec else 0,
     })
@@ -16087,7 +16102,7 @@ DISPLAY_PAGE = """
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
   body {
-    background: radial-gradient(circle at center, #1A0B0A 0%, #0A0A0B 100%);
+    background: #10161F;
     color: #F5F5F2; font-family: 'Exo 2', -apple-system, sans-serif;
     height: 100vh; display:flex; align-items:center; justify-content:center;
     overflow: hidden; text-align:center;
@@ -16095,15 +16110,33 @@ DISPLAY_PAGE = """
   .idle .shop { font-family:'Teko', sans-serif; font-weight:600; font-size: 4.5vw; letter-spacing:1px; opacity:.9; text-transform:uppercase; }
   .idle .clock { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 10vw; margin-top: 2vh; font-variant-numeric: tabular-nums; color:#E8352E; }
   .idle .date { font-size: 2.2vw; opacity:.6; margin-top:1vh; }
-  .active { animation: fadein .4s ease; }
-  .active .greet { font-family:'Teko', sans-serif; font-weight:600; font-size: 5vw; color:#3FBE7E; text-transform:uppercase; }
-  .active .plate { font-family:'IBM Plex Mono', monospace; font-size: 6vw; font-weight:600; letter-spacing:4px; margin: 3vh 0; padding: 1vh 3vw;
-    border: 4px solid #F5F5F2; border-radius: 6px; display:inline-block; }
-  .active .info { font-size: 2.4vw; opacity:.85; line-height:1.7; margin-top:2vh; }
-  .active .notfound { font-size: 3vw; opacity:.8; margin-top:3vh; }
-  .active .rec { display:inline-block; margin-top:4vh; padding: 1.6vh 3vw; border-radius: 14px; background: rgba(255,210,63,.14);
-    border: 2px solid #FFD23F; color:#FFD23F; font-size: 3.2vw; font-weight:600; line-height:1.35; }
-  .active .rec .off { display:block; color:#F5F5F2; font-size: 2.6vw; margin-top: .6vh; }
+  /* «Здоровье машины»: слева кто приехал, справа шкалы износа, внизу прошлая замена */
+  .hc { width: 92vw; height: 88vh; display:grid; grid-template-columns: 1fr 1.05fr; grid-template-rows: 1fr auto;
+    gap: 3vh 4vw; text-align:left; animation: fadein .45s ease; }
+  .hc .who { align-self:center; }
+  .hc .hello { font-size: 2.4vw; color:#8FA3B8; }
+  .hc .name { font-family:'Teko', sans-serif; font-weight:600; font-size: 7.5vw; line-height: .95; color:#F3F6FA; }
+  .hc .car { font-size: 2.3vw; color:#B8C4D2; margin-top: 1vh; }
+  .hc .km { font-size: 2vw; color:#8FA3B8; margin-top: 2.4vh; }
+  .uzp { display:inline-flex; align-items:stretch; margin-top: 3vh; background:#fff; color:#111; border: .35vw solid #111;
+    border-radius: .8vw; font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 4.2vw; letter-spacing: .3vw; line-height:1.25; }
+  .uzp .rg { padding: .3vh 1.2vw; border-right: .35vw solid #111; }
+  .uzp .rs { padding: .3vh 1.6vw; }
+  .hc .side { align-self:center; background:#17202B; border-radius: 1.6vw; padding: 3.4vh 2.6vw; }
+  .hc .side h3 { font-size: 1.7vw; font-weight:600; color:#8FA3B8; letter-spacing: .15vw; text-transform: uppercase; margin-bottom: 2.4vh; }
+  .brow { margin-bottom: 2.2vh; }
+  .btop { display:flex; justify-content:space-between; font-size: 2vw; color:#E6ECF2; }
+  .bar { height: 1.4vh; border-radius: .7vh; background:#2A3544; overflow:hidden; margin-top: .8vh; }
+  .bar i { display:block; height:100%; border-radius: .7vh; }
+  .rec { margin-top: 1.4vh; border: .2vw solid #FFD23F; color:#FFD23F; background: rgba(255,210,63,.1); border-radius: 1vw;
+    padding: 1.6vh 1.4vw; font-size: 2.1vw; font-weight:600; line-height:1.35; }
+  .rec .off { display:block; color:#F3F6FA; font-weight:500; font-size: 1.8vw; margin-top: .5vh; }
+  .hc .last { grid-column: 1 / -1; border-top: 1px solid #2A3544; padding-top: 2.4vh; font-size: 1.9vw; color:#C7D2DE; line-height:1.6; }
+  .hc .last .lt { color:#8FA3B8; font-weight:600; margin-right: 1vw; }
+  .hc .last .chip { display:inline-block; background:#1B2532; border-radius: .8vw; padding: .5vh 1vw; margin: .5vh .6vw .5vh 0; }
+  .welcome { animation: fadein .45s ease; }
+  .welcome .greet { font-family:'Teko', sans-serif; font-weight:600; font-size: 6vw; color:#3FBE7E; }
+  .welcome .notfound { font-size: 3vw; color:#C7D2DE; margin-top: 3vh; }
   @keyframes fadein { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
 </style>
 </head>
@@ -16120,41 +16153,91 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+// перерисовываем экран, только когда данные поменялись — иначе анимация
+// появления проигрывалась бы каждую секунду и экран «мигал»
+let SCREEN_KEY = '';
+function show(key, html) {
+  if (key === SCREEN_KEY) return;
+  SCREEN_KEY = key;
+  document.getElementById('screen').innerHTML = html;
+}
 function renderIdle() {
   const now = new Date();
   const days = T.days_of_week;
-  document.getElementById('screen').innerHTML = `
+  const clock = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  show('idle' + clock, `
     <div class="idle">
       <div class="shop">${SHOP_NAME ? esc(SHOP_NAME) : '🔧 ' + T.app_title}</div>
-      <div class="clock">${pad(now.getHours())}:${pad(now.getMinutes())}</div>
+      <div class="clock">${clock}</div>
       <div class="date">${days[now.getDay()]}, ${pad(now.getDate())}.${pad(now.getMonth()+1)}.${now.getFullYear()}</div>
-    </div>`;
+    </div>`);
+}
+
+function greetWord() {
+  const h = new Date().getHours();
+  return h < 12 ? T.display_morning : (h < 18 ? T.display_day : T.display_evening);
+}
+// номер как настоящая табличка: код региона отдельно (у узбекских номеров)
+function plateHtml(p) {
+  p = String(p || '');
+  let rg = null, rest = p;
+  let m = p.match(/^([0-9]{2})([A-Z])([0-9]{3})([A-Z]{2})$/);
+  if (m) { rg = m[1]; rest = m[2] + ' ' + m[3] + ' ' + m[4]; }
+  else if ((m = p.match(/^([0-9]{2})([0-9]{3})([A-Z]{3})$/))) { rg = m[1]; rest = m[2] + ' ' + m[3]; }
+  return `<div class="uzp">${rg ? `<span class="rg">${esc(rg)}</span>` : ''}<span class="rs">${esc(rest)}</span></div>`;
+}
+function fmtKm(n) { return Math.round(Number(n) || 0).toLocaleString('ru-RU'); }
+function fmtDate(s) { s = String(s || ''); return s.length >= 10 ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : s; }
+function barHtml(b) {
+  const p = Math.round(Number(b.pct) || 0);
+  const color = p >= 100 ? '#E24B4A' : (p >= 80 ? '#EF9F27' : '#3FBE7E');
+  const label = p >= 100 ? T.display_due : p + '%';
+  return `<div class="brow"><div class="btop"><span>${esc(b.name)}</span><span style="color:${color}">${esc(label)}</span></div>
+    <div class="bar"><i style="width:${Math.min(p, 100)}%; background:${color}"></i></div></div>`;
+}
+// прошлая замена — без цен: что меняли, марка, литры
+function lastHtml(last) {
+  if (!last || !last.items || !last.items.length) return '';
+  const chips = last.items.map(it => {
+    let t = esc(it.name);
+    if (it.brand) t += ' · ' + esc(it.brand);
+    if (String(it.key || '').startsWith('fluid') && it.qty) t += ' · ' + esc(it.qty) + ' ' + esc(T.display_l);
+    return `<span class="chip">${t}</span>`;
+  }).join('');
+  const when = [fmtDate(last.date), last.mileage ? fmtKm(last.mileage) + ' ' + T.display_km : ''].filter(Boolean).join(' · ');
+  return `<div class="last"><span class="lt">${esc(T.display_last_title)} · ${esc(when)}</span>${chips}</div>`;
 }
 
 function renderActive(d) {
   if (!d.found) {
-    document.getElementById('screen').innerHTML = `
-      <div class="active">
-        <div class="greet">${T.display_welcome} 👋</div>
-        <div class="plate">${esc(d.plate)}</div>
-        <div class="notfound">${T.display_not_client_yet}</div>
-      </div>`;
+    show(JSON.stringify(d), `
+      <div class="welcome">
+        <div class="greet">${esc(T.display_welcome)} 👋</div>
+        ${plateHtml(d.plate)}
+        <div class="notfound">${esc(T.display_not_client_yet)}</div>
+      </div>`);
     return;
   }
-  const last = d.last_service_date
-    ? `${T.display_last_service} ${esc(d.last_service_date)}${d.service_type ? ' — ' + esc(d.service_type) : ''}${d.oil_brand ? ' (' + esc(d.oil_brand) + ')' : ''}`
-    : T.display_no_history;
   // совет «пора менять …» и скидка точки — то, ради чего табло стоит у входа
   const rec = d.rec_item
     ? `<div class="rec">💡 ${esc(T.display_rec_due)} ${esc(d.rec_item)}${d.offer_pct ? `<span class="off">${esc(T.display_rec_discount.replace('{pct}', d.offer_pct))}</span>` : ''}</div>`
     : '';
-  document.getElementById('screen').innerHTML = `
-    <div class="active">
-      <div class="greet">${T.display_greeting} ${esc(d.owner_name)}!</div>
-      <div class="plate">${esc(d.plate)}</div>
-      <div class="info">${last}</div>
-      ${rec}
-    </div>`;
+  const bars = (d.health || []).map(barHtml).join('');
+  const side = bars || rec
+    ? `<div class="side">${bars ? `<h3>${esc(T.display_health_title)}</h3>${bars}` : ''}${rec}</div>`
+    : `<div class="side"><div class="btop">${esc(T.display_no_history)}</div></div>`;
+  show(JSON.stringify(d), `
+    <div class="hc">
+      <div class="who">
+        <div class="hello">${esc(greetWord())},</div>
+        <div class="name">${esc(d.owner_name || '')}</div>
+        ${d.car ? `<div class="car">${esc(d.car)}</div>` : ''}
+        ${plateHtml(d.plate)}
+        ${d.est_km ? `<div class="km">${esc(T.display_now_km.replace('{km}', fmtKm(d.est_km)))}</div>` : ''}
+      </div>
+      ${side}
+      ${lastHtml(d.last)}
+    </div>`);
 }
 
 async function tick() {

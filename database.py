@@ -1633,48 +1633,70 @@ SERVICE_INTERVALS = {
 }
 
 
-def service_recommendation(history, today=None):
-    """Что этой машине больше всего пора поменять — ключ позиции (filter_1,
-    fluid_3…) или None. history — записи из get_car_history (свежие первыми).
-    Пробег на сегодня оценивается по последней записи и пробегу в день; если
-    его нет — считаем только по времени. Позицию, которую на этой точке ещё
-    не меняли, отсчитываем от первого визита. Если из дополнительного ничего
-    не просрочено, но вышел срок масла — советуем масло (fluid_0)."""
-    if not history:
+def _day(s):
+    try:
+        return datetime.strptime(str(s or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
         return None
+
+
+def _service_items(h):
+    try:
+        items = json.loads(h.get("items_json") or "[]") or []
+    except (TypeError, ValueError):
+        return []
+    return [i for i in items if isinstance(i, dict)]
+
+
+def car_health(history, today=None):
+    """Износ расходников машины: {"est_km": пробег сейчас или None,
+    "oil": доля срока масла или None, "items": {ключ: (доля, меняли_здесь)}}.
+    Доля 1.0 = срок вышел. Пробег на сегодня оценивается по последней записи и
+    пробегу в день; без него считаем только по времени. Позицию, которую на
+    этой точке ещё не меняли, отсчитываем от первого визита."""
+    if not history:
+        return {"est_km": None, "oil": None, "items": {}}
     today = today or datetime.now().date()
-
-    def day(s):
-        try:
-            return datetime.strptime(str(s or "")[:10], "%Y-%m-%d").date()
-        except ValueError:
-            return None
-
-    def keys(h):
-        try:
-            items = json.loads(h.get("items_json") or "[]") or []
-        except (TypeError, ValueError):
-            return set()
-        return {i.get("key") for i in items if isinstance(i, dict)}
-
-    last = history[0]
+    last, first = history[0], history[-1]
     daily = next((h.get("daily_km") for h in history if h.get("daily_km")), None)
-    last_day = day(last.get("change_date"))
+    last_day = _day(last.get("change_date"))
     est_km = None
     if last.get("mileage") and daily and last_day:
         est_km = last["mileage"] + daily * max(0, (today - last_day).days)
 
-    first = history[-1]
-    best, best_ratio = None, 0.0
+    items = {}
     for key, (km_int, months_int) in SERVICE_INTERVALS.items():
-        done = next((h for h in history if key in keys(h)), None)
-        d = day((done or first).get("change_date"))
+        done = next((h for h in history if any(i.get("key") == key for i in _service_items(h))), None)
+        base = done or first
+        d = _day(base.get("change_date"))
         if not d:
             continue
         ratio = ((today - d).days / 30.4) / months_int
-        if est_km is not None and (done or first).get("mileage"):
-            ratio = max(ratio, (est_km - (done or first)["mileage"]) / km_int)
-        if done is None:
+        if est_km is not None and base.get("mileage"):
+            ratio = max(ratio, (est_km - base["mileage"]) / km_int)
+        items[key] = (ratio, done is not None)
+
+    # масло: его срок посчитан в самой записи (next_change_date / next_mileage)
+    oil = None
+    next_day = _day(last.get("next_change_date"))
+    if next_day and last_day and next_day > last_day:
+        oil = (today - last_day).days / (next_day - last_day).days
+    if est_km is not None and last.get("next_mileage") and last.get("mileage") \
+            and last["next_mileage"] > last["mileage"]:
+        km_ratio = (est_km - last["mileage"]) / (last["next_mileage"] - last["mileage"])
+        oil = km_ratio if oil is None else max(oil, km_ratio)
+    return {"est_km": est_km, "oil": oil, "items": items}
+
+
+def service_recommendation(history, today=None, health=None):
+    """Что этой машине больше всего пора поменять — ключ позиции (filter_1,
+    fluid_3…) или None. history — записи из get_car_history (свежие первыми).
+    Если из дополнительного ничего не просрочено, но вышел срок масла —
+    советуем масло (fluid_0)."""
+    health = health or car_health(history, today)
+    best, best_ratio = None, 0.0
+    for key, (ratio, changed_here) in health["items"].items():
+        if not changed_here:
             # на этой точке ещё не меняли — возможно, меняли в другом месте:
             # советуем с запасом, а не ровно по сроку от первого визита
             ratio *= 0.85
@@ -1682,11 +1704,23 @@ def service_recommendation(history, today=None):
             best, best_ratio = key, ratio
     if best:
         return best
-    next_day = day(last.get("next_change_date"))
-    if (next_day and next_day <= today) or (
-            est_km is not None and last.get("next_mileage") and est_km >= last["next_mileage"]):
+    if health["oil"] is not None and health["oil"] >= 1.0:
         return "fluid_0"
     return None
+
+
+def last_service_summary(history):
+    """Прошлая замена для табло у входа — БЕЗ цен: дата, пробег и что
+    меняли (позиция, марка, литры). У старых записей без позиций — тип
+    услуги и марка масла."""
+    if not history:
+        return None
+    last = history[0]
+    items = [{"key": i.get("key") or "", "name": i.get("name") or "", "brand": i.get("brand") or "",
+              "qty": i.get("qty")} for i in _service_items(last) if i.get("name")]
+    if not items and last.get("service_type"):
+        items = [{"key": "", "name": last["service_type"], "brand": last.get("oil_brand") or "", "qty": None}]
+    return {"date": last.get("change_date"), "mileage": last.get("mileage"), "items": items}
 
 
 def get_cross_network_history(plate: str, exclude_shop_id: int):
