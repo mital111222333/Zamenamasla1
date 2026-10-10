@@ -16101,42 +16101,42 @@ DISPLAY_PAGE = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
+  /* Светлая тема: голубой фон, тёмно-синий текст, белые плашки; украшения
+     по углам меняются по сезону сами (зима ❄, весна ✿, лето ☀, осень 🍂) */
   body {
-    background: #10161F;
-    color: #F5F5F2; font-family: 'Exo 2', -apple-system, sans-serif;
+    background: #DCEBF7;
+    color: #0C447C; font-family: 'Exo 2', -apple-system, sans-serif;
     height: 100vh; display:flex; align-items:center; justify-content:center;
     overflow: hidden; text-align:center;
   }
-  .idle .shop { font-family:'Teko', sans-serif; font-weight:600; font-size: 4.5vw; letter-spacing:1px; opacity:.9; text-transform:uppercase; }
-  .idle .clock { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 10vw; margin-top: 2vh; font-variant-numeric: tabular-nums; color:#E8352E; }
-  .idle .date { font-size: 2.2vw; opacity:.6; margin-top:1vh; }
-  /* «Здоровье машины»: слева кто приехал, справа шкалы износа, внизу прошлая замена */
-  .hc { width: 92vw; height: 88vh; display:grid; grid-template-columns: 1fr 1.05fr; grid-template-rows: 1fr auto;
-    gap: 3vh 4vw; text-align:left; animation: fadein .45s ease; }
-  .hc .who { align-self:center; }
-  .hc .hello { font-size: 2.4vw; color:#8FA3B8; }
-  .hc .name { font-family:'Teko', sans-serif; font-weight:600; font-size: 7.5vw; line-height: .95; color:#F3F6FA; }
-  .hc .car { font-size: 2.3vw; color:#B8C4D2; margin-top: 1vh; }
-  .hc .km { font-size: 2vw; color:#8FA3B8; margin-top: 2.4vh; }
-  .uzp { display:inline-flex; align-items:stretch; margin-top: 3vh; background:#fff; color:#111; border: .35vw solid #111;
-    border-radius: .8vw; font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 4.2vw; letter-spacing: .3vw; line-height:1.25; }
-  .uzp .rg { padding: .3vh 1.2vw; border-right: .35vw solid #111; }
-  .uzp .rs { padding: .3vh 1.6vw; }
-  .hc .side { align-self:center; background:#17202B; border-radius: 1.6vw; padding: 3.4vh 2.6vw; }
-  .hc .side h3 { font-size: 1.7vw; font-weight:600; color:#8FA3B8; letter-spacing: .15vw; text-transform: uppercase; margin-bottom: 2.4vh; }
-  .brow { margin-bottom: 2.2vh; }
-  .btop { display:flex; justify-content:space-between; font-size: 2vw; color:#E6ECF2; }
-  .bar { height: 1.4vh; border-radius: .7vh; background:#2A3544; overflow:hidden; margin-top: .8vh; }
-  .bar i { display:block; height:100%; border-radius: .7vh; }
-  .rec { margin-top: 1.4vh; border: .2vw solid #FFD23F; color:#FFD23F; background: rgba(255,210,63,.1); border-radius: 1vw;
-    padding: 1.6vh 1.4vw; font-size: 2.1vw; font-weight:600; line-height:1.35; }
-  .rec .off { display:block; color:#F3F6FA; font-weight:500; font-size: 1.8vw; margin-top: .5vh; }
-  .hc .last { grid-column: 1 / -1; border-top: 1px solid #2A3544; padding-top: 2.4vh; font-size: 1.9vw; color:#C7D2DE; line-height:1.6; }
-  .hc .last .lt { color:#8FA3B8; font-weight:600; margin-right: 1vw; }
-  .hc .last .chip { display:inline-block; background:#1B2532; border-radius: .8vw; padding: .5vh 1vw; margin: .5vh .6vw .5vh 0; }
-  .welcome { animation: fadein .45s ease; }
-  .welcome .greet { font-family:'Teko', sans-serif; font-weight:600; font-size: 6vw; color:#3FBE7E; }
-  .welcome .notfound { font-size: 3vw; color:#C7D2DE; margin-top: 3vh; }
+  .deco { position:fixed; font-size: 3.2vw; color:#85B7EB; line-height:1; pointer-events:none; }
+  .deco.tl { top: 3vh; left: 2.5vw; } .deco.br { bottom: 3vh; right: 2.5vw; }
+  .idle .shop { font-weight:700; font-size: 4vw; color:#0C447C; }
+  .idle .clock { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 10vw; margin-top: 2vh; font-variant-numeric: tabular-nums; color:#185FA5; }
+  .idle .date { font-size: 2.2vw; color:#378ADD; margin-top:1vh; }
+  .hc { width: 90vw; display:flex; flex-direction:column; align-items:center; gap: 2.6vh; animation: fadein .45s ease; }
+  .hc .hello { font-weight:700; font-size: 4.6vw; line-height:1.1; color:#0C447C; }
+  .hc .sub { font-size: 2.2vw; color:#185FA5; }
+  .uzp { display:inline-flex; align-items:stretch; background:#fff; color:#111; border: .3vw solid #111;
+    border-radius: .7vw; font-family:'IBM Plex Mono', monospace; font-weight:600; font-size: 3.6vw; letter-spacing: .3vw; line-height:1.25; }
+  .uzp .rg { padding: .2vh 1.1vw; border-right: .3vw solid #111; }
+  .uzp .rs { padding: .2vh 1.5vw; }
+  .rec { background:#fff; border-radius: 1.2vw; padding: 1.6vh 2.4vw; font-size: 2.2vw; color:#0C447C; line-height:1.35; }
+  .rec b { font-weight:700; }
+  .rec .off { display:inline-block; margin-left: 1vw; background:#FAEEDA; color:#854F0B; border-radius: 2vw; padding: .3vh 1.2vw; font-weight:600; font-size: 1.9vw; }
+  .cards { width:100%; display:grid; grid-template-columns: 1fr 1fr; gap: 2vw; text-align:left; }
+  .card { background:#fff; border-radius: 1.4vw; padding: 2.6vh 2.2vw; }
+  .card h3 { font-size: 1.6vw; font-weight:600; color:#378ADD; letter-spacing: .1vw; text-transform: uppercase; margin-bottom: 1.8vh; }
+  .brow { margin-bottom: 1.8vh; }
+  .brow:last-child { margin-bottom: 0; }
+  .btop { display:flex; justify-content:space-between; font-size: 1.9vw; color:#0C447C; }
+  .bar { height: 1.3vh; border-radius: .65vh; background:#E6F1FB; overflow:hidden; margin-top: .7vh; }
+  .bar i { display:block; height:100%; border-radius: .65vh; }
+  .last .when { font-size: 1.9vw; color:#185FA5; margin-bottom: 1.2vh; }
+  .last .chip { display:inline-block; background:#E6F1FB; color:#0C447C; border-radius: .8vw; padding: .5vh 1vw; margin: .5vh .6vw .5vh 0; font-size: 1.8vw; }
+  .welcome { animation: fadein .45s ease; display:flex; flex-direction:column; align-items:center; gap: 3vh; }
+  .welcome .greet { font-weight:700; font-size: 5vw; color:#0C447C; }
+  .welcome .notfound { background:#fff; border-radius: 1.2vw; padding: 1.6vh 2.4vw; font-size: 2.4vw; color:#185FA5; }
   @keyframes fadein { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
 </style>
 </head>
@@ -16159,7 +16159,13 @@ let SCREEN_KEY = '';
 function show(key, html) {
   if (key === SCREEN_KEY) return;
   SCREEN_KEY = key;
-  document.getElementById('screen').innerHTML = html;
+  document.getElementById('screen').innerHTML = html + decoHtml();
+}
+// украшения по углам — по сезону: зима ❄, весна ✿, лето ☀, осень 🍂
+function decoHtml() {
+  const m = new Date().getMonth();
+  const d = m === 11 || m <= 1 ? ['❄ ❄', '❄'] : m <= 4 ? ['✿ ✿', '✿'] : m <= 7 ? ['☀', '☀'] : ['🍂', '🍂'];
+  return `<div class="deco tl">${d[0]}</div><div class="deco br">${d[1]}</div>`;
 }
 function renderIdle() {
   const now = new Date();
@@ -16190,7 +16196,7 @@ function fmtKm(n) { return Math.round(Number(n) || 0).toLocaleString('ru-RU'); }
 function fmtDate(s) { s = String(s || ''); return s.length >= 10 ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : s; }
 function barHtml(b) {
   const p = Math.round(Number(b.pct) || 0);
-  const color = p >= 100 ? '#E24B4A' : (p >= 80 ? '#EF9F27' : '#3FBE7E');
+  const color = p >= 100 ? '#E24B4A' : (p >= 80 ? '#BA7517' : '#1D9E75');
   const label = p >= 100 ? T.display_due : p + '%';
   return `<div class="brow"><div class="btop"><span>${esc(b.name)}</span><span style="color:${color}">${esc(label)}</span></div>
     <div class="bar"><i style="width:${Math.min(p, 100)}%; background:${color}"></i></div></div>`;
@@ -16205,7 +16211,7 @@ function lastHtml(last) {
     return `<span class="chip">${t}</span>`;
   }).join('');
   const when = [fmtDate(last.date), last.mileage ? fmtKm(last.mileage) + ' ' + T.display_km : ''].filter(Boolean).join(' · ');
-  return `<div class="last"><span class="lt">${esc(T.display_last_title)} · ${esc(when)}</span>${chips}</div>`;
+  return `<div class="card last"><h3>${esc(T.display_last_title)}</h3><div class="when">${esc(when)}</div>${chips}</div>`;
 }
 
 function renderActive(d) {
@@ -16220,23 +16226,22 @@ function renderActive(d) {
   }
   // совет «пора менять …» и скидка точки — то, ради чего табло стоит у входа
   const rec = d.rec_item
-    ? `<div class="rec">💡 ${esc(T.display_rec_due)} ${esc(d.rec_item)}${d.offer_pct ? `<span class="off">${esc(T.display_rec_discount.replace('{pct}', d.offer_pct))}</span>` : ''}</div>`
+    ? `<div class="rec">💡 ${esc(T.display_rec_due)} <b>${esc(d.rec_item)}</b>${d.offer_pct ? `<span class="off">${esc(T.display_rec_discount.replace('{pct}', d.offer_pct))}</span>` : ''}</div>`
     : '';
   const bars = (d.health || []).map(barHtml).join('');
-  const side = bars || rec
-    ? `<div class="side">${bars ? `<h3>${esc(T.display_health_title)}</h3>${bars}` : ''}${rec}</div>`
-    : `<div class="side"><div class="btop">${esc(T.display_no_history)}</div></div>`;
+  const health = bars ? `<div class="card"><h3>${esc(T.display_health_title)}</h3>${bars}</div>` : '';
+  const last = lastHtml(d.last);
+  const cards = health || last
+    ? `<div class="cards" style="${health && last ? '' : 'grid-template-columns:1fr; max-width:60vw;'}">${health}${last}</div>`
+    : `<div class="rec">${esc(T.display_no_history)}</div>`;
+  const sub = [d.car, d.est_km ? T.display_now_km.replace('{km}', fmtKm(d.est_km)) : ''].filter(Boolean).join(' · ');
   show(JSON.stringify(d), `
     <div class="hc">
-      <div class="who">
-        <div class="hello">${esc(greetWord())},</div>
-        <div class="name">${esc(d.owner_name || '')}</div>
-        ${d.car ? `<div class="car">${esc(d.car)}</div>` : ''}
-        ${plateHtml(d.plate)}
-        ${d.est_km ? `<div class="km">${esc(T.display_now_km.replace('{km}', fmtKm(d.est_km)))}</div>` : ''}
-      </div>
-      ${side}
-      ${lastHtml(d.last)}
+      <div class="hello">${esc(greetWord())}, ${esc(d.owner_name || '')}</div>
+      ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
+      ${plateHtml(d.plate)}
+      ${rec}
+      ${cards}
     </div>`);
 }
 
