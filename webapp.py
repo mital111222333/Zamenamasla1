@@ -89,6 +89,52 @@ def _gzip_response(resp):
     if etag and not etag.startswith("W/"):
         resp.headers["ETag"] = "W/" + etag  # сжатый вариант — «слабый» отпечаток
 
+
+@app.after_request
+def _security_headers(resp):
+    """Базовые заголовки безопасности. Встраивать сайт во фрейм можно только
+    ему самому и Telegram (панель открывается как Telegram Mini App, а в
+    веб-версии Telegram это фрейм) — чужой сайт не сможет «накрыть» кнопки
+    панели своими (clickjacking). Скрипты CSP не ограничиваем: в страницах
+    много встроенного JS."""
+    resp.headers.setdefault("Content-Security-Policy",
+                            "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org")
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    # ссылки паспорта и табло содержат токен — не отдаём полный адрес чужим сайтам
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if request.is_secure:
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return resp
+
+
+# Камера ANPR шлёт номера со своего устройства, а не из браузера — её не проверяем
+# (там защита — секретный токен в адресе).
+_CSRF_EXEMPT_PREFIXES = ("/api/anpr/",)
+
+
+@app.before_request
+def _csrf_origin_check():
+    """Защита от CSRF: изменяющий запрос (POST/PUT/DELETE) принимаем, только
+    если браузер прислал его с нашего же сайта. Иначе чужая страница могла
+    бы от имени вошедшего владельца что-то удалить или изменить. Сравниваем
+    только домен (без http/https — за прокси схема может отличаться)."""
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    if request.path.startswith(_CSRF_EXEMPT_PREFIXES):
+        return None
+    source = request.headers.get("Origin") or request.headers.get("Referer")
+    if not source:
+        return None  # не браузер (или очень старый) — у таких нет чужих cookie
+    source_host = urllib.parse.urlparse(source).netloc.lower()
+    allowed = {(request.host or "").lower()}
+    public_host = urllib.parse.urlparse(os.environ.get("PUBLIC_URL", "")).netloc.lower()
+    if public_host:
+        allowed.add(public_host)
+    if source_host and source_host in allowed:
+        return None
+    logger.warning(f"CSRF: отклонён {request.method} {request.path} с источника {source_host or source!r}")
+    return jsonify({"ok": False, "error": "запрос с чужого сайта отклонён"}), 403
+
 # ---------- Защита от дублей при плохом интернете ----------
 # Приложение отправляет каждое изменение (замена, оплата, склад…) с ключом
 # X-Request-Id. Если связь оборвалась уже ПОСЛЕ того, как сервер всё
@@ -167,6 +213,11 @@ def _idem_teardown(exc):
         ent["ev"].set()
 
 
+if not os.environ.get("SECRET_KEY") or len(os.environ.get("SECRET_KEY", "")) < 32:
+    # без постоянного ключа: все сессии сбрасываются при каждом перезапуске,
+    # а пароль Eskiz в базе шифруется общеизвестным ключом (см. database.py)
+    logger.critical("SECRET_KEY не задан или короче 32 символов — задайте длинный случайный "
+                    "SECRET_KEY в переменных окружения хостинга")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # самый большой законный файл — резервная копия базы
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
@@ -243,6 +294,9 @@ def _validate_sqlite_backup(file_path):
     return True, None
 
 
+RESTORE_MAX_BYTES = 1024 * 1024 * 1024  # 1 ГБ распакованной базы
+
+
 def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
     """Заменяет текущую базу данных на загруженную резервную копию —
     атомарно (через os.replace, чтобы не оставить базу в 'наполовину
@@ -254,10 +308,14 @@ def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
     можно было откатить."""
     same_dir_tmp = os.path.join(os.path.dirname(os.path.abspath(db.DB_PATH)), ".restore_upload.db")
     if uploaded_bytes[:2] == b"\x1f\x8b":
-        # сжатая копия (.db.gz) — распаковываем
-        import gzip
+        # сжатая копия (.db.gz) — распаковываем, но не больше RESTORE_MAX_BYTES:
+        # маленький «gz-бомба» файл иначе раздулся бы в памяти до гигабайт
+        import zlib
         try:
-            uploaded_bytes = gzip.decompress(uploaded_bytes)
+            d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+            uploaded_bytes = d.decompress(uploaded_bytes, RESTORE_MAX_BYTES)
+            if d.unconsumed_tail:
+                return False, f"Распакованный файл больше {RESTORE_MAX_BYTES // (1024 * 1024)} МБ — это не похоже на копию базы"
         except Exception as e:
             return False, f"Не удалось распаковать файл: {e}"
     with open(same_dir_tmp, "wb") as f:
@@ -1294,21 +1352,49 @@ def login_page():
     return render_template_string(LOGIN_PAGE, error=error, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru")
 
 
+# Лимит на отправку кодов восстановления: без него можно было заспамить
+# Telegram владельца кодами и каждым новым запросом сжигать его настоящий код.
+_reset_req_lock = threading.Lock()
+_reset_req_hits = {}
+RESET_REQ_WINDOW_SEC = 10 * 60
+RESET_REQ_MAX_PER_IP = 10
+RESET_REQ_MAX_PER_USER = 3
+
+
+def _reset_request_limited(ip, username) -> bool:
+    now = time.time()
+    keys = (("ip", ip, RESET_REQ_MAX_PER_IP), ("user", username.lower(), RESET_REQ_MAX_PER_USER))
+    with _reset_req_lock:
+        if len(_reset_req_hits) > 5000:
+            for k in [k for k, v in _reset_req_hits.items() if not v or now - v[-1] > RESET_REQ_WINDOW_SEC]:
+                _reset_req_hits.pop(k, None)
+        for kind, value, limit in keys:
+            hits = [t for t in _reset_req_hits.get((kind, value), []) if now - t < RESET_REQ_WINDOW_SEC]
+            _reset_req_hits[(kind, value)] = hits
+            if len(hits) >= limit:
+                return True
+        for kind, value, _ in keys:
+            _reset_req_hits[(kind, value)].append(now)
+    return False
+
+
 @app.route("/api/forgot_password/request", methods=["POST"])
 def api_forgot_password_request():
     """Первый шаг восстановления пароля — отправляет 6-значный код в
-    привязанный Telegram точки. Если Telegram не привязан, честно говорит
-    об этом (это не секретная информация — точка и так это знает),
-    предлагая обратиться к администратору."""
-    data = request.get_json(force=True)
-    username = (data.get("username") or "").strip()
+    привязанный Telegram точки. Несуществующий логин и логин без Telegram
+    получают ОДИНАКОВЫЙ ответ — чтобы по ответам нельзя было выяснить,
+    какие логины есть на платформе."""
+    data = request.get_json(force=True, silent=True) or {}
+    username = str(data.get("username") or "").strip()[:64]
     if not username:
         return jsonify({"ok": False, "error": "укажите логин"}), 400
+    if _reset_request_limited(_client_ip(), username):
+        return jsonify({"ok": False, "error": "слишком много запросов — подождите 10 минут и попробуйте снова"}), 429
+    no_code = jsonify({"ok": False, "error": "не удалось отправить код: проверьте логин. Если к точке не привязан "
+                                              "Telegram — обратитесь к администратору платформы для сброса пароля"})
     shop = db.find_shop_by_username(username)
-    if not shop:
-        return jsonify({"ok": False, "error": "точка с таким логином не найдена"}), 404
-    if not shop.get("notify_telegram_id"):
-        return jsonify({"ok": False, "error": "к этой точке не привязан Telegram — обратитесь к администратору платформы для сброса пароля", "no_telegram": True}), 400
+    if not shop or not shop.get("notify_telegram_id"):
+        return no_code, 400
     code = db.create_password_reset_code(shop["id"])
     lang = shop.get("language") or "ru"
     text = i18n.t("password_reset_code_message", lang, code=code)
@@ -5643,7 +5729,7 @@ async function submitShip() {
     loadWarehouse();
     if (WH.branchId) selectWhBranch(WH.branchId);
   } else if (data.error === 'problems') {
-    const names = data.problems.map(p => `${p.name || '#' + p.product_id}${p.available !== undefined ? ` (${T.whn_available} ${whQty(p.available)})` : ''}`).join(', ');
+    const names = data.problems.map(p => `${escapeHtml(p.name || '#' + p.product_id)}${p.available !== undefined ? ` (${T.whn_available} ${whQty(p.available)})` : ''}`).join(', ');
     showMsg(`${T.whn_err_not_enough} ${names}`, false);
   } else {
     showMsg(T['whn_err_' + data.error] || data.error, false);
@@ -8099,7 +8185,7 @@ async function lookupPlate(force) {
         const items = JSON.parse(last.items_json);
         LAST_VISIT_ITEMS = Array.isArray(items) ? items : [];
         lastItemsHtml = '<div class="kc-lv-items">' + items.map(it =>
-          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}</span><span>${it.total.toLocaleString('ru-RU')} ${T.currency}</span></div>`
+          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + escapeHtml(it.qty) + ' ' + T.liters_ph : ''}</span><span>${(Number(it.total) || 0).toLocaleString('ru-RU')} ${T.currency}</span></div>`
         ).join('') + '</div>';
       } catch (e) { /* старая запись без items_json — просто не показываем разбивку */ }
     }
@@ -8158,7 +8244,7 @@ function renderCrossNetworkHistory(crossHistory) {
       try {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div class="kc-lv-items">' + items.map(it =>
-          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}</span></div>`
+          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + escapeHtml(it.qty) + ' ' + T.liters_ph : ''}</span></div>`
         ).join('') + '</div>';
       } catch (e) {}
     }
@@ -9008,7 +9094,7 @@ async function toggleHistory(plate) {
       try {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div class="kc-he-items">' + items.map(it =>
-          `${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + it.qty + ' ' + T.liters_ph : ''}: ${it.total.toLocaleString('ru-RU')} ${T.currency}`
+          `${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + escapeHtml(it.qty) + ' ' + T.liters_ph : ''}: ${(Number(it.total) || 0).toLocaleString('ru-RU')} ${T.currency}`
         ).join('<br>') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
@@ -11184,7 +11270,9 @@ def api_add():
         vin = db.normalize_vin(data.get("vin"))
         mileage = int(data["mileage"]) if data.get("mileage") else None
         next_mileage = int(data["next_mileage"]) if data.get("next_mileage") else None
-        items = data.get("items") or []
+        # проверяем позиции ДО того, как создадим клиента/машину — иначе при
+        # ошибке в позициях остались бы пустые записи
+        items = db.sanitize_items(data.get("items") or [])
         interval_value = int(data["interval_value"])
         interval_unit = data.get("interval_unit") or "months"
         if interval_unit not in ("days", "months"):
@@ -15745,7 +15833,7 @@ def api_anpr(anpr_token):
     if not plate:
         return jsonify({"ok": False, "error": "no plate found in request"}), 400
 
-    plate = db.normalize_plate(plate)
+    plate = db.normalize_plate(str(plate))[:20]
     with _display_lock:
         _display_states[shop["id"]] = {"plate": plate, "shown_at": time.time()}
 
@@ -15816,12 +15904,17 @@ const SHOP_NAME = {{ shop_name|tojson }};
 const ANPR_TOKEN = {{ anpr_token|tojson }};
 
 function pad(n) { return n.toString().padStart(2, '0'); }
+// номер приходит от камеры, имя/услуга — из базы: в HTML только экранированными
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 function renderIdle() {
   const now = new Date();
   const days = T.days_of_week;
   document.getElementById('screen').innerHTML = `
     <div class="idle">
-      <div class="shop">${SHOP_NAME || '🔧 ' + T.app_title}</div>
+      <div class="shop">${SHOP_NAME ? esc(SHOP_NAME) : '🔧 ' + T.app_title}</div>
       <div class="clock">${pad(now.getHours())}:${pad(now.getMinutes())}</div>
       <div class="date">${days[now.getDay()]}, ${pad(now.getDate())}.${pad(now.getMonth()+1)}.${now.getFullYear()}</div>
     </div>`;
@@ -15832,18 +15925,18 @@ function renderActive(d) {
     document.getElementById('screen').innerHTML = `
       <div class="active">
         <div class="greet">${T.display_welcome} 👋</div>
-        <div class="plate">${d.plate}</div>
+        <div class="plate">${esc(d.plate)}</div>
         <div class="notfound">${T.display_not_client_yet}</div>
       </div>`;
     return;
   }
   const last = d.last_service_date
-    ? `${T.display_last_service} ${d.last_service_date}${d.service_type ? ' — ' + d.service_type : ''}${d.oil_brand ? ' (' + d.oil_brand + ')' : ''}`
+    ? `${T.display_last_service} ${esc(d.last_service_date)}${d.service_type ? ' — ' + esc(d.service_type) : ''}${d.oil_brand ? ' (' + esc(d.oil_brand) + ')' : ''}`
     : T.display_no_history;
   document.getElementById('screen').innerHTML = `
     <div class="active">
-      <div class="greet">${T.display_greeting} ${d.owner_name || ''}!</div>
-      <div class="plate">${d.plate}</div>
+      <div class="greet">${T.display_greeting} ${esc(d.owner_name)}!</div>
+      <div class="plate">${esc(d.plate)}</div>
       <div class="info">${last}</div>
     </div>`;
 }
