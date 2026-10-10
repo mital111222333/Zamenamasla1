@@ -2683,3 +2683,46 @@ UZ.update({
     "bot_shop_info_missing": "Nuqta hali manzil, telefon va joylashuvni ko'rsatmagan. Ularni ustadan so'rang.",
     "bot_error": "Nimadir xato ketdi. Birozdan keyin qayta urinib ko'ring.",
 })
+
+
+# --- Табло у входа: сканер номера с обычной камеры (телефон / веб-камера) ---
+RU.update({
+    "scn_title": "Сканер номеров — OilBook",
+    "scn_loading": "Загружаю камеру и распознавание…",
+    "scn_waiting": "Жду машину… Номер должен попасть в зелёную рамку.",
+    "scn_sent": "На табло:",
+    "scn_send_fail": "Не удалось отправить номер — проверьте интернет.",
+    "scn_no_camera": "Камера недоступна. Откройте страницу в Chrome или Safari.",
+    "scn_denied": "Нет доступа к камере — разрешите его в настройках браузера для этого сайта.",
+    "scn_load_fail": "Не удалось загрузить распознавание — проверьте интернет и обновите страницу.",
+    "scn_zone_btn": "Настроить зону",
+    "scn_zone_done": "Готово",
+    "scn_zone_hint": "Проведите пальцем прямоугольник вокруг номера машины, стоящей на месте остановки. Рамка должна плотно обхватывать номер.",
+    "scn_camera": "Камера",
+    "myshop_display_title": "Табло у входа",
+    "myshop_display_hint": "Телевизор показывает приветствие, когда к точке подъезжает машина. Номер распознаёт телефон или веб-камера у въезда — дорогая камера не нужна.",
+    "myshop_display_tv": "Для Smart TV — откройте в браузере телевизора:",
+    "myshop_display_scanner": "Для телефона у въезда — откройте в Chrome и направьте камеру на место остановки машины:",
+    "myshop_copy": "Копировать",
+    "myshop_copied": "Скопировано",
+})
+UZ.update({
+    "scn_title": "Raqam skaneri — OilBook",
+    "scn_loading": "Kamera va aniqlash yuklanmoqda…",
+    "scn_waiting": "Mashina kutilmoqda… Raqam yashil ramkaga tushishi kerak.",
+    "scn_sent": "Tabloda:",
+    "scn_send_fail": "Raqamni yuborib bo'lmadi — internetni tekshiring.",
+    "scn_no_camera": "Kamera mavjud emas. Sahifani Chrome yoki Safari'da oching.",
+    "scn_denied": "Kameraga ruxsat yo'q — brauzer sozlamalarida ushbu sayt uchun ruxsat bering.",
+    "scn_load_fail": "Aniqlashni yuklab bo'lmadi — internetni tekshirib, sahifani yangilang.",
+    "scn_zone_btn": "Zonani sozlash",
+    "scn_zone_done": "Tayyor",
+    "scn_zone_hint": "To'xtash joyida turgan mashina raqami atrofida barmoq bilan to'rtburchak chizing. Ramka raqamni zich o'rab turishi kerak.",
+    "scn_camera": "Kamera",
+    "myshop_display_title": "Kirishdagi tablo",
+    "myshop_display_hint": "Nuqtaga mashina kelganda televizor salomlashuvni ko'rsatadi. Raqamni kirishdagi telefon yoki veb-kamera aniqlaydi — qimmat kamera kerak emas.",
+    "myshop_display_tv": "Smart TV uchun — televizor brauzerida oching:",
+    "myshop_display_scanner": "Kirishdagi telefon uchun — Chrome'da oching va kamerani mashina to'xtaydigan joyga qarating:",
+    "myshop_copy": "Nusxa olish",
+    "myshop_copied": "Nusxa olindi",
+})

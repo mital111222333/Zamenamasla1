@@ -4080,7 +4080,30 @@ async function loadMyShop() {
       </div>
       <button class="submit" onclick="saveMyShop(${s.id})">${escapeHtml(T.btn_save)}</button>
       <div id="ms_msg_${s.id}"></div>
+      ${s.anpr_token ? `<div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+        <div style="font-weight:600; color:var(--text); margin-bottom:4px;"><i class="fa-solid fa-tv"></i> ${escapeHtml(T.myshop_display_title)}</div>
+        <div class="hint-text" style="margin:0 0 6px;">${escapeHtml(T.myshop_display_hint)}</div>
+        ${myShopLinkRow(T.myshop_display_tv, '/display/' + encodeURIComponent(s.anpr_token))}
+        ${myShopLinkRow(T.myshop_display_scanner, '/scanner/' + encodeURIComponent(s.anpr_token))}
+      </div>` : ''}
     </div>`).join('');
+}
+function myShopLinkRow(label, path) {
+  const url = location.origin + path;
+  return `<div style="margin-top:10px;">
+    <div class="hint-text" style="margin:0 0 4px;">${escapeHtml(label)}</div>
+    <div style="display:flex; gap:6px;">
+      <input readonly value="${escapeHtml(url)}" style="flex:1; min-width:0;" onclick="this.select()">
+      <button type="button" style="flex:none; height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:#fff; color:var(--blue); font-weight:600; font-size:13px; font-family:inherit; cursor:pointer;" onclick="myShopCopy(this, ${escapeHtml(JSON.stringify(url))})">${escapeHtml(T.myshop_copy)}</button>
+    </div></div>`;
+}
+async function myShopCopy(btn, text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); } catch (e2) {} ta.remove();
+  }
+  btn.textContent = T.myshop_copied;
 }
 function myShopLocate(id, btn) {
   if (!navigator.geolocation) { alert(T.myshop_loc_failed); return; }
@@ -16047,6 +16070,331 @@ def display_page(anpr_token):
     )
 
 
+# ============ СКАНЕР НОМЕРОВ С ОБЫЧНОЙ КАМЕРЫ (замена дорогой ANPR-камере) ============
+# Телефон или веб-камера у въезда открывает /scanner/<токен табло>: номер
+# распознаётся прямо в браузере той же моделью, что и сканер в панели, и
+# уходит на /api/anpr/<токен> — дальше всё как с настоящей ANPR-камерой.
+# Модель читает уже вырезанный номер, поэтому владелец один раз обводит
+# «зону номера» — место, где оказывается номер машины на месте остановки.
+# Кадры никуда не отправляются, на сервер уходит только текст номера.
+
+SCANNER_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex">
+<title>{{ T.scn_title }}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; background:#000; color:#F5F5F2; font-family:-apple-system, 'Segoe UI', Roboto, sans-serif; overflow:hidden; }
+  #wrap { position:fixed; inset:0; touch-action:none; }
+  video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
+  #zone { position:absolute; border:3px solid #3FBE7E; border-radius:6px; box-shadow:0 0 0 9999px rgba(0,0,0,.35); pointer-events:none; }
+  #zone.hit { border-color:#FFD23F; }
+  #zone.edit { border-style:dashed; border-color:#00A8E8; }
+  #hint { position:absolute; top:12px; left:12px; right:12px; padding:10px 14px; border-radius:10px; background:rgba(0,168,232,.92); color:#001018; font-size:14px; line-height:1.4; display:none; }
+  #bar { position:absolute; left:0; right:0; bottom:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:rgba(10,10,11,.85); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  #status { flex:1 1 220px; font-size:15px; line-height:1.4; }
+  #status b { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:18px; letter-spacing:2px; }
+  #status.err { color:#FF8A80; }
+  button, select { height:40px; padding:0 14px; border-radius:10px; border:1px solid #444; background:#1E1E22; color:#F5F5F2; font-size:14px; font-family:inherit; max-width:100%; }
+  button.on { background:#00A8E8; border-color:#00A8E8; color:#001018; }
+  canvas { display:none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <video id="v" playsinline muted autoplay></video>
+  <div id="zone"></div>
+  <div id="hint">{{ T.scn_zone_hint }}</div>
+  <div id="bar">
+    <div id="status">{{ T.scn_loading }}</div>
+    <select id="cam" hidden aria-label="{{ T.scn_camera }}"></select>
+    <button type="button" id="zoneBtn">{{ T.scn_zone_btn }}</button>
+    <button type="button" id="fsBtn" aria-label="fullscreen">⛶</button>
+  </div>
+</div>
+<canvas id="c" width="128" height="64"></canvas>
+<script>
+const T = {{ t_json|safe }};
+const TOKEN = {{ anpr_token|tojson }};
+const ZONE_KEY = 'oilbook_scn_zone_' + TOKEN.slice(0, 8);
+const CAM_KEY = 'oilbook_scn_cam_' + TOKEN.slice(0, 8);
+// распознавание — как у сканера в панели (psDecode): модель читает вырезанный
+// номер 128×64, ответ — 10 позиций × 37 символов
+const ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
+const FORMATS = ['DDLDDDLL', 'DDDDDLLL'];
+const REGIONS = ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '85', '90', '95'];
+const MIN_CONF = 0.6;      // кадр учитываем при такой уверенности
+const NEED_HITS = 3;       // камера неподвижна, кадров много — подтверждаем с запасом
+const HIT_WINDOW_MS = 2500; // прочтения должны идти подряд, без долгих пауз
+const RESEND_MS = 90000;   // тот же номер повторно на табло не шлём полторы минуты
+const FRAME_MS = 250;      // ~4 кадра в секунду: хватает, и телефон не перегревается
+
+const S = { session: null, stream: null, zone: null, editing: false, hits: {}, lastHitAt: 0,
+            lastSent: {}, tickN: 0, wake: null };
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function status(html, err) {
+  const el = document.getElementById('status');
+  el.classList.toggle('err', !!err);
+  el.innerHTML = html;
+}
+function pretty(p) {
+  if (/^[0-9]{2}[A-Z][0-9]{3}[A-Z]{2}$/.test(p)) return p.slice(0, 2) + ' ' + p[2] + ' ' + p.slice(3, 6) + ' ' + p.slice(6);
+  if (/^[0-9]{5}[A-Z]{3}$/.test(p)) return p.slice(0, 2) + ' ' + p.slice(2, 5) + ' ' + p.slice(5);
+  return p;
+}
+
+// ---- зона номера: хранится в долях кадра камеры, на этом устройстве ----
+function loadZone() {
+  try {
+    const z = JSON.parse(localStorage.getItem(ZONE_KEY) || 'null');
+    if (z && z.w > 0.02 && z.h > 0.01) return z;
+  } catch (e) {}
+  return { x: 0.3, y: 0.55, w: 0.4, h: 0.13 };
+}
+function saveZone(z) { try { localStorage.setItem(ZONE_KEY, JSON.stringify(z)); } catch (e) {} }
+// видео вписано в экран с полями (object-fit: contain) — где именно кадр
+function videoBox() {
+  const v = document.getElementById('v');
+  const vw = v.videoWidth || 16, vh = v.videoHeight || 9;
+  const ew = v.clientWidth, eh = v.clientHeight;
+  const sc = Math.min(ew / vw, eh / vh);
+  return { x: (ew - vw * sc) / 2, y: (eh - vh * sc) / 2, w: vw * sc, h: vh * sc };
+}
+function drawZone() {
+  const b = videoBox(), z = S.zone, el = document.getElementById('zone');
+  el.style.left = (b.x + z.x * b.w) + 'px';
+  el.style.top = (b.y + z.y * b.h) + 'px';
+  el.style.width = (z.w * b.w) + 'px';
+  el.style.height = (z.h * b.h) + 'px';
+}
+function setupZoneEditing() {
+  const wrap = document.getElementById('wrap');
+  let start = null;
+  const pt = e => {
+    const b = videoBox(), r = wrap.getBoundingClientRect();
+    const cl = n => Math.min(1, Math.max(0, n));
+    return { x: cl((e.clientX - r.left - b.x) / b.w), y: cl((e.clientY - r.top - b.y) / b.h) };
+  };
+  wrap.addEventListener('pointerdown', e => {
+    if (!S.editing || e.target.closest('#bar')) return;
+    start = pt(e);
+    e.preventDefault();
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!start) return;
+    const p = pt(e);
+    S.zone = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+    drawZone();
+  });
+  const end = () => {
+    if (!start) return;
+    start = null;
+    if (S.zone.w > 0.02 && S.zone.h > 0.01) saveZone(S.zone);
+    else { S.zone = loadZone(); drawZone(); }
+  };
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
+  document.getElementById('zoneBtn').onclick = () => {
+    S.editing = !S.editing;
+    const btn = document.getElementById('zoneBtn');
+    btn.classList.toggle('on', S.editing);
+    btn.textContent = S.editing ? T.scn_zone_done : T.scn_zone_btn;
+    document.getElementById('zone').classList.toggle('edit', S.editing);
+    document.getElementById('hint').style.display = S.editing ? 'block' : 'none';
+  };
+}
+
+// ---- камера ----
+async function startCamera(deviceId) {
+  if (S.stream) S.stream.getTracks().forEach(t => t.stop());
+  S.stream = null;
+  // для неподвижной камеры важно разрешение: номер в зоне должен быть крупным
+  const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  const video = deviceId ? Object.assign({ deviceId: { exact: deviceId } }, size)
+                         : Object.assign({ facingMode: { ideal: 'environment' } }, size);
+  S.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: video });
+  const v = document.getElementById('v');
+  v.srcObject = S.stream;
+  try { await v.play(); } catch (e) {}
+  if (!v.videoWidth) await new Promise(r => v.addEventListener('loadedmetadata', r, { once: true }));
+  drawZone();
+}
+async function fillCameras() {
+  try {
+    const list = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    if (list.length < 2) return;
+    const sel = document.getElementById('cam');
+    sel.innerHTML = list.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || (T.scn_camera + ' ' + (i + 1)))}</option>`).join('');
+    const track = S.stream && S.stream.getVideoTracks()[0];
+    const cur = track && track.getSettings ? track.getSettings().deviceId : null;
+    if (cur) sel.value = cur;
+    sel.hidden = false;
+    sel.onchange = async () => {
+      try {
+        await startCamera(sel.value);
+        try { localStorage.setItem(CAM_KEY, sel.value); } catch (e) {}
+      } catch (e) { status(esc(T.scn_no_camera), true); }
+    };
+  } catch (e) {}
+}
+// экран телефона у въезда не должен гаснуть
+async function keepAwake() {
+  try { if ('wakeLock' in navigator) S.wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+
+// ---- распознавание ----
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('load ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function loadModel() {
+  if (!window.ort) await loadScript('/ocr/v1/ort.wasm.min.js');
+  ort.env.wasm.wasmPaths = '/ocr/v1/';
+  ort.env.wasm.numThreads = 1;
+  const sess = await ort.InferenceSession.create('/ocr/v1/plate_ocr.onnx', { executionProviders: ['wasm'] });
+  try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('uint8', new Uint8Array(64 * 128 * 3), [1, 64, 128, 3]) }); } catch (e) {}
+  return sess;
+}
+function cropTensor(inset) {
+  const v = document.getElementById('v');
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return null;
+  const z = S.zone;
+  let x = z.x * vw, y = z.y * vh, w = z.w * vw, h = z.h * vh;
+  x += w * inset[0]; w *= 1 - 2 * inset[0];
+  y += h * inset[1]; h *= 1 - 2 * inset[1];
+  const ctx = document.getElementById('c').getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(v, x, y, w, h, 0, 0, 128, 64);
+  const px = ctx.getImageData(0, 0, 128, 64).data;
+  const rgb = new Uint8Array(128 * 64 * 3);
+  for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { rgb[j] = px[i]; rgb[j + 1] = px[i + 1]; rgb[j + 2] = px[i + 2]; }
+  return new ort.Tensor('uint8', rgb, [1, 64, 128, 3]);
+}
+function decode(probs) {
+  const lp = (k, j) => Math.log(probs[k * 37 + j] + 1e-9);
+  let reg = null;
+  for (let a = 0; a < 10; a++) for (let b = 0; b < 10; b++) {
+    const code = String(a) + String(b);
+    const sc = lp(0, a) + lp(1, b) - (REGIONS.includes(code) ? 0 : 3);
+    if (!reg || sc > reg.score) reg = { score: sc, code: code };
+  }
+  let best = null;
+  for (const f of FORMATS) {
+    let score = reg.score, out = reg.code;
+    for (let k = 2; k < 10; k++) {
+      if (k >= f.length) { score += lp(k, 36); continue; }
+      const lo = f[k] === 'D' ? 0 : 10, hi = f[k] === 'D' ? 10 : 36;
+      let bj = lo;
+      for (let j = lo + 1; j < hi; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
+      score += lp(k, bj);
+      out += ALPHA[bj];
+    }
+    if (!best || score > best.score) best = { score: score, plate: out };
+  }
+  return { plate: best.plate, conf: Math.exp(best.score / 10) };
+}
+async function recognize() {
+  S.tickN++;
+  // по очереди: вся зона / чуть плотнее — номер не всегда ровно на всю зону
+  const t = cropTensor(S.tickN % 2 ? [0, 0] : [0.06, 0.14]);
+  if (!t) return null;
+  const out = await S.session.run({ [S.session.inputNames[0]]: t });
+  return decode(out[S.session.outputNames[0]].data);
+}
+async function send(plate) {
+  const now = Date.now();
+  if (S.lastSent[plate] && now - S.lastSent[plate] < RESEND_MS) return;
+  S.lastSent[plate] = now;
+  try {
+    const r = await fetch('/api/anpr/' + encodeURIComponent(TOKEN), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plate: plate })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = new Date();
+    status(`${esc(T.scn_sent)} <b>${esc(pretty(plate))}</b> · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+  } catch (e) {
+    delete S.lastSent[plate];
+    status(esc(T.scn_send_fail), true);
+  }
+}
+async function tick() {
+  if (!S.editing && S.session) {
+    let r = null;
+    try { r = await recognize(); } catch (e) { r = null; }
+    const zone = document.getElementById('zone');
+    const now = Date.now();
+    if (now - S.lastHitAt > HIT_WINDOW_MS) S.hits = {};
+    if (r && r.conf >= MIN_CONF) {
+      S.lastHitAt = now;
+      S.hits[r.plate] = (S.hits[r.plate] || 0) + 1;
+      zone.classList.add('hit');
+      if (S.hits[r.plate] >= NEED_HITS) { S.hits = {}; send(r.plate); }
+    } else {
+      zone.classList.remove('hit');
+    }
+  }
+  setTimeout(tick, FRAME_MS);
+}
+
+(async function init() {
+  S.zone = loadZone();
+  setupZoneEditing();
+  window.addEventListener('resize', drawZone);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+  document.getElementById('fsBtn').onclick = () => {
+    const d = document.documentElement;
+    if (d.requestFullscreen) d.requestFullscreen().catch(() => {});
+  };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status(esc(T.scn_no_camera), true); return; }
+  const modelP = loadModel();
+  let savedCam = null;
+  try { savedCam = localStorage.getItem(CAM_KEY); } catch (e) {}
+  try {
+    await startCamera(savedCam);
+  } catch (e) {
+    let err = e;
+    if (savedCam) { try { await startCamera(null); err = null; } catch (e2) { err = e2; } }
+    if (err) {
+      const denied = err.name === 'NotAllowedError' || err.name === 'SecurityError';
+      status(esc(denied ? T.scn_denied : T.scn_no_camera), true);
+      return;
+    }
+  }
+  fillCameras();
+  keepAwake();
+  try { S.session = await modelP; } catch (e) { status(esc(T.scn_load_fail), true); return; }
+  status(esc(T.scn_waiting));
+  tick();
+})();
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/scanner/<anpr_token>")
+def scanner_page(anpr_token):
+    shop = db.get_shop_by_anpr_token(anpr_token)
+    if not shop or not shop["is_active"]:
+        return "Сканер не найден — проверьте ссылку.", 404
+    lang = shop.get("language") or "ru"
+    T = i18n.get_texts(lang)
+    t_scn = {k: v for k, v in T.items() if k.startswith("scn_")}
+    return render_template_string(SCANNER_PAGE, T=T, lang=lang, anpr_token=anpr_token,
+                                  t_json=json.dumps(t_scn, ensure_ascii=False))
+
+
 # ======================================================================
 # ПОДПИСКА: страница оплаты, приём чека, решения админа
 # ======================================================================
@@ -17109,7 +17457,9 @@ def _shop_contacts(shop: dict) -> dict:
     return {"id": shop["id"], "name": shop.get("shop_name") or shop.get("username"),
             "is_branch": shop.get("role") == "branch",
             "phone": shop.get("phone") or "", "address": shop.get("address") or "",
-            "hours": shop.get("hours") or "", "lat": shop.get("lat"), "lon": shop.get("lon")}
+            "hours": shop.get("hours") or "", "lat": shop.get("lat"), "lon": shop.get("lon"),
+            # токен табло/сканера — только своей точке и её владельцу
+            "anpr_token": shop.get("anpr_token") or ""}
 
 
 def _can_edit_contacts(shop_id: int) -> bool:
