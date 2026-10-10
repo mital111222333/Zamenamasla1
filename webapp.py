@@ -10125,7 +10125,26 @@ function psDecode(probs) {
     }
     if (!best || score > best.score) best = { score, plate: out };
   }
+  // модель глобальная (номера многих стран): если узбекский формат подходит
+  // заметно хуже свободного чтения — это российский, старый узбекский или
+  // другой номер, берём его как есть
+  const free = psFreeRead(probs, lp);
+  if (free.plate.length >= 4 && free.score - best.score > PS_FREE_MARGIN) {
+    return { plate: free.plate, conf: Math.exp(free.score / 10) };
+  }
   return { plate: best.plate, conf: Math.exp(best.score / 10) };
+}
+// свободное чтение: в каждой позиции самый вероятный символ, «_» — пусто
+const PS_FREE_MARGIN = 2.5;
+function psFreeRead(probs, lp) {
+  let score = 0, plate = '';
+  for (let k = 0; k < 10; k++) {
+    let bj = 0;
+    for (let j = 1; j < 37; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
+    score += lp(k, bj);
+    if (bj !== 36) plate += PS_ALPHA[bj];
+  }
+  return { score, plate };
 }
 
 async function psRecognize() {
@@ -16050,7 +16069,7 @@ async function tick() {
 }
 
 tick();
-setInterval(tick, 2000);
+setInterval(tick, 1000);  // раз в секунду: приветствие появляется почти сразу после распознавания
 </script>
 </body>
 </html>
@@ -16133,10 +16152,11 @@ const ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
 const FORMATS = ['DDLDDDLL', 'DDDDDLLL'];
 const REGIONS = ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '85', '90', '95'];
 const MIN_CONF = 0.6;      // кадр учитываем при такой уверенности
-const NEED_HITS = 3;       // камера неподвижна, кадров много — подтверждаем с запасом
-const HIT_WINDOW_MS = 2500; // прочтения должны идти подряд, без долгих пауз
+const NEED_HITS = 2;       // два одинаковых прочтения подряд — и номер на табло
+const INSTANT_CONF = 0.95; // при такой уверенности хватает одного кадра
+const HIT_WINDOW_MS = 2000; // прочтения должны идти подряд, без долгих пауз
 const RESEND_MS = 90000;   // тот же номер повторно на табло не шлём полторы минуты
-const FRAME_MS = 250;      // ~4 кадра в секунду: хватает, и телефон не перегревается
+const FRAME_MS = 100;      // пауза между кадрами: ~6–10 кадров в секунду, телефон не перегревается
 
 const S = { session: null, stream: null, zone: null, editing: false, hits: {}, lastHitAt: 0,
             lastSent: {}, tickN: 0, wake: null };
@@ -16307,7 +16327,26 @@ function decode(probs) {
     }
     if (!best || score > best.score) best = { score: score, plate: out };
   }
+  // модель глобальная (номера многих стран): если узбекский формат подходит
+  // заметно хуже свободного чтения — это российский, старый узбекский или
+  // другой номер, берём его как есть
+  const free = freeRead(probs, lp);
+  if (free.plate.length >= 4 && free.score - best.score > FREE_MARGIN) {
+    return { plate: free.plate, conf: Math.exp(free.score / 10) };
+  }
   return { plate: best.plate, conf: Math.exp(best.score / 10) };
+}
+// свободное чтение: в каждой позиции самый вероятный символ, «_» — пусто
+const FREE_MARGIN = 2.5;
+function freeRead(probs, lp) {
+  let score = 0, plate = '';
+  for (let k = 0; k < 10; k++) {
+    let bj = 0;
+    for (let j = 1; j < 37; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
+    score += lp(k, bj);
+    if (bj !== 36) plate += ALPHA[bj];
+  }
+  return { score: score, plate: plate };
 }
 async function recognize() {
   S.tickN++;
@@ -16355,7 +16394,7 @@ async function tick() {
       S.lastHitAt = now;
       S.hits[r.plate] = (S.hits[r.plate] || 0) + 1;
       zone.classList.add('hit');
-      if (S.hits[r.plate] >= NEED_HITS) { S.hits = {}; send(r.plate); }
+      if (S.hits[r.plate] >= NEED_HITS || r.conf >= INSTANT_CONF) { S.hits = {}; send(r.plate); }
     } else {
       zone.classList.remove('hit');
     }
