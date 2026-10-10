@@ -16096,9 +16096,14 @@ SCANNER_PAGE = """
   #zone.edit { border-style:dashed; border-color:#00A8E8; }
   #hint { position:absolute; top:12px; left:12px; right:12px; padding:10px 14px; border-radius:10px; background:rgba(0,168,232,.92); color:#001018; font-size:14px; line-height:1.4; display:none; }
   #bar { position:absolute; left:0; right:0; bottom:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:rgba(10,10,11,.85); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-  #status { flex:1 1 220px; font-size:15px; line-height:1.4; }
+  #info { flex:1 1 220px; min-width:0; }
+  #status { font-size:15px; line-height:1.4; }
   #status b { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:18px; letter-spacing:2px; }
   #status.err { color:#FF8A80; }
+  #live { font-size:13px; line-height:1.4; margin-top:2px; min-height:18px; }
+  #live.good { color:#3FBE7E; }
+  #live.weak { color:#FFB74D; }
+  #live.none { color:#9AA3B2; }
   button, select { height:40px; padding:0 14px; border-radius:10px; border:1px solid #444; background:#1E1E22; color:#F5F5F2; font-size:14px; font-family:inherit; max-width:100%; }
   button.on { background:#00A8E8; border-color:#00A8E8; color:#001018; }
   canvas { display:none; }
@@ -16110,7 +16115,7 @@ SCANNER_PAGE = """
   <div id="zone"></div>
   <div id="hint">{{ T.scn_zone_hint }}</div>
   <div id="bar">
-    <div id="status">{{ T.scn_loading }}</div>
+    <div id="info"><div id="status">{{ T.scn_loading }}</div><div id="live"></div></div>
     <select id="cam" hidden aria-label="{{ T.scn_camera }}"></select>
     <button type="button" id="zoneBtn">{{ T.scn_zone_btn }}</button>
     <button type="button" id="fsBtn" aria-label="fullscreen">⛶</button>
@@ -16328,12 +16333,23 @@ async function send(plate) {
     status(esc(T.scn_send_fail), true);
   }
 }
+// живая подсказка при настройке: что модель читает в рамке прямо сейчас и
+// насколько уверенно — сразу видно, мешает рамка, расстояние или свет
+const NOTHING_CONF = 0.2;
+function showLive(r) {
+  const el = document.getElementById('live');
+  if (!r || r.conf < NOTHING_CONF) { el.className = 'none'; el.textContent = T.scn_nothing; return; }
+  el.className = r.conf >= MIN_CONF ? 'good' : 'weak';
+  el.textContent = T.scn_seeing + ' ' + pretty(r.plate) + ' · ' + Math.round(r.conf * 100) + '%';
+}
 async function tick() {
+  if (S.editing) document.getElementById('live').textContent = '';
   if (!S.editing && S.session) {
     let r = null;
     try { r = await recognize(); } catch (e) { r = null; }
     const zone = document.getElementById('zone');
     const now = Date.now();
+    showLive(r);
     if (now - S.lastHitAt > HIT_WINDOW_MS) S.hits = {};
     if (r && r.conf >= MIN_CONF) {
       S.lastHitAt = now;
