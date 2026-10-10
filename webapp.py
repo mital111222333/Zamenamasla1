@@ -555,6 +555,8 @@ if ('serviceWorker' in navigator) {
   .forgot-link { display:block; text-align:center; margin-top:12px; color:#3a86ff; font-size:13px; background:none; border:none; cursor:pointer; padding:0; }
   .hint { font-size:12px; color:#7a7a7a; margin:-8px 0 14px; }
   .reg-link { display:block; text-align:center; margin-top:16px; padding:11px; border:1px solid #2a2e37; border-radius:10px; color:#e6e6e6; font-size:14px; text-decoration:none; }
+  .app-link { display:block; text-align:center; margin-top:16px; padding:10px 18px; border-radius:22px; background:rgba(56,189,248,.10); border:1px solid rgba(56,189,248,.30); color:#7DD3FC; font-size:14px; font-weight:600; text-decoration:none; }
+  @media (display-mode: standalone) { .app-link { display:none; } }
 </style>
 </head>
 <body>
@@ -576,6 +578,7 @@ if ('serviceWorker' in navigator) {
     <a class="reg-link" href="/register?lang={{ lang }}">{{ T.reg_link_login }}</a>
     <a class="lang-link" href="/login?lang={{ other_lang }}">{{ T.lang_switch }}</a>
   </form>
+  <a class="app-link" href="/app?lang={{ lang }}">{{ T.inst_login_link }}</a>
 
   <div class="box" id="forgotBox" style="display:none;">
     <h1>🔑 {{ T.forgot_title }}</h1>
@@ -1336,6 +1339,297 @@ def logout():
     return redirect(url_for("login_page"))
 
 
+# ---------- Страница «Скачать приложение» (/app) ----------
+# Открыта без входа: ссылку можно дать любому (сотруднику, новой точке).
+# Сама определяет телефон и браузер:
+#   Android + Chrome  → кнопка «Установить» (системное окно Chrome);
+#   iPhone            → инструкция для Safari («Поделиться» → «На экран Домой»);
+#   внутри Telegram   → просьба открыть в Chrome/Safari (оттуда установить нельзя);
+#   компьютер         → QR-код, чтобы открыть страницу на телефоне;
+#   уже установлено   → кнопка «Открыть OilBook».
+APP_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>{{ T.inst_title }}</title>
+<meta name="description" content="{{ T.inst_lead }}">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0A2540">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="OilBook">
+<meta property="og:title" content="{{ T.inst_title }}">
+<meta property="og:description" content="{{ T.inst_lead }}">
+<meta property="og:image" content="{{ page_origin }}/static/icons/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { background:#F1F5F9; color:#0F172A; font-family:-apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing:antialiased; }
+  .hero { background:linear-gradient(160deg, #0A2540 0%, #0B1B3A 60%, #10305E 100%); color:#fff; padding:calc(22px + env(safe-area-inset-top, 0px)) 16px 64px; text-align:center; position:relative; overflow:hidden; }
+  .hero::after { content:''; position:absolute; width:340px; height:340px; border-radius:50%; background:radial-gradient(circle, rgba(56,189,248,.22), rgba(56,189,248,0) 70%); top:-120px; right:-120px; }
+  .top { display:flex; justify-content:space-between; align-items:center; max-width:520px; margin:0 auto 22px; position:relative; z-index:1; }
+  .wordmark { font-family:'Sora', -apple-system, sans-serif; font-weight:800; font-size:22px; letter-spacing:-.6px; }
+  .wm-oil { background:linear-gradient(135deg, #38BDF8 0%, #3B82F6 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .wm-book { color:#fff; }
+  .lang { color:#B9CBEA; font-size:13px; text-decoration:none; border:1px solid rgba(255,255,255,.18); padding:6px 12px; border-radius:20px; }
+  .app-icon { width:96px; height:96px; border-radius:24px; display:block; margin:0 auto 16px; box-shadow:0 14px 36px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.08); position:relative; z-index:1; }
+  .hero h1 { font-family:'Sora', -apple-system, sans-serif; font-size:26px; margin:0 0 8px; letter-spacing:-.5px; position:relative; z-index:1; }
+  .hero p { margin:0 auto; max-width:360px; color:#B9CBEA; font-size:15px; line-height:1.45; position:relative; z-index:1; }
+  .chips { display:flex; justify-content:center; gap:8px; margin-top:14px; position:relative; z-index:1; flex-wrap:wrap; }
+  .chip { font-size:12.5px; color:#E2E8F0; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:20px; padding:5px 11px; display:inline-flex; align-items:center; gap:6px; }
+  .chip svg { width:14px; height:14px; }
+
+  .wrap { max-width:520px; margin:-40px auto 0; padding:0 16px calc(28px + env(safe-area-inset-bottom, 0px)); position:relative; z-index:2; }
+  .card { background:#fff; border-radius:20px; padding:18px 16px; margin-bottom:12px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
+  .card h2 { font-size:17px; margin:0 0 12px; }
+  .btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; border:none; border-radius:14px; padding:15px 16px; font-size:16px; font-weight:700; cursor:pointer; text-decoration:none; font-family:inherit; }
+  .btn svg { width:20px; height:20px; flex:none; }
+  .btn-main { background:#E63946; color:#fff; box-shadow:0 8px 20px rgba(230,57,70,.30); }
+  .btn-blue { background:#2563EB; color:#fff; }
+  .btn-ghost { background:#F1F5F9; color:#0F172A; margin-top:8px; }
+  .state { display:none; }
+  .state.on { display:block; }
+  .note { font-size:14px; color:#475569; line-height:1.5; margin:0 0 12px; }
+  .ok { display:flex; gap:12px; align-items:center; }
+  .ok .tick { width:40px; height:40px; border-radius:50%; background:#DCFCE7; color:#16A34A; display:flex; align-items:center; justify-content:center; flex:none; }
+  .ok .tick svg { width:22px; height:22px; }
+  .ok b { font-size:15px; }
+  .warn { border-left:4px solid #F59E0B; }
+
+  .tabs { display:flex; background:#F1F5F9; border-radius:12px; padding:4px; margin-bottom:14px; }
+  .tab { flex:1; border:none; background:none; padding:9px 6px; border-radius:9px; font-size:14px; font-weight:700; color:#64748B; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .tab svg { width:16px; height:16px; }
+  .tab.on { background:#fff; color:#0F172A; box-shadow:0 1px 4px rgba(15,23,42,.10); }
+  .steps { list-style:none; margin:0; padding:0; display:none; }
+  .steps.on { display:block; }
+  .steps li { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed #E2E8F0; font-size:14.5px; line-height:1.45; }
+  .steps li:last-child { border-bottom:none; }
+  .num { width:28px; height:28px; border-radius:50%; background:#0A2540; color:#fff; font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center; flex:none; }
+  .steps .pic { margin-left:auto; flex:none; width:40px; height:40px; border-radius:10px; background:#F1F5F9; display:flex; align-items:center; justify-content:center; color:#334155; }
+  .steps .pic svg { width:22px; height:22px; }
+  .result { display:flex; gap:12px; align-items:center; background:#EFF6FF; border-radius:14px; padding:12px; margin-top:12px; font-size:14px; color:#1E3A8A; line-height:1.4; }
+  .result img { width:44px; height:44px; border-radius:11px; flex:none; }
+
+  .qr { display:flex; gap:16px; align-items:center; }
+  .qr img { width:132px; height:132px; border-radius:12px; border:1px solid #E2E8F0; padding:6px; background:#fff; flex:none; }
+  .qr p { margin:0; font-size:14px; color:#475569; line-height:1.5; }
+  .qr .url { display:block; margin-top:8px; font-weight:700; color:#0F172A; word-break:break-all; }
+
+  details { border-bottom:1px solid #F1F5F9; padding:12px 0; }
+  details:last-child { border-bottom:none; padding-bottom:0; }
+  summary { font-weight:700; font-size:14.5px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; gap:10px; }
+  summary::-webkit-details-marker { display:none; }
+  summary::after { content:'+'; color:#94A3B8; font-size:18px; line-height:1; }
+  details[open] summary::after { content:'−'; }
+  details p { margin:8px 0 0; font-size:14px; color:#475569; line-height:1.5; }
+  .foot { text-align:center; margin-top:16px; }
+  .foot a { color:#2563EB; font-weight:600; font-size:14px; text-decoration:none; }
+  .toast { position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%) translateY(20px); background:#0F172A; color:#fff; padding:11px 16px; border-radius:12px; font-size:14px; opacity:0; transition:.2s; pointer-events:none; z-index:10; }
+  .toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+  @media (min-width: 700px) { .hero { padding-bottom:72px; } .hero h1 { font-size:30px; } }
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top">
+    <span class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></span>
+    <a class="lang" href="/app?lang={{ other_lang }}">{{ T.lang_switch_short }}</a>
+  </div>
+  <img class="app-icon" src="/static/icons/icon-192.png" alt="OilBook">
+  <h1>{{ T.inst_title }}</h1>
+  <p>{{ T.inst_lead }}</p>
+  <div class="chips">
+    <span class="chip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18a.38.38 0 0 0-.66-.38l-1.86 3.22A11.4 11.4 0 0 0 12 8.1c-1.77 0-3.43.39-4.92 1.04L5.22 5.92a.38.38 0 0 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>Android</span>
+    <span class="chip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46a4.2 4.2 0 0 0-3.32-1.8c-1.4-.14-2.75.83-3.46.83-.72 0-1.82-.81-3-.79a4.43 4.43 0 0 0-3.74 2.28c-1.6 2.77-.41 6.86 1.14 9.1.76 1.1 1.66 2.33 2.85 2.29 1.14-.05 1.58-.74 2.96-.74 1.38 0 1.77.74 2.98.71 1.23-.02 2-1.11 2.75-2.22a9.6 9.6 0 0 0 1.25-2.57 3.97 3.97 0 0 1-2.37-3.63zM14.1 5.86A3.98 3.98 0 0 0 15.04 3a4.06 4.06 0 0 0-2.63 1.36 3.8 3.8 0 0 0-.96 2.76 3.36 3.36 0 0 0 2.65-1.26z"/></svg>iPhone</span>
+    <span class="chip">{{ T.inst_chip_free }}</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- уже установлено -->
+  <div class="card state" id="stInstalled">
+    <div class="ok"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>{{ T.inst_installed }}</b></div>
+    <a class="btn btn-blue" href="/" style="margin-top:14px;">{{ T.inst_open }}</a>
+  </div>
+
+  <!-- Android Chrome: системная кнопка установки -->
+  <div class="card state" id="stPrompt">
+    <button class="btn btn-main" id="installBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6.5 10L12 15.5 17.5 10M4 20h16"/></svg>
+      <span>{{ T.inst_btn }}</span>
+    </button>
+  </div>
+
+  <!-- только что установили -->
+  <div class="card state" id="stDone">
+    <div class="ok"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>{{ T.inst_done }}</b></div>
+  </div>
+
+  <!-- открыто внутри Telegram и т.п. -->
+  <div class="card warn state" id="stInApp">
+    <h2>{{ T.inst_inapp_title }}</h2>
+    <p class="note" id="inAppText"></p>
+    <a class="btn btn-blue" id="openChromeBtn" href="#">{{ T.inst_open_chrome }}</a>
+    <button class="btn btn-ghost" type="button" onclick="copyLink()">{{ T.inst_copy }}</button>
+  </div>
+
+  <!-- компьютер: QR-код -->
+  <div class="card state" id="stDesktop">
+    <h2>{{ T.inst_qr_title }}</h2>
+    <div class="qr">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data={{ page_url|urlencode }}" alt="QR">
+      <p>{{ T.inst_qr_text }}<span class="url">{{ page_url_short }}</span></p>
+    </div>
+  </div>
+
+  <div class="card" id="howCard">
+    <h2>{{ T.inst_how }}</h2>
+    <div class="tabs">
+      <button class="tab" type="button" data-os="android" onclick="pickOs('android')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18a.38.38 0 0 0-.66-.38l-1.86 3.22A11.4 11.4 0 0 0 12 8.1c-1.77 0-3.43.39-4.92 1.04L5.22 5.92a.38.38 0 0 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>Android</button>
+      <button class="tab" type="button" data-os="ios" onclick="pickOs('ios')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46a4.2 4.2 0 0 0-3.32-1.8c-1.4-.14-2.75.83-3.46.83-.72 0-1.82-.81-3-.79a4.43 4.43 0 0 0-3.74 2.28c-1.6 2.77-.41 6.86 1.14 9.1.76 1.1 1.66 2.33 2.85 2.29 1.14-.05 1.58-.74 2.96-.74 1.38 0 1.77.74 2.98.71 1.23-.02 2-1.11 2.75-2.22a9.6 9.6 0 0 0 1.25-2.57 3.97 3.97 0 0 1-2.37-3.63zM14.1 5.86A3.98 3.98 0 0 0 15.04 3a4.06 4.06 0 0 0-2.63 1.36 3.8 3.8 0 0 0-.96 2.76 3.36 3.36 0 0 0 2.65-1.26z"/></svg>iPhone</button>
+    </div>
+    <ol class="steps" id="steps-android">
+      <li><span class="num">1</span><span>{{ T.inst_a1|safe }}</span><span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#EA4335"/><path d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L3.34 7A10 10 0 0 1 12 2z" fill="#EA4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5A5 5 0 0 0 17 12a5 5 0 0 0-.67-2.5z" fill="#FBBC05"/><path d="M12 22A10 10 0 0 1 3.34 7l4.33 7.5A5 5 0 0 0 12 17a5 5 0 0 0 4.33-2.5z" fill="#34A853"/><circle cx="12" cy="12" r="4" fill="#4285F4" stroke="#fff" stroke-width="1.6"/></svg></span></li>
+      <li><span class="num">2</span><span>{{ T.inst_a2|safe }}</span><span class="pic"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg></span></li>
+      <li><span class="num">3</span><span>{{ T.inst_a3|safe }}</span><span class="pic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7.5v7M9 11.5l3 3 3-3"/></svg></span></li>
+    </ol>
+    <ol class="steps" id="steps-ios">
+      <li><span class="num">1</span><span>{{ T.inst_i1|safe }}</span><span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1E90FF"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff" stroke-width=".8" stroke-dasharray="1 2"/><path d="M15.8 8.2l-5.2 2.4-2.4 5.2 5.2-2.4z" fill="#fff"/><path d="M15.8 8.2l-2.4 5.2-2.8-2.8z" fill="#FF3B30"/></svg></span></li>
+      <li><span class="num">2</span><span>{{ T.inst_i2|safe }}</span><span class="pic"><svg viewBox="0 0 24 24" fill="none" stroke="#1E90FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9H6.5A1.5 1.5 0 0 0 5 10.5v9A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 17.5 9H16"/><path d="M12 14V2.5M8.5 6L12 2.5 15.5 6"/></svg></span></li>
+      <li><span class="num">3</span><span>{{ T.inst_i3|safe }}</span><span class="pic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
+    </ol>
+    <div class="result"><img src="/static/icons/icon-192.png" alt=""><span>{{ T.inst_result }}</span></div>
+  </div>
+
+  <div class="card">
+    <button class="btn btn-ghost" type="button" style="margin-top:0;" onclick="shareLink()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 3.5L10.5 14.5M21.5 3.5l-7 18-4-7-7-4z"/></svg>
+      <span>{{ T.inst_share }}</span>
+    </button>
+  </div>
+
+  <div class="card">
+    <details><summary>{{ T.inst_faq1_q }}</summary><p>{{ T.inst_faq1_a }}</p></details>
+    <details><summary>{{ T.inst_faq2_q }}</summary><p>{{ T.inst_faq2_a }}</p></details>
+  </div>
+
+  <div class="foot"><a href="/login?lang={{ lang }}">{{ T.inst_login }} →</a></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const L = {{ js_texts|tojson }};
+  const PAGE_URL = {{ page_url|tojson }};
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = ua.indexOf('Android') !== -1;
+  const isMobile = isIOS || isAndroid;
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  // встроенные браузеры (Telegram, Instagram, Facebook, WebView) — из них установить нельзя
+  const inApp = ['Telegram', 'FBAN', 'FBAV', 'Instagram', '; wv)'].some(s => ua.indexOf(s) !== -1);
+  // на iPhone ставится только из Safari
+  const iosOther = isIOS && ['CriOS', 'FxiOS', 'EdgiOS', 'OPiOS', 'YaBrowser', 'GSA'].some(s => ua.indexOf(s) !== -1);
+
+  function show(id) {
+    ['stInstalled', 'stPrompt', 'stDone', 'stInApp', 'stDesktop'].forEach(x => document.getElementById(x).classList.toggle('on', x === id));
+  }
+  function pickOs(os) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.os === os));
+    document.getElementById('steps-android').classList.toggle('on', os === 'android');
+    document.getElementById('steps-ios').classList.toggle('on', os === 'ios');
+  }
+  function toast(text) {
+    const el = document.getElementById('toast');
+    el.textContent = text;
+    el.classList.add('on');
+    setTimeout(() => el.classList.remove('on'), 2200);
+  }
+  async function copyLink() {
+    try { await navigator.clipboard.writeText(PAGE_URL); toast(L.copied); }
+    catch (e) { window.prompt(L.copy, PAGE_URL); }
+  }
+  async function shareLink() {
+    if (navigator.share) {
+      try { await navigator.share({ title: L.title, text: L.share_text, url: PAGE_URL }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    copyLink();
+  }
+
+  pickOs(isIOS ? 'ios' : 'android');
+
+  if (standalone) {
+    show('stInstalled');
+  } else if (inApp || iosOther) {
+    document.getElementById('inAppText').textContent = isIOS ? L.inapp_ios : L.inapp_android;
+    const chrome = document.getElementById('openChromeBtn');
+    if (isAndroid) {
+      const u = new URL(PAGE_URL);
+      chrome.href = 'intent://' + u.host + u.pathname + u.search + '#Intent;scheme=https;package=com.android.chrome;end';
+    } else {
+      chrome.style.display = 'none';
+    }
+    show('stInApp');
+  } else if (!isMobile) {
+    show('stDesktop');
+  }
+
+  // Android Chrome сам предлагает установку — показываем большую кнопку
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferred = e;
+    if (!standalone && !inApp) show('stPrompt');
+  });
+  document.getElementById('installBtn').addEventListener('click', async () => {
+    if (!deferred) return;
+    deferred.prompt();
+    try {
+      const choice = await deferred.userChoice;
+      if (choice && choice.outcome === 'accepted') show('stDone');
+    } catch (e) {}
+    deferred = null;
+  });
+  window.addEventListener('appinstalled', () => show('stDone'));
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/app")
+@app.route("/install")
+def app_install_page():
+    """Публичная страница установки приложения (без входа)."""
+    lang = request.args.get("lang")
+    if lang not in ("ru", "uz"):
+        al = (request.headers.get("Accept-Language") or "").lower()
+        lang = "uz" if al.startswith("uz") else "ru"
+    T = i18n.get_texts(lang)
+    origin = (PUBLIC_URL or request.host_url).rstrip("/")
+    page_url = f"{origin}/app" + ("?lang=uz" if lang == "uz" else "")
+    js_texts = {
+        "title": T["inst_title"], "copied": T["inst_copied"], "copy": T["inst_copy"],
+        "inapp_ios": T["inst_inapp_ios"], "inapp_android": T["inst_inapp_android"],
+        "share_text": T["inst_share_text"],
+    }
+    return render_template_string(
+        APP_PAGE, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru",
+        page_url=page_url, page_url_short=page_url.split("://", 1)[-1],
+        page_origin=origin, js_texts=js_texts,
+    )
+
+
 # ---------- Справка (раздел «Справка» / «Yordam») ----------
 # Общие куски для панели точки и для /admin/help. Статьи — в help_content.py.
 HELP_CSS = """
@@ -1560,6 +1854,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .more-item.hidden-in-more { display:none; }
   .more-item .nav-badge { position:static; margin-left:auto; }
   .more-logout, .more-logout i { color:var(--btn); border-bottom:none; }
+  @media (display-mode: standalone) { .more-install { display:none; } }
   /* ---- навигация: планшет и компьютер ---- */
   @media (min-width: 900px) {
     .bottom-bar, .more-sheet, .more-backdrop, .topbar { display:none !important; }
@@ -2426,6 +2721,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
       {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
+      <a class="more-item more-install" href="/app?lang={{ lang }}"><i class="fa-solid fa-mobile-screen-button"></i><span>{{ T.inst_menu }}</span></a>
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
       <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
   </div>
