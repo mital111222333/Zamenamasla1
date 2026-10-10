@@ -620,10 +620,10 @@ RU = {
 
     # --- Табло ---
     "display_welcome": "Добро пожаловать!",
-    "display_not_client_yet": "Вы пока не наш клиент",
+    "display_not_client_yet": "Рады видеть вас впервые! Мастер сейчас подойдёт 🙂",
     "display_greeting": "Здравствуйте, уважаемый клиент",
     "display_last_service": "Последнее обслуживание:",
-    "display_no_history": "История обслуживания не найдена",
+    "display_no_history": "Рады вас видеть! Мастер сейчас подойдёт 🙂",
 
     # --- Бот: клиентская часть ---
     "menu_history": "🕒 Моя история",
@@ -1267,10 +1267,10 @@ UZ = {
     "admin_location_error": "Lokatsiya quyidagi formatda bo'lishi kerak: kenglik, uzunlik (vergul bilan ajratilgan ikkita raqam).",
 
     "display_welcome": "Xush kelibsiz!",
-    "display_not_client_yet": "Siz hali bizning mijozimiz emassiz",
+    "display_not_client_yet": "Sizni birinchi marta ko'rib turganimizdan xursandmiz! Usta hozir keladi 🙂",
     "display_greeting": "Assalomu alaykum, hurmatli mijoz",
     "display_last_service": "So'nggi xizmat:",
-    "display_no_history": "Xizmat tarixi topilmadi",
+    "display_no_history": "Sizni ko'rganimizdan xursandmiz! Usta hozir keladi 🙂",
 
     # --- Бот: клиентская часть ---
     "menu_history": "🕒 Mening tarixim",
