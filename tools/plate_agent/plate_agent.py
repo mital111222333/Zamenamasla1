@@ -34,7 +34,13 @@ INSTANT_CONF = 0.95   # при такой уверенности хватает 
 HIT_WINDOW = 2.0      # секунды: прочтения должны идти подряд
 RESEND = 90           # секунды: тот же номер повторно на табло не шлём
 FRAME_PAUSE = 0.1     # секунды между кадрами
-INSETS = ((0.0, 0.0), (0.06, 0.14))  # по очереди: вся зона / чуть плотнее
+# Окна поиска номера вокруг зоны — как рамка сканера в панели: ширина = ширина
+# номера, высота = ширина / 3.2 (запас сверху и снизу). Плюс рамки крупнее,
+# мельче и со сдвигом — машина не всегда встаёт точно в одно место.
+WIN_SCALES = (1.0, 1.3, 0.8)
+WIN_SHIFTS = (0.0, -0.25, 0.25)
+WIN_INSETS = ((0.0, 0.0), (0.06, 0.14))
+LOCK_MISSES = 15      # столько кадров подряд без номера — отпускаем «удачную» рамку
 
 
 def decode(probs):
@@ -261,17 +267,37 @@ def setup():
 
 
 # --- работа ---
-def crop_tensor(frame, zone, inset):
+def search_windows(frame_w, frame_h, zone):
+    """Список окон (x, y, w, h) в пикселях кадра; [0] — основная рамка по центру зоны."""
+    zw = zone[2] * frame_w
+    cx = (zone[0] + zone[2] / 2) * frame_w
+    cy = (zone[1] + zone[3] / 2) * frame_h
+    wins = []
+    for s in WIN_SCALES:
+        for dx in WIN_SHIFTS:
+            for ix, iy in WIN_INSETS:
+                w = zw * s
+                h = w / 3.2
+                x = cx - w / 2 + dx * zw
+                y = cy - h / 2
+                x += w * ix
+                w *= 1 - 2 * ix
+                y += h * iy
+                h *= 1 - 2 * iy
+                # окно, вылезающее за кадр, прижимаем к краю (размер не меняем)
+                x = min(max(0.0, x), max(0.0, frame_w - w))
+                y = min(max(0.0, y), max(0.0, frame_h - h))
+                wins.append((x, y, min(w, frame_w), min(h, frame_h)))
+    return wins
+
+
+def crop_tensor(frame, win):
     import cv2
     import numpy as np
     h, w = frame.shape[:2]
-    x, y, zw, zh = zone[0] * w, zone[1] * h, zone[2] * w, zone[3] * h
-    x += zw * inset[0]
-    zw *= 1 - 2 * inset[0]
-    y += zh * inset[1]
-    zh *= 1 - 2 * inset[1]
+    x, y, ww, wh = win
     x0, y0 = max(0, int(x)), max(0, int(y))
-    x1, y1 = min(w, int(x + zw)), min(h, int(y + zh))
+    x1, y1 = min(w, int(x + ww)), min(h, int(y + wh))
     if x1 - x0 < 4 or y1 - y0 < 2:
         return None
     crop = cv2.resize(frame[y0:y1, x0:x1], (128, 64), interpolation=cv2.INTER_LINEAR)
@@ -299,6 +325,7 @@ def run():
     reader.start()
     log("Жду машину… (закройте окно, чтобы остановить)")
     hits, last_hit, last_sent, last_no, tick = {}, 0.0, {}, 0, 0
+    lock_idx, lock_miss = 0, 0
     while True:
         frame, no = reader.latest()
         if frame is None or no == last_no:
@@ -306,12 +333,30 @@ def run():
             continue
         last_no = no
         tick += 1
-        tensor = crop_tensor(frame, cfg["zone"], INSETS[tick % 2])
-        if tensor is None:
+        wins = search_windows(frame.shape[1], frame.shape[0], cfg["zone"])
+        # за кадр — «удачная» рамка и следующая по очереди; берём лучшее прочтение
+        lock = lock_idx if lock_idx < len(wins) else 0
+        rot = tick % len(wins)
+        if rot == lock:
+            rot = (rot + 1) % len(wins)
+        plate, conf, best_idx = None, 0.0, lock
+        for idx in (lock, rot):
+            tensor = crop_tensor(frame, wins[idx])
+            if tensor is None:
+                continue
+            probs = sess.run([out], {inp: tensor})[0].reshape(-1).tolist()
+            p, c = decode(probs)
+            if plate is None or c > conf:
+                plate, conf, best_idx = p, c, idx
+        if plate is None:
             time.sleep(FRAME_PAUSE)
             continue
-        probs = sess.run([out], {inp: tensor})[0].reshape(-1).tolist()
-        plate, conf = decode(probs)
+        if conf >= MIN_CONF:
+            lock_idx, lock_miss = best_idx, 0
+        else:
+            lock_miss += 1
+            if lock_miss > LOCK_MISSES:
+                lock_idx, lock_miss = 0, 0
         now = time.time()
         if now - last_hit > HIT_WINDOW:
             hits = {}

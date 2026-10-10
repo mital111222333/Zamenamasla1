@@ -16305,7 +16305,9 @@ SCANNER_PAGE = """
   #live.none { color:#9AA3B2; }
   button, select { height:40px; padding:0 14px; border-radius:10px; border:1px solid #444; background:#1E1E22; color:#F5F5F2; font-size:14px; font-family:inherit; max-width:100%; }
   button.on { background:#00A8E8; border-color:#00A8E8; color:#001018; }
-  canvas { display:none; }
+  #c { display:none; }
+  #peekBox { flex:none; text-align:center; font-size:11px; color:#9AA3B2; }
+  #peek { display:block; width:128px; height:64px; border:1px solid #444; border-radius:4px; background:#000; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -16314,6 +16316,7 @@ SCANNER_PAGE = """
   <div id="zone"></div>
   <div id="hint">{{ T.scn_zone_hint }}</div>
   <div id="bar">
+    <div id="peekBox">{{ T.scn_peek }}<canvas id="peek" width="128" height="64"></canvas></div>
     <div id="info"><div id="status">{{ T.scn_loading }}</div><div id="live"></div></div>
     <select id="cam" hidden aria-label="{{ T.scn_camera }}"></select>
     <button type="button" id="zoneBtn">{{ T.scn_zone_btn }}</button>
@@ -16339,7 +16342,7 @@ const RESEND_MS = 90000;   // тот же номер повторно на та�
 const FRAME_MS = 100;      // пауза между кадрами: ~6–10 кадров в секунду, телефон не перегревается
 
 const S = { session: null, stream: null, zone: null, editing: false, hits: {}, lastHitAt: 0,
-            lastSent: {}, tickN: 0, wake: null };
+            lastSent: {}, tickN: 0, wake: null, lockIdx: 0, lockMiss: 0 };
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -16471,16 +16474,39 @@ async function loadModel() {
   try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('uint8', new Uint8Array(64 * 128 * 3), [1, 64, 128, 3]) }); } catch (e) {}
   return sess;
 }
-function cropTensor(inset) {
+// Окна поиска номера вокруг зоны. Геометрия — как у рамки сканера в панели
+// (там номер читается за доли секунды): ширина рамки = ширина номера,
+// высота = ширина / 3.2, то есть с запасом сверху и снизу. Зона задаёт только
+// где номер и какой он ширины. Машина не всегда встаёт точно — поэтому, кроме
+// основной рамки, по очереди пробуем рамки крупнее/мельче и со сдвигом.
+const WIN_SCALES = [1, 1.3, 0.8];
+const WIN_SHIFTS = [0, -0.25, 0.25];
+const WIN_INSETS = [[0, 0], [0.06, 0.14]];
+const LOCK_MISSES = 15;  // столько кадров подряд без номера — отпускаем «удачную» рамку
+function searchWindows() {
   const v = document.getElementById('v');
   const vw = v.videoWidth, vh = v.videoHeight;
-  if (!vw || !vh) return null;
+  if (!vw || !vh) return [];
   const z = S.zone;
-  let x = z.x * vw, y = z.y * vh, w = z.w * vw, h = z.h * vh;
-  x += w * inset[0]; w *= 1 - 2 * inset[0];
-  y += h * inset[1]; h *= 1 - 2 * inset[1];
+  const zw = z.w * vw, cx = (z.x + z.w / 2) * vw, cy = (z.y + z.h / 2) * vh;
+  const list = [];
+  for (const s of WIN_SCALES) for (const dx of WIN_SHIFTS) for (const ins of WIN_INSETS) {
+    let w = zw * s, h = w / 3.2;
+    let x = cx - w / 2 + dx * zw, y = cy - h / 2;
+    x += w * ins[0]; w *= 1 - 2 * ins[0];
+    y += h * ins[1]; h *= 1 - 2 * ins[1];
+    // окно, вылезающее за кадр, прижимаем к краю (размер не меняем)
+    x = Math.min(Math.max(0, x), Math.max(0, vw - w));
+    y = Math.min(Math.max(0, y), Math.max(0, vh - h));
+    list.push({ x: x, y: y, w: Math.min(w, vw), h: Math.min(h, vh) });
+  }
+  return list;  // [0] — основная рамка по центру зоны
+}
+function cropTensor(win) {
+  const v = document.getElementById('v');
+  if (!win || !v.videoWidth) return null;
   const ctx = document.getElementById('c').getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(v, x, y, w, h, 0, 0, 128, 64);
+  ctx.drawImage(v, win.x, win.y, win.w, win.h, 0, 0, 128, 64);
   const px = ctx.getImageData(0, 0, 128, 64).data;
   const rgb = new Uint8Array(128 * 64 * 3);
   for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { rgb[j] = px[i]; rgb[j + 1] = px[i + 1]; rgb[j + 2] = px[i + 2]; }
@@ -16528,13 +16554,36 @@ function freeRead(probs, lp) {
   }
   return { score: score, plate: plate };
 }
-async function recognize() {
-  S.tickN++;
-  // по очереди: вся зона / чуть плотнее — номер не всегда ровно на всю зону
-  const t = cropTensor(S.tickN % 2 ? [0, 0] : [0.06, 0.14]);
+async function readWindow(win) {
+  const t = cropTensor(win);
   if (!t) return null;
   const out = await S.session.run({ [S.session.inputNames[0]]: t });
   return decode(out[S.session.outputNames[0]].data);
+}
+// за кадр — две рамки: «удачная» (где номер читался в прошлый раз) и
+// следующая по очереди; берём более уверенное прочтение
+async function recognize() {
+  const wins = searchWindows();
+  if (!wins.length) return null;
+  S.tickN++;
+  const lock = S.lockIdx < wins.length ? S.lockIdx : 0;
+  let rot = S.tickN % wins.length;
+  if (rot === lock) rot = (rot + 1) % wins.length;
+  let best = null, bestIdx = lock;
+  for (const idx of [lock, rot]) {
+    const r = await readWindow(wins[idx]);
+    if (r && (!best || r.conf > best.conf)) { best = r; bestIdx = idx; }
+  }
+  if (best && best.conf >= MIN_CONF) { S.lockIdx = bestIdx; S.lockMiss = 0; }
+  else if (++S.lockMiss > LOCK_MISSES) { S.lockIdx = 0; S.lockMiss = 0; }
+  peek(wins[bestIdx]);
+  return best;
+}
+// маленькое окошко «что видит модель» — сразу видно, попал ли номер в рамку
+function peek(win) {
+  const v = document.getElementById('v');
+  const ctx = document.getElementById('peek').getContext('2d');
+  try { ctx.drawImage(v, win.x, win.y, win.w, win.h, 0, 0, 128, 64); } catch (e) {}
 }
 async function send(plate) {
   const now = Date.now();
