@@ -783,6 +783,62 @@ def normalize_plate(plate: str) -> str:
     return plate.strip().upper().replace(" ", "")
 
 
+_ITEM_STR_LIMITS = {"key": 40, "name": 120, "brand": 80, "unit": 20}
+_ITEM_NUM_LIMITS = {"qty": 100000, "unit_price": 10 ** 10, "total": 10 ** 12}
+
+
+def sanitize_items(items):
+    """Позиции замены приходят из браузера — до сохранения приводим их к
+    ожидаемому виду: числа — числами, строки — строками разумной длины,
+    лишние поля (в т.ч. cost_price — его ставит только сервер) отбрасываем.
+    Раньше в qty/total можно было записать HTML, и он выполнялся в браузере
+    другой точки, открывшей ту же машину («история по сети»).
+    Бросает ValueError, если позиция явно испорчена."""
+    if not items:
+        return []
+    if not isinstance(items, list) or len(items) > 50:
+        raise ValueError("неверный список позиций")
+    out = []
+    for it in items:
+        if not isinstance(it, dict):
+            raise ValueError("неверная позиция")
+        clean = {}
+        for k, limit in _ITEM_STR_LIMITS.items():
+            v = it.get(k)
+            if v is None or v == "":
+                continue
+            if isinstance(v, bool) or not isinstance(v, (str, int, float)):
+                raise ValueError("неверная позиция")
+            v = " ".join(str(v).split())[:limit]
+            if v:
+                clean[k] = v
+        if not clean.get("name"):
+            raise ValueError("у позиции нет названия")
+        for k, limit in _ITEM_NUM_LIMITS.items():
+            v = it.get(k)
+            if v is None or v == "":
+                continue
+            if isinstance(v, bool):
+                raise ValueError("неверное число в позиции")
+            try:
+                num = float(v)
+            except (TypeError, ValueError):
+                raise ValueError("неверное число в позиции")
+            if not math.isfinite(num) or num < 0 or num > limit:
+                raise ValueError("неверное число в позиции")
+            clean[k] = int(num) if num.is_integer() else round(num, 3)
+        pid = it.get("product_id")
+        if pid not in (None, ""):
+            if isinstance(pid, bool):
+                raise ValueError("неверный товар в позиции")
+            try:
+                clean["product_id"] = int(pid)
+            except (TypeError, ValueError):
+                raise ValueError("неверный товар в позиции")
+        out.append(clean)
+    return out
+
+
 def generate_token() -> str:
     return secrets.token_urlsafe(6)
 
@@ -1583,6 +1639,9 @@ def get_cross_network_history(plate: str, exclude_shop_id: int):
     out = []
     for r in rows:
         d = dict(r)
+        # заметки — внутреннее дело точки (там бывают телефоны, имена, долги),
+        # другим точкам их не отдаём; на экране они и раньше не показывались
+        d.pop("notes", None)
         # в items_json чужой точки лежат её цены продажи и закупки — наружу
         # отдаём только ЧТО делали (позиция, марка, количество), без денег
         if d.get("items_json"):
@@ -1674,6 +1733,7 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
 
     items_json = None
     stock_moves = []  # (product_id, qty) — списываются ниже в ОДНОЙ транзакции с самой записью
+    items = sanitize_items(items)
     if items:
         with get_conn() as _conn:
             car_row = _conn.execute("SELECT shop_id FROM cars WHERE id=?", (car_id,)).fetchone()
@@ -1751,6 +1811,7 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
     existing = get_oil_change_for_shop(oc_id, shop_id)
     if not existing:
         return False
+    items = sanitize_items(items)
 
     fields = {}
     if change_date is not None:
