@@ -2130,6 +2130,9 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   }
   .known-client .kc-name { font-size:18px; font-weight:700; color:var(--text); line-height:1.25; }
   .known-client .kc-meta { font-size:13px; color:var(--hint); margin-top:3px; }
+  .known-client .kc-call { display:inline-flex; align-items:center; gap:6px; color:var(--blue); font-weight:600; text-decoration:none; background:#EFF6FF; border:1px solid #DBEAFE; border-radius:999px; padding:3px 10px; margin:2px 0; }
+  .known-client .kc-call i { font-size:11px; }
+  .known-client .kc-call:active { background:#DBEAFE; }
   .known-client .kc-history-label { font-size:11px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px; }
   .known-client .kc-last-visit {
     background:var(--field-bg); border-radius:12px; padding:11px 13px; margin-bottom:14px;
@@ -8327,7 +8330,7 @@ async function lookupPlate(force) {
               <div class="kc-avatar">${escapeHtml(initials)}</div>
               <div>
                 <div class="kc-name">${escapeHtml(name)}</div>
-                <div class="kc-meta">${escapeHtml(metaParts.join(' · '))}</div>
+                <div class="kc-meta">${kcMetaHtml(data.car.owner_phone, carLine)}</div>
               </div>
             </div>
             <button type="button" class="kc-new-owner" onclick="startNewOwner()"><i class="fa-solid fa-user-pen"></i>${T.kc_new_owner_btn}</button>
@@ -9238,7 +9241,7 @@ async function toggleHistory(plate) {
           <div class="kc-avatar">${escapeHtml(initials)}</div>
           <div>
             <div class="kc-name">${escapeHtml(name)}</div>
-            <div class="kc-meta">${escapeHtml(metaParts.join(' · '))}</div>
+            <div class="kc-meta">${kcMetaHtml(car.owner_phone, carLine)}</div>
           </div>
         </div>
         <button type="button" class="kc-action-btn" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
@@ -9285,6 +9288,20 @@ async function toggleHistory(plate) {
       </div>
     </div>
   `;
+}
+
+// Телефон клиента — ссылка «позвонить» (tel:), рядом марка/модель
+function kcMetaHtml(phone, carLine) {
+  const parts = [];
+  const ph = (phone || '').trim();
+  if (ph) {
+    const digits = ph.replace(/[^0-9+]/g, '');
+    parts.push(digits.length >= 7
+      ? `<a class="kc-call" href="tel:${escapeHtml(digits)}" onclick="event.stopPropagation()"><i class="fa-solid fa-phone"></i> ${escapeHtml(ph)}</a>`
+      : escapeHtml(ph));
+  }
+  if (carLine) parts.push(escapeHtml(carLine));
+  return parts.join(' · ');
 }
 
 function escapeHtml(str) {
