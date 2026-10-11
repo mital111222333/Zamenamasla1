@@ -2429,6 +2429,17 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .whc-info { font-size:12px; color:#64748B; }
   .whc-info .warn { color:#B91C1C; font-weight:700; }
   .whc-info .amber { color:#B45309; font-weight:700; }
+  .whc-store { font-size:12px; color:#0F52BA; margin-top:4px; }
+  .whc-store i { font-size:11px; margin-right:2px; }
+  .whc-store a { color:#0F52BA; font-weight:700; text-decoration:none; }
+  .sm-rows { max-height:52vh; overflow-y:auto; margin-bottom:12px; }
+  .sm-row { display:flex; align-items:center; gap:10px; padding:9px 6px; border-bottom:1px solid #EEF2F7; border-radius:8px; }
+  .sm-row.on { background:#EFF6FF; }
+  .sm-row input[type=checkbox] { width:20px; height:20px; flex:none; accent-color:#0F52BA; }
+  .sm-name { flex:1; min-width:0; display:flex; flex-direction:column; cursor:pointer; text-transform:none; letter-spacing:0; }
+  .sm-name b { font-size:14px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sm-name span { font-size:12px; color:#64748B; }
+  .sm-qty { width:76px !important; flex:none; text-align:center; padding:8px 6px !important; }
   .whc-bottom { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
   .whc-price { font-size:12px; color:#475569; }
   .whc-price .mg { color:#15803D; font-weight:700; }
@@ -2758,7 +2769,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span></div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-stats" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
-    {% if warehouse_enabled and not is_employee %}<div class="side-item" id="tab-warehouse" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>{% endif %}
+    {% if warehouse_enabled and (not is_employee or store_enabled) %}<div class="side-item" id="tab-warehouse" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid {{ 'fa-store' if is_employee else 'fa-boxes-stacked' }}"></i><span>{{ T.st_tab if is_employee else T.tab_warehouse }}</span></div>{% endif %}
     {% if warehouse_enabled and not is_employee and not is_branch %}<div class="side-item" id="tab-suppliers" data-tab="suppliers" onclick="showTab('suppliers')"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     {% if not is_employee %}<div class="side-item" id="tab-expenses" data-tab="expenses" onclick="showTab('expenses')"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
@@ -2805,7 +2816,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
       <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
-      {% if warehouse_enabled and not is_employee %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>{% endif %}
+      {% if warehouse_enabled and (not is_employee or store_enabled) %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><i class="fa-solid {{ 'fa-store' if is_employee else 'fa-boxes-stacked' }}"></i><span>{{ T.st_tab if is_employee else T.tab_warehouse }}</span></div>{% endif %}
       <div class="more-item" data-tab="debts" data-more-slot="debts" onclick="showTab('debts'); closeMore();"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
       {% if not is_employee %}<div class="more-item" data-tab="expenses" data-more-slot="expenses" onclick="showTab('expenses'); closeMore();"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
       <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
@@ -3296,14 +3307,35 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   </div>
   {% endif %}
 
-  {% if warehouse_enabled and not is_employee %}
+  {% if warehouse_enabled and (not is_employee or store_enabled) %}
   <div id="view-warehouse" style="display:none;">
+
+    {% if not is_employee %}
     <div class="subtabs">
-      <div class="subtab active" id="subwh-own" onclick="showWhSubTab('own')">{{ T.wh_sub_own }}</div>
+      <div class="subtab active" id="subwh-own" onclick="showWhSubTab('own')">{{ T.st_sub_main if store_enabled else T.wh_sub_own }}</div>
+      {% if store_enabled %}<div class="subtab" id="subwh-store" onclick="showWhSubTab('store')"><i class="fa-solid fa-store"></i> {{ T.st_tab }}<b class="nav-badge" id="stTabBadge"></b></div>{% endif %}
       <div class="subtab" id="subwh-branches" onclick="showWhSubTab('branches')" style="display:none;">{{ T.wh_sub_branches }}</div>
       <div class="subtab" id="subwh-network" onclick="showWhSubTab('network')" style="display:none;">{{ T.wh_sub_network }}</div>
     </div>
-
+    {% endif %}
+    {% if store_enabled %}
+    <div id="whStoreView" style="display:{{ 'block' if is_employee else 'none' }};">
+      <div class="card">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;"><i class="fa-solid fa-store" style="color:#0F52BA;"></i> {{ T.st_title }}</label>
+        <div class="hint-text" style="margin-bottom:10px;">{{ T.st_hint_employee if is_employee else T.st_hint }}</div>
+        <div class="wh-kpis" id="stKpis">{{ T.stats_loading }}</div>
+        <div id="stAttention"></div>
+        {% if not is_employee %}<button class="wh-tbtn wh-tbtn-primary wh-tbtn-wide" style="margin-top:10px;" onclick="openStoreMove()"><i class="fa-solid fa-dolly"></i> <span id="stMoveBtnText">{{ T.st_move_btn }}</span></button>{% endif %}
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="wh-toolbar">
+          <div class="wh-search"><i class="fa-solid fa-magnifying-glass"></i><input id="stSearch" placeholder="{{ T.whs_search }}" oninput="renderStoreCards()" autocomplete="off"></div>
+        </div>
+        <div id="stCards"></div>
+      </div>
+    </div>
+    {% endif %}
+    {% if not is_employee %}
     <div id="whOwnView">
       <div class="card" id="whSummaryCard">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.whs_title }}</label>
@@ -3382,8 +3414,32 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       </div>
 
     </div>
+    {% endif %}
 
   </div>
+
+  {% if store_enabled and not is_employee %}
+  <div class="modal-overlay" id="storeMoveModal">
+    <div class="modal modal-wide" style="text-align:left;">
+      <h3 style="text-align:center; margin-top:0;"><i class="fa-solid fa-dolly" style="color:#0F52BA;"></i> {{ T.st_move_title }}</h3>
+      <div class="hint-text" style="text-align:center; margin:-6px 0 10px;">{{ T.st_move_hint }}</div>
+      <div class="wh-search" style="margin-bottom:8px;"><i class="fa-solid fa-magnifying-glass"></i><input id="smSearch" placeholder="{{ T.whs_search }}" oninput="renderStoreMoveRows()" autocomplete="off"></div>
+      <div id="smRows" class="sm-rows"></div>
+      <button class="submit" onclick="submitStoreMove()"><i class="fa-solid fa-dolly"></i> <span id="smSubmitText">{{ T.st_move_submit }}</span></button>
+      <button class="close-btn" onclick="closeWhModal('storeMoveModal')">{{ T.modal_close }}</button>
+    </div>
+  </div>
+  <div class="modal-overlay" id="storeQtyModal">
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center; margin-top:0;" id="sqTitle"></h3>
+      <div class="hint-text" id="sqHint" style="text-align:center; margin:-6px 0 12px;"></div>
+      <div class="field"><label id="sqLabel"></label><input id="sqQty" type="number" min="0" step="0.5" inputmode="decimal"></div>
+      <div class="field" id="sqReasonWrap"><label>{{ T.whe_reason_label }}</label><input id="sqReason" placeholder="{{ T.whe_reason_ph }}"></div>
+      <button class="submit" onclick="submitStoreQty()">{{ T.whe_save }}</button>
+      <button class="close-btn" onclick="closeWhModal('storeQtyModal')">{{ T.modal_close }}</button>
+    </div>
+  </div>
+  {% endif %}
 
   {% if warehouse_enabled and not is_employee and not is_branch %}
   <div id="view-suppliers" style="display:none;">
@@ -3645,7 +3701,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
           <div class="hint-text" id="ep_price_hint" style="margin:-4px 0 10px;">{{ T.whe_price_hint }}</div>
           <div class="row2">
             <div class="field">
-              <label>{{ T.whe_stock_label }} (<span id="ep_unit"></span>)</label>
+              <label><span id="ep_stock_lbl">{{ T.whe_stock_label }}</span> (<span id="ep_unit"></span>)</label>
               <input id="ep_stock" type="number" min="0" step="0.5" oninput="onEditStockChanged()">
             </div>
             <div class="field" id="ep_reason_wrap" style="display:none;">
@@ -3859,6 +3915,7 @@ MODAL_AND_SCRIPT = """
 const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
+const STORE_ENABLED = {{ store_enabled|tojson }};  // «Склад магазина»: основной склад + магазин
 const IS_BRANCH = {{ is_branch|tojson }};
 const IS_EMPLOYEE = {{ is_employee|tojson }};
 const CAR_MODELS = {{ car_models|tojson }};
@@ -4365,6 +4422,7 @@ const WHCTX = {
 };
 
 async function loadWarehouse() {
+  if (IS_EMPLOYEE) { if (STORE_ENABLED) loadStore(); return; }
   renderWarehouseCategoryOptions();
   let data = null;
   try { data = await (await fetch('/api/warehouse/overview')).json(); } catch (e) {}
@@ -4380,6 +4438,7 @@ async function loadWarehouse() {
   renderWarehouseSummary('own');
   renderWhCategoryChips('own');
   renderProductCards('own');
+  if (STORE_ENABLED) renderStore();
   loadRestockHistory();
   // склад мог поменяться — обновляем списки «марка» в формах замены
   renderItemLists();
@@ -4411,6 +4470,224 @@ async function loadWarehouse() {
 }
 
 function whUnit(u) { return u === 'pc' ? T.unit_pc : T.unit_l; }
+
+// ---- «Склад магазина» ----
+// Продаём из магазина: в формах замены показываем остаток магазина. Хозяину
+// дополнительно — сколько на основном складе (оттуда добирается нехватка).
+function sellQty(p) { return STORE_ENABLED && !IS_EMPLOYEE ? (p.shop_qty || 0) : (p.stock_qty || 0); }
+function mainQtyOf(p) {
+  if (!STORE_ENABLED || IS_EMPLOYEE) return 0;
+  return p.main_qty !== undefined ? (p.main_qty || 0) : Math.max(0, (p.stock_qty || 0) - (p.shop_qty || 0));
+}
+function mainTail(p, unitLabel) {
+  const m = mainQtyOf(p);
+  return STORE_ENABLED && !IS_EMPLOYEE && m > 0 ? ` · ${T.st_main_short} ${whQty(m)}` : '';
+}
+
+const ST = { products: [], summary: null, sel: {}, qty: null };
+
+async function loadStore() {
+  // сотрудник: свой запрос (только магазин); хозяин берёт данные основного склада
+  let d = null;
+  try { d = await (await fetch('/api/store/overview')).json(); } catch (e) {}
+  if (d && d.ok) {
+    ST.products = d.products;
+    ST.summary = d.summary;
+    if (!IS_EMPLOYEE) { WHCTX.own.products = d.products; productsCache = d.products; }
+  }
+  renderStore();
+  renderItemLists();
+  renderSvcItemLists();
+}
+
+function renderStore() {
+  if (!IS_EMPLOYEE) { ST.products = WHCTX.own.products || []; ST.summary = WHCTX.own.summary; }
+  const k = document.getElementById('stKpis');
+  if (!k) return;
+  const list = ST.products || [];
+  const s = ST.summary || {};
+  const inStore = list.filter(p => (p.shop_qty || 0) > 0).length;
+  const suggest = list.filter(p => p.store_status !== 'ok' && (p.store_suggest || 0) > 0);
+  const boxes = [
+    `<div class="wh-kpi"><b>${inStore}</b><span>${T.st_kpi_items}</span></div>`,
+    `<div class="wh-kpi ${s.store_low_count ? 'bad' : ''}"><b>${s.store_low_count || 0}</b><span>${T.st_kpi_low}</span></div>`,
+    `<div class="wh-kpi ${s.store_out_count ? 'muted' : ''}"><b>${s.store_out_count || 0}</b><span>${T.st_kpi_out}</span></div>`,
+  ];
+  if (!IS_EMPLOYEE) boxes.push(`<div class="wh-kpi ${suggest.length ? 'bad' : 'good'}"><b>${suggest.length}</b><span>${T.st_kpi_suggest}</span></div>`);
+  k.innerHTML = boxes.join('');
+  const badge = document.getElementById('stTabBadge');
+  if (badge) { badge.textContent = suggest.length || ''; badge.style.display = suggest.length ? '' : 'none'; }
+
+  const att = document.getElementById('stAttention');
+  const urgent = list.filter(p => p.store_status !== 'ok' && (IS_EMPLOYEE ? (p.per_day > 0 || (p.shop_qty || 0) > 0) : (p.main_qty || 0) > 0))
+    .sort((a, b) => (a.store_days_left ?? 99) - (b.store_days_left ?? 99) || (a.shop_qty || 0) - (b.shop_qty || 0))
+    .slice(0, 6);
+  if (urgent.length) {
+    att.innerHTML = `<div class="wh-att-title">${IS_EMPLOYEE ? T.st_att_title_emp : T.st_att_title}</div>` + urgent.map(p => `
+      <div class="wh-att">
+        <i class="fa-solid fa-triangle-exclamation" style="color:${(p.shop_qty || 0) <= 0 ? '#DC2626' : '#D97706'};"></i>
+        <div class="wa-main"><b>${escapeHtml(p.name)}</b><span>${T.st_in_store} ${whQty(p.shop_qty)} ${whUnit(p.unit)}${IS_EMPLOYEE ? '' : ` · ${T.st_on_main} ${whQty(p.main_qty)} ${whUnit(p.unit)}`}</span></div>
+        ${IS_EMPLOYEE ? '' : `<button class="wh-tbtn wh-tbtn-sm" onclick="openStoreMove(${p.id})">+${whQty(p.store_suggest || 0)} ${whUnit(p.unit)}</button>`}
+      </div>`).join('');
+  } else {
+    att.innerHTML = list.length ? `<div class="wh-att-title" style="color:#15803D;"><i class="fa-solid fa-circle-check"></i> ${T.st_att_ok}</div>` : '';
+  }
+  const btnText = document.getElementById('stMoveBtnText');
+  if (btnText) btnText.textContent = T.st_move_btn + (suggest.length ? ` (${suggest.length})` : '');
+  renderStoreCards();
+}
+
+function storeInfoText(p) {
+  const u = whUnit(p.unit);
+  if ((p.shop_qty || 0) <= 0) return `<span class="warn">${T.st_kpi_out}</span>${p.per_day ? ` · ~${whQty(p.per_day)} ${u}${T.whs_per_day}` : ''}`;
+  if (p.per_day) {
+    const cls = p.store_status === 'low' ? 'warn' : '';
+    return `~${whQty(p.per_day)} ${u}${T.whs_per_day} · <span class="${cls}">${T.whs_enough_for} ${p.store_days_left} ${T.whs_days}</span>`;
+  }
+  return p.store_status === 'low' ? `<span class="amber">${T.whs_low_left}</span>` : T.whs_no_sales_yet;
+}
+
+function renderStoreCards() {
+  const box = document.getElementById('stCards');
+  if (!box) return;
+  const q = ((document.getElementById('stSearch') || {}).value || '').trim().toLowerCase();
+  const rank = { out: 0, low: 1, ok: 2 };
+  const all = ST.products || [];
+  if (!all.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.st_no_items}</div>`; return; }
+  const list = all.filter(p => !q || p.name.toLowerCase().includes(q))
+    // сверху — то, что есть в магазине и заканчивается; товары, которых нет нигде, — в конце
+    .sort((a, b) => ((a.shop_qty || 0) <= 0 && !(a.main_qty > 0)) - ((b.shop_qty || 0) <= 0 && !(b.main_qty > 0))
+      || (rank[a.store_status] ?? 2) - (rank[b.store_status] ?? 2) || a.name.localeCompare(b.name));
+  if (!list.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.whs_nothing_found}</div>`; return; }
+  box.innerHTML = list.map(p => {
+    const st = p.store_status || 'ok';
+    const width = p.store_days_left !== null && p.store_days_left !== undefined
+      ? Math.min(100, Math.max(3, p.store_days_left / 14 * 100))
+      : ((p.shop_qty || 0) > 0 ? 60 : 3);
+    const color = st === 'out' ? '#DC2626' : st === 'low' ? '#F59E0B' : '#22C55E';
+    const actions = IS_EMPLOYEE ? '' : [
+      (p.main_qty || 0) > 0 ? `<button class="wh-tbtn wh-tbtn-sm" onclick="openStoreMove(${p.id})"><i class="fa-solid fa-dolly"></i> ${T.st_move_one}</button>` : '',
+      (p.shop_qty || 0) > 0 ? `<button class="wh-tbtn wh-tbtn-icon" title="${T.st_back}" onclick="openStoreQty('back', ${p.id})"><i class="fa-solid fa-rotate-left"></i></button>` : '',
+      `<button class="wh-tbtn wh-tbtn-icon" title="${T.st_count}" onclick="openStoreQty('count', ${p.id})"><i class="fa-solid fa-pen"></i></button>`,
+    ].join('');
+    const sub = IS_EMPLOYEE ? '' : `<div class="whc-store"><i class="fa-solid fa-warehouse"></i> ${T.st_on_main} <b>${whQty(p.main_qty)} ${whUnit(p.unit)}</b></div>`;
+    return `
+      <div class="whc st-${st}">
+        <div class="whc-top">
+          <div class="whc-name"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.category === 'other' ? T.wh_category_other : (T[p.category] || p.category))}</span></div>
+          <div class="whc-qty">${whQty(p.shop_qty)} ${whUnit(p.unit)}</div>
+        </div>
+        <div class="whc-bar"><i style="width:${width}%; background:${color};"></i></div>
+        <div class="whc-info">${storeInfoText(p)}</div>
+        ${sub}
+        <div class="whc-bottom">
+          <span class="whc-price">${p.sell_price ? `${fmtNum(p.sell_price)} ${T.currency}` : '—'}</span>
+          <div class="whc-actions">${actions}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ---- перенос основной склад → магазин ----
+function openStoreMove(onlyId) {
+  const list = (WHCTX.own.products || []).filter(p => (p.main_qty || 0) > 0);
+  if (!list.length) { showMsg(T.st_nothing_main, false); return; }
+  ST.sel = {};
+  list.forEach(p => {
+    const want = onlyId ? p.id === onlyId : (p.store_status !== 'ok' && (p.store_suggest || 0) > 0);
+    const qty = p.store_suggest > 0 ? p.store_suggest : '';
+    ST.sel[p.id] = { on: !!want, qty: want ? (qty || '') : qty };
+  });
+  const sr = document.getElementById('smSearch');
+  if (sr) sr.value = '';
+  renderStoreMoveRows();
+  document.getElementById('storeMoveModal').classList.add('open');
+  if (onlyId) setTimeout(() => { const el = document.getElementById('sm_q_' + onlyId); if (el) { el.focus(); el.select(); } }, 150);
+}
+
+function renderStoreMoveRows() {
+  const box = document.getElementById('smRows');
+  const q = ((document.getElementById('smSearch') || {}).value || '').trim().toLowerCase();
+  const list = (WHCTX.own.products || []).filter(p => (p.main_qty || 0) > 0)
+    .filter(p => !q || p.name.toLowerCase().includes(q) || (ST.sel[p.id] || {}).on)
+    .sort((a, b) => ((ST.sel[b.id] || {}).on ? 1 : 0) - ((ST.sel[a.id] || {}).on ? 1 : 0) || a.name.localeCompare(b.name));
+  box.innerHTML = list.map(p => {
+    const s = ST.sel[p.id] || { on: false, qty: '' };
+    return `
+    <div class="sm-row ${s.on ? 'on' : ''}">
+      <input type="checkbox" id="sm_on_${p.id}" ${s.on ? 'checked' : ''} onchange="onStoreMoveEdit(${p.id})">
+      <div class="sm-name" onclick="const c=document.getElementById('sm_on_${p.id}'); c.checked=!c.checked; onStoreMoveEdit(${p.id})"><b>${escapeHtml(p.name)}</b><span>${T.st_in_store} ${whQty(p.shop_qty)} · ${T.st_main_short} ${whQty(p.main_qty)} ${whUnit(p.unit)}</span></div>
+      <input class="sm-qty" id="sm_q_${p.id}" type="number" min="0" step="${p.unit === 'pc' ? 1 : 0.5}" inputmode="decimal" value="${s.qty}" placeholder="0" oninput="onStoreMoveEdit(${p.id}, true)">
+    </div>`;
+  }).join('') || `<div class="hint-text" style="padding:10px 0;">${T.whs_nothing_found}</div>`;
+  updateStoreMoveCount();
+}
+
+function onStoreMoveEdit(id, fromQty) {
+  const cb = document.getElementById('sm_on_' + id);
+  const qi = document.getElementById('sm_q_' + id);
+  const s = ST.sel[id] || (ST.sel[id] = { on: false, qty: '' });
+  s.qty = qi.value;
+  if (fromQty) { s.on = parseFloat(qi.value) > 0; cb.checked = s.on; }
+  else { s.on = cb.checked; if (s.on && !(parseFloat(qi.value) > 0)) qi.focus(); }
+  cb.closest('.sm-row').classList.toggle('on', s.on);
+  updateStoreMoveCount();
+}
+
+function updateStoreMoveCount() {
+  const n = Object.values(ST.sel).filter(s => s.on && parseFloat(s.qty) > 0).length;
+  const t = document.getElementById('smSubmitText');
+  if (t) t.textContent = T.st_move_submit + (n ? ` (${n})` : '');
+}
+
+async function submitStoreMove() {
+  const lines = Object.entries(ST.sel).filter(([, s]) => s.on && parseFloat(s.qty) > 0)
+    .map(([id, s]) => ({ product_id: Number(id), qty: parseFloat(s.qty) }));
+  if (!lines.length) { showMsg(T.st_err_empty, false); return; }
+  const res = await fetch('/api/store/move', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ lines }) });
+  const data = await res.json().catch(() => ({}));
+  if (data.ok) {
+    closeWhModal('storeMoveModal');
+    showMsg(T.st_moved, true);
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + (data.error || ''), false);
+  }
+}
+
+// ---- вернуть на основной склад / пересчёт магазина ----
+function openStoreQty(mode, id) {
+  const p = (ST.products || []).find(x => x.id === id);
+  if (!p) return;
+  ST.qty = { mode, p };
+  document.getElementById('sqTitle').textContent = mode === 'back' ? T.st_back : T.st_count;
+  document.getElementById('sqHint').innerHTML = `<b>${escapeHtml(p.name)}</b> · ${T.st_now_store} ${whQty(p.shop_qty)} ${whUnit(p.unit)}` + (mode === 'count' ? `<br>${T.st_count_hint}` : '');
+  document.getElementById('sqLabel').textContent = (mode === 'back' ? T.st_back_label : T.st_count_label) + ` (${whUnit(p.unit)})`;
+  const qi = document.getElementById('sqQty');
+  qi.value = mode === 'back' ? '' : Math.round((p.shop_qty || 0) * 100) / 100;
+  document.getElementById('sqReason').value = '';
+  document.getElementById('sqReasonWrap').style.display = mode === 'count' ? '' : 'none';
+  document.getElementById('storeQtyModal').classList.add('open');
+  setTimeout(() => { qi.focus(); qi.select(); }, 150);
+}
+
+async function submitStoreQty() {
+  if (!ST.qty) return;
+  const { mode, p } = ST.qty;
+  const v = parseFloat(document.getElementById('sqQty').value);
+  if (isNaN(v) || v < 0 || (mode === 'back' && v <= 0)) { showMsg(T.st_err_qty, false); return; }
+  const res = mode === 'back'
+    ? await fetch('/api/store/move', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ back: true, lines: [{ product_id: p.id, qty: v }] }) })
+    : await fetch('/api/store/count/' + p.id, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ qty: v, reason: document.getElementById('sqReason').value.trim() }) });
+  const data = await res.json().catch(() => ({}));
+  if (data.ok) {
+    closeWhModal('storeQtyModal');
+    showMsg(mode === 'back' ? T.st_backed : T.whe_saved, true);
+    loadWarehouse();
+  } else {
+    showMsg(T.msg_error + ' ' + (data.error || ''), false);
+  }
+}
 function whQty(q) { return (Math.round((q || 0) * 100) / 100).toLocaleString('ru-RU'); }
 function whEl(key, suffix) { return document.getElementById(WHCTX[key].p + suffix); }
 
@@ -4526,6 +4803,7 @@ function renderProductCards(key) {
   if (!list.length) { box.innerHTML = `<div class="hint-text" style="padding:14px 0;">${T.whs_nothing_found}</div>`; return; }
 
   const canTransfer = !IS_BRANCH && WH.hasBranches;
+  const storeOwn = STORE_ENABLED && key === 'own';
   box.innerHTML = list.map(p => {
     const st = p.status || 'ok';
     const width = (p.days_left !== null && p.days_left !== undefined)
@@ -4552,10 +4830,11 @@ function renderProductCards(key) {
       <div class="whc st-${st}">
         <div class="whc-top">
           <div class="whc-name"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.category === 'other' ? T.wh_category_other : (T[p.category] || p.category))}</span></div>
-          <div class="whc-qty">${whQty(p.stock_qty)} ${whUnit(p.unit)}</div>
+          <div class="whc-qty">${whQty(storeOwn ? p.main_qty : p.stock_qty)} ${whUnit(p.unit)}</div>
         </div>
         <div class="whc-bar"><i style="width:${width}%; background:${color};"></i></div>
         <div class="whc-info">${whStatusText(p)}</div>
+        ${storeOwn ? `<div class="whc-store"><i class="fa-solid fa-store"></i> ${T.st_in_store} <b>${whQty(p.shop_qty)} ${whUnit(p.unit)}</b>${p.store_status !== 'ok' && (p.main_qty || 0) > 0 ? ` · <a href="javascript:void(0)" onclick="openStoreMove(${p.id})">${T.st_move_one} →</a>` : ''}</div>` : ''}
         <div class="whc-bottom">
           <span class="whc-price">${price || '—'}</span>
           <div class="whc-actions">${actions}</div>
@@ -5981,16 +6260,22 @@ function openEditProductModal(key, productId) {
   document.getElementById('ep_usd_wrap').style.display = canBuy && USD_RATE ? '' : 'none';
   document.getElementById('ep_price_hint').style.display = canBuy ? '' : 'none';
   document.getElementById('ep_unit').textContent = whUnit(p.unit);
-  document.getElementById('ep_stock').value = Math.round((p.stock_qty || 0) * 100) / 100;
+  document.getElementById('ep_stock').value = Math.round(epBaseQty(editingProduct) * 100) / 100;
+  const stLbl = document.getElementById('ep_stock_lbl');
+  if (stLbl) stLbl.textContent = epStoreMode(editingProduct) ? T.st_on_main.replace(':', '') : T.whe_stock_label;
   document.getElementById('ep_reason').value = '';
   document.getElementById('ep_reason_wrap').style.display = 'none';
   document.getElementById('editProductModal').classList.add('open');
 }
 
+// «Склад магазина»: на основном складе правим основной остаток, магазин не трогаем
+function epStoreMode(ep) { return STORE_ENABLED && ep && ep.key === 'own'; }
+function epBaseQty(ep) { return epStoreMode(ep) ? (ep.p.main_qty || 0) : (ep.p.stock_qty || 0); }
+
 function onEditStockChanged() {
   if (!editingProduct) return;
   const v = parseFloat(document.getElementById('ep_stock').value);
-  const changed = !isNaN(v) && Math.abs(v - (editingProduct.p.stock_qty || 0)) > 1e-9;
+  const changed = !isNaN(v) && Math.abs(v - epBaseQty(editingProduct)) > 1e-9;
   document.getElementById('ep_reason_wrap').style.display = changed ? '' : 'none';
 }
 
@@ -6009,8 +6294,9 @@ async function submitEditProduct() {
   if (name !== p.name) payload.name = name;
   if (sell !== String(p.sell_price ?? '')) payload.sell_price = sell;
   if (canBuy && buy !== String(p.purchase_price ?? '')) payload.purchase_price = buy;
-  if (Math.abs(parseFloat(stock) - (p.stock_qty || 0)) > 1e-9) {
-    payload.stock_qty = stock;
+  if (Math.abs(parseFloat(stock) - epBaseQty(editingProduct)) > 1e-9) {
+    payload.stock_qty = epStoreMode(editingProduct)
+      ? String(Math.round((parseFloat(stock) + (p.shop_qty || 0)) * 1000) / 1000) : stock;
     payload.stock_reason = document.getElementById('ep_reason').value.trim();
   }
   if (!Object.keys(payload).length) { closeWhModal('editProductModal'); return; }
@@ -6185,13 +6471,14 @@ async function submitTransfer() {
 }
 
 function showWhSubTab(t) {
-  ['own', 'branches', 'network'].forEach(k => {
-    const view = document.getElementById({ own: 'whOwnView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
+  ['own', 'store', 'branches', 'network'].forEach(k => {
+    const view = document.getElementById({ own: 'whOwnView', store: 'whStoreView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
     if (view) view.style.display = t === k ? 'block' : 'none';
     const tab = document.getElementById('subwh-' + k);
     if (tab) tab.classList.toggle('active', t === k);
   });
   if (t === 'network') { WH.net = null; loadNetworkStock(); }
+  if (t === 'store') renderStore();
   if (t === 'branches') {
     if (!WH.branchId && WH.branches.length) selectWhBranch(WH.branches[0].id);
     else if (WH.branchId) selectWhBranch(WH.branchId);
@@ -6348,11 +6635,11 @@ async function loadRestockHistory() {
 function renderMovements(el, moves, showPrice) {
   if (!el) return;
   if (!moves || !moves.length) { el.innerHTML = `<div class="hint-text">${T.wh_no_restocks}</div>`; return; }
-  const icon = { restock: ['fa-arrow-down', '#15803D'], transfer_in: ['fa-right-to-bracket', '#0F52BA'], transfer_out: ['fa-right-from-bracket', '#B45309'], adjust: ['fa-scale-balanced', '#7C3AED'] };
+  const icon = { restock: ['fa-arrow-down', '#15803D'], transfer_in: ['fa-right-to-bracket', '#0F52BA'], transfer_out: ['fa-right-from-bracket', '#B45309'], adjust: ['fa-scale-balanced', '#7C3AED'], to_store: ['fa-store', '#0F52BA'], from_store: ['fa-rotate-left', '#64748B'] };
   el.innerHTML = moves.slice(0, 30).map(m => {
     const [ic, col] = icon[m.type] || icon.restock;
-    const sign = m.type === 'transfer_out' || (m.type === 'adjust' && m.delta < 0) ? '−' : '+';
-    const what = m.type === 'restock' ? T.whs_mv_restock + (m.order_number ? ' · ' + T.ord_title_n.replace('{n}', m.order_number) : '')
+    const sign = m.type === 'to_store' || m.type === 'from_store' ? '' : (m.type === 'transfer_out' || (m.type === 'adjust' && m.delta < 0) ? '−' : '+');
+    const what = m.type === 'to_store' ? T.st_mv_to_store : m.type === 'from_store' ? T.st_mv_from_store : m.type === 'restock' ? T.whs_mv_restock + (m.order_number ? ' · ' + T.ord_title_n.replace('{n}', m.order_number) : '')
       : m.type === 'adjust' ? `${T.whe_mv_adjust}: ${whQty(m.old_qty)} → ${whQty(m.new_qty)}${m.reason ? ' · ' + escapeHtml(m.reason) : ''}`
       : (m.type === 'transfer_in' ? `${T.whs_mv_from} ${escapeHtml(m.other_shop || '')}` : `${T.whs_mv_to} ${escapeHtml(m.other_shop || '')}`) + (m.batch ? ` · ${T.shp_batch} ${escapeHtml(m.batch)}` : '');
     return `
@@ -7323,8 +7610,8 @@ function brandFieldHtml(key, fieldId, onPickHandler) {
   const options = ['<option value="">' + T.brand_ph + '</option>'].concat(
     prods.map(p => {
       const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
-      const stockWarn = p.stock_qty < 0 ? ' ⚠️' : '';
-      return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.stock_qty} ${unitLabel}${stockWarn})</option>`;
+      const stockWarn = sellQty(p) < 0 || (STORE_ENABLED && !(sellQty(p) > 0)) ? ' ⚠️' : '';
+      return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${whQty(sellQty(p))} ${unitLabel}${stockWarn}${mainTail(p, unitLabel)})</option>`;
     })
   ).join('');
   return `<select id="${fieldId}" data-is-product="1" onchange="${onPickHandler}">${options}</select>`;
@@ -7383,8 +7670,8 @@ function renderOneOtherStockRow(prefix, id) {
   const options = ['<option value="">' + T.brand_ph + '</option>'].concat(
     prods.map(p => {
       const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
-      const stockWarn = p.stock_qty < 0 ? ' ⚠️' : '';
-      return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.stock_qty} ${unitLabel}${stockWarn})</option>`;
+      const stockWarn = sellQty(p) < 0 || (STORE_ENABLED && !(sellQty(p) > 0)) ? ' ⚠️' : '';
+      return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${whQty(sellQty(p))} ${unitLabel}${stockWarn}${mainTail(p, unitLabel)})</option>`;
     })
   ).join('');
   return `
@@ -7515,7 +7802,7 @@ function renderPickResults(ctx) {
       if (!words.every(w => hay.includes(w))) return null;
       let score = 0;
       if (n.startsWith(words[0])) score -= 2;
-      if (!(p.stock_qty > 0)) score += 5;
+      if (!(sellQty(p) > 0) && !(STORE_ENABLED && mainQtyOf(p) > 0)) score += 5;
       return { p, score };
     })
     .filter(Boolean)
@@ -7526,9 +7813,9 @@ function renderPickResults(ctx) {
   if (!found.length) { box.innerHTML = `<div class="pick-note">${T.pick_nothing}</div>`; return; }
   box.innerHTML = found.map(p => {
     const unitLabel = p.unit === 'pc' ? T.unit_pc : T.unit_l;
-    const stock = p.stock_qty > 0
-      ? `${p.stock_qty} ${unitLabel}`
-      : `<span class="pi-out">${p.stock_qty} ${unitLabel} ⚠️</span>`;
+    const stock = (sellQty(p) > 0
+      ? `${whQty(sellQty(p))} ${unitLabel}`
+      : `<span class="pi-out">${whQty(sellQty(p))} ${unitLabel} ⚠️</span>`) + mainTail(p, unitLabel);
     const price = p.sell_price ? fmtNum(p.sell_price) : '—';
     return `<div class="pick-item" role="button" tabindex="0" onclick="pickProduct('${ctx}', ${p.id})">
       <div class="pi-main"><div class="pi-name">${escapeHtml(p.name)}</div>
@@ -7901,7 +8188,7 @@ function specProducts(s) {
     const appr = [...tokens].some(tk => nm.indexOf(tk) >= 0);
     return { p, hot: !need.has(v), appr };
   }).filter(Boolean).sort((a, b) =>
-    (a.hot - b.hot) || (b.appr - a.appr) || ((b.p.stock_qty || 0) - (a.p.stock_qty || 0)));
+    (a.hot - b.hot) || (b.appr - a.appr) || ((sellQty(b.p) || 0) - (sellQty(a.p) || 0)));
 }
 function renderSpecCard() {
   const box = document.getElementById('specCard');
@@ -7914,7 +8201,7 @@ function renderSpecCard() {
   const matches = specProducts(s);
   const unit = T.unit_l;
   const stock = matches.length ? matches.slice(0, 4).map(m => `
-      <div class="sp-prod"><span>${escapeHtml(m.p.name)}${m.appr ? `<span class="sp-badge">${T.sp_appr_badge}</span>` : ''}${m.hot ? `<span class="sp-badge hot">${T.sp_hot_badge}</span>` : ''}</span><em>${m.p.stock_qty} ${unit}</em></div>`).join('')
+      <div class="sp-prod"><span>${escapeHtml(m.p.name)}${m.appr ? `<span class="sp-badge">${T.sp_appr_badge}</span>` : ''}${m.hot ? `<span class="sp-badge hot">${T.sp_hot_badge}</span>` : ''}</span><em>${whQty(sellQty(m.p))} ${unit}</em></div>`).join('')
     : `<div class="sp-note">${T.sp_stock_none}</div>`;
   const hot = (s.visc_hot || []).length ? `<span>${T.sp_hot}</span><div>${escapeHtml(s.visc_hot.join(' / '))} <i>— ${T.sp_hot_note}</i></div>` : '';
   const row = (label, val) => val ? `<span>${label}</span><div>${escapeHtml(val)}</div>` : '';
@@ -9678,7 +9965,7 @@ guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarComp
   'payDebt', 'cancelDebtPayment', 'confirmWriteoff', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
   'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveUsdRate',
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
-  'submitCatalog', 'applyImport', 'editBranchPrice',
+  'submitCatalog', 'applyImport', 'editBranchPrice', 'submitStoreMove', 'submitStoreQty',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
   'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct',
   'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete']);
@@ -10918,6 +11205,7 @@ def index():
         sms_enabled=bool(shop.get("sms_enabled")) if shop else False,
         eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
+        store_enabled=_store_on(shop),
         is_employee=g.is_employee,
         is_branch=g.is_branch,
         usd_rate=_effective_usd_rate(shop),
@@ -12106,6 +12394,11 @@ def _warehouse_required():
     return None
 
 
+def _store_on(shop) -> bool:
+    """Включён ли «Склад магазина» (нужен и сам склад)."""
+    return bool(shop and shop.get("warehouse_enabled") and shop.get("store_enabled"))
+
+
 @app.route("/api/products")
 @login_required
 def api_list_products():
@@ -12113,7 +12406,79 @@ def api_list_products():
     if g.is_employee or g.is_branch:
         for p in products:
             p.pop("purchase_price", None)
+    if g.is_employee and _store_on(db.get_shop(g.shop_id)):
+        # сотрудник работает только с магазином — основной склад ему не виден
+        for p in products:
+            p["stock_qty"] = p.get("shop_qty") or 0
     return jsonify(products)
+
+
+# ---------- «Склад магазина» ----------
+STORE_EMPLOYEE_FIELDS = ("id", "name", "category", "unit", "sell_price", "shop_qty", "per_day",
+                         "store_days_left", "store_status")
+
+
+@app.route("/api/store/overview")
+@login_required
+def api_store_overview():
+    """Склад магазина. Хозяину — всё (включая остаток основного склада и
+    подсказку, сколько перенести); сотруднику — только магазин."""
+    shop = db.get_shop(g.shop_id)
+    if not _store_on(shop):
+        return jsonify({"ok": False, "error": "Склад магазина не включён"}), 403
+    result = db.get_warehouse_overview(g.shop_id)
+    s = result["summary"]
+    summary = {"product_count": s["product_count"], "store_low_count": s["store_low_count"],
+               "store_out_count": s["store_out_count"]}
+    if g.is_employee:
+        products = [{k: p.get(k) for k in STORE_EMPLOYEE_FIELDS} for p in result["products"]]
+    else:
+        summary["store_suggest_count"] = s["store_suggest_count"]
+        products = result["products"]
+        if g.is_branch:
+            for p in products:
+                p.pop("purchase_price", None)
+                p.pop("margin_pct", None)
+    return jsonify({"ok": True, "products": products, "summary": summary})
+
+
+@app.route("/api/store/move", methods=["POST"])
+@login_required
+@employee_blocked
+def api_store_move():
+    """Перенос основной склад → магазин (back=true — обратно). Только хозяин."""
+    if not _store_on(db.get_shop(g.shop_id)):
+        return jsonify({"ok": False, "error": "Склад магазина не включён"}), 403
+    data = request.get_json(force=True) or {}
+    lines = [(l.get("product_id"), l.get("qty")) for l in (data.get("lines") or []) if isinstance(l, dict)]
+    res = db.move_to_store(g.shop_id, lines, back=bool(data.get("back")))
+    if res.get("ok"):
+        return jsonify(res)
+    err = res.get("error")
+    msg = {"empty": g.T.get("st_err_empty", "empty"), "bad_qty": g.T.get("st_err_qty", "bad qty"),
+           "not_found": g.T.get("st_err_not_found", "not found")}.get(err)
+    if err == "not_enough":
+        msg = g.T.get("st_err_not_enough", "{name}: {n}").replace("{name}", res.get("name") or "") \
+            .replace("{n}", f"{res.get('available'):g}")
+    return jsonify({"ok": False, "error": msg or err}), 400
+
+
+@app.route("/api/store/count/<int:product_id>", methods=["POST"])
+@login_required
+@employee_blocked
+def api_store_count(product_id):
+    """Пересчёт магазина по факту (найдено/пропало). Только хозяин."""
+    if not _store_on(db.get_shop(g.shop_id)):
+        return jsonify({"ok": False, "error": "Склад магазина не включён"}), 403
+    data = request.get_json(force=True) or {}
+    try:
+        qty = float(data.get("qty"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": PRODUCT_EDIT_ERRORS["bad_qty"]}), 400
+    ok, err = db.set_store_count(product_id, g.shop_id, qty, data.get("reason"))
+    if not ok:
+        return jsonify({"ok": False, "error": PRODUCT_EDIT_ERRORS.get(err, err)}), (404 if err == "not_found" else 400)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/products", methods=["POST"])
@@ -14191,6 +14556,7 @@ function renderShopsTable(shops) {
       <div class="sc-toggles">
         <span>SMS<button class="sw ${s.sms_enabled ? 'on' : ''}" title="${s.sms_enabled ? 'выключить' : 'включить'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})"></button></span>
         <span>Склад<button class="sw ${s.warehouse_enabled ? 'on' : ''}" title="${s.warehouse_enabled ? 'выключить' : 'включить'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})"></button></span>
+        <span title="Склад магазина: основной склад + магазин в одном аккаунте. Сотрудники видят только магазин.">Магазин<button class="sw ${s.store_enabled && s.warehouse_enabled ? 'on' : ''}" title="${s.store_enabled && s.warehouse_enabled ? 'выключить склад магазина' : 'включить склад магазина'}" onclick="toggleStore(${s.id}, ${s.store_enabled && s.warehouse_enabled ? 0 : 1})"></button></span>
         <span class="grp-chip">🏷<input value="${escapeHtml(s.client_group || '')}" list="clientGroupsList" placeholder="без группы" onchange="setClientGroup(${s.id}, this.value)"></span>
       </div>
 
@@ -14502,6 +14868,14 @@ async function createBranch(shopId) {
   } else {
     showMsg('Ошибка: ' + data.error, false);
   }
+}
+
+async function toggleStore(id, makeEnabled) {
+  if (!makeEnabled && !confirm('Выключить «Склад магазина»? Остатки магазина перестанут учитываться отдельно (общий остаток не изменится).')) return;
+  await fetch(`/api/admin/shops/${id}/toggle_store`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: !!makeEnabled})
+  });
+  loadShops();
 }
 
 async function toggleWarehouse(id, makeEnabled) {
@@ -15956,6 +16330,18 @@ def api_admin_toggle_sms(shop_id):
 def api_admin_toggle_warehouse(shop_id):
     data = request.get_json(force=True)
     db.set_shop_warehouse_enabled(shop_id, bool(data.get("enabled")))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/toggle_store", methods=["POST"])
+@admin_required
+def api_admin_toggle_store(shop_id):
+    """«Склад магазина»: основной склад + магазин в одном аккаунте."""
+    data = request.get_json(force=True)
+    enabled = bool(data.get("enabled"))
+    if enabled:
+        db.set_shop_warehouse_enabled(shop_id, True)  # без склада магазин не работает
+    db.set_shop_store_enabled(shop_id, enabled)
     return jsonify({"ok": True})
 
 

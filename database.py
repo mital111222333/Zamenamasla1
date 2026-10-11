@@ -342,6 +342,8 @@ def _migrate(conn):
         "owner_link_token": "TEXT",
         # скидка (%) на расходник, который табло у входа советует поменять
         "offer_pct": "INTEGER DEFAULT 0",
+        # «Склад магазина»: основной склад + витрина/магазин в одном аккаунте
+        "store_enabled": "INTEGER DEFAULT 0",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
@@ -409,6 +411,36 @@ def _migrate(conn):
     )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_adjustments_shop ON stock_adjustments(shop_id)")
+    # --- «Склад магазина»: stock_qty — ВСЕГО товара у точки (как раньше),
+    # shop_qty — сколько из этого лежит в магазине/на витрине. Основной склад
+    # = stock_qty - shop_qty. Так стоимость склада, прибыль, перемещения в
+    # филиалы и всё старое считается по-прежнему от общего остатка.
+    prod_cols = {r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()}
+    if "shop_qty" not in prod_cols:
+        conn.execute("ALTER TABLE products ADD COLUMN shop_qty REAL NOT NULL DEFAULT 0")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS store_moves (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        batch TEXT,
+        move_date TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_store_moves_shop ON store_moves(shop_id)")
+    # в магазине не может лежать больше, чем всего есть у точки — что бы ни
+    # уменьшило общий остаток (корректировка, перемещение в филиал и т.п.)
+    conn.execute("""
+    CREATE TRIGGER IF NOT EXISTS trg_products_shop_qty_clamp
+    AFTER UPDATE OF stock_qty ON products
+    WHEN NEW.shop_qty > MAX(NEW.stock_qty, 0)
+    BEGIN
+        UPDATE products SET shop_qty = MAX(NEW.stock_qty, 0) WHERE id = NEW.id;
+    END
+    """)
+
     tr_cols = [r[1] for r in conn.execute("PRAGMA table_info(stock_transfers)").fetchall()]
     if "batch" not in tr_cols:
         conn.execute("ALTER TABLE stock_transfers ADD COLUMN batch TEXT")
@@ -1190,6 +1222,86 @@ def set_shop_warehouse_enabled(shop_id: int, enabled: bool):
         conn.commit()
 
 
+@_serialized
+def set_shop_store_enabled(shop_id: int, enabled: bool):
+    """Платформенный админ включает/выключает «Склад магазина» (основной
+    склад + магазин в одном аккаунте). При выключении остатки магазина
+    просто перестают учитываться отдельно — общий остаток не меняется."""
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET store_enabled=? WHERE id=?", (1 if enabled else 0, shop_id))
+        if not enabled:
+            conn.execute("UPDATE products SET shop_qty=0 WHERE shop_id=?", (shop_id,))
+        conn.commit()
+
+
+@_serialized
+def move_to_store(shop_id: int, lines: list, back: bool = False) -> dict:
+    """Перенос товара с основного склада в магазин (или обратно при back=True).
+    lines = [(product_id, qty), ...]. Одна транзакция: всё или ничего.
+    Возвращает {"ok": True, "batch": ..., "count": n} или {"error": код, ...}."""
+    if not lines:
+        return {"error": "empty"}
+    merged = {}
+    for pid, qty in lines:
+        try:
+            pid, qty = int(pid), float(qty)
+        except (TypeError, ValueError):
+            return {"error": "bad_qty"}
+        if qty <= 0:
+            return {"error": "bad_qty"}
+        merged[pid] = merged.get(pid, 0) + qty
+    today = datetime.now().strftime("%Y-%m-%d")
+    batch = datetime.now().strftime("M%y%m%d-%H%M") + "-" + secrets.token_hex(2).upper()
+    with get_conn() as conn:
+        for pid, qty in merged.items():
+            row = conn.execute("SELECT * FROM products WHERE id=? AND shop_id=? AND is_active=1",
+                               (pid, shop_id)).fetchone()
+            if not row:
+                return {"error": "not_found", "product_id": pid}
+            total = max(row["stock_qty"] or 0, 0)
+            in_store = row["shop_qty"] or 0
+            available = in_store if back else total - in_store
+            if qty > available + 1e-9:
+                return {"error": "not_enough", "product_id": pid, "name": row["name"],
+                        "available": round(available, 3)}
+        for pid, qty in merged.items():
+            sign = -1 if back else 1
+            conn.execute("UPDATE products SET shop_qty = shop_qty + ? WHERE id=?", (sign * qty, pid))
+            conn.execute("INSERT INTO store_moves (shop_id, product_id, quantity, batch, move_date) VALUES (?,?,?,?,?)",
+                         (shop_id, pid, sign * qty, batch, today))
+        conn.commit()
+    return {"ok": True, "batch": batch, "count": len(merged)}
+
+
+@_serialized
+def set_store_count(product_id: int, shop_id: int, new_qty: float, reason: str = None):
+    """Пересчёт магазина по факту. Разница — это реально найденный/пропавший
+    товар, поэтому общий остаток меняется на ту же разницу (основной склад
+    не трогаем) и пишется корректировка в историю."""
+    existing = get_product(product_id, shop_id)
+    if not existing:
+        return False, "not_found"
+    if new_qty is None or new_qty < 0:
+        return False, "bad_qty"
+    old_shop = existing.get("shop_qty") or 0
+    diff = new_qty - old_shop
+    if abs(diff) < 1e-9:
+        return True, None
+    old_total = existing["stock_qty"] or 0
+    new_total = old_total + diff
+    if new_total < 0:
+        new_total = 0
+    note = "Магазин: " + ((reason or "").strip() or "пересчёт")
+    with get_conn() as conn:
+        conn.execute("UPDATE products SET stock_qty=?, shop_qty=? WHERE id=?", (new_total, new_qty, product_id))
+        conn.execute("""
+            INSERT INTO stock_adjustments (shop_id, product_id, old_qty, new_qty, reason, adjust_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (shop_id, product_id, old_total, new_total, note[:200], datetime.now().strftime("%Y-%m-%d")))
+        conn.commit()
+    return True, None
+
+
 # ============ СКЛАД: товары и остатки ============
 
 @_serialized
@@ -1347,6 +1459,16 @@ def get_restock_history(shop_id: int, limit: int = 50):
         return [dict(r) for r in rows]
 
 
+# Продажа (qty > 0) или возврат (qty < 0). Если у точки включён «Склад
+# магазина» — продажа сначала берёт из магазина, нехватку автоматически
+# добирает с основного склада; возврат кладётся обратно в магазин.
+_SALE_SQL = """UPDATE products SET
+    shop_qty = CASE WHEN COALESCE((SELECT s.store_enabled FROM shops s WHERE s.id = products.shop_id), 0) = 1
+                    THEN MAX(0, shop_qty - ?) ELSE shop_qty END,
+    stock_qty = stock_qty - ?
+    WHERE id=?"""
+
+
 @_serialized
 def adjust_stock(product_id: int, delta: float):
     """Внутренняя функция — сдвигает остаток товара на delta (может быть
@@ -1355,7 +1477,7 @@ def adjust_stock(product_id: int, delta: float):
     только изнутри add/update/delete_oil_change, где принадлежность уже
     проверена на уровне самой записи о замене."""
     with get_conn() as conn:
-        conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (delta, product_id))
+        conn.execute(_SALE_SQL, (delta, delta, product_id))
         conn.commit()
 
 
@@ -1876,7 +1998,7 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         # со склада, либо ничего (раньше склад списывался отдельно и при сбое
         # сохранения записи товар «пропадал»)
         for pid, qty in stock_moves:
-            conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (qty, pid))
+            conn.execute(_SALE_SQL, (qty, qty, pid))
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
@@ -2065,7 +2187,7 @@ def delete_oil_change(oc_id: int, shop_id: int):
             conn.execute("DELETE FROM installment_payments WHERE plan_id=?", (p["id"],))
             conn.execute("DELETE FROM installment_plans WHERE id=?", (p["id"],))
         for pid, qty in returns:
-            conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (qty, pid))
+            conn.execute(_SALE_SQL, (-qty, -qty, pid))
         if existing["status"] == "active":
             next_row = conn.execute(
                 "SELECT id FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC LIMIT 1",
@@ -3540,6 +3662,9 @@ WH_LOW_THRESHOLD = 50       # как в get_low_stock_products: меньше 50 
 WH_LOW_DAYS = 7             # если по скорости продаж хватит меньше чем на неделю — «заканчивается»
 WH_COVER_DAYS = 30          # список закупки: сколько нужно, чтобы хватило на месяц
 WH_DEAD_DAYS = 30           # «не продавался» — ни одной продажи за 30 дней
+STORE_LOW_DAYS = 3          # «Склад магазина»: в магазине хватит меньше чем на 3 дня — пора переносить
+STORE_COVER_DAYS = 7        # сколько предложить перенести: чтобы в магазине хватило на неделю
+STORE_LOW_THRESHOLD = 5     # если продаж ещё нет: в магазине меньше 5 л/шт — «мало»
 
 
 def get_product_sales(shop_id: int, days: int = 30) -> dict:
@@ -3579,7 +3704,8 @@ def get_warehouse_overview(shop_id: int, days: int = 30) -> dict:
     items = []
     summary = {"product_count": len(products), "stock_value": 0, "retail_value": 0,
                "potential_margin": 0, "missing_price_count": 0,
-               "low_count": 0, "out_count": 0, "dead_count": 0, "dead_value": 0, "reorder_count": 0}
+               "low_count": 0, "out_count": 0, "dead_count": 0, "dead_value": 0, "reorder_count": 0,
+               "store_low_count": 0, "store_out_count": 0, "store_suggest_count": 0}
     for p in products:
         sold = round(sales.get(p["id"], {}).get("qty", 0), 2)
         per_day = sold / days if sold else 0
@@ -3598,9 +3724,35 @@ def get_warehouse_overview(shop_id: int, days: int = 30) -> dict:
         dead = stock > 0 and not sold and (p.get("created_at") or "") < old_enough
         buy, sell = p.get("purchase_price"), p.get("sell_price")
         margin_pct = round((sell - buy) / buy * 100) if buy and sell else None
+        # «Склад магазина»: сколько в магазине, сколько на основном и что перенести
+        shop_qty = p.get("shop_qty") or 0
+        main_qty = max(stock, 0) - shop_qty
+        store_days = round(shop_qty / per_day) if per_day and shop_qty > 0 else (0 if per_day else None)
+        if shop_qty <= 0:
+            store_status = "out"
+        elif per_day and store_days is not None and store_days < STORE_LOW_DAYS:
+            store_status = "low"
+        elif not per_day and shop_qty < STORE_LOW_THRESHOLD:
+            store_status = "low"
+        else:
+            store_status = "ok"
+        want = per_day * STORE_COVER_DAYS if per_day else (STORE_LOW_THRESHOLD if store_status != "ok" else 0)
+        suggest = max(0, math.ceil(want - shop_qty)) if want else 0
+        suggest = min(suggest, main_qty) if main_qty > 0 else 0
+        if suggest and p.get("unit") != "l":
+            suggest = math.floor(suggest)
         items.append({**p, "sold_30d": sold, "per_day": round(per_day, 2), "days_left": days_left,
                       "reorder_qty": reorder, "status": status, "dead": dead,
-                      "last_sale": sales.get(p["id"], {}).get("last_sale"), "margin_pct": margin_pct})
+                      "last_sale": sales.get(p["id"], {}).get("last_sale"), "margin_pct": margin_pct,
+                      "shop_qty": round(shop_qty, 3), "main_qty": round(main_qty, 3),
+                      "store_days_left": store_days, "store_status": store_status,
+                      "store_suggest": round(suggest, 3)})
+        if store_status == "low":
+            summary["store_low_count"] += 1
+        if store_status == "out":
+            summary["store_out_count"] += 1
+        if suggest > 0 and store_status != "ok":
+            summary["store_suggest_count"] += 1
         if buy is None:
             summary["missing_price_count"] += 1
         if stock > 0:
@@ -3734,6 +3886,16 @@ def get_stock_movements(shop_id: int, limit: int = 60) -> list:
                     "unit": r["unit"], "quantity": abs(r["new_qty"] - r["old_qty"]),
                     "delta": r["new_qty"] - r["old_qty"], "old_qty": r["old_qty"], "new_qty": r["new_qty"],
                     "reason": r["reason"], "sort": (r["adjust_date"], r["created_at"] or "")})
+    with get_conn() as conn:
+        mv = conn.execute("""
+            SELECT m.*, p.name as product_name, p.unit FROM store_moves m
+            JOIN products p ON p.id = m.product_id
+            WHERE m.shop_id=? ORDER BY m.id DESC LIMIT ?
+        """, (shop_id, limit)).fetchall()
+    for r in mv:
+        out.append({"type": "to_store" if r["quantity"] > 0 else "from_store", "date": r["move_date"],
+                    "product_name": r["product_name"], "unit": r["unit"], "quantity": abs(r["quantity"]),
+                    "batch": r["batch"], "sort": (r["move_date"], r["created_at"] or "")})
     out.sort(key=lambda x: x["sort"], reverse=True)
     for x in out:
         x.pop("sort", None)
