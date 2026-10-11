@@ -1965,11 +1965,16 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     .side-foot { margin-top:auto; padding-top:14px; border-top:1px solid #F1F5F9; display:flex; flex-direction:column; gap:8px; }
     .side-foot .lang-btn, .side-foot .logout { text-align:center; padding:9px 10px; display:block; }
   }
-  .subtabs { display:flex; gap:8px; margin-bottom:14px; }
+  .subtabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
   .subtab {
-    flex:1; text-align:center; padding:10px; border-radius:10px; background:var(--field-bg);
+    flex:1 1 0; min-width:0; text-align:center; padding:10px 8px; border-radius:10px; background:var(--field-bg);
     border:1.5px solid var(--border); cursor:pointer; font-weight:700; font-size:13px; color:var(--hint);
+    line-height:1.25; overflow-wrap:anywhere; display:flex; align-items:center; justify-content:center; gap:5px;
   }
+  .subtab .nav-badge { position:static; }
+  /* 4 вкладки на телефоне — сетка 2×2, чтобы ничего не вылезало за экран */
+  @media (max-width:599px) { .subtabs.subtabs-many .subtab { flex:1 1 calc(50% - 4px); } }
+  html, body { max-width:100%; overflow-x:clip; }
   .subtab.active { background:var(--btn); color:#fff; border-color:var(--btn); }
   .tab {
     text-align:center; padding: 10px 4px; border-radius: 14px; background: var(--card);
@@ -4464,6 +4469,7 @@ async function loadWarehouse() {
       } else {
         branchBtn.style.display = 'none';
       }
+      fitSubtabs(branchBtn.parentElement);
       renderProductCards('own');
     } catch (e) { /* не главный аккаунт — подвкладку не показываем */ }
   }
@@ -6470,6 +6476,11 @@ async function submitTransfer() {
   }
 }
 
+function fitSubtabs(box) {
+  if (!box) return;
+  const n = [...box.children].filter(e => e.style.display !== 'none').length;
+  box.classList.toggle('subtabs-many', n >= 4);
+}
 function showWhSubTab(t) {
   ['own', 'store', 'branches', 'network'].forEach(k => {
     const view = document.getElementById({ own: 'whOwnView', store: 'whStoreView', branches: 'whBranchesView', network: 'whNetworkView' }[k]);
