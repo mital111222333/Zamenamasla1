@@ -1237,7 +1237,7 @@ _OCR_FILES = {
     "ort.wasm.min.js": "text/javascript",
     "ort-wasm-simd-threaded.mjs": "text/javascript",
     "ort-wasm-simd-threaded.wasm": "application/wasm",
-    "plate_ocr.onnx": "application/octet-stream",
+    "plate_ocr_uz.onnx": "application/octet-stream",  # дообучена на номерах UZ / RU / KZ / KG / TJ
 }
 _ocr_gz_cache = {}
 _ocr_gz_lock = threading.Lock()
@@ -9846,6 +9846,118 @@ _SW_SNIPPET = "<script>\nif ('serviceWorker' in navigator) {"
 
 
 # Сканер госномера камерой телефона (распознавание прямо в браузере)
+PLATE_DECODE_JS = r"""
+// ===== Расшифровка ответа модели номеров (общая для сканера в панели и /scanner) =====
+// Модель отдаёт 10 позиций × 37 символов (0-9, A-Z, «_» = пусто). Подбираем
+// вариант, лучше всего подходящий под известные форматы номеров. Между
+// символами шаблона допускается «лишний» символ (разделитель региона,
+// флаг, двойное прочтение буквы) — со штрафом, поэтому сдвиг на одну
+// позицию больше не ломает весь номер.
+const PLATE_ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
+const PLATE_RU_LET = 'ABEKMHOPCTYX';
+// D — цифра, L — латинская буква, R — буква, которая бывает на российских номерах
+const PLATE_TEMPLATES = [
+  ['DDLDDDLL', 0],     // UZ физлица:            01 A 123 BC
+  ['DDDDDLLL', 0],     // UZ юрлица (и KG):      01 123 ABC
+  ['DDLDDDD', 0.4],    // UZ старый 1996–2008:   23 G 8107
+  ['DDLDDDDDD', 0.8],  // UZ иностранцы/фирмы:   01 H 123456, 01 M 123456
+  ['RDDDRRDD', 0.6],   // RU:                    A 123 BC 77
+  ['RDDDRRDDD', 0.6],  // RU:                    A 123 BC 777
+  ['DDDLLLDD', 0.6],   // KZ:                    123 ABC 01
+  ['DDDLLDD', 0.8],    // KZ:                    123 AB 01
+  ['DDDDLLDD', 0.6]    // TJ:                    1234 AB 01
+];
+const PLATE_JUNK = 2.0;        // штраф за лишний символ внутри номера
+const PLATE_FREE_MARGIN = 3.0; // насколько «свободное» чтение должно быть лучше шаблона
+const PLATE_CLASSES = (() => {
+  const r = { D: [], L: [], R: [], A: [] };
+  for (let j = 0; j < 36; j++) { (j < 10 ? r.D : r.L).push(j); r.A.push(j); }
+  for (const ch of PLATE_RU_LET) r.R.push(PLATE_ALPHA.indexOf(ch));
+  return r;
+})();
+
+function plateDecode(probs) {
+  const L = [];
+  for (let k = 0; k < 10; k++) {
+    const row = [];
+    for (let j = 0; j < 37; j++) row.push(Math.log(probs[k * 37 + j] + 1e-9));
+    L.push(row);
+  }
+  // лучший символ каждого класса в каждой позиции
+  const best = L.map(row => {
+    const o = {};
+    for (const c in PLATE_CLASSES) {
+      let bj = PLATE_CLASSES[c][0];
+      for (const j of PLATE_CLASSES[c]) if (row[j] > row[bj]) bj = j;
+      o[c] = bj;
+    }
+    return o;
+  });
+  let cand = null;
+  for (const [tpl, prior] of PLATE_TEMPLATES) {
+    const n = tpl.length, NEG = -1e18;
+    const dp = [], bk = [];
+    for (let i = 0; i <= 10; i++) { dp.push(new Array(n + 1).fill(NEG)); bk.push(new Array(n + 1).fill(null)); }
+    dp[0][0] = 0;
+    for (let i = 0; i < 10; i++) for (let t = 0; t <= n; t++) {
+      const s = dp[i][t];
+      if (s === NEG) continue;
+      if (t < n) {  // символ шаблона
+        const j = best[i][tpl[t]], v = L[i][j];
+        if (s + v > dp[i + 1][t + 1]) { dp[i + 1][t + 1] = s + v; bk[i + 1][t + 1] = [t, j, v]; }
+      } else {      // после номера — пусто
+        const v = L[i][36];
+        if (s + v > dp[i + 1][t]) { dp[i + 1][t] = s + v; bk[i + 1][t] = [t, -2, v]; }
+      }
+      const jj = best[i].A, vj = L[i][jj];  // лишний символ
+      if (s + vj - PLATE_JUNK > dp[i + 1][t]) { dp[i + 1][t] = s + vj - PLATE_JUNK; bk[i + 1][t] = [t, -1, vj]; }
+    }
+    let sc = dp[10][n];
+    if (sc === NEG) continue;
+    let out = '', raw = 0;
+    for (let i = 10, t = n; i > 0; i--) {
+      const b = bk[i][t];
+      raw += b[2];
+      if (b[1] >= 0) out = PLATE_ALPHA[b[1]] + out;
+      t = b[0];
+    }
+    // регион «00» не бывает
+    if (tpl.startsWith('DD') && out.startsWith('00')) { sc -= 4; raw -= 4; }
+    sc -= prior;
+    if (!cand || sc > cand.score) cand = { score: sc, raw: raw, plate: out, fmt: tpl };
+  }
+  // свободное чтение: в каждой позиции самый вероятный символ
+  let fs = 0, fp = '';
+  for (let k = 0; k < 10; k++) {
+    let bj = 0;
+    for (let j = 1; j < 37; j++) if (L[k][j] > L[k][bj]) bj = j;
+    fs += L[k][bj];
+    if (bj !== 36) fp += PLATE_ALPHA[bj];
+  }
+  if (fp.length >= 4 && (!cand || fs - PLATE_FREE_MARGIN > cand.score)) {
+    return { plate: fp, conf: Math.exp(fs / 10), fmt: '' };
+  }
+  return { plate: cand.plate, conf: Math.exp(cand.raw / 10), fmt: cand.fmt };
+}
+
+// красивый вид номера с пробелами
+function platePretty(p) {
+  p = String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const m = [
+    [/^([0-9]{2})([A-Z])([0-9]{3})([A-Z]{2})$/, '$1 $2 $3 $4'],
+    [/^([0-9]{2})([0-9]{3})([A-Z]{3})$/, '$1 $2 $3'],
+    [/^([0-9]{2})([A-Z])([0-9]{4})$/, '$1 $2 $3'],
+    [/^([0-9]{2})([A-Z])([0-9]{6})$/, '$1 $2 $3'],
+    [/^([A-Z])([0-9]{3})([A-Z]{2})([0-9]{2,3})$/, '$1 $2 $3 $4'],
+    [/^([0-9]{3})([A-Z]{2,3})([0-9]{2})$/, '$1 $2 $3'],
+    [/^([0-9]{4})([A-Z]{2})([0-9]{2})$/, '$1 $2 $3']
+  ];
+  for (const [re, f] of m) if (re.test(p)) return p.replace(re, f);
+  return p;
+}
+"""
+
+
 PLATE_SCAN_HTML = r"""<style>
   .plate-wrap #plate { padding-right:58px; }
   .ps-cam-btn {
@@ -9931,12 +10043,10 @@ PLATE_SCAN_HTML = r"""<style>
 // Распознавание идёт прямо на телефоне (ONNX-модель в браузере): кадры с
 // камеры никуда не отправляются и нигде не сохраняются, сервер только один
 // раз отдаёт файлы модели (/ocr/v1/…), дальше они берутся из кэша.
-// Формат узбекских номеров: 01 A 123 BC (физлица) и 01 123 ABC (юрлица).
+// Форматы номеров и расшифровка ответа модели — в plateDecode() (PLATE_DECODE_JS).
+/*__PLATE_DECODE_JS__*/
 const PS = { stream: null, track: null, session: null, loading: null, running: false, timer: null,
              hits: {}, startedAt: 0, result: null, torch: false, editing: false, gen: 0 };
-const PS_ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
-const PS_FORMATS = ['DDLDDDLL', 'DDDDDLLL'];
-const PS_REGIONS = ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '85', '90', '95'];
 const PS_MIN_CONF = 0.55;     // кадр учитывается, если модель уверена хотя бы на столько
 const PS_NEED_HITS = 2;       // сколько раз подряд должен прочитаться один и тот же номер
 const PS_INSTANT_CONF = 0.97; // при такой уверенности хватает одного кадра
@@ -9957,7 +10067,7 @@ function psLoadModel() {
       if (!window.ort) await psLoadScript('/ocr/v1/ort.wasm.min.js');
       ort.env.wasm.wasmPaths = '/ocr/v1/';
       ort.env.wasm.numThreads = 1;
-      const sess = await ort.InferenceSession.create('/ocr/v1/plate_ocr.onnx', { executionProviders: ['wasm'] });
+      const sess = await ort.InferenceSession.create('/ocr/v1/plate_ocr_uz.onnx', { executionProviders: ['wasm'] });
       // «прогрев»: первый прогон всегда медленный — делаем его заранее
       try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('uint8', new Uint8Array(64 * 128 * 3), [1, 64, 128, 3]) }); } catch (e) {}
       PS.session = sess;
@@ -10112,51 +10222,7 @@ function psCropTensor(inset) {
   return new ort.Tensor('uint8', rgb, [1, 64, 128, 3]);
 }
 
-// ответ модели: 10 позиций × 37 символов (вероятности). Подбираем лучший
-// вариант, подходящий под узбекский формат номера.
-function psDecode(probs) {
-  const lp = (k, j) => Math.log(probs[k * 37 + j] + 1e-9);
-  // код региона: 01, 10, 20 … 95 — остальные пары цифр сильно маловероятны
-  let reg = null;
-  for (let a = 0; a < 10; a++) for (let b = 0; b < 10; b++) {
-    const code = String(a) + String(b);
-    const sc = lp(0, a) + lp(1, b) - (PS_REGIONS.includes(code) ? 0 : 3);
-    if (!reg || sc > reg.score) reg = { score: sc, code };
-  }
-  let best = null;
-  for (const f of PS_FORMATS) {
-    let score = reg.score, out = reg.code;
-    for (let k = 2; k < 10; k++) {
-      if (k >= f.length) { score += lp(k, 36); continue; }
-      const lo = f[k] === 'D' ? 0 : 10, hi = f[k] === 'D' ? 10 : 36;
-      let bj = lo;
-      for (let j = lo + 1; j < hi; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
-      score += lp(k, bj);
-      out += PS_ALPHA[bj];
-    }
-    if (!best || score > best.score) best = { score, plate: out };
-  }
-  // модель глобальная (номера многих стран): если узбекский формат подходит
-  // заметно хуже свободного чтения — это российский, старый узбекский или
-  // другой номер, берём его как есть
-  const free = psFreeRead(probs, lp);
-  if (free.plate.length >= 4 && free.score - best.score > PS_FREE_MARGIN) {
-    return { plate: free.plate, conf: Math.exp(free.score / 10) };
-  }
-  return { plate: best.plate, conf: Math.exp(best.score / 10) };
-}
-// свободное чтение: в каждой позиции самый вероятный символ, «_» — пусто
-const PS_FREE_MARGIN = 2.5;
-function psFreeRead(probs, lp) {
-  let score = 0, plate = '';
-  for (let k = 0; k < 10; k++) {
-    let bj = 0;
-    for (let j = 1; j < 37; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
-    score += lp(k, bj);
-    if (bj !== 36) plate += PS_ALPHA[bj];
-  }
-  return { score, plate };
-}
+function psDecode(probs) { return plateDecode(probs); }
 
 async function psRecognize() {
   const sess = PS.session;
@@ -10200,12 +10266,7 @@ function psNextFrame(gen) {
 
 // ---- результат ----
 function psNorm(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
-function psPretty(p) {
-  p = psNorm(p);
-  if (/^[0-9]{2}[A-Z][0-9]{3}[A-Z]{2}$/.test(p)) return p.slice(0, 2) + ' ' + p[2] + ' ' + p.slice(3, 6) + ' ' + p.slice(6);
-  if (/^[0-9]{5}[A-Z]{3}$/.test(p)) return p.slice(0, 2) + ' ' + p.slice(2, 5) + ' ' + p.slice(5);
-  return p;
-}
+function psPretty(p) { return platePretty(p); }
 function psDist(a, b) {
   if (Math.abs(a.length - b.length) > 1) return 9;
   const d = [];
@@ -10822,6 +10883,7 @@ function pickQuickModel(i) {
 """
 
 _ps_i = PAGE.rfind("</body>")
+PLATE_SCAN_HTML = PLATE_SCAN_HTML.replace("/*__PLATE_DECODE_JS__*/", PLATE_DECODE_JS)
 PAGE = PAGE[:_ps_i] + PLATE_SCAN_HTML + VIN_SCAN_HTML + PAGE[_ps_i:]
 assert PAGE.count(_SW_SNIPPET) == 1
 PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
@@ -16450,9 +16512,7 @@ const ZONE_KEY = 'oilbook_scn_zone_' + TOKEN.slice(0, 8);
 const CAM_KEY = 'oilbook_scn_cam_' + TOKEN.slice(0, 8);
 // распознавание — как у сканера в панели (psDecode): модель читает вырезанный
 // номер 128×64, ответ — 10 позиций × 37 символов
-const ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
-const FORMATS = ['DDLDDDLL', 'DDDDDLLL'];
-const REGIONS = ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '85', '90', '95'];
+/*__PLATE_DECODE_JS__*/
 const MIN_CONF = 0.6;      // кадр учитываем при такой уверенности
 const NEED_HITS = 2;       // два одинаковых прочтения подряд — и номер на табло
 const INSTANT_CONF = 0.95; // при такой уверенности хватает одного кадра
@@ -16472,11 +16532,7 @@ function status(html, err) {
   el.classList.toggle('err', !!err);
   el.innerHTML = html;
 }
-function pretty(p) {
-  if (/^[0-9]{2}[A-Z][0-9]{3}[A-Z]{2}$/.test(p)) return p.slice(0, 2) + ' ' + p[2] + ' ' + p.slice(3, 6) + ' ' + p.slice(6);
-  if (/^[0-9]{5}[A-Z]{3}$/.test(p)) return p.slice(0, 2) + ' ' + p.slice(2, 5) + ' ' + p.slice(5);
-  return p;
-}
+function pretty(p) { return platePretty(p); }
 
 // ---- зона номера: хранится в долях кадра камеры, на этом устройстве ----
 function loadZone() {
@@ -16589,7 +16645,7 @@ async function loadModel() {
   if (!window.ort) await loadScript('/ocr/v1/ort.wasm.min.js');
   ort.env.wasm.wasmPaths = '/ocr/v1/';
   ort.env.wasm.numThreads = 1;
-  const sess = await ort.InferenceSession.create('/ocr/v1/plate_ocr.onnx', { executionProviders: ['wasm'] });
+  const sess = await ort.InferenceSession.create('/ocr/v1/plate_ocr_uz.onnx', { executionProviders: ['wasm'] });
   try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('uint8', new Uint8Array(64 * 128 * 3), [1, 64, 128, 3]) }); } catch (e) {}
   return sess;
 }
@@ -16631,48 +16687,7 @@ function cropTensor(win) {
   for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { rgb[j] = px[i]; rgb[j + 1] = px[i + 1]; rgb[j + 2] = px[i + 2]; }
   return new ort.Tensor('uint8', rgb, [1, 64, 128, 3]);
 }
-function decode(probs) {
-  const lp = (k, j) => Math.log(probs[k * 37 + j] + 1e-9);
-  let reg = null;
-  for (let a = 0; a < 10; a++) for (let b = 0; b < 10; b++) {
-    const code = String(a) + String(b);
-    const sc = lp(0, a) + lp(1, b) - (REGIONS.includes(code) ? 0 : 3);
-    if (!reg || sc > reg.score) reg = { score: sc, code: code };
-  }
-  let best = null;
-  for (const f of FORMATS) {
-    let score = reg.score, out = reg.code;
-    for (let k = 2; k < 10; k++) {
-      if (k >= f.length) { score += lp(k, 36); continue; }
-      const lo = f[k] === 'D' ? 0 : 10, hi = f[k] === 'D' ? 10 : 36;
-      let bj = lo;
-      for (let j = lo + 1; j < hi; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
-      score += lp(k, bj);
-      out += ALPHA[bj];
-    }
-    if (!best || score > best.score) best = { score: score, plate: out };
-  }
-  // модель глобальная (номера многих стран): если узбекский формат подходит
-  // заметно хуже свободного чтения — это российский, старый узбекский или
-  // другой номер, берём его как есть
-  const free = freeRead(probs, lp);
-  if (free.plate.length >= 4 && free.score - best.score > FREE_MARGIN) {
-    return { plate: free.plate, conf: Math.exp(free.score / 10) };
-  }
-  return { plate: best.plate, conf: Math.exp(best.score / 10) };
-}
-// свободное чтение: в каждой позиции самый вероятный символ, «_» — пусто
-const FREE_MARGIN = 2.5;
-function freeRead(probs, lp) {
-  let score = 0, plate = '';
-  for (let k = 0; k < 10; k++) {
-    let bj = 0;
-    for (let j = 1; j < 37; j++) if (probs[k * 37 + j] > probs[k * 37 + bj]) bj = j;
-    score += lp(k, bj);
-    if (bj !== 36) plate += ALPHA[bj];
-  }
-  return { score: score, plate: plate };
-}
+function decode(probs) { return plateDecode(probs); }
 async function readWindow(win) {
   const t = cropTensor(win);
   if (!t) return null;
@@ -16809,6 +16824,9 @@ def download_plate_agent():
             zf.writestr("OilBook-camera/" + name, data)
     buf.seek(0)
     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="OilBook-camera.zip")
+
+
+SCANNER_PAGE = SCANNER_PAGE.replace("/*__PLATE_DECODE_JS__*/", PLATE_DECODE_JS)
 
 
 @app.route("/scanner/<anpr_token>")
