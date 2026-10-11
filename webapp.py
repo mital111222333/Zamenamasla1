@@ -22,7 +22,7 @@ import requests
 from datetime import datetime
 from functools import wraps
 from urllib.parse import quote
-from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g, send_file
+from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g, send_file, make_response
 
 import database as db
 import i18n
@@ -769,12 +769,15 @@ REGISTER_PAGE = """
   .locrow { display:flex; gap:10px; align-items:flex-start; margin-top:16px; padding:12px; border:1px dashed #3a4456; border-radius:10px; background:#141821; }
   .locico { font-size:20px; line-height:1; margin-top:1px; }
   .loct { font-size:14px; font-weight:600; color:#e6e6e6; }
+  .refnote { background:#2a2410; border:1px solid #6b5a1c; color:#f5dc8a; border-radius:10px; padding:10px 12px; font-size:14px; margin:0 0 14px; line-height:1.45; }
+  .refnote b { color:#fff; }
 </style>
 </head>
 <body>
   <div class="brand"><div class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></div></div>
 
   <form class="box" id="regForm" novalidate onsubmit="submitReg(event)">
+    {% if ref_name %}<div class="refnote">🎁 {{ T.reg_ref_from }} <b>{{ ref_name }}</b></div>{% endif %}
     <div class="step">{{ T.reg_step.format(n=1) }}</div>
     <h1>{{ T.reg_title }}</h1>
     <p class="intro">{{ T.reg_intro }}</p>
@@ -2764,6 +2767,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     {% if not is_employee %}<div class="side-item" id="tab-staff" data-tab="staff" onclick="showTab('staff')"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-myshop" data-tab="myshop" onclick="showTab('myshop')"><i class="fa-solid fa-store"></i><span>{{ T.tab_myshop }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
+    {% if is_sub_owner %}<div class="side-item" onclick="location.href='/referral'"><i class="fa-solid fa-gift"></i><span>{{ T.ref_menu }}</span></div>{% endif %}
   </nav>
   <div class="side-foot">
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
@@ -2809,6 +2813,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
       {% if not is_employee %}<div class="more-item" data-tab="myshop" data-more-slot="myshop" onclick="showTab('myshop'); closeMore();"><i class="fa-solid fa-store"></i><span>{{ T.tab_myshop }}</span></div>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
+      {% if is_sub_owner %}<a class="more-item" href="/referral"><i class="fa-solid fa-gift"></i><span>{{ T.ref_menu }}</span></a>{% endif %}
       <a class="more-item more-install" href="/app?lang={{ lang }}"><i class="fa-solid fa-mobile-screen-button"></i><span>{{ T.inst_menu }}</span></a>
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
       <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
@@ -13022,6 +13027,7 @@ if ('serviceWorker' in navigator) {
   label { display:block; font-size: 12px; color: var(--hint); margin-bottom: 4px; text-transform:uppercase; letter-spacing:0.4px; }
   input { width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--field-bg); color: var(--text); font-size: 15px; font-family: var(--font-body); }
   input:focus { outline:none; border-color: var(--blue); box-shadow:0 0 0 3px rgba(15,82,186,.12); }
+  .field select { width:100%; padding:10px; border-radius:10px; border:1.5px solid var(--border); background:var(--field-bg); color:var(--text); font-size:15px; font-family:var(--font-body); }
   button.submit { width: 100%; padding: 14px; border: none; border-radius: 14px; background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 55%, #312E81 100%); color:#fff; font-size: 15px; font-weight: 700; font-family: var(--font-display); letter-spacing:0.5px; text-transform:uppercase; cursor: pointer; margin-top: 6px; box-shadow: 0 8px 18px rgba(29,78,216,.30); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
@@ -13105,6 +13111,7 @@ if ('serviceWorker' in navigator) {
   .pay-item .pay-act { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; white-space:normal; }
   .pay-item .pay-act button, .pay-item .pay-act a { border:0; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; color:#fff; text-decoration:none; font-size:13px; }
   .pay-act .ok { background:#16A34A; } .pay-act .no { background:#DC2626; } .pay-act a { background:#0F52BA; }
+  .ref-cp { border:1px solid #CBD5E1; background:#fff; border-radius:7px; width:30px; height:28px; margin-left:4px; cursor:pointer; color:#0F52BA; }
   .adm-tabs { display:flex; gap:6px; background:#E2E8F0; padding:4px; border-radius:12px; margin-bottom:14px; }
   .adm-tabs button { flex:1; height:42px; border:0; border-radius:9px; background:transparent; font-weight:700; font-size:14px; color:#475569; cursor:pointer; font-family:inherit; }
   .adm-tabs button.on { background:#fff; color:var(--blue); box-shadow:0 1px 3px rgba(15,23,42,.12); }
@@ -13410,6 +13417,34 @@ if ('serviceWorker' in navigator) {
     </div>
   </details>
 
+  <details class="adm-sec" id="secRef">
+    <summary>
+      <span class="ic" style="background:#FEF9C3; color:#A16207;"><i class="fa-solid fa-gift"></i></span>
+      <span>Реферальная программа<span class="sub" id="refSecSub">бонусы за приглашённые точки</span></span>
+      <i class="fa-solid fa-chevron-down chev"></i>
+    </summary>
+    <div class="sec-body">
+      <div class="adm-stats" style="margin-bottom:12px;">
+        <div class="adm-stat"><b id="refPendSum">—</b><span>к выплате, сум</span></div>
+        <div class="adm-stat"><b id="refPaidSum">—</b><span>выплачено, сум</span></div>
+        <div class="adm-stat"><b id="refWaitCnt">—</b><span>ещё не оплатили</span></div>
+      </div>
+      <div style="font-weight:700; font-size:13px; margin-bottom:8px;">К выплате</div>
+      <div id="refPending"><div class="hint-text">Загружаю…</div></div>
+      <div style="font-weight:700; font-size:13px; margin:14px 0 8px;">Приглашены, но ещё не оплатили</div>
+      <div id="refWaiting"></div>
+      <div style="font-weight:700; font-size:13px; margin:14px 0 8px;">Выплаченные</div>
+      <div id="refPaid"></div>
+      <div style="font-weight:700; font-size:13px; margin:16px 0 8px;">Указать вручную, кто пригласил точку</div>
+      <div class="row2">
+        <div class="field"><label>Приглашённая точка</label><select id="refSetShop"></select></div>
+        <div class="field"><label>Кто пригласил</label><select id="refSetBy"></select></div>
+      </div>
+      <button class="submit" style="width:auto; padding:10px 20px;" onclick="saveReferrer()">Сохранить</button>
+      <div class="hint-text" style="margin-top:10px;">Нужно, если точку создали в админке, а не по ссылке. Если точка уже платила — бонус начислится с её первой оплаты. Бонус = <span id="refPct">50</span>% от первой оплаты подписки, один раз. Деньги переводишь сам на карту из списка и нажимаешь «Выплачено» — точке придёт сообщение в Telegram.</div>
+    </div>
+  </details>
+
   <details class="adm-sec" id="secBackup">
     <summary>
       <span class="ic" style="background:#EFF6FF; color:var(--blue);"><i class="fa-solid fa-box-archive"></i></span>
@@ -13635,6 +13670,7 @@ function regCard(r, withButtons) {
     `Локация: ${r.lat != null && r.lon != null ? `<a href="https://maps.google.com/?q=${Number(r.lat).toFixed(6)},${Number(r.lon).toFixed(6)}" target="_blank" rel="noopener">📍 открыть на карте</a>` : '—'}`,
     `Логин: <b>${escapeHtml(r.username)}</b> · язык ${escapeHtml((r.language || 'ru').toUpperCase())}`,
   ];
+  if (r.ref_name) lines.push(`🎁 Пригласил: <b>${escapeHtml(r.ref_name)}</b>`);
   const when = withButtons ? `подтверждена ${escapeHtml(r.confirmed_at || r.created_at || '')}` : `решение ${escapeHtml(r.decided_at || '')}`;
   return `<div class="pay-item"><div class="pay-cap" style="white-space:normal; line-height:1.6;">${lines.join('<br>')}</div>
     <div class="hint-text" style="margin-top:4px;">№${r.id} · ${when}</div>
@@ -13659,6 +13695,83 @@ async function loadRegs() {
     const sec = document.getElementById('secReg');
     if (pend.length && !sec.dataset.autoOpened) { sec.open = true; sec.dataset.autoOpened = '1'; }
   } catch (e) {}
+}
+
+let REF = null;
+function refItem(r, withBtn) {
+  const card = r.ref_card ? `<b style="font-family:var(--font-mono, monospace);">${escapeHtml(r.ref_card)}</b>
+      <button type="button" class="ref-cp" onclick="copyRefCard(this, ${JSON.stringify(r.ref_card).replace(/"/g, '&quot;')})"><i class="fa-regular fa-copy"></i></button>`
+    : '<span style="color:#B45309;">карта не указана — точка вписывает её в разделе «Пригласи друга»</span>';
+  const lines = [
+    `<b>${escapeHtml(r.ref_name || '—')}</b> <span class="hint-text">@${escapeHtml(r.ref_username || '')}</span>`,
+    `За точку: ${escapeHtml(r.new_name || '—')} <span class="hint-text">@${escapeHtml(r.new_username || '')}</span>`,
+    `Оплата ${fmtSum(r.base_amount)} сум → бонус <b>${fmtSum(r.reward_amount)} сум</b>`,
+    withBtn ? `Карта: ${card}` : `Выплачено ${escapeHtml(fmtDay(r.paid_at))}`,
+  ];
+  return `<div class="pay-item"><div class="pay-cap" style="white-space:normal; line-height:1.6;">${lines.join('<br>')}</div>
+    ${withBtn ? `<div class="pay-act"><button class="ok" onclick="refMarkPaid(${r.id}, ${JSON.stringify(fmtSum(r.reward_amount))}, ${JSON.stringify(r.ref_name || '').replace(/"/g, '&quot;')})">✅ Выплачено</button></div>` : ''}
+  </div>`;
+}
+
+async function loadRefs() {
+  try {
+    const res = await fetch('/api/admin/referrals');
+    const d = await res.json();
+    if (!d.ok) return;
+    REF = d;
+    document.getElementById('refPendSum').textContent = fmtSum(d.pending_sum);
+    document.getElementById('refPaidSum').textContent = fmtSum(d.paid_sum);
+    document.getElementById('refWaitCnt').textContent = d.waiting.length;
+    document.getElementById('refPct').textContent = d.pct;
+    document.getElementById('refPending').innerHTML = d.pending.length ? d.pending.map(r => refItem(r, true)).join('')
+      : '<div class="hint-text">Нечего выплачивать.</div>';
+    document.getElementById('refPaid').innerHTML = d.paid.length ? d.paid.map(r => refItem(r, false)).join('')
+      : '<div class="hint-text">Пока пусто.</div>';
+    document.getElementById('refWaiting').innerHTML = d.waiting.length ? d.waiting.map(w =>
+      `<div class="inc-row"><div>${escapeHtml(w.new_name || w.new_username)}<div class="r-s">пригласил: ${escapeHtml(w.ref_name || w.ref_username || '—')}</div></div>
+       <div class="r-s">${escapeHtml(fmtDay(w.created_at))}</div></div>`).join('')
+      : '<div class="hint-text">Пока пусто.</div>';
+    document.getElementById('refSecSub').textContent = d.pending.length
+      ? `к выплате: ${d.pending.length} на ${fmtSum(d.pending_sum)} сум` : 'бонусы за приглашённые точки';
+    const opt = s => `<option value="${s.id}">${escapeHtml(s.shop_name || s.username)} (@${escapeHtml(s.username)})</option>`;
+    const a = document.getElementById('refSetShop'), b = document.getElementById('refSetBy');
+    const keepA = a.value, keepB = b.value;
+    a.innerHTML = '<option value="">— выберите —</option>' + d.shops.map(opt).join('');
+    b.innerHTML = '<option value="0">— никто (убрать) —</option>' + d.shops.map(opt).join('');
+    a.value = keepA; b.value = keepB || '0';
+    a.onchange = () => { const s = d.shops.find(x => String(x.id) === a.value); b.value = s && s.referred_by ? String(s.referred_by) : '0'; };
+    const sec = document.getElementById('secRef');
+    if (d.pending.length && !sec.dataset.autoOpened) { sec.open = true; sec.dataset.autoOpened = '1'; }
+  } catch (e) {}
+}
+
+function copyRefCard(btn, card) {
+  const plain = String(card).replace(/[^0-9]/g, '');
+  const done = () => { const old = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-check"></i>'; setTimeout(() => { btn.innerHTML = old; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(plain).then(done, () => prompt('Скопируйте:', plain));
+  else prompt('Скопируйте:', plain);
+}
+
+async function refMarkPaid(id, sum, name) {
+  if (!confirm(`Ты перевёл ${sum} сум точке «${name}»? Точке придёт сообщение, что бонус выплачен.`)) return;
+  const res = await fetch(`/api/admin/referrals/${id}/paid`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) showMsg('✅ Отмечено как выплачено', true);
+  else showMsg('Ошибка: ' + data.error, false);
+  loadRefs();
+}
+
+async function saveReferrer() {
+  const shopId = document.getElementById('refSetShop').value;
+  const by = document.getElementById('refSetBy').value;
+  if (!shopId) { showMsg('Выберите приглашённую точку', false); return; }
+  const res = await fetch(`/api/admin/shops/${shopId}/referrer`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({referrer_id: Number(by) || null})
+  });
+  const data = await res.json();
+  if (data.ok) showMsg(Number(by) ? '✅ Сохранено' : '✅ Привязка убрана', true);
+  else showMsg('Ошибка: ' + data.error, false);
+  loadRefs();
 }
 
 async function decideReg(id, ok) {
@@ -14546,7 +14659,7 @@ function guardOnce(names) {
     window[name] = wrapped;
   });
 }
-guardOnce(['createShop', 'createBranch', 'createEmployee', 'toggleEmployeeActive', 'saveBranchEdit', 'deleteBranch',
+guardOnce(['refMarkPaid', 'saveReferrer', 'createShop', 'createBranch', 'createEmployee', 'toggleEmployeeActive', 'saveBranchEdit', 'deleteBranch',
   'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
   'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField',
   'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings',
@@ -14555,6 +14668,7 @@ loadShops();
 loadSubPanel();
 loadRegs();
 setInterval(() => { if (!document.hidden) loadRegs(); }, 60000);
+loadRefs();
 // ---------- Карта точек с аналитикой ----------
 let MAP = null, MAPDATA = null, mapLayer = null, mapDays = 30, mapMetric = 'count', mapFilt = 'all', mapGroupSel = '';
 let mapMarkers = {}, mapPickId = null, mapFitted = false, mapSaving = false, leafletPromise = null;
@@ -16873,6 +16987,8 @@ def sub_decide(payment_id: int, approve: bool):
         notify_sub_decision(p)
     except Exception as e:
         logger.error(f"Не удалось уведомить точку о решении по чеку {payment_id}: {e}")
+    if approve:
+        _ref_sync(p["shop_id"])
     return p
 
 
@@ -17115,10 +17231,12 @@ def api_admin_sub_decide(payment_id, action):
             return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
         if not db.admin_set_payment_amount(payment_id, amount):
             return jsonify({"ok": False, "error": "сумму можно менять только у оплат, внесённых вручную"}), 400
+        _ref_sync((db.get_sub_payment(payment_id) or {}).get("shop_id"))
         return jsonify({"ok": True})
     if action == "cancel":
         if not db.admin_cancel_payment(payment_id):
             return jsonify({"ok": False, "error": "оплата не найдена"}), 404
+        _ref_sync((db.get_sub_payment(payment_id) or {}).get("shop_id"))
         return jsonify({"ok": True})
     if action not in ("confirm", "reject"):
         return jsonify({"ok": False, "error": "неизвестное действие"}), 400
@@ -17169,6 +17287,7 @@ def api_admin_shop_sub(shop_id):
         q = db.sub_quote(shop_id)
         amount = next((o["amount"] for o in q["options"] if o["months"] == months), None)
         new_until = db.admin_extend_subscription(shop_id, months, amount)
+        _ref_sync(shop_id)
         return jsonify({"ok": True, "paid_until": new_until})
     if action == "set_until":
         raw = (data.get("date") or "").strip()
@@ -17189,6 +17308,7 @@ def api_admin_shop_sub(shop_id):
         if amount is False:
             return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
         db.admin_set_lifetime(shop_id, bool(data.get("on")), amount)
+        _ref_sync(shop_id)
         return jsonify({"ok": True})
     if action == "price":
         price = _parse_admin_sum(data.get("price"))
@@ -17207,6 +17327,7 @@ def api_admin_branch_sub_paid(branch_id):
         return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
     if not db.admin_mark_branch_paid(branch_id, amount):
         return jsonify({"ok": False, "error": "филиал не найден"}), 404
+    _ref_sync((db.get_shop(branch_id) or {}).get("parent_shop_id"))
     return jsonify({"ok": True})
 
 
@@ -17511,6 +17632,207 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 """
 
 
+REFERRAL_PAGE = r"""<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A2540">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<title>{{ T.ref_title }} · OilBook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
+<style>
+:root { --line:#E3E8F0; --text:#0B1F3A; --muted:#5B6B82; --blue:#1D6FE0; --blue-bg:#F0F6FF; --green:#0E6B3E; --green-bg:#E3F4EA;
+  --gold:#F5B700; --mono:'IBM Plex Mono', ui-monospace, monospace; }
+* { box-sizing:border-box; }
+body { margin:0; background:#F3F5F9; color:var(--text); font-family:'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color:transparent; }
+.wrap { max-width:520px; margin:0 auto; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+.top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px; padding:calc(6px + env(safe-area-inset-top, 0px)) 16px 6px; min-height:56px; background:#fff; border-bottom:1px solid var(--line); }
+.back { width:44px; height:44px; margin-left:-12px; display:flex; align-items:center; justify-content:center; color:var(--text); text-decoration:none; font-size:20px; }
+.ttl { font-size:18px; font-weight:700; }
+.wm { margin-left:auto; font-family:Sora, sans-serif; font-weight:800; font-size:17px; }
+.wm b { color:var(--blue); font-weight:800; }
+.body { flex:1; padding:16px 16px calc(28px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; gap:12px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.h { font-size:16px; font-weight:700; margin:0 0 8px; }
+.muted { color:var(--muted); font-size:14px; }
+.hero { position:relative; overflow:hidden; background:#0B1F3A; color:#fff; border-radius:16px; padding:18px 18px 20px; }
+.hero:after { content:""; position:absolute; right:-40px; top:-40px; width:150px; height:150px; border-radius:50%; background:radial-gradient(circle, rgba(245,183,0,.35), rgba(245,183,0,0) 70%); }
+.hero .pct { font-family:Sora, sans-serif; font-weight:800; font-size:52px; line-height:1; color:var(--gold); }
+.hero .t1 { font-size:17px; font-weight:700; margin-top:8px; line-height:1.35; position:relative; }
+.hero .t2 { font-size:14px; color:#B9C6DA; margin-top:6px; line-height:1.45; position:relative; }
+.hero .gift { position:absolute; right:18px; top:18px; font-size:34px; color:var(--gold); }
+.linkbox { display:flex; align-items:center; gap:8px; background:#F4F7FB; border:1.5px dashed #9AAAC2; border-radius:12px; padding:6px 6px 6px 12px; }
+.linkbox .l { flex:1; min-width:0; font-family:var(--mono); font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cp { width:44px; height:44px; border:0; border-radius:10px; background:#fff; color:var(--blue); font-size:18px; cursor:pointer; flex:none; border:1px solid var(--line); }
+.btn { height:50px; border:0; border-radius:12px; background:var(--blue); color:#fff; font:700 15px 'Plus Jakarta Sans', system-ui, sans-serif; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:10px; text-decoration:none; }
+.btn.tg { background:#229ED9; }
+.btn.ghost { background:#fff; color:var(--text); border:1.5px solid #D5DDE8; }
+.btn:disabled { opacity:.55; }
+.btns { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+.stat { background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px 8px; text-align:center; }
+.stat b { display:block; font-family:var(--mono); font-size:20px; font-weight:600; }
+.stat span { font-size:12px; color:var(--muted); }
+.money { display:flex; gap:10px; }
+.money > div { flex:1; }
+.money .v { font-family:var(--mono); font-size:20px; font-weight:600; margin-top:2px; }
+.money .v.g { color:var(--green); }
+.field { display:flex; gap:8px; margin-top:8px; }
+.field input { flex:1; min-width:0; height:48px; border:1.5px solid #D5DDE8; border-radius:12px; padding:0 10px; font:600 16px var(--mono); letter-spacing:-.3px; color:var(--text); background:#fff; }
+.field input:focus { outline:none; border-color:var(--blue); }
+.field .btn { width:auto; padding:0 14px; height:48px; flex:none; }
+.ok { color:var(--green); font-size:13px; font-weight:700; margin-top:6px; }
+.err { color:#B3122F; font-size:13px; font-weight:700; margin-top:6px; }
+.it { display:flex; align-items:center; gap:10px; padding:11px 0; border-top:1px solid #EEF1F6; }
+.it:first-of-type { border-top:0; }
+.it .ic { width:38px; height:38px; border-radius:10px; background:#EEF3FA; color:var(--blue); display:flex; align-items:center; justify-content:center; flex:none; }
+.it .mid { flex:1; min-width:0; }
+.it .nm { font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.it .sb { font-size:12.5px; color:var(--muted); margin-top:2px; }
+.chip { font-size:12px; font-weight:700; padding:4px 9px; border-radius:999px; white-space:nowrap; flex:none; }
+.chip.grey { background:#EEF1F6; color:#3E4F68; }
+.chip.blue { background:var(--blue-bg); color:var(--blue); }
+.chip.green { background:var(--green-bg); color:var(--green); }
+.chip.dark { background:#0B1F3A; color:#fff; }
+.empty { text-align:center; color:var(--muted); font-size:14px; padding:10px 0 4px; line-height:1.45; }
+.steps { display:flex; flex-direction:column; gap:10px; }
+.st { display:flex; gap:12px; align-items:flex-start; font-size:14px; line-height:1.45; color:#3E4F68; }
+.st b { width:26px; height:26px; border-radius:50%; background:var(--gold); color:#0B1F3A; display:flex; align-items:center; justify-content:center; font-size:13px; flex:none; }
+.small { font-size:12.5px; color:var(--muted); line-height:1.5; }
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="back" href="/" aria-label="{{ T.sub_back }}"><i class="fa-solid fa-chevron-left"></i></a>
+    <div class="ttl">{{ T.ref_title }}</div>
+    <div class="wm"><b>Oil</b>Book</div>
+  </div>
+  <div class="body">
+    <div class="hero">
+      <i class="fa-solid fa-gift gift"></i>
+      <div class="pct">{{ pct }}%</div>
+      <div class="t1">{{ T.ref_hero_title }}</div>
+      <div class="t2">{{ T.ref_hero_text }}</div>
+    </div>
+
+    <div class="card">
+      <div class="h">{{ T.ref_your_link }}</div>
+      <div class="linkbox">
+        <span class="l" id="refLink">{{ link }}</span>
+        <button class="cp" type="button" aria-label="{{ T.sub_copy }}" onclick="copyLink(this)"><i class="fa-regular fa-copy"></i></button>
+      </div>
+      <div class="btns">
+        <a class="btn tg" href="{{ tg_share }}" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i>{{ T.ref_share_tg }}</a>
+        <button class="btn ghost hidden" id="shareBtn" type="button" onclick="shareOther()"><i class="fa-solid fa-share-nodes"></i>{{ T.ref_share_other }}</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b>{{ stats.invited }}</b><span>{{ T.ref_stat_invited }}</span></div>
+      <div class="stat"><b>{{ stats.paying }}</b><span>{{ T.ref_stat_paying }}</span></div>
+      <div class="stat"><b>{{ earned_txt }}</b><span>{{ T.ref_stat_earned }}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="money">
+        <div><div class="muted">{{ T.ref_to_receive }}</div><div class="v g">{{ pending_txt }}</div></div>
+        <div><div class="muted">{{ T.ref_paid_out }}</div><div class="v">{{ paid_txt }}</div></div>
+      </div>
+      <div class="muted" style="margin-top:12px; font-weight:600; color:var(--text);">{{ T.ref_card_label }}</div>
+      <div class="field">
+        <input id="card" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="8600 0000 0000 0000" value="{{ card }}">
+        <button class="btn" id="cardBtn" type="button" onclick="saveCard()">{{ T.ref_card_save }}</button>
+      </div>
+      <div class="small" style="margin-top:6px;">{{ T.ref_card_hint }}</div>
+      <div class="ok hidden" id="cardOk">{{ T.ref_card_saved }}</div>
+      <div class="err hidden" id="cardErr"></div>
+    </div>
+
+    <div class="card">
+      <div class="h">{{ T.ref_list_title }}</div>
+      {% if items %}
+        {% for it in items %}
+        <div class="it">
+          <div class="ic"><i class="fa-solid fa-store"></i></div>
+          <div class="mid"><div class="nm">{{ it.name }}</div><div class="sb">{{ it.date }} · {{ it.sub }}</div></div>
+          <span class="chip {{ it.chip[0] }}">{{ it.chip[1] }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">{{ T.ref_list_empty }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="h">{{ T.ref_how_title }}</div>
+      <div class="steps">
+        <div class="st"><b>1</b><span>{{ T.ref_how_1 }}</span></div>
+        <div class="st"><b>2</b><span>{{ T.ref_how_2 }}</span></div>
+        <div class="st"><b>3</b><span>{{ T.ref_how_3.format(pct=pct) }}</span></div>
+      </div>
+      <div class="small" style="margin-top:12px;">{{ T.ref_rules }}</div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const LINK = {{ link|tojson }};
+  const SHARE_TEXT = {{ share_text|tojson }};
+  const L = { saving: {{ T.ref_saving|tojson }}, save: {{ T.ref_card_save|tojson }}, err: {{ T.sub_err|tojson }}, copied: {{ T.sub_copied|tojson }} };
+  const $ = id => document.getElementById(id);
+  if (navigator.share) $('shareBtn').classList.remove('hidden');
+
+  window.copyLink = function (btn) {
+    const done = () => { const old = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-check"></i>'; setTimeout(() => { btn.innerHTML = old; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(LINK).then(done, () => { prompt(L.copied, LINK); });
+    } else { prompt(L.copied, LINK); }
+  };
+
+  window.shareOther = function () {
+    navigator.share({ text: SHARE_TEXT }).catch(() => {});
+  };
+
+  $('card').addEventListener('input', function () {
+    const d = this.value.replace(/[^0-9]/g, '').slice(0, 19);
+    this.value = d.replace(/(.{4})/g, '$1 ').trim();
+    $('cardOk').classList.add('hidden'); $('cardErr').classList.add('hidden');
+  });
+
+  let busy = false;
+  window.saveCard = async function () {
+    if (busy) return;
+    busy = true;
+    const btn = $('cardBtn');
+    btn.disabled = true; btn.textContent = L.saving;
+    try {
+      const res = await fetch('/api/referral/card', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card: $('card').value }) });
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (res.status === 401) { location.href = '/login'; return; }
+      if (res.ok && data.ok) { $('card').value = data.card || ''; $('cardOk').classList.remove('hidden'); }
+      else { $('cardErr').textContent = data.error || L.err; $('cardErr').classList.remove('hidden'); }
+    } catch (e) {
+      $('cardErr').textContent = L.err; $('cardErr').classList.remove('hidden');
+    } finally {
+      busy = false; btn.disabled = false; btn.textContent = L.save;
+    }
+  };
+})();
+</script>
+</body>
+</html>
+"""
+
+
 # ---------- Самостоятельная регистрация точки ----------
 # Форма /register → подтверждение Telegram и номера в боте (bot.py) →
 # заявка администратору с кнопками ✅/❌ → точка с пробным периодом.
@@ -17526,9 +17848,15 @@ def _reg_lang():
 @app.route("/register")
 def register_page():
     lang = _reg_lang()
-    return render_template_string(
+    ref_code = (request.args.get("ref") or request.cookies.get(_REF_COOKIE) or "").strip()
+    referrer = db.find_referrer_by_code(ref_code) if ref_code else None
+    resp = make_response(render_template_string(
         REGISTER_PAGE, T=i18n.get_texts(lang), lang=lang, other_lang="uz" if lang == "ru" else "ru",
-        cities=REG_CITIES[lang], bot_username=BOT_USERNAME or "OilBook")
+        cities=REG_CITIES[lang], bot_username=BOT_USERNAME or "OilBook",
+        ref_name=(referrer.get("shop_name") or referrer.get("username")) if referrer else ""))
+    if referrer and request.args.get("ref"):
+        _set_ref_cookie(resp, referrer["ref_code"])
+    return resp
 
 
 def _reg_status_payload(req: dict) -> dict:
@@ -17587,6 +17915,9 @@ def api_register():
         return bad("username", "reg_err_username_taken")
     phone = f"+{digits[:3]} {digits[3:5]} {digits[5:8]} {digits[8:10]} {digits[10:12]}"
     req = db.create_registration(shop_name, owner_name, city, phone, address, username, password, lang, ip)
+    referrer = db.find_referrer_by_code(data.get("ref") or request.cookies.get(_REF_COOKIE))
+    if referrer:
+        db.set_registration_ref(req["id"], referrer["id"])
     return jsonify(_reg_status_payload(req))
 
 
@@ -17617,7 +17948,7 @@ def _reg_admin_text(req: dict) -> str:
         f"Локация: {_reg_map_link(req)}",
         f"Логин: {req['username']}",
         f"Язык: {(req.get('language') or 'ru').upper()}",
-    ])
+    ] + _reg_ref_line(req))
 
 
 def _reg_map_link(req: dict) -> str:
@@ -17655,6 +17986,12 @@ def reg_decide(req_id: int, approve: bool, auto: bool = False) -> dict:
     if not r["ok"]:
         return r
     shop = r.get("shop")
+    if approve and shop and req.get("ref_shop_id"):
+        try:
+            if db.link_referred_shop(shop["id"], req["ref_shop_id"]):
+                _ref_notify(req["ref_shop_id"], "ref_bot_joined", shop=req["shop_name"])
+        except Exception as e:
+            logger.error(f"Реферал: не удалось привязать точку {shop.get('id')}: {e}")
     if req.get("admin_msg_id") and ADMIN_TELEGRAM_ID:
         mark = (f"✅ {'Подключена автоматически' if auto else 'Одобрено'} — точка создана, "
                 f"пробный период до {_fmt_day(shop.get('paid_until'))}"
@@ -17697,6 +18034,165 @@ def api_admin_registration_decide(req_id, action):
     if r.get("shop"):
         out.update(shop_id=r["shop"]["id"], paid_until=r["shop"].get("paid_until"))
     return jsonify(out)
+
+
+# ---------- Реферальная программа «Пригласи друга» ----------
+# Ссылка /r/<код> ставит cookie на REF_COOKIE_DAYS дней и ведёт на /register.
+# Заявка запоминает пригласившего, одобренная точка — shops.referred_by.
+# Первая подтверждённая оплата приглашённой точки → бонус REF_SHARE_PCT %
+# (db.referral_sync). Выплачивает администратор вручную.
+
+_REF_COOKIE = "ob_ref"
+
+
+def _set_ref_cookie(resp, code):
+    resp.set_cookie(_REF_COOKIE, code, max_age=db.REF_COOKIE_DAYS * 86400, samesite="Lax",
+                    secure=request.is_secure, httponly=True)
+
+
+def _ref_link(code) -> str:
+    base = PUBLIC_URL.rstrip("/") if PUBLIC_URL else request.host_url.rstrip("/")
+    return f"{base}/r/{code}"
+
+
+def _reg_ref_line(req: dict) -> list:
+    if not req.get("ref_shop_id"):
+        return []
+    ref = db.get_shop(req["ref_shop_id"]) or {}
+    return [f"🎁 Пригласил: {ref.get('shop_name') or '—'} (@{ref.get('username') or '?'})"]
+
+
+def _ref_notify(shop_id, key, **kw):
+    shop = db.get_shop(shop_id) if shop_id else None
+    if not shop or not shop.get("notify_telegram_id"):
+        return
+    try:
+        _send_telegram_message(shop["notify_telegram_id"], i18n.t(key, shop.get("language") or "ru", **kw))
+    except Exception as e:
+        logger.error(f"Реферал: сообщение точке {shop_id} не отправлено: {e}")
+
+
+def _ref_sync(referred_id):
+    """Пересчитать бонус после изменения оплат; о новом бонусе — сообщение
+    пригласившему и администратору (напоминание перевести деньги)."""
+    if not referred_id:
+        return
+    try:
+        r = db.referral_sync(int(referred_id))
+    except Exception as e:
+        logger.error(f"Реферал: пересчёт бонуса для точки {referred_id} не выполнен: {e}")
+        return
+    rw = r.get("reward")
+    if not r.get("created") or not rw:
+        return
+    new = db.get_shop(rw["referred_id"]) or {}
+    ref = db.get_shop(rw["referrer_id"]) or {}
+    _ref_notify(rw["referrer_id"], "ref_bot_reward", shop=new.get("shop_name") or new.get("username") or "—",
+                sum=_fmt_sum(rw["reward_amount"]))
+    if ADMIN_TELEGRAM_ID:
+        card = ref.get("ref_card") or "карта не указана"
+        _send_telegram_message(ADMIN_TELEGRAM_ID, "\n".join([
+            "🎁 Реферальный бонус к выплате",
+            f"Кому: {ref.get('shop_name') or '—'} (@{ref.get('username') or '?'})",
+            f"Карта: {card}",
+            f"За точку: {new.get('shop_name') or '—'} (@{new.get('username') or '?'})",
+            f"Оплата: {_fmt_sum(rw['base_amount'])} сум → бонус {db.REF_SHARE_PCT}%: {_fmt_sum(rw['reward_amount'])} сум",
+            "После перевода нажмите «Выплачено» в админке → Реферальная программа.",
+        ]))
+
+
+@app.route("/r/<code>")
+def referral_entry(code):
+    referrer = db.find_referrer_by_code(code)
+    lang = request.args.get("lang")
+    target = "/register" + ("?lang=uz" if lang == "uz" else "")
+    resp = redirect(target)
+    if referrer:
+        _set_ref_cookie(resp, referrer["ref_code"])
+    return resp
+
+
+@app.route("/referral")
+@login_required
+@sub_exempt
+def referral_page():
+    if not _is_sub_owner():
+        return redirect("/")
+    T = g.T
+    code = db.get_or_create_ref_code(g.shop_id)
+    if not code:
+        return redirect("/")
+    shop = db.get_shop(g.shop_id) or {}
+    data = db.my_referrals(g.shop_id)
+    link = _ref_link(code)
+    chips = {"request": ("grey", T["ref_st_request"]), "joined": ("blue", T["ref_st_joined"]),
+             "paid": ("green", T["ref_st_paid"]), "paid_out": ("dark", T["ref_st_paid_out"])}
+    items = []
+    for it in data["items"]:
+        chip = chips[it["status"]]
+        if it["status"] == "paid":
+            sub = T["ref_item_wait"].format(sum=_fmt_sum(it["reward"]))
+        elif it["status"] == "paid_out":
+            sub = T["ref_item_paid"].format(sum=_fmt_sum(it["reward"]), date=_fmt_day(it.get("paid_at")))
+        elif it["status"] == "joined":
+            sub = T["ref_item_joined"]
+        else:
+            sub = T["ref_item_request"]
+        items.append({"name": it["name"], "date": _fmt_day(it["date"]), "chip": chip, "sub": sub})
+    share_text = T["ref_share_text"].format(link=link)
+    return render_template_string(
+        REFERRAL_PAGE, T=T, lang=g.lang, link=link, code=code, pct=db.REF_SHARE_PCT,
+        share_text=share_text,
+        tg_share="https://t.me/share/url?url=" + quote(link, safe="") + "&text=" + quote(
+            T["ref_share_text_tg"], safe=""),
+        stats=data, pending_txt=_fmt_sum(data["pending"]), paid_txt=_fmt_sum(data["paid_out"]),
+        earned_txt=_fmt_sum(data["earned"]), items=items, card=shop.get("ref_card") or "")
+
+
+@app.route("/api/referral/card", methods=["POST"])
+@login_required
+@sub_exempt
+def api_referral_card():
+    if not _is_sub_owner():
+        return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
+    raw = (request.get_json(force=True, silent=True) or {}).get("card") or ""
+    digits = "".join(ch for ch in str(raw) if ch.isdigit())
+    if digits and not (12 <= len(digits) <= 19):
+        return jsonify({"ok": False, "error": g.T["ref_card_bad"]}), 400
+    return jsonify({"ok": True, "card": db.set_ref_card(g.shop_id, digits) or ""})
+
+
+@app.route("/api/admin/referrals")
+@admin_required
+def api_admin_referrals():
+    return jsonify({"ok": True, **db.admin_referrals()})
+
+
+@app.route("/api/admin/referrals/<int:reward_id>/paid", methods=["POST"])
+@admin_required
+def api_admin_referral_paid(reward_id):
+    rw = db.admin_mark_reward_paid(reward_id)
+    if not rw:
+        return jsonify({"ok": False, "error": "бонус уже отмечен или не найден"}), 409
+    new = db.get_shop(rw["referred_id"]) or {}
+    _ref_notify(rw["referrer_id"], "ref_bot_paid", sum=_fmt_sum(rw["reward_amount"]),
+                shop=new.get("shop_name") or new.get("username") or "—")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/shops/<int:shop_id>/referrer", methods=["POST"])
+@admin_required
+def api_admin_set_referrer(shop_id):
+    raw = (request.get_json(force=True, silent=True) or {}).get("referrer_id")
+    try:
+        ref_id = int(raw) if raw not in (None, "", 0, "0") else None
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "неверная точка"}), 400
+    err = db.admin_set_referrer(shop_id, ref_id)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    _ref_sync(shop_id)
+    return jsonify({"ok": True})
 
 
 # ---------- Сотрудники: владелец точки управляет сам ----------

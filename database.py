@@ -299,6 +299,7 @@ def init_db():
         _migrate_daily_km(conn)
         _migrate_course(conn)
         _migrate_registration(conn)
+        _migrate_referral(conn)
         _migrate_vin(conn)
         _migrate_debts(conn)
         _bootstrap_accounts(conn)
@@ -6613,13 +6614,292 @@ def list_registrations(limit_done: int = 15) -> dict:
         _expire_old_registrations(conn)
         conn.commit()
         cols = ("id, shop_name, owner_name, city, phone, address, username, language, tg_id, tg_username, "
-                "tg_name, tg_phone, lat, lon, status, shop_id, created_at, confirmed_at, decided_at")
+                "tg_name, tg_phone, lat, lon, status, shop_id, created_at, confirmed_at, decided_at, "
+                "(SELECT shop_name FROM shops WHERE shops.id = registration_requests.ref_shop_id) AS ref_name")
         pending = [dict(r) for r in conn.execute(
             f"SELECT {cols} FROM registration_requests WHERE status='pending' ORDER BY id").fetchall()]
         done = [dict(r) for r in conn.execute(
             f"SELECT {cols} FROM registration_requests WHERE status IN ('approved', 'rejected') "
             f"ORDER BY decided_at DESC, id DESC LIMIT ?", (limit_done,)).fetchall()]
         return {"pending": pending, "done": done}
+
+
+# ======================================================================
+# Реферальная программа «Пригласи друга»
+# ======================================================================
+# Главная или самостоятельная точка делится ссылкой /r/<код>. Новый человек
+# регистрируется по ней (/register), и его точка запоминает, кто её привёл
+# (shops.referred_by). Когда приглашённая точка ПЕРВЫЙ раз оплачивает
+# подписку, пригласившему начисляется REF_SHARE_PCT % от этой оплаты —
+# один раз (referral_rewards, одна запись на приглашённую точку). Деньги
+# переводит администратор вручную и нажимает «Выплачено».
+
+REF_SHARE_PCT = 50
+REF_COOKIE_DAYS = 60
+_REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # без 0/O и 1/I — не перепутать
+
+
+def _migrate_referral(conn):
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    for col, ddl in {"ref_code": "TEXT", "referred_by": "INTEGER", "ref_card": "TEXT"}.items():
+        if col not in cols:
+            conn.execute(f"ALTER TABLE shops ADD COLUMN {col} {ddl}")
+    reg_cols = {row["name"] for row in conn.execute("PRAGMA table_info(registration_requests)").fetchall()}
+    if "ref_shop_id" not in reg_cols:
+        conn.execute("ALTER TABLE registration_requests ADD COLUMN ref_shop_id INTEGER")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS referral_rewards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        referrer_id INTEGER NOT NULL,
+        referred_id INTEGER NOT NULL UNIQUE,
+        payment_id INTEGER,
+        base_amount INTEGER NOT NULL,
+        reward_amount INTEGER NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        paid_at TEXT
+    )
+    """)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_ref_code ON shops(ref_code)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_shops_referred_by ON shops(referred_by)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ref_rewards_referrer ON referral_rewards(referrer_id, status)")
+    conn.commit()
+
+
+def _can_refer(shop) -> bool:
+    """Приглашать могут только главная и самостоятельная точка (не филиал)."""
+    return bool(shop) and shop.get("role") == "shop"
+
+
+@_serialized
+def get_or_create_ref_code(shop_id: int):
+    with get_conn() as conn:
+        row = conn.execute("SELECT role, ref_code FROM shops WHERE id=?", (shop_id,)).fetchone()
+        if not row or row["role"] != "shop":
+            return None
+        if row["ref_code"]:
+            return row["ref_code"]
+        for _ in range(50):
+            code = "".join(secrets.choice(_REF_ALPHABET) for _ in range(6))
+            if not conn.execute("SELECT 1 FROM shops WHERE ref_code=?", (code,)).fetchone():
+                conn.execute("UPDATE shops SET ref_code=? WHERE id=?", (code, shop_id))
+                conn.commit()
+                return code
+        return None
+
+
+def find_referrer_by_code(code):
+    """Точка-пригласитель по коду из ссылки (только активная главная/самостоятельная)."""
+    code = "".join(ch for ch in str(code or "").upper() if ch.isalnum())[:12]
+    if not code:
+        return None
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM shops WHERE ref_code=? AND role='shop' AND is_active=1",
+                           (code,)).fetchone()
+        return dict(row) if row else None
+
+
+@_serialized
+def set_registration_ref(req_id: int, ref_shop_id: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE registration_requests SET ref_shop_id=? WHERE id=?", (ref_shop_id, req_id))
+        conn.commit()
+
+
+@_serialized
+def link_referred_shop(shop_id: int, ref_shop_id: int) -> bool:
+    """После одобрения заявки: новая точка запоминает, кто её привёл."""
+    if not ref_shop_id or int(ref_shop_id) == int(shop_id):
+        return False
+    with get_conn() as conn:
+        ref = conn.execute("SELECT role FROM shops WHERE id=?", (ref_shop_id,)).fetchone()
+        if not ref or ref["role"] != "shop":
+            return False
+        conn.execute("UPDATE shops SET referred_by=? WHERE id=? AND role='shop' AND referred_by IS NULL",
+                     (int(ref_shop_id), shop_id))
+        conn.commit()
+        return True
+
+
+@_serialized
+def set_ref_card(shop_id: int, card: str):
+    digits = "".join(ch for ch in str(card or "") if ch.isdigit())[:19]
+    pretty = " ".join(digits[i:i + 4] for i in range(0, len(digits), 4)) if digits else None
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET ref_card=? WHERE id=? AND role='shop'", (pretty, shop_id))
+        conn.commit()
+    return pretty
+
+
+def _ref_first_payment(conn, shop_id: int):
+    """Первая подтверждённая оплата подписки с суммой — с неё считается бонус."""
+    row = conn.execute("""
+        SELECT id, amount FROM sub_payments
+        WHERE shop_id=? AND status='confirmed' AND COALESCE(amount, 0) > 0
+        ORDER BY COALESCE(decided_at, created_at), id LIMIT 1
+    """, (shop_id,)).fetchone()
+    return dict(row) if row else None
+
+
+@_serialized
+def referral_sync(referred_id: int) -> dict:
+    """Приводит бонус приглашённой точки в соответствие с её оплатами.
+    Вызывается после любого изменения оплат (подтверждение чека, оплата
+    наличными, правка суммы, отмена записи) и при ручной привязке.
+    Выплаченный бонус не меняется никогда.
+    Возвращает {"created": bool, "reward": dict | None}."""
+    out = {"created": False, "reward": None}
+    with get_conn() as conn:
+        shop = conn.execute("SELECT id, role, referred_by FROM shops WHERE id=?", (referred_id,)).fetchone()
+        if not shop:
+            return out
+        rw = conn.execute("SELECT * FROM referral_rewards WHERE referred_id=?", (referred_id,)).fetchone()
+        rw = dict(rw) if rw else None
+        if rw and rw["status"] == "paid":
+            out["reward"] = rw
+            return out
+        ref_id = shop["referred_by"] if shop["role"] == "shop" else None
+        pay = _ref_first_payment(conn, referred_id) if ref_id else None
+        if not pay:
+            if rw and rw["status"] == "pending":
+                conn.execute("UPDATE referral_rewards SET status='cancelled' WHERE id=?", (rw["id"],))
+                conn.commit()
+            return out
+        base = int(pay["amount"])
+        reward = int(round(base * REF_SHARE_PCT / 100.0))
+        if rw:
+            if (rw["status"] != "pending" or rw["payment_id"] != pay["id"] or rw["base_amount"] != base
+                    or rw["referrer_id"] != ref_id):
+                conn.execute("""UPDATE referral_rewards SET referrer_id=?, payment_id=?, base_amount=?,
+                                reward_amount=?, status='pending' WHERE id=?""",
+                             (ref_id, pay["id"], base, reward, rw["id"]))
+                out["created"] = rw["status"] != "pending" or rw["referrer_id"] != ref_id
+        else:
+            conn.execute("""INSERT INTO referral_rewards (referrer_id, referred_id, payment_id, base_amount, reward_amount)
+                            VALUES (?, ?, ?, ?, ?)""", (ref_id, referred_id, pay["id"], base, reward))
+            out["created"] = True
+        conn.commit()
+        out["reward"] = dict(conn.execute("SELECT * FROM referral_rewards WHERE referred_id=?",
+                                          (referred_id,)).fetchone())
+        return out
+
+
+def my_referrals(referrer_id: int) -> dict:
+    """Для раздела «Пригласи друга»: кого пригласили и сколько заработано."""
+    with get_conn() as conn:
+        _expire_old_registrations(conn)
+        conn.commit()
+        shops = [dict(r) for r in conn.execute("""
+            SELECT s.id, s.shop_name, s.username, s.created_at, s.is_active,
+                   r.status AS rw_status, r.reward_amount, r.base_amount, r.paid_at, r.created_at AS rw_at
+            FROM shops s LEFT JOIN referral_rewards r ON r.referred_id = s.id AND r.status != 'cancelled'
+            WHERE s.referred_by=? AND s.role='shop'
+            ORDER BY s.id DESC
+        """, (referrer_id,)).fetchall()]
+        regs = [dict(r) for r in conn.execute("""
+            SELECT id, shop_name, created_at FROM registration_requests
+            WHERE ref_shop_id=? AND status IN ('new', 'pending') ORDER BY id DESC
+        """, (referrer_id,)).fetchall()]
+    items = []
+    for r in regs:
+        items.append({"name": r["shop_name"], "date": r["created_at"], "status": "request", "reward": None})
+    for s in shops:
+        if s["rw_status"] == "paid":
+            st = "paid_out"
+        elif s["rw_status"] == "pending":
+            st = "paid"
+        else:
+            st = "joined"
+        items.append({"name": s["shop_name"] or s["username"], "date": s["created_at"], "status": st,
+                      "reward": s["reward_amount"] if s["rw_status"] else None,
+                      "paid_at": s["paid_at"]})
+    pending = sum(i["reward"] or 0 for i in items if i["status"] == "paid")
+    paid_out = sum(i["reward"] or 0 for i in items if i["status"] == "paid_out")
+    return {
+        "items": items,
+        "invited": len(items),
+        "paying": sum(1 for i in items if i["status"] in ("paid", "paid_out")),
+        "pending": pending, "paid_out": paid_out, "earned": pending + paid_out,
+    }
+
+
+def admin_referrals() -> dict:
+    """Для админки: бонусы к выплате, выплаченные и приглашённые без оплаты."""
+    with get_conn() as conn:
+        rewards = [dict(r) for r in conn.execute("""
+            SELECT r.*, a.shop_name AS ref_name, a.username AS ref_username, a.ref_card,
+                   a.notify_telegram_id AS ref_tg, b.shop_name AS new_name, b.username AS new_username
+            FROM referral_rewards r
+            LEFT JOIN shops a ON a.id = r.referrer_id
+            LEFT JOIN shops b ON b.id = r.referred_id
+            WHERE r.status IN ('pending', 'paid')
+            ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, COALESCE(r.paid_at, r.created_at) DESC
+            LIMIT 200
+        """).fetchall()]
+        waiting = [dict(r) for r in conn.execute("""
+            SELECT b.id, b.shop_name AS new_name, b.username AS new_username, b.created_at,
+                   a.shop_name AS ref_name, a.username AS ref_username
+            FROM shops b JOIN shops a ON a.id = b.referred_by
+            WHERE b.role='shop' AND NOT EXISTS (
+                SELECT 1 FROM referral_rewards r WHERE r.referred_id = b.id AND r.status IN ('pending', 'paid'))
+            ORDER BY b.id DESC LIMIT 200
+        """).fetchall()]
+        heads = [dict(r) for r in conn.execute("""
+            SELECT id, shop_name, username, referred_by FROM shops WHERE role='shop'
+            ORDER BY shop_name COLLATE NOCASE
+        """).fetchall()]
+    for r in rewards:
+        r.pop("ref_tg", None)
+    pend = [r for r in rewards if r["status"] == "pending"]
+    return {
+        "pending": pend,
+        "paid": [r for r in rewards if r["status"] == "paid"][:30],
+        "waiting": waiting,
+        "shops": heads,
+        "pending_sum": sum(r["reward_amount"] for r in pend),
+        "paid_sum": sum(r["reward_amount"] for r in rewards if r["status"] == "paid"),
+        "pct": REF_SHARE_PCT,
+    }
+
+
+def get_referral_reward(reward_id: int):
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM referral_rewards WHERE id=?", (reward_id,)).fetchone()
+        return dict(r) if r else None
+
+
+@_serialized
+def admin_mark_reward_paid(reward_id: int):
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE referral_rewards SET status='paid', paid_at=datetime('now','localtime') "
+                           "WHERE id=? AND status='pending'", (reward_id,))
+        conn.commit()
+        if not cur.rowcount:
+            return None
+        return dict(conn.execute("SELECT * FROM referral_rewards WHERE id=?", (reward_id,)).fetchone())
+
+
+@_serialized
+def admin_set_referrer(shop_id: int, referrer_id) -> str:
+    """Ручная привязка «кто пригласил» (точку создали в админке, а не по ссылке).
+    Возвращает '' при успехе или текст ошибки."""
+    with get_conn() as conn:
+        shop = conn.execute("SELECT id, role FROM shops WHERE id=?", (shop_id,)).fetchone()
+        if not shop or shop["role"] != "shop":
+            return "точка не найдена"
+        rw = conn.execute("SELECT status FROM referral_rewards WHERE referred_id=?", (shop_id,)).fetchone()
+        if rw and rw["status"] == "paid":
+            return "бонус за эту точку уже выплачен — менять нельзя"
+        if referrer_id:
+            referrer_id = int(referrer_id)
+            if referrer_id == int(shop_id):
+                return "точка не может пригласить саму себя"
+            ref = conn.execute("SELECT role FROM shops WHERE id=?", (referrer_id,)).fetchone()
+            if not ref or ref["role"] != "shop":
+                return "пригласить может только главная или самостоятельная точка"
+        conn.execute("UPDATE shops SET referred_by=? WHERE id=?", (referrer_id or None, shop_id))
+        conn.commit()
+    return ""
 
 
 # ======================================================================
