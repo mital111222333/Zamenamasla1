@@ -21,13 +21,113 @@ from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
-MODEL_PATH = os.path.join(HERE, "plate_ocr.onnx")
+MODEL_PATH = os.path.join(HERE, "plate_ocr_uz.onnx")
 
-# --- распознавание: то же, что в сканере в браузере (webapp.py, decode) ---
+# --- распознавание: то же, что в сканере в браузере (webapp.py, plateDecode) ---
 ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
-FORMATS = ("DDLDDDLL", "DDDDDLLL")  # новые узбекские: 01 A 123 BC и 01 123 ABC
-REGIONS = {"01", "10", "20", "25", "30", "40", "50", "60", "70", "75", "80", "85", "90", "95"}
-FREE_MARGIN = 2.5     # насколько свободное чтение должно быть лучше узбекского формата
+RU_LET = "ABEKMHOPCTYX"
+TEMPLATES = [
+    ("DDLDDDLL", 0.0),    # UZ физлица:            01 A 123 BC
+    ("DDDDDLLL", 0.0),    # UZ юрлица (и KG):      01 123 ABC
+    ("DDLDDDD", 0.4),     # UZ старый 1996–2008:   23 G 8107
+    ("DDLDDDDDD", 0.8),   # UZ иностранцы/фирмы:   01 H 123456
+    ("RDDDRRDD", 0.6),    # RU:                    A 123 BC 77
+    ("RDDDRRDDD", 0.6),   # RU:                    A 123 BC 777
+    ("DDDLLLDD", 0.6),    # KZ:                    123 ABC 01
+    ("DDDLLDD", 0.8),     # KZ:                    123 AB 01
+    ("DDDDLLDD", 0.6),    # TJ:                    1234 AB 01
+]
+JUNK = 2.0
+FREE_MARGIN = 3.0
+CLASSES = {"D": list(range(10)), "L": list(range(10, 36)),
+           "R": [ALPHA.index(c) for c in RU_LET], "A": list(range(36))}
+NEG = -1e18
+
+
+def decode(probs):
+    """probs — 370 чисел (10 позиций × 37) или массив 10×37. Возвращает (номер, уверенность)."""
+    flat = [float(x) for x in (probs.reshape(-1) if hasattr(probs, "reshape") else probs)]
+    L = [[math.log(flat[k * 37 + j] + 1e-9) for j in range(37)] for k in range(10)]
+    best = []
+    for row in L:
+        o = {}
+        for c, idx in CLASSES.items():
+            bj = idx[0]
+            for j in idx:
+                if row[j] > row[bj]:
+                    bj = j
+            o[c] = bj
+        best.append(o)
+    cand = None
+    for tpl, prior in TEMPLATES:
+        n = len(tpl)
+        dp = [[NEG] * (n + 1) for _ in range(11)]
+        bk = [[None] * (n + 1) for _ in range(11)]
+        dp[0][0] = 0.0
+        for i in range(10):
+            for t in range(n + 1):
+                s = dp[i][t]
+                if s == NEG:
+                    continue
+                if t < n:
+                    j = best[i][tpl[t]]; v = L[i][j]
+                    if s + v > dp[i + 1][t + 1]:
+                        dp[i + 1][t + 1] = s + v; bk[i + 1][t + 1] = (t, j, v)
+                else:
+                    v = L[i][36]
+                    if s + v > dp[i + 1][t]:
+                        dp[i + 1][t] = s + v; bk[i + 1][t] = (t, -2, v)
+                jj = best[i]["A"]; vj = L[i][jj]
+                if s + vj - JUNK > dp[i + 1][t]:
+                    dp[i + 1][t] = s + vj - JUNK; bk[i + 1][t] = (t, -1, vj)
+        sc = dp[10][n]
+        if sc == NEG:
+            continue
+        out, raw, t = "", 0.0, n
+        for i in range(10, 0, -1):
+            pt, j, v = bk[i][t]
+            raw += v
+            if j >= 0:
+                out = ALPHA[j] + out
+            t = pt
+        if tpl.startswith("DD") and out.startswith("00"):
+            sc -= 4; raw -= 4
+        sc -= prior
+        if cand is None or sc > cand[0]:
+            cand = (sc, raw, out)
+    fs, fp = 0.0, ""
+    for k in range(10):
+        bj = 0
+        for j in range(1, 37):
+            if L[k][j] > L[k][bj]:
+                bj = j
+        fs += L[k][bj]
+        if bj != 36:
+            fp += ALPHA[bj]
+    if len(fp) >= 4 and (cand is None or fs - FREE_MARGIN > cand[0]):
+        return fp, math.exp(fs / 10)
+    return cand[2], math.exp(cand[1] / 10)
+
+
+_PRETTY = [
+    (r"^([0-9]{2})([A-Z])([0-9]{3})([A-Z]{2})$", r"\1 \2 \3 \4"),
+    (r"^([0-9]{2})([0-9]{3})([A-Z]{3})$", r"\1 \2 \3"),
+    (r"^([0-9]{2})([A-Z])([0-9]{4})$", r"\1 \2 \3"),
+    (r"^([0-9]{2})([A-Z])([0-9]{6})$", r"\1 \2 \3"),
+    (r"^([A-Z])([0-9]{3})([A-Z]{2})([0-9]{2,3})$", r"\1 \2 \3 \4"),
+    (r"^([0-9]{3})([A-Z]{2,3})([0-9]{2})$", r"\1 \2 \3"),
+    (r"^([0-9]{4})([A-Z]{2})([0-9]{2})$", r"\1 \2 \3"),
+]
+
+
+def pretty(p):
+    p = re.sub(r"[^A-Z0-9]", "", str(p or "").upper())
+    for rx, f in _PRETTY:
+        if re.match(rx, p):
+            return re.sub(rx, f, p)
+    return p
+
+
 MIN_CONF = 0.6        # кадр учитываем при такой уверенности
 NEED_HITS = 2         # два одинаковых прочтения подряд — и номер на табло
 INSTANT_CONF = 0.95   # при такой уверенности хватает одного кадра
@@ -41,53 +141,6 @@ WIN_SCALES = (1.0, 1.3, 0.8)
 WIN_SHIFTS = (0.0, -0.25, 0.25)
 WIN_INSETS = ((0.0, 0.0), (0.06, 0.14))
 LOCK_MISSES = 15      # столько кадров подряд без номера — отпускаем «удачную» рамку
-
-
-def decode(probs):
-    """probs — 370 чисел (10 позиций × 37 символов). Возвращает (номер, уверенность).
-    Сначала подгоняем под узбекский формат; если свободное чтение заметно
-    лучше — это российский, старый узбекский или другой номер."""
-    def lp(k, j):
-        return math.log(probs[k * 37 + j] + 1e-9)
-
-    reg_score, reg_code = None, None
-    for a in range(10):
-        for b in range(10):
-            code = f"{a}{b}"
-            sc = lp(0, a) + lp(1, b) - (0 if code in REGIONS else 3)
-            if reg_score is None or sc > reg_score:
-                reg_score, reg_code = sc, code
-    best_score, best_plate = None, None
-    for f in FORMATS:
-        score, out = reg_score, reg_code
-        for k in range(2, 10):
-            if k >= len(f):
-                score += lp(k, 36)
-                continue
-            lo, hi = (0, 10) if f[k] == "D" else (10, 36)
-            bj = max(range(lo, hi), key=lambda j: probs[k * 37 + j])
-            score += lp(k, bj)
-            out += ALPHA[bj]
-        if best_score is None or score > best_score:
-            best_score, best_plate = score, out
-
-    free_score, free_plate = 0.0, ""
-    for k in range(10):
-        bj = max(range(37), key=lambda j: probs[k * 37 + j])
-        free_score += lp(k, bj)
-        if bj != 36:
-            free_plate += ALPHA[bj]
-    if len(free_plate) >= 4 and free_score - best_score > FREE_MARGIN:
-        return free_plate, math.exp(free_score / 10)
-    return best_plate, math.exp(best_score / 10)
-
-
-def pretty(p):
-    if re.fullmatch(r"[0-9]{2}[A-Z][0-9]{3}[A-Z]{2}", p):
-        return f"{p[:2]} {p[2]} {p[3:6]} {p[6:]}"
-    if re.fullmatch(r"[0-9]{5}[A-Z]{3}", p):
-        return f"{p[:2]} {p[2:5]} {p[5:]}"
-    return p
 
 
 def parse_scanner_link(link):
@@ -132,7 +185,7 @@ def ensure_model(server):
         return
     import requests
     log("Скачиваю модель распознавания…")
-    r = requests.get(server + "/ocr/v1/plate_ocr.onnx", timeout=120)
+    r = requests.get(server + "/ocr/v1/plate_ocr_uz.onnx", timeout=120)
     r.raise_for_status()
     tmp = MODEL_PATH + ".part"
     with open(tmp, "wb") as f:
