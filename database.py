@@ -699,8 +699,8 @@ def _bootstrap_accounts(conn):
     try:
         conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
-                                anpr_token, notify_telegram_id, is_active)
-            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                                anpr_token, notify_telegram_id, is_active, warehouse_enabled, store_enabled)
+            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1)
         """, (
             BOOTSTRAP_SHOP_USERNAME, generate_password_hash(shop_password),
             BOOTSTRAP_SHOP_NAME, BOOTSTRAP_SHOP_PHONE or None, BOOTSTRAP_SHOP_ADDRESS or None, BOOTSTRAP_SHOP_HOURS or None,
@@ -887,11 +887,14 @@ def create_shop(username: str, password: str, shop_name: str = None, phone: str 
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address, hours, lat, lon,
-                                anpr_token, notify_telegram_id, is_active, client_group, owner_link_token)
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                                anpr_token, notify_telegram_id, is_active, client_group, owner_link_token,
+                                warehouse_enabled, store_enabled)
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
         """, (username, generate_password_hash(password), role, shop_name,
               phone, address, hours, lat, lon, secrets.token_urlsafe(8), notify_telegram_id, client_group or None,
-              secrets.token_urlsafe(12)))
+              secrets.token_urlsafe(12),
+              # у новой точки «Склад» и «Магазин» включены сразу; SMS и филиалы подключает админ
+              1 if role == "shop" else 0, 1 if role == "shop" else 0))
         conn.commit()
         return get_shop(cur.lastrowid)
 
@@ -6766,9 +6769,9 @@ def approve_registration(req_id: int) -> dict:
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
                                anpr_token, notify_telegram_id, language, is_active, owner_link_token,
-                               warehouse_enabled, sms_enabled, paid_until, license_type, trial, self_registered,
-                               lat, lon)
-            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 0, ?, 'sub', 1, 1, ?, ?)
+                               warehouse_enabled, store_enabled, sms_enabled, paid_until, license_type, trial,
+                               self_registered, lat, lon)
+            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 1, 0, ?, 'sub', 1, 1, ?, ?)
         """, (req["username"], req["password_hash"], req["shop_name"], req.get("phone"), address,
               secrets.token_urlsafe(8), str(req["tg_id"]) if req.get("tg_id") else None,
               req.get("language") or "ru", secrets.token_urlsafe(12), until, req.get("lat"), req.get("lon")))
