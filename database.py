@@ -5726,6 +5726,8 @@ def get_map_points(days: int = 30) -> dict:
         shops = conn.execute("""
             SELECT s.id, s.shop_name, s.username, s.role, s.parent_shop_id, s.client_group,
                    s.address, s.phone, s.hours, s.lat, s.lon, s.is_active,
+                   s.paid_until AS own_paid_until, s.license_type AS own_license,
+                   p.paid_until AS par_paid_until, p.license_type AS par_license,
                    p.shop_name AS parent_name, p.username AS parent_username,
                    (SELECT COUNT(*) FROM shops b WHERE b.parent_shop_id = s.id AND b.role='branch') AS branch_count,
                    (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) AS client_count
@@ -5765,7 +5767,30 @@ def get_map_points(days: int = 30) -> dict:
             kind = "main"
         else:
             kind = "single"
+        # подписка: филиал платит вместе с главной точкой
+        if d["role"] == "branch" and d.get("parent_shop_id"):
+            lic, paid_raw = d.get("par_license"), d.get("par_paid_until")
+        else:
+            lic, paid_raw = d.get("own_license"), d.get("own_paid_until")
+        for k in ("own_paid_until", "own_license", "par_paid_until", "par_license"):
+            d.pop(k, None)
+        sub_until = _parse_day(paid_raw)
+        sub_left = (sub_until - _today()).days if sub_until else None
+        if (lic or "sub") == "lifetime":
+            sub_status = "paid"
+        elif sub_until is None:
+            sub_status = "unset"
+        elif sub_left < 0:
+            sub_status = "blocked"
+        elif sub_left <= 5:
+            sub_status = "soon"
+        else:
+            sub_status = "paid"
         d.update({
+            "sub_status": sub_status,
+            "sub_lifetime": (lic or "sub") == "lifetime",
+            "sub_until": sub_until.strftime("%Y-%m-%d") if sub_until else None,
+            "sub_left": sub_left,
             "kind": kind,
             "is_active": bool(d["is_active"]),
             "count": st.get("cnt") or 0,

@@ -13971,6 +13971,14 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
     <div class="map-bar">
+      <div class="map-seg" id="mapSubSeg">
+        <button class="on" data-s="all" onclick="setMapSub('all')">Все</button>
+        <button data-s="paid" onclick="setMapSub('paid')">Оплачено</button>
+        <button data-s="soon" onclick="setMapSub('soon')">Скоро истекает</button>
+        <button data-s="blocked" onclick="setMapSub('blocked')">Заблокировано</button>
+      </div>
+    </div>
+    <div class="map-bar">
       <div class="map-seg" id="mapFilterSeg">
         <button class="on" data-f="all" onclick="setMapFilter('all')">Все</button>
         <button data-f="green" onclick="setMapFilter('green')">Работают</button>
@@ -13996,7 +14004,7 @@ if ('serviceWorker' in navigator) {
       <span><i class="dot" style="background:#EAB308"></i>4–14 дней назад</span>
       <span><i class="dot" style="background:#DC2626"></i>больше 14 дней / не было</span>
       <span><i class="dot" style="background:#94A3B8"></i>выключена</span>
-      <span>● размер круга — <b id="mapLegendMetric">замены</b> за период; толстая обводка — главная точка</span>
+      <span>толстая обводка — главная точка</span>
     </div>
     <div class="map-list" id="mapNoCoords" style="display:none;"></div>
     <div class="map-list" id="mapRating"></div>
@@ -15134,7 +15142,7 @@ loadRegs();
 setInterval(() => { if (!document.hidden) loadRegs(); }, 60000);
 loadRefs();
 // ---------- Карта точек с аналитикой ----------
-let MAP = null, MAPDATA = null, mapLayer = null, mapDays = 30, mapMetric = 'count', mapFilt = 'all', mapGroupSel = '';
+let MAP = null, MAPDATA = null, mapLayer = null, mapDays = 30, mapMetric = 'count', mapFilt = 'all', mapSub = 'all', mapGroupSel = '';
 let mapMarkers = {}, mapPickId = null, mapFitted = false, mapSaving = false, leafletPromise = null;
 const MAP_COLORS = { green: '#16A34A', yellow: '#EAB308', red: '#DC2626', off: '#94A3B8' };
 
@@ -15174,6 +15182,15 @@ function mapKindText(p) {
   if (p.kind === 'main') return `Главная точка · филиалов: ${p.branch_count}`;
   return 'Самостоятельная точка';
 }
+function mapSubText(p) {
+  if (p.sub_lifetime) return '∞ Бессрочная лицензия';
+  if (!p.sub_until) return 'Дата оплаты не указана';
+  const d = p.sub_until.split('-').reverse().join('.');
+  if (p.sub_status === 'blocked') return `Заблокировано за неуплату · с ${d} (${-p.sub_left} дн.)`;
+  if (p.sub_status === 'soon') return `Скоро истекает · до ${d} (осталось ${p.sub_left} дн.)`;
+  return `Оплачено до ${d}`;
+}
+const MAP_SUB_COLORS = { paid: '#16A34A', soon: '#EAB308', blocked: '#DC2626', unset: '#94A3B8' };
 function mapPctHtml(pct) {
   if (pct === null || pct === undefined) return '<span style="color:#94A3B8">—</span>';
   const up = pct >= 0;
@@ -15183,7 +15200,8 @@ function mapVisible() {
   if (!MAPDATA) return [];
   return MAPDATA.points.filter(p =>
     (!mapGroupSel || (p.client_group || '') === mapGroupSel) &&
-    (mapFilt === 'all' || mapStatus(p) === mapFilt));
+    (mapFilt === 'all' || mapStatus(p) === mapFilt) &&
+    (mapSub === 'all' || p.sub_status === mapSub));
 }
 
 async function loadMap() {
@@ -15235,11 +15253,15 @@ function renderMap() {
     <div class="map-kpi"><b style="color:#16A34A">${all.filter(p => p.is_active && p.today > 0).length}</b><span>работали сегодня</span></div>
     <div class="map-kpi"><b style="color:#DC2626">${all.filter(p => mapStatus(p) === 'red').length}</b><span>молчат больше 14 дней</span></div>
     <div class="map-kpi"><b>${fmtShort(sum(pts, 'total'))}</b><span>${sum(pts, 'count').toLocaleString('ru-RU')} замен · ${per}</span></div>`;
-  document.getElementById('mapLegendMetric').textContent = mapMetric === 'total' ? 'выручка' : 'замены';
+  const subCnt = k => all.filter(p => p.sub_status === k).length;
+  [['all', 'Все', all.length], ['paid', 'Оплачено', subCnt('paid')], ['soon', 'Скоро истекает', subCnt('soon')],
+   ['blocked', 'Заблокировано', subCnt('blocked')]].forEach(([k, t, n]) => {
+    const b = document.querySelector('#mapSubSeg button[data-s="' + k + '"]');
+    if (b) b.textContent = k === 'all' ? t : `${t} · ${n}`;
+  });
 
   mapLayer.clearLayers();
   mapMarkers = {};
-  const maxV = Math.max(1, ...withXY.map(p => Number(p[mapMetric]) || 0));
   if (document.getElementById('mapLinksChk').checked) {
     const byId = {};
     MAPDATA.points.forEach(p => { byId[p.id] = p; });
@@ -15251,12 +15273,11 @@ function renderMap() {
     });
   }
   withXY.slice().sort((a, b) => (Number(b[mapMetric]) || 0) - (Number(a[mapMetric]) || 0)).forEach(p => {
-    const v = Number(p[mapMetric]) || 0;
     const st = mapStatus(p);
-    const r = 7 + 22 * Math.sqrt(v / maxV);
+    const r = 9;  // одинаковый размер у всех точек, цвет — по активности
     const m = L.circleMarker([p.lat, p.lon], {
       radius: r, color: p.kind === 'main' ? '#0A2540' : '#fff', weight: p.kind === 'main' ? 4 : 2,
-      fillColor: MAP_COLORS[st], fillOpacity: .85
+      fillColor: MAP_COLORS[st], fillOpacity: .9
     }).addTo(mapLayer);
     m.bindPopup(() => mapPopupHtml(p), { maxWidth: 280 });
     m.bindTooltip(escapeHtml(p.shop_name || p.username), { direction: 'top', offset: [0, -r] });
@@ -15299,6 +15320,7 @@ function mapPopupHtml(p) {
     <div class="mp-name">${escapeHtml(p.shop_name || p.username)}</div>
     <div class="mp-kind">${mapKindText(p)}${p.client_group ? ' · ' + escapeHtml(p.client_group) : ''}</div>
     <div class="mp-st" style="color:${MAP_COLORS[st]}">● ${mapIdleText(p)}</div>
+    <div class="mp-st" style="color:${MAP_SUB_COLORS[p.sub_status] || '#94A3B8'}"><i class="fa-solid fa-credit-card"></i> ${mapSubText(p)}</div>
     <div class="mp-grid">
       <div><b>${p.count}</b>замен · ${per}</div>
       <div><b>${fmtShort(p.total)}</b>выручка ${mapPctHtml(p.pct)}</div>
@@ -15325,6 +15347,11 @@ function setMapDays(d) {
 function setMapMetric(m) {
   mapMetric = m;
   document.querySelectorAll('#mapMetricSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  renderMap();
+}
+function setMapSub(s) {
+  mapSub = s;
+  document.querySelectorAll('#mapSubSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
   renderMap();
 }
 function setMapFilter(f) {
