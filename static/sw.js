@@ -11,7 +11,7 @@
 // каждом открытии приложения.
 
 const OFFLINE_CACHE = 'oilbook-offline-v4';
-const ASSET_CACHE = 'oilbook-assets-v1';
+const ASSET_CACHE = 'oilbook-assets-v2';
 const OFFLINE_URL = '/static/offline.html';
 const KEEP = [OFFLINE_CACHE, ASSET_CACHE];
 
@@ -39,6 +39,9 @@ function isImmutable(url) {
 // свои иконки/manifest и CSS шрифтов — показываем из кэша, а в фоне обновляем
 function isRefreshable(url) {
   if (url.hostname === 'fonts.googleapis.com') return true;
+  // manifest.json не кэшируем: по нему телефон рисует заставку при запуске,
+  // старая копия из кэша оставляла светлый фон с квадратом
+  if (url.pathname === '/static/manifest.json') return false;
   return url.origin === self.location.origin && url.pathname.startsWith('/static/');
 }
 
