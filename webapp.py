@@ -60,6 +60,9 @@ def _no_stale_cache(resp):
             resp.headers["Cache-Control"] = "no-store, max-age=0"
     elif path.startswith("/api/") or is_html:
         resp.headers["Cache-Control"] = "no-store, max-age=0"
+    elif path in ("/static/manifest.json", "/sw.js"):
+        # по manifest телефон рисует заставку при запуске — всегда свежий
+        resp.headers["Cache-Control"] = "no-cache"
     try:
         _gzip_response(resp)
     except Exception as e:  # сжатие — только ускорение, ответ уйдёт и без него
@@ -573,7 +576,7 @@ LOGIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ T.app_title }}</title>
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
@@ -721,7 +724,7 @@ REGISTER_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ T.reg_title }} — OilBook</title>
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -1444,7 +1447,7 @@ APP_PAGE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{{ T.inst_title }}</title>
 <meta name="description" content="{{ T.inst_lead }}">
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1839,7 +1842,7 @@ PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{{ shop_name }} — OilBook</title>
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13436,7 +13439,7 @@ ADMIN_PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OilBook — админ-панель</title>
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17871,7 +17874,7 @@ SUB_PAGE = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0A2540">
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <title>{{ T.sub_title }} · OilBook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18172,7 +18175,7 @@ REFERRAL_PAGE = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0A2540">
-<link rel="manifest" href="/static/manifest.json">
+<link rel="manifest" href="/static/manifest.json?v=2">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <title>{{ T.ref_title }} · OilBook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
