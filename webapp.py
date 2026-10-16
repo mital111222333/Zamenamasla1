@@ -16143,38 +16143,41 @@ SPLASH_HTML = """
 }catch(e){}})();
 </script>
 <style>
-#obSplash{display:none;position:fixed;inset:0;z-index:2147483000;background:#0A2540;flex-direction:column;align-items:center;justify-content:center;transition:opacity .4s ease}
-html.ob-sp #obSplash{display:flex}
+#obSplash{display:none;position:fixed;inset:0;z-index:2147483000;background:#0A2540;transition:opacity .4s ease}
+html.ob-sp #obSplash{display:block}
 html.ob-sp body{overflow:hidden}
 #obSplash.out{opacity:0;pointer-events:none}
-#obSplash .obs-wm{font-family:'Sora',-apple-system,Segoe UI,Roboto,sans-serif;font-weight:800;font-size:34px;letter-spacing:-1px;margin-top:22px;opacity:0;animation:obsUp .5s .5s ease-out forwards}
+#obSplash svg{position:absolute;left:50%;width:min(30.7vw,170px);height:auto;top:calc(50vh - min(17.05vw,94px));transform:translateX(-50%)}
+#obSplash .obs-txt{position:absolute;left:0;right:0;text-align:center;top:calc(50vh + min(26.4vw,146px))}
+#obSplash .obs-wm{font-family:'Sora',-apple-system,Segoe UI,Roboto,sans-serif;font-weight:800;font-size:34px;letter-spacing:-1px;opacity:0;animation:obsUp .5s 1.1s ease-out forwards}
 #obSplash .obs-oil{color:#38BDF8}
 #obSplash .obs-book{color:#fff}
-#obSplash .obs-sub{font-size:13px;color:#8fa6c8;margin-top:8px;opacity:0;animation:obsUp .5s .8s ease-out forwards}
-#obSplash .obs-lvl{animation:obsFill 1.5s cubic-bezier(.3,.1,.3,1) forwards,obsBob 2.4s 1.5s ease-in-out infinite alternate}
+#obSplash .obs-sub{font-size:13px;color:#8fa6c8;margin-top:8px;opacity:0;animation:obsUp .5s 1.4s ease-out forwards}
+#obSplash .obs-lvl{transform:translateY(84px);animation:obsFill 1.6s .15s cubic-bezier(.35,.1,.3,1) forwards,obsBob 2.4s 1.75s ease-in-out infinite alternate}
 #obSplash .obs-wave{animation:obsWave 1.1s linear infinite}
 #obSplash .obs-wave2{animation:obsWave 1.7s linear infinite reverse}
-@keyframes obsFill{from{transform:translateY(80px)}to{transform:translateY(14px)}}
-@keyframes obsBob{from{transform:translateY(14px)}to{transform:translateY(22px)}}
+@keyframes obsFill{from{transform:translateY(84px)}to{transform:translateY(10px)}}
+@keyframes obsBob{from{transform:translateY(10px)}to{transform:translateY(17px)}}
 @keyframes obsWave{to{transform:translateX(-60px)}}
 @keyframes obsUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){ #obSplash *{animation-duration:.01s!important;animation-iteration-count:1!important}}
 </style>
 <div id="obSplash" aria-hidden="true">
-  <svg viewBox="0 0 60 80" width="96" height="128">
-    <defs><clipPath id="obsClip"><path d="M30 3C30 3 5 36 5 52a25 25 0 0050 0C55 36 30 3 30 3z"/></clipPath></defs>
-    <path d="M30 3C30 3 5 36 5 52a25 25 0 0050 0C55 36 30 3 30 3z" fill="#0F3358"/>
+  <svg viewBox="0 0 60 80">
+    <defs><clipPath id="obsClip"><path d="M30 0C30 0 5 34 5 52a25 25 0 0050 0C55 34 30 0 30 0z"/></clipPath></defs>
+    <path d="M30 0C30 0 5 34 5 52a25 25 0 0050 0C55 34 30 0 30 0z" fill="#00A8E8"/>
     <g clip-path="url(#obsClip)">
       <g class="obs-lvl">
-        <path class="obs-wave2" d="M0 4q15-6 30 0t30 0 30 0 30 0V90H0z" fill="#FFD261" opacity=".55"/>
+        <path class="obs-wave2" d="M0 4q15-6 30 0t30 0 30 0 30 0V90H0z" fill="#FFD261" opacity=".6"/>
         <path class="obs-wave" d="M0 8q15-7 30 0t30 0 30 0 30 0V90H0z" fill="#F5B82E"/>
       </g>
     </g>
-    <path d="M30 3C30 3 5 36 5 52a25 25 0 0050 0C55 36 30 3 30 3z" fill="none" stroke="#38BDF8" stroke-width="2.5"/>
-    <ellipse cx="20" cy="50" rx="4" ry="8" fill="#fff" opacity=".35"/>
+    <ellipse cx="20.9" cy="45.9" rx="5.5" ry="11" fill="#85D3F2"/>
   </svg>
-  <div class="obs-wm"><span class="obs-oil">Oil</span><span class="obs-book">Book</span></div>
-  <div class="obs-sub">{{ T.splash_loading }}</div>
+  <div class="obs-txt">
+    <div class="obs-wm"><span class="obs-oil">Oil</span><span class="obs-book">Book</span></div>
+    <div class="obs-sub">{{ T.splash_loading }}</div>
+  </div>
 </div>
 <script>
 (function(){
@@ -16186,7 +16189,7 @@ html.ob-sp body{overflow:hidden}
     el.classList.add('out');
     setTimeout(function(){document.documentElement.classList.remove('ob-sp');if(el.parentNode)el.parentNode.removeChild(el);},450);
   }
-  function ready(){var left=1600-(Date.now()-(window.__obSpT||0));setTimeout(hide,left>0?left:0);}
+  function ready(){var left=1900-(Date.now()-(window.__obSpT||0));setTimeout(hide,left>0?left:0);}
   if(document.readyState==='complete')ready();else window.addEventListener('load',ready);
   setTimeout(hide,10000);
 })();
