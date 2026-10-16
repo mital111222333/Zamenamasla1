@@ -8,6 +8,7 @@ RU = {
     # --- Общее / шапка ---
     "app_title": "OilBook",
     "app_tagline": "учёт для пунктов замены масла",
+    "splash_loading": "наливаем масло…",
     "logout": "Выйти",
     "nav_add_short": "Замена",
     "kc_repeat": "Повторить прошлую замену",
@@ -664,6 +665,7 @@ RU = {
 UZ = {
     "app_title": "OilBook",
     "app_tagline": "moy almashtirish nuqtalari uchun hisob",
+    "splash_loading": "moy quyilmoqda…",
     "logout": "Chiqish",
     "nav_add_short": "Almashtirish",
     "kc_repeat": "O'tgan almashtirishni takrorlash",

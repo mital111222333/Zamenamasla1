@@ -16131,6 +16131,78 @@ if (location.hash === '#map') admTab('map');
 assert ADMIN_PAGE.count(_SW_SNIPPET) == 1
 ADMIN_PAGE = ADMIN_PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
+# Заставка при запуске приложения с иконки (вариант 2: капля наполняется маслом).
+# Показывается только в установленном приложении (standalone) и один раз за запуск:
+# при переходах между страницами больше не появляется. Исчезает, когда страница
+# загрузилась (но не раньше, чем капля наполнится), максимум через 10 секунд.
+SPLASH_HTML = """
+<script>
+(function(){try{
+  var sa=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
+  if(sa&&!sessionStorage.getItem('ob_splash')){sessionStorage.setItem('ob_splash','1');document.documentElement.classList.add('ob-sp');window.__obSpT=Date.now();}
+}catch(e){}})();
+</script>
+<style>
+#obSplash{display:none;position:fixed;inset:0;z-index:2147483000;background:#0A2540;flex-direction:column;align-items:center;justify-content:center;transition:opacity .4s ease}
+html.ob-sp #obSplash{display:flex}
+html.ob-sp body{overflow:hidden}
+#obSplash.out{opacity:0;pointer-events:none}
+#obSplash .obs-wm{font-family:'Sora',-apple-system,Segoe UI,Roboto,sans-serif;font-weight:800;font-size:34px;letter-spacing:-1px;margin-top:22px;opacity:0;animation:obsUp .5s .5s ease-out forwards}
+#obSplash .obs-oil{color:#38BDF8}
+#obSplash .obs-book{color:#fff}
+#obSplash .obs-sub{font-size:13px;color:#8fa6c8;margin-top:8px;opacity:0;animation:obsUp .5s .8s ease-out forwards}
+#obSplash .obs-lvl{animation:obsFill 1.5s cubic-bezier(.3,.1,.3,1) forwards,obsBob 2.4s 1.5s ease-in-out infinite alternate}
+#obSplash .obs-wave{animation:obsWave 1.1s linear infinite}
+#obSplash .obs-wave2{animation:obsWave 1.7s linear infinite reverse}
+@keyframes obsFill{from{transform:translateY(80px)}to{transform:translateY(14px)}}
+@keyframes obsBob{from{transform:translateY(14px)}to{transform:translateY(22px)}}
+@keyframes obsWave{to{transform:translateX(-60px)}}
+@keyframes obsUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){ #obSplash *{animation-duration:.01s!important;animation-iteration-count:1!important}}
+</style>
+<div id="obSplash" aria-hidden="true">
+  <svg viewBox="0 0 60 80" width="96" height="128">
+    <defs><clipPath id="obsClip"><path d="M30 3C30 3 5 36 5 52a25 25 0 0050 0C55 36 30 3 30 3z"/></clipPath></defs>
+    <path d="M30 3C30 3 5 36 5 52a25 25 0 0050 0C55 36 30 3 30 3z" fill="#0F3358"/>
+    <g clip-path="url(#obsClip)">
+      <g class="obs-lvl">
+        <path class="obs-wave2" d="M0 4q15-6 30 0t30 0 30 0 30 0V90H0z" fill="#FFD261" opacity=".55"/>
+        <path class="obs-wave" d="M0 8q15-7 30 0t30 0 30 0 30 0V90H0z" fill="#F5B82E"/>
+      </g>
+    </g>
+    <path d="M30 3C30 3 5 36 5 52a25 25 0 0050 0C55 36 30 3 30 3z" fill="none" stroke="#38BDF8" stroke-width="2.5"/>
+    <ellipse cx="20" cy="50" rx="4" ry="8" fill="#fff" opacity=".35"/>
+  </svg>
+  <div class="obs-wm"><span class="obs-oil">Oil</span><span class="obs-book">Book</span></div>
+  <div class="obs-sub">{{ T.splash_loading }}</div>
+</div>
+<script>
+(function(){
+  var el=document.getElementById('obSplash');
+  if(!el||!document.documentElement.classList.contains('ob-sp'))return;
+  var done=false;
+  function hide(){
+    if(done)return;done=true;
+    el.classList.add('out');
+    setTimeout(function(){document.documentElement.classList.remove('ob-sp');if(el.parentNode)el.parentNode.removeChild(el);},450);
+  }
+  function ready(){var left=1600-(Date.now()-(window.__obSpT||0));setTimeout(hide,left>0?left:0);}
+  if(document.readyState==='complete')ready();else window.addEventListener('load',ready);
+  setTimeout(hide,10000);
+})();
+</script>
+"""
+
+
+def _with_splash(page):
+    assert page.count("<body>") >= 1
+    return page.replace("<body>", "<body>" + SPLASH_HTML, 1)
+
+
+LOGIN_PAGE = _with_splash(LOGIN_PAGE)
+PAGE = _with_splash(PAGE)
+ADMIN_PAGE = _with_splash(ADMIN_PAGE)
+
 
 @app.route("/admin")
 @admin_required
