@@ -2457,6 +2457,9 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .wh-kpi { background:#F8FAFC; border-radius:12px; padding:10px 12px; }
   .wh-kpi b { display:block; font-size:18px; font-family:var(--font-display); color:var(--text); line-height:1.2; }
   .wh-kpi span { font-size:11.5px; color:#64748B; }
+  .wh-kpi .wh-kpi-usd { display:block; margin-top:3px; font-style:normal; font-size:13px; font-weight:600; font-family:var(--font-display); color:#475569; }
+  .wh-kpi.good .wh-kpi-usd { color:#15803D; }
+  .wh-kpi.bad .wh-kpi-usd { color:#B91C1C; }
   .wh-kpi.good b { color:#15803D; }
   .wh-kpi.bad { background:#FEF2F2; }
   .wh-kpi.bad b { color:#B91C1C; }
@@ -4789,9 +4792,10 @@ function renderWarehouseSummary(key) {
   const problems = (s.low_count || 0) + (s.out_count || 0);
   const boxes = [];
   if (ctx.showCost) {
-    boxes.push(`<div class="wh-kpi"><b>${fmtShort(s.stock_value)}</b><span>${T.whs_kpi_value}</span></div>`);
+    const usdLine = (v, sign) => (USD_RATE > 0 && v != null) ? `<em class="wh-kpi-usd">≈ ${v < 0 ? '−' : (sign && v > 0 ? '+' : '')}${fmtUsdShort(Math.round(Math.abs(v) / USD_RATE))}</em>` : '';
+    boxes.push(`<div class="wh-kpi"><b>${fmtShort(s.stock_value)}</b><span>${T.whs_kpi_value}</span>${usdLine(s.stock_value, false)}</div>`);
     const neg = s.potential_margin < 0;
-    boxes.push(`<div class="wh-kpi ${neg ? 'bad' : 'good'}"><b>${neg ? '' : '+'}${fmtShort(s.potential_margin)}</b><span>${neg ? T.whs_kpi_margin_neg : T.whs_kpi_margin}</span></div>`);
+    boxes.push(`<div class="wh-kpi ${neg ? 'bad' : 'good'}"><b>${neg ? '' : '+'}${fmtShort(s.potential_margin)}</b><span>${neg ? T.whs_kpi_margin_neg : T.whs_kpi_margin}</span>${usdLine(s.potential_margin, true)}</div>`);
   } else {
     boxes.push(`<div class="wh-kpi"><b>${s.product_count}</b><span>${T.whs_kpi_products}</span></div>`);
     boxes.push(`<div class="wh-kpi"><b>${s.reorder_count}</b><span>${T.whs_kpi_reorder}</span></div>`);
