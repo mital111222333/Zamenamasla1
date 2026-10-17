@@ -302,6 +302,7 @@ def init_db():
         _migrate_referral(conn)
         _migrate_vin(conn)
         _migrate_debts(conn)
+        _migrate_usd(conn)
         _bootstrap_accounts(conn)
 
 
@@ -1309,12 +1310,15 @@ def set_store_count(product_id: int, shop_id: int, new_qty: float, reason: str =
 
 @_serialized
 def create_product(shop_id: int, category: str, name: str, unit: str = "l",
-                    sell_price=None, purchase_price=None, initial_stock: float = 0) -> dict:
+                    sell_price=None, purchase_price=None, initial_stock: float = 0,
+                    purchase_currency=None, purchase_usd=None) -> dict:
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
         """, (shop_id, category, name, unit, initial_stock, sell_price, purchase_price))
+        if purchase_currency == "USD":
+            set_product_currency(conn, cur.lastrowid, shop_id, "USD", purchase_usd, purchase_price)
         conn.commit()
         return get_product(cur.lastrowid, shop_id)
 
@@ -1349,7 +1353,7 @@ def list_products(shop_id: int, category: str = None, active_only: bool = True):
 
 @_serialized
 def update_product(product_id: int, shop_id: int, name=None, sell_price=None, purchase_price=None,
-                   clear_purchase_price=False):
+                   clear_purchase_price=False, purchase_currency=None, purchase_usd=None):
     """Меняет название и цены товара. Возвращает (ok, error).
     Важно: прошлые продажи НЕ пересчитываются — в каждой записи о замене
     уже сохранена цена закупки на момент продажи (cost_price), поэтому
@@ -1379,11 +1383,23 @@ def update_product(product_id: int, shop_id: int, name=None, sell_price=None, pu
         fields["purchase_price"] = purchase_price
     elif clear_purchase_price:
         fields["purchase_price"] = None
-    if not fields:
+    if purchase_currency == "USD" and purchase_usd not in (None, ""):
+        try:
+            if float(purchase_usd) < 0:
+                return False, "bad_price"
+        except (TypeError, ValueError):
+            return False, "bad_price"
+    if not fields and purchase_currency not in ("USD", "UZS"):
         return True, None
-    set_clause = ", ".join(f"{k}=?" for k in fields)
     with get_conn() as conn:
-        conn.execute(f"UPDATE products SET {set_clause} WHERE id=?", (*fields.values(), product_id))
+        if fields:
+            set_clause = ", ".join(f"{k}=?" for k in fields)
+            conn.execute(f"UPDATE products SET {set_clause} WHERE id=?", (*fields.values(), product_id))
+        if purchase_currency in ("USD", "UZS"):
+            price = set_product_currency(conn, product_id, shop_id, purchase_currency, purchase_usd,
+                                         fields.get("purchase_price"))
+            if price is not None:
+                fields["purchase_price"] = price
         conn.commit()
     if existing.get("purchase_price") is None and fields.get("purchase_price") is not None:
         backfill_cost_price(shop_id, product_id, fields["purchase_price"])
@@ -1428,7 +1444,8 @@ def delete_product(product_id: int, shop_id: int):
 
 
 @_serialized
-def restock_product(product_id: int, shop_id: int, quantity: float, purchase_price=None, restock_date: str = None):
+def restock_product(product_id: int, shop_id: int, quantity: float, purchase_price=None, restock_date: str = None,
+                    purchase_usd=None):
     """Пополнение склада — увеличивает остаток и пишет запись в историю
     пополнений (дата, количество, цена закупки на тот момент). Если указана
     цена закупки — обновляет её и в самой карточке товара (для будущих продаж)."""
@@ -1439,7 +1456,11 @@ def restock_product(product_id: int, shop_id: int, quantity: float, purchase_pri
         restock_date = datetime.now().strftime("%Y-%m-%d")
     with get_conn() as conn:
         conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (quantity, product_id))
-        if purchase_price is not None:
+        if existing.get("purchase_currency") == "USD" and purchase_usd not in (None, ""):
+            # долларовый товар пополнили с ценой в $ — храним ровно введённые $
+            price = set_product_currency(conn, product_id, shop_id, "USD", purchase_usd, purchase_price)
+            purchase_price = price if price is not None else purchase_price
+        elif purchase_price is not None:
             conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (purchase_price, product_id))
         conn.execute("""
             INSERT INTO stock_restocks (product_id, shop_id, quantity, purchase_price, restock_date)
@@ -2899,12 +2920,14 @@ def get_net_profit_30d(shop_id: int) -> dict:
     today = datetime.now().strftime("%Y-%m-%d")
     br = get_profit_breakdown(shop_id, start_date, today)
     expenses = get_expense_summary(shop_id, days=30)
+    usd = profit_usd_range(shop_id, start_date, today)
     return {
         "oil_profit": br["goods_profit"],
         "services": br["services"],
         "unpriced": br["unpriced"],
         "expenses_total": expenses["total"],
         "net_profit": br["profit"] - expenses["total"],
+        "net_profit_usd": usd["net_usd"],
     }
 
 
@@ -3592,10 +3615,14 @@ def get_network_overview(shop_ids) -> dict:
     profit = {p: sum(x[p] for x in prof) for p in periods}
 
     net = {"oil_profit": 0, "services": 0, "unpriced": 0, "expenses_total": 0, "net_profit": 0}
+    net_usd = []
     for sid in shop_ids:
         n = get_net_profit_30d(sid)
         for k in net:
             net[k] += n[k]
+        net_usd.append({"v": n.get("net_profit_usd")})
+    net["net_profit_usd"] = sum_usd_dicts(net_usd).get("v")
+    profit_usd = sum_usd_dicts([profit_stats_usd(sid) for sid in shop_ids])
 
     daily = None
     for sid in shop_ids:
@@ -3621,7 +3648,7 @@ def get_network_overview(shop_ids) -> dict:
                                   "shop_name": shop_name})
     low_stock.sort(key=lambda p: p["stock_qty"])
 
-    return {"stats": stats, "comparison": comparison, "profit": profit, "net_profit": net,
+    return {"stats": stats, "comparison": comparison, "profit": profit, "profit_usd": profit_usd, "net_profit": net,
             "daily_revenue": daily or [], "debt_summary": debt, "low_stock": low_stock}
 
 
@@ -3833,11 +3860,13 @@ def transfer_stock(parent_shop_id: int, from_shop_id: int, product_id: int, to_s
                 VALUES (?, ?, ?, ?, 0, ?, ?, 1)
             """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
             dst_id = cur.lastrowid
+            _copy_currency(conn, src, dst_id)
         else:
             dst_id = dst["id"]
             # как при пополнении: цена закупки товара = цена последней пришедшей
             # партии, а партия от главного приходит со своей ценой закупки
             if src.get("purchase_price") is not None:
+                _copy_currency(conn, src, dst_id)
                 conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (src["purchase_price"], dst_id))
         conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (quantity, src["id"]))
         conn.execute("UPDATE products SET stock_qty = stock_qty + ? WHERE id=?", (quantity, dst_id))
@@ -4011,6 +4040,7 @@ def copy_catalog_to_branch(parent_shop_id: int, branch_id: int, categories=None)
                 INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
                 VALUES (?, ?, ?, ?, 0, ?, ?, 1)
             """, (branch_id, p["category"], p["name"], p["unit"], p["sell_price"], p["purchase_price"]))
+            _copy_currency(conn, p, conn.execute("SELECT last_insert_rowid()").fetchone()[0])
             have.add(key)
             created += 1
         conn.commit()
@@ -4107,12 +4137,14 @@ def _transfer_lines(conn, parent_shop_id: int, from_shop_id: int, to_shop_id: in
                 INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
                 VALUES (?, ?, ?, ?, 0, ?, ?, 1)
             """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
+            _copy_currency(conn, dict(src), cur.lastrowid)
             dst = {"id": cur.lastrowid, "purchase_price": src["purchase_price"], "_new": True}
             dst_by_key[key] = dst
         else:
             if dst.get("purchase_price") is None and src.get("purchase_price") is not None and not dst.get("_new"):
                 backfills.append((dst["id"], src["purchase_price"]))
             if src.get("purchase_price") is not None:
+                _copy_currency(conn, dict(src), dst["id"])
                 conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (src["purchase_price"], dst["id"]))
                 dst["purchase_price"] = src["purchase_price"]
         conn.execute("UPDATE products SET stock_qty = stock_qty - ? WHERE id=?", (q, pid))
@@ -4272,12 +4304,12 @@ def shop_usd_rate(shop_id: int):
         r = conn.execute("SELECT usd_rate, parent_shop_id FROM shops WHERE id=?", (shop_id,)).fetchone()
         if not r:
             return None
-        if r["usd_rate"]:
-            return r["usd_rate"]
+        # единый курс сети: у филиала действует курс главной точки
         if r["parent_shop_id"]:
             p = conn.execute("SELECT usd_rate FROM shops WHERE id=?", (r["parent_shop_id"],)).fetchone()
-            return p["usd_rate"] if p and p["usd_rate"] else None
-        return None
+            if p and p["usd_rate"]:
+                return p["usd_rate"]
+        return r["usd_rate"] or None
 
 
 def _supplier_fields(data: dict) -> dict:
@@ -7192,3 +7224,373 @@ def top_car_models(shop_id: int, limit: int = 12):
                 cur.update(brand=r["car_brand"], model=r["model"], _top=r["n"])
     out = sorted(best.values(), key=lambda x: -x["n"])[:limit]
     return [{"brand": x["brand"], "model": x["model"]} for x in out]
+
+
+# ============ ЕДИНЫЙ КУРС ДОЛЛАРА ============
+# Курс задаёт главная (или самостоятельная) точка — он действует на неё и на
+# все её филиалы. У товара закупка бывает в сумах или в долларах:
+#   • purchase_currency='USD' — хранится purchase_usd_cents (сколько $ стоит
+#     единица), а purchase_price (сумы) всегда = $ × текущий курс. При смене
+#     курса сумы пересчитываются у всей сети, склад переоценивается;
+#   • purchase_currency='UZS' (по умолчанию) — сумы не меняются, $-эквивалент
+#     в интерфейсе считается делением на курс.
+# Прошлые продажи не меняются: в записи замены хранится закупка в сумах на
+# момент продажи, а прибыль в $ считается по курсу того дня (история курса).
+
+def _migrate_usd(conn):
+    p_cols = {r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()}
+    if "purchase_currency" not in p_cols:
+        conn.execute("ALTER TABLE products ADD COLUMN purchase_currency TEXT DEFAULT 'UZS'")
+    if "purchase_usd_cents" not in p_cols:
+        conn.execute("ALTER TABLE products ADD COLUMN purchase_usd_cents INTEGER")
+    s_cols = {r[1] for r in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    if "usd_setup_done" not in s_cols:
+        conn.execute("ALTER TABLE shops ADD COLUMN usd_setup_done INTEGER DEFAULT 0")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS usd_rate_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        rate REAL NOT NULL,
+        prev_rate REAL,
+        reval_amount INTEGER DEFAULT 0,
+        usd_products INTEGER DEFAULT 0,
+        set_at TEXT NOT NULL
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usd_rate_history_shop ON usd_rate_history(shop_id, set_at)")
+    # стартовая запись истории: текущий курс точки считается действовавшим «всегда»
+    # (для пересчёта прошлой прибыли в $), если истории ещё нет
+    conn.execute("""
+        INSERT INTO usd_rate_history (shop_id, rate, prev_rate, set_at)
+        SELECT s.id, s.usd_rate, NULL, '2000-01-01 00:00:00' FROM shops s
+        WHERE s.usd_rate > 0 AND NOT EXISTS (SELECT 1 FROM usd_rate_history h WHERE h.shop_id = s.id)
+    """)
+    # если закупку долларового товара поменяли в сумах (пополнение, приёмка
+    # заказа, перемещение, импорт) — пересчитываем его $ по курсу сети
+    conn.execute("DROP TRIGGER IF EXISTS trg_products_usd_sync")
+    conn.execute("""
+    CREATE TRIGGER trg_products_usd_sync
+    AFTER UPDATE OF purchase_price ON products
+    WHEN NEW.purchase_currency = 'USD' AND NEW.purchase_price IS NOT NULL
+         AND NEW.purchase_price IS NOT OLD.purchase_price
+    BEGIN
+        UPDATE products SET purchase_usd_cents = COALESCE(
+            (SELECT CAST(ROUND(NEW.purchase_price * 100.0 / r.rate) AS INTEGER) FROM (
+                SELECT COALESCE(
+                    (SELECT p.usd_rate FROM shops p WHERE p.id = s.parent_shop_id AND p.usd_rate > 0),
+                    NULLIF(s.usd_rate, 0)) AS rate
+                FROM shops s WHERE s.id = NEW.shop_id) r WHERE r.rate > 0),
+            purchase_usd_cents)
+        WHERE id = NEW.id;
+    END
+    """)
+    conn.commit()
+
+
+def _rate_head_id(shop_id: int):
+    """Чей курс действует на точку: у филиала — главной точки."""
+    shop = get_shop(shop_id)
+    if not shop:
+        return None
+    return shop.get("parent_shop_id") or shop["id"]
+
+
+def _round_usd_cents(usd) -> int:
+    return int(round(float(usd) * 100))
+
+
+def _usd_price(cents, rate):
+    return int(round(cents * rate / 100)) if cents is not None and rate else None
+
+
+def get_usd_rate_history(shop_id: int, limit: int = 12):
+    head = _rate_head_id(shop_id)
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT rate, prev_rate, reval_amount, usd_products, set_at FROM usd_rate_history
+            WHERE shop_id=? AND set_at > '2000-01-01 00:00:00' ORDER BY set_at DESC, id DESC LIMIT ?
+        """, (head, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def last_usd_revaluation(shop_id: int):
+    """Последняя переоценка склада от смены курса (для сводки склада)."""
+    h = get_usd_rate_history(shop_id, 1)
+    return h[0] if h and h[0].get("prev_rate") else None
+
+
+def usd_rate_fn(shop_id: int):
+    """Функция дата → курс, действовавший в тот день (по истории курса сети).
+    Для пересчёта прошлой прибыли и расходов в $ по курсу дня операции."""
+    head = _rate_head_id(shop_id)
+    with get_conn() as conn:
+        rows = conn.execute("SELECT rate, set_at FROM usd_rate_history WHERE shop_id=? ORDER BY set_at, id",
+                            (head,)).fetchall()
+    points = [(r["set_at"][:10], r["rate"]) for r in rows if r["rate"]]
+    fallback = shop_usd_rate(shop_id)
+    if not points:
+        return lambda d: fallback
+
+    def rate_on(day):
+        day = (day or "")[:10]
+        best = points[0][1]
+        for d, r in points:
+            if d <= day:
+                best = r
+            else:
+                break
+        return best
+    return rate_on
+
+
+def _network_ids(head_id: int):
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id FROM shops WHERE id=? OR parent_shop_id=?", (head_id, head_id)).fetchall()
+    return [r["id"] for r in rows]
+
+
+def _network_usd_products(conn, ids):
+    marks = ",".join("?" * len(ids))
+    return conn.execute(f"""
+        SELECT p.*, COALESCE(s.shop_name, s.username) AS shop_name FROM products p
+        JOIN shops s ON s.id = p.shop_id
+        WHERE p.shop_id IN ({marks}) AND p.is_active=1 AND p.purchase_currency='USD'
+          AND p.purchase_usd_cents IS NOT NULL
+    """, ids).fetchall()
+
+
+def price_suggestions(head_id: int, old_rate, new_rate):
+    """Курс вырос — у долларовых товаров закупка в сумах подорожала. Предлагаем
+    поднять цену продажи на тот же процент (округление до 1 000 сум)."""
+    if not old_rate or not new_rate or new_rate <= old_rate:
+        return []
+    k = new_rate / old_rate
+    ids = _network_ids(head_id)
+    with get_conn() as conn:
+        rows = _network_usd_products(conn, ids)
+    out = []
+    for p in rows:
+        sell = p["sell_price"]
+        if not sell:
+            continue
+        proposed = int(round(sell * k / 1000.0)) * 1000
+        if proposed <= sell:
+            continue
+        buy = p["purchase_price"]
+        out.append({"product_id": p["id"], "shop_id": p["shop_id"], "shop_name": p["shop_name"],
+                    "is_head": p["shop_id"] == head_id, "name": p["name"], "category": p["category"],
+                    "unit": p["unit"], "sell_price": sell, "proposed": proposed, "purchase_price": buy,
+                    "margin_pct": round((sell - buy) / buy * 100) if buy else None,
+                    "new_margin_pct": round((proposed - buy) / buy * 100) if buy else None})
+    out.sort(key=lambda x: (not x["is_head"], x["shop_name"] or "", x["name"]))
+    return out
+
+
+@_serialized
+def set_network_usd_rate(head_id: int, rate: float) -> dict:
+    """Новый курс сети: курс главной точки, у филиалов свой курс сбрасывается
+    (они берут курс главной). Долларовые товары всей сети переоцениваются в
+    сумах; изменение стоимости склада записывается в историю курса."""
+    ids = _network_ids(head_id)
+    with get_conn() as conn:
+        head = conn.execute("SELECT usd_rate FROM shops WHERE id=?", (head_id,)).fetchone()
+        old = head["usd_rate"] if head else None
+        # сначала курс (триггер пересчёта $ читает курс сети), потом товары
+        conn.execute("UPDATE shops SET usd_rate=? WHERE id=?", (rate, head_id))
+        conn.execute("UPDATE shops SET usd_rate=NULL WHERE parent_shop_id=?", (head_id,))
+        reval = 0
+        count = 0
+        for p in _network_usd_products(conn, ids):
+            new_price = _usd_price(p["purchase_usd_cents"], rate)
+            old_price = p["purchase_price"] or 0
+            if new_price != p["purchase_price"]:
+                conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (new_price, p["id"]))
+            reval += max(p["stock_qty"] or 0, 0) * (new_price - old_price)
+            count += 1
+        if old != rate:
+            conn.execute("""INSERT INTO usd_rate_history (shop_id, rate, prev_rate, reval_amount, usd_products, set_at)
+                            VALUES (?, ?, ?, ?, ?, ?)""", (head_id, rate, old, int(round(reval)), count, _now_str()))
+        conn.commit()
+    pct = round((rate - old) / old * 100, 2) if old else None
+    return {"old_rate": old, "rate": rate, "pct": pct, "reval": int(round(reval)), "usd_products": count,
+            "suggestions": price_suggestions(head_id, old, rate)}
+
+
+@_serialized
+def apply_price_suggestions(head_id: int, items) -> int:
+    """Поднять цены продажи, выбранные в окне после смены курса (только товары сети)."""
+    ids = set(_network_ids(head_id))
+    n = 0
+    with get_conn() as conn:
+        for it in items or []:
+            try:
+                pid, price = int(it["product_id"]), int(round(float(it["sell_price"])))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if price < 0:
+                continue
+            row = conn.execute("SELECT shop_id FROM products WHERE id=? AND is_active=1", (pid,)).fetchone()
+            if not row or row["shop_id"] not in ids:
+                continue
+            conn.execute("UPDATE products SET sell_price=? WHERE id=?", (price, pid))
+            n += 1
+        conn.commit()
+    return n
+
+
+def usd_setup_products(head_id: int):
+    """Все товары сети с закупкой — для разметки «какие закупаются в $»."""
+    ids = _network_ids(head_id)
+    marks = ",".join("?" * len(ids))
+    with get_conn() as conn:
+        rows = conn.execute(f"""
+            SELECT p.id, p.shop_id, p.name, p.category, p.unit, p.stock_qty, p.sell_price, p.purchase_price,
+                   p.purchase_currency, p.purchase_usd_cents, COALESCE(s.shop_name, s.username) AS shop_name
+            FROM products p JOIN shops s ON s.id = p.shop_id
+            WHERE p.shop_id IN ({marks}) AND p.is_active=1
+            ORDER BY (p.shop_id <> ?), s.shop_name, p.category, p.name
+        """, (*ids, head_id)).fetchall()
+        done = conn.execute("SELECT usd_setup_done FROM shops WHERE id=?", (head_id,)).fetchone()
+    return {"done": bool(done and done["usd_setup_done"]),
+            "products": [{**dict(r), "is_head": r["shop_id"] == head_id} for r in rows]}
+
+
+@_serialized
+def mark_usd_products(head_id: int, usd_ids, entered_rate: float) -> dict:
+    """Разметка товаров сети: отмеченные — закупка в $ (переводим сумы в $
+    по курсу, по которому их вводили), остальные — в сумах. Затем сумы
+    долларовых товаров пересчитываются по текущему курсу."""
+    ids = _network_ids(head_id)
+    want = {int(x) for x in usd_ids or []}
+    marks = ",".join("?" * len(ids))
+    with get_conn() as conn:
+        cur_rate = conn.execute("SELECT usd_rate FROM shops WHERE id=?", (head_id,)).fetchone()["usd_rate"]
+        rows = conn.execute(f"SELECT * FROM products WHERE shop_id IN ({marks}) AND is_active=1", ids).fetchall()
+        reval = 0
+        marked = 0
+        for p in rows:
+            if p["id"] in want and p["purchase_price"] is not None:
+                if p["purchase_currency"] == "USD" and p["purchase_usd_cents"] is not None:
+                    cents = p["purchase_usd_cents"]
+                else:
+                    cents = int(round(p["purchase_price"] * 100.0 / entered_rate))
+                new_price = _usd_price(cents, cur_rate) if cur_rate else p["purchase_price"]
+                conn.execute("UPDATE products SET purchase_currency='USD', purchase_usd_cents=? WHERE id=?",
+                             (cents, p["id"]))
+                if new_price != p["purchase_price"]:
+                    conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (new_price, p["id"]))
+                    reval += max(p["stock_qty"] or 0, 0) * (new_price - p["purchase_price"])
+                marked += 1
+            elif p["id"] not in want and p["purchase_currency"] == "USD":
+                conn.execute("UPDATE products SET purchase_currency='UZS', purchase_usd_cents=NULL WHERE id=?",
+                             (p["id"],))
+        conn.execute("UPDATE shops SET usd_setup_done=1 WHERE id=?", (head_id,))
+        conn.commit()
+    return {"marked": marked, "reval": int(round(reval))}
+
+
+def set_product_currency(conn, product_id: int, shop_id: int, currency, usd=None, fallback_price=None):
+    """Валюта закупки одного товара (из формы «Изменить»/«Новый товар»).
+    Для $: хранит $ и ставит сумы = $ × курс сети. Возвращает сумы."""
+    if currency == "USD" and usd not in (None, ""):
+        cents = _round_usd_cents(usd)
+        rate = shop_usd_rate(shop_id)
+        price = _usd_price(cents, rate) if rate else fallback_price
+        conn.execute("UPDATE products SET purchase_currency='USD', purchase_usd_cents=? WHERE id=?", (cents, product_id))
+        if price is not None:
+            conn.execute("UPDATE products SET purchase_price=? WHERE id=?", (price, product_id))
+        return price
+    if currency == "UZS":
+        conn.execute("UPDATE products SET purchase_currency='UZS', purchase_usd_cents=NULL WHERE id=?", (product_id,))
+    return None
+
+
+def _rows_usd(rows, rate_on, amount_key, date_key):
+    total, missing = 0.0, 0
+    for r in rows:
+        rate = rate_on(r[date_key])
+        if rate:
+            total += (r[amount_key] or 0) / rate
+        elif r[amount_key]:
+            missing += 1
+    return total, missing
+
+
+def profit_usd_range(shop_id: int, date_from: str, date_to: str, rate_on=None) -> dict:
+    """Прибыль и расходы точки за период в $ — каждая продажа и каждый расход
+    по курсу своего дня (история курса), а не по сегодняшнему."""
+    rate_on = rate_on or usd_rate_fn(shop_id)
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json, oc.change_date FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ?
+        """, (shop_id, date_from, date_to)).fetchall()
+        exp = conn.execute("""SELECT amount, expense_date FROM expense_entries
+                              WHERE shop_id=? AND expense_date >= ? AND expense_date <= ?""",
+                           (shop_id, date_from, date_to)).fetchall()
+    per_day = {}
+    for row in rows:
+        try:
+            items = json.loads(row["items_json"]) if row["items_json"] else None
+        except (ValueError, TypeError):
+            items = None
+        p = 0
+        for item in items or []:
+            total = item.get("total") or 0
+            if item.get("cost_price") is not None and item.get("qty") is not None:
+                p += total - item["qty"] * item["cost_price"]
+            elif item.get("product_id") or str(item.get("key") or "").startswith(("fluid_", "filter_")):
+                pass
+            else:
+                p += total
+        d = (row["change_date"] or "")[:10]
+        per_day[d] = per_day.get(d, 0) + p
+    profit = 0.0
+    no_rate = False
+    for d, v in per_day.items():
+        rate = rate_on(d)
+        if rate:
+            profit += v / rate
+        elif v:
+            no_rate = True
+    expenses, miss = _rows_usd(exp, rate_on, "amount", "expense_date")
+    if rate_on("9999-12-31") is None:
+        return {"profit_usd": None, "expenses_usd": None, "net_usd": None}
+    return {"profit_usd": round(profit, 2), "expenses_usd": round(expenses, 2),
+            "net_usd": round(profit - expenses, 2), "partial": no_rate or bool(miss)}
+
+
+def profit_stats_usd(shop_id: int) -> dict:
+    """Прибыль в $ за те же периоды, что get_profit_stats."""
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    starts = {"today": today,
+              "yesterday": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
+              "week": (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d"),
+              "month": now.strftime("%Y-%m-01"), "year": now.strftime("%Y-01-01")}
+    rate_on = usd_rate_fn(shop_id)
+    out = {}
+    for k, start in starts.items():
+        end = start if k == "yesterday" else today
+        out[k] = profit_usd_range(shop_id, start, end, rate_on)["profit_usd"]
+    return out
+
+
+def sum_usd_dicts(parts) -> dict:
+    out = {}
+    for d in parts:
+        for k, v in d.items():
+            if v is None:
+                out.setdefault(k, None)
+                continue
+            out[k] = round((out.get(k) or 0) + v, 2)
+    return out
+
+
+def _copy_currency(conn, src, dst_id):
+    """Товар уходит в другую точку сети вместе с валютой закупки ($ или сумы)."""
+    if src.get("purchase_currency") == "USD" and src.get("purchase_usd_cents") is not None:
+        conn.execute("UPDATE products SET purchase_currency='USD', purchase_usd_cents=? WHERE id=?",
+                     (src["purchase_usd_cents"], dst_id))
+    elif src.get("purchase_price") is not None:
+        conn.execute("UPDATE products SET purchase_currency='UZS', purchase_usd_cents=NULL WHERE id=?", (dst_id,))

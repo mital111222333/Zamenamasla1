@@ -185,6 +185,40 @@ def _idem_before():
     return resp
 
 
+_USD_COST_KEYS = ("purchase_usd_cents", "purchase_currency")
+
+
+def _strip_usd_cost(obj):
+    if isinstance(obj, dict):
+        for k in _USD_COST_KEYS:
+            obj.pop(k, None)
+        for v in obj.values():
+            _strip_usd_cost(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            _strip_usd_cost(v)
+    return obj
+
+
+@app.after_request
+def _hide_usd_cost(resp):
+    """Филиал и сотрудник не видят закупку — значит и закупку в $ тоже: из
+    любого JSON-ответа для них убираем долларовую цену закупки товара."""
+    if not (getattr(g, "is_branch", False) or getattr(g, "is_employee", False)):
+        return resp
+    if resp.mimetype != "application/json" or resp.direct_passthrough:
+        return resp
+    body = resp.get_data()
+    if b"purchase_usd_cents" not in body and b"purchase_currency" not in body:
+        return resp
+    try:
+        data = _strip_usd_cost(json.loads(body))
+    except ValueError:
+        return resp
+    resp.set_data(json.dumps(data, ensure_ascii=False))
+    return resp
+
+
 @app.after_request
 def _idem_after(resp):
     key = getattr(g, "_idem_key", None)
@@ -2343,6 +2377,27 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .dsum .v { font-size:16px; font-weight:800; font-family:var(--font-display); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .dsum .v.bad { color:#B3241C; } .dsum .v.ok { color:#15803D; }
   .dtabs { display:flex; gap:6px; margin-bottom:10px; }
+  .rate-now { display:flex; align-items:baseline; gap:8px; font-family:var(--font-mono); color:var(--hint); }
+  .rate-now b { font-size:30px; color:var(--text); font-weight:700; }
+  .rate-h { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13px; }
+  .rate-h b { font-family:var(--font-mono); }
+  .rate-h .up { color:#B3241C; } .rate-h .down { color:#15803D; }
+  .rate-shop { font-size:12px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:.04em; margin:12px 0 4px; }
+  .rate-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--border); font-size:13.5px; cursor:pointer; }
+  .rate-row input[type=checkbox] { width:20px; height:20px; flex:0 0 auto; accent-color:#0F52BA; }
+  .rate-row .rr-main { flex:1; min-width:0; }
+  .rate-row .rr-main b { display:block; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rate-row .rr-main span { color:var(--hint); font-size:12px; }
+  .rate-row .rr-price { text-align:right; font-family:var(--font-mono); font-size:12.5px; white-space:nowrap; }
+  .rate-row .rr-price input { width:92px; padding:6px 8px; font-size:13px; text-align:right; }
+  .rate-how { font-size:13px; line-height:1.6; color:var(--text); }
+  .rate-how p { margin:0 0 8px; }
+  .rate-banner { padding:10px 12px; background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px; font-size:12.5px; color:#92400E; margin-bottom:12px; }
+  .rate-banner.ok { background:#F0FDF4; border-color:#86EFAC; color:#166534; }
+  .cur-switch { display:flex; gap:6px; margin:0 0 8px; }
+  .cur-switch button { font:inherit; font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
+  .cur-switch button.on { background:#0F52BA; border-color:#0F52BA; color:#fff; }
+  .usd-tag { display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:6px; background:#DBEAFE; color:#1E40AF; margin-left:4px; vertical-align:1px; }
   .dtabs button { font:inherit; font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
   .dtabs button.on { background:var(--text); border-color:var(--text); color:#fff; }
   .debt-card .dc-prog { margin-top:10px; }
@@ -2781,6 +2836,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     {% if warehouse_enabled and not is_employee and not is_branch %}<div class="side-item" id="tab-suppliers" data-tab="suppliers" onclick="showTab('suppliers')"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     {% if not is_employee %}<div class="side-item" id="tab-expenses" data-tab="expenses" onclick="showTab('expenses')"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
+    {% if not is_employee %}<div class="side-item" id="tab-rate" data-tab="rate" onclick="showTab('rate')"><i class="fa-solid fa-dollar-sign"></i><span>{{ T.usd_rate_title }}</span><b class="nav-badge" data-badge="rate"></b></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
     <div class="side-item" id="tab-course" data-tab="course" onclick="showTab('course')"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
@@ -2827,6 +2883,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if warehouse_enabled and (not is_employee or store_enabled) %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><i class="fa-solid {{ 'fa-store' if is_employee else 'fa-boxes-stacked' }}"></i><span>{{ T.st_tab if is_employee else T.tab_warehouse }}</span></div>{% endif %}
       <div class="more-item" data-tab="debts" data-more-slot="debts" onclick="showTab('debts'); closeMore();"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
       {% if not is_employee %}<div class="more-item" data-tab="expenses" data-more-slot="expenses" onclick="showTab('expenses'); closeMore();"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="rate" data-more-slot="rate" onclick="showTab('rate'); closeMore();"><i class="fa-solid fa-dollar-sign"></i><span>{{ T.usd_rate_title }}</span><b class="nav-badge" data-badge="rate"></b></div>{% endif %}
       <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
       {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
       <div class="more-item" data-tab="course" data-more-slot="course" onclick="showTab('course'); closeMore();"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
@@ -3025,21 +3082,62 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   </div>
 
   {% if not is_employee %}
-  <div id="view-expenses" style="display:none;">
-    {% if true %}
-    <div class="card" id="usdRateCardExp" style="margin-bottom:14px;">
-      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
-      <div class="row2">
-        <div class="field">
-          <label>{{ T.usd_rate_label }}</label>
-          <input id="usd_rate_input_exp" type="number" step="0.01" placeholder="{{ '%g'|format(usd_rate_head) if usd_rate_head else 12700 }}" value="{{ '%g'|format(usd_rate_own) if usd_rate_own else '' }}">
-        </div>
+  <div id="view-rate" style="display:none;">
+    <div class="card">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.usd_rate_title }}</label>
+      <div class="hint-text" id="rateScope" style="margin:0 0 12px;"></div>
+      <div class="rate-now"><span>1 $ =</span><b id="rateNow">—</b><span>{{ T.currency }}</span></div>
+      {% if not is_branch %}
+      <div class="field" style="margin-top:12px;">
+        <label>{{ T.usd_rate_new }}</label>
+        <input id="rate_input" type="number" inputmode="decimal" step="0.01" placeholder="12100">
       </div>
-      <button class="submit" onclick="saveUsdRate('usd_rate_input_exp', 'usdRateSaved_exp')">{{ T.usd_rate_save }}</button>
-      <div id="usdRateSaved_exp" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
-      <div class="hint-text usd-inherit-hint" style="display:none; margin-top:8px; color:#0F52BA;"></div>
+      <button class="submit" id="rateSaveBtn" onclick="saveNetworkRate()">{{ T.usd_rate_save }}</button>
+      {% endif %}
+      <div id="rateHistory" style="margin-top:14px;"></div>
+    </div>
+    {% if not is_branch %}
+    <div class="card" id="rateSetupCard" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.usd_setup_title }}</label>
+      <div class="hint-text" style="margin:0 0 10px;">{{ T.usd_setup_hint }}</div>
+      <div id="rateSetupBanner"></div>
+      <div class="field">
+        <label>{{ T.usd_setup_entered }}</label>
+        <input id="rate_setup_entered" type="number" inputmode="decimal" step="0.01" placeholder="11800">
+      </div>
+      <div class="wh-search" style="margin-bottom:8px;"><i class="fa-solid fa-magnifying-glass"></i><input id="rateSetupSearch" placeholder="{{ T.whs_search }}" oninput="renderRateSetup()" autocomplete="off"></div>
+      <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+        <button class="wh-tbtn wh-tbtn-sm" onclick="rateSetupSelect(true)">{{ T.usd_setup_all }}</button>
+        <button class="wh-tbtn wh-tbtn-sm" onclick="rateSetupSelect(false)">{{ T.usd_setup_none }}</button>
+        <span class="hint-text" id="rateSetupCount" style="margin:0; align-self:center;"></span>
+      </div>
+      <div id="rateSetupList"></div>
+      <button class="submit" id="rateSetupBtn" onclick="saveRateSetup()" style="margin-top:12px;">{{ T.usd_setup_save }}</button>
+    </div>
+    <div class="modal-overlay" id="ratePriceModal">
+      <div class="modal modal-wide" style="text-align:left;">
+        <h3 style="text-align:center; margin-top:0;" id="rpTitle"></h3>
+        <div class="hint-text" id="rpSub" style="text-align:center; margin:-6px 0 12px;"></div>
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+          <button class="wh-tbtn wh-tbtn-sm" onclick="rpSelect(true)">{{ T.usd_setup_all }}</button>
+          <button class="wh-tbtn wh-tbtn-sm" onclick="rpSelect(false)">{{ T.usd_setup_none }}</button>
+        </div>
+        <div id="rpList"></div>
+        <div class="hint-text" style="margin:8px 0 0;">{{ T.usd_rp_round }}</div>
+        <button class="submit" id="rpApplyBtn" onclick="applyRatePrices()">{{ T.usd_rp_apply }}</button>
+        <button class="close-btn" onclick="closeWhModal('ratePriceModal')">{{ T.usd_rp_later }}</button>
+      </div>
     </div>
     {% endif %}
+    <div class="card" style="margin-top:14px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:8px;">{{ T.usd_how_title }}</label>
+      <div class="rate-how">{{ T.usd_how_html|safe }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not is_employee %}
+  <div id="view-expenses" style="display:none;">
 
     <div class="card">
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.expense_add_title }}</label>
@@ -3367,21 +3465,6 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
         <div id="restockHistory"></div>
       </div>
 
-      {% if true %}
-      <div class="card" id="usdRateCard" style="margin-top:14px;">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.usd_rate_title }}</label>
-        <div class="row2">
-          <div class="field">
-            <label>{{ T.usd_rate_label }}</label>
-            <input id="usd_rate_input" type="number" step="0.01" placeholder="{{ '%g'|format(usd_rate_head) if usd_rate_head else 12700 }}" value="{{ '%g'|format(usd_rate_own) if usd_rate_own else '' }}">
-          </div>
-        </div>
-        <button class="submit" onclick="saveUsdRate()">{{ T.usd_rate_save }}</button>
-        <div id="usdRateSaved" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px;">✓ {{ T.usd_rate_saved }}</div>
-        <div class="hint-text usd-inherit-hint" style="display:none; margin-top:8px; color:#0F52BA;"></div>
-        <p class="hint-text" style="margin-top:10px; margin-bottom:0;">{{ T.usd_rate_hint }}</p>
-      </div>
-      {% endif %}
 
 
     </div>
@@ -3506,12 +3589,16 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
               <input id="wh_new_sell_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_sell_usd', 'wh_new_sell_price')">
             </div>
           </div>
+          {% if not is_branch %}
+          <div class="cur-switch" id="wh_new_cur"><button type="button" data-cur="UZS" class="on" onclick="curSet('wh_new', 'UZS')">{{ T.usd_cur_uzs }}</button><button type="button" data-cur="USD" onclick="curSet('wh_new', 'USD')">{{ T.usd_cur_usd }}</button></div>
+          <div class="hint-text" id="wh_new_cur_hint" style="margin:-2px 0 8px;">{{ T.usd_cur_hint_uzs }}</div>
+          {% endif %}
           <div class="row2" {% if is_branch %}style="display:none;"{% endif %}>
             <div class="field">
               <label>{{ T.wh_purchase_price }}</label>
               <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd')">
             </div>
-            <div class="field">
+            <div class="field" id="wh_new_purchase_usd_wrap">
               <label>{{ T.usd_buy_label }}</label>
               <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
             </div>
@@ -3611,19 +3698,6 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
           <div class="sp-foot" id="supCardFoot"></div>
         </div>
       </div>
-      <div class="modal-overlay" id="supRateModal" onclick="if (event.target === this) closeWhModal('supRateModal')">
-        <div class="modal" style="text-align:left; max-width:380px;">
-          <h3 style="text-align:center; margin-top:0;">{{ T.usd_rate_title }}</h3>
-          <div class="field">
-            <label>{{ T.usd_rate_label }}</label>
-            <input id="usd_rate_input_sup" type="number" inputmode="decimal" step="0.01" placeholder="12700" value="{{ '%g'|format(usd_rate_own) if usd_rate_own else '' }}">
-          </div>
-          <p class="hint-text" style="margin-top:0;">{{ T.sp_rate_hint }}</p>
-          <button class="submit" onclick="saveSupRate()">{{ T.usd_rate_save }}</button>
-          <div id="usdRateSaved_sup" style="display:none; color:#1B8A5A; font-size:13px; margin-top:8px; text-align:center;">✓ {{ T.usd_rate_saved }}</div>
-          <button class="close-btn" onclick="closeWhModal('supRateModal')">{{ T.modal_close }}</button>
-        </div>
-      </div>
       <div class="modal-overlay" id="orderNewProductModal">
         <div class="modal modal-wide" style="text-align:left;">
           <h3 style="text-align:center; margin-top:0;">{{ T.onp_title }}</h3>
@@ -3695,6 +3769,10 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
               <label>{{ T.usd_sell_label }}</label>
               <input id="ep_sell_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('ep_sell_usd', 'ep_sell')">
             </div>
+          </div>
+          <div id="ep_cur_wrap">
+            <div class="cur-switch" id="ep_cur"><button type="button" data-cur="UZS" class="on" onclick="curSet('ep', 'UZS')">{{ T.usd_cur_uzs }}</button><button type="button" data-cur="USD" onclick="curSet('ep', 'USD')">{{ T.usd_cur_usd }}</button></div>
+            <div class="hint-text" id="ep_cur_hint" style="margin:-2px 0 8px;">{{ T.usd_cur_hint_uzs }}</div>
           </div>
           <div class="row2" id="ep_buy_wrap">
             <div class="field">
@@ -3928,7 +4006,6 @@ const IS_BRANCH = {{ is_branch|tojson }};
 const IS_EMPLOYEE = {{ is_employee|tojson }};
 const CAR_MODELS = {{ car_models|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
-const HEAD_USD_RATE = {{ usd_rate_head|tojson }};  // у филиала: курс главной точки (если свой не задан)
 const BOT_USERNAME = {{ bot_username|tojson }};
 function clientLink(token) { return token && BOT_USERNAME ? 'https://t.me/' + BOT_USERNAME + '?start=' + token : ''; }
 // Графики (Chart.js, ~70 КБ) нужны только в «Статистике» — грузим их не при
@@ -4006,6 +4083,9 @@ function showTab(t, keepScroll) {
   if (t === 'table') loadCars();
   if (t === 'debts') loadDebts();
   if (t === 'expenses') loadExpensesTab();
+  const rateView = document.getElementById('view-rate');
+  if (rateView) rateView.style.display = t === 'rate' ? 'block' : 'none';
+  if (t === 'rate') loadRateTab();
   if (t === 'broadcast') loadBroadcastInfo();
   document.querySelectorAll('[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
   // пункт «Ещё» подсвечен, если открыт раздел, которого нет в нижней панели
@@ -4752,6 +4832,14 @@ function renderWarehouseSummary(key) {
       </div>`).join('');
   }
   if (!html && list.length) html = `<div class="wh-att-title" style="color:#15803D;"><i class="fa-solid fa-circle-check"></i> ${T.whs_att_ok}</div>`;
+  if (key === 'own' && ctx.showCost && s) {
+    if (s.usd_setup_done === false && list.some(p => p.purchase_price != null)) {
+      html = `<div class="rate-banner" style="cursor:pointer;" onclick="showTab('rate')"><i class="fa-solid fa-dollar-sign"></i> ${T.usd_wh_banner} <b>${T.usd_wh_banner_btn} →</b></div>` + html;
+    } else if (s.usd_reval && s.usd_reval.reval_amount) {
+      const r = s.usd_reval;
+      html = `<div class="rate-banner ok" style="cursor:pointer;" onclick="showTab('rate')"><i class="fa-solid fa-dollar-sign"></i> ${T.usd_wh_reval} ${rateFmt(r.prev_rate)} → ${rateFmt(r.rate)} (${rateDate(r.set_at)}): <b>${r.reval_amount > 0 ? '+' : '−'}${fmtShort(Math.abs(r.reval_amount))} ${T.currency}</b></div>` + html;
+    }
+  }
   att.innerHTML = html;
 }
 
@@ -4822,7 +4910,7 @@ function renderProductCards(key) {
     const missingPrice = key === 'br' && p.purchase_price == null;
     const price = [
       p.sell_price ? `${fmtNum(p.sell_price)} ${T.currency}` : '',
-      ctx.showCost && p.purchase_price ? `${T.whs_buy} ${fmtNum(p.purchase_price)}` : '',
+      ctx.showCost && p.purchase_price ? `${T.whs_buy} ${fmtNum(p.purchase_price)}${p.purchase_currency === 'USD' && p.purchase_usd_cents != null ? `<span class="usd-tag">${fmtUsdShort(p.purchase_usd_cents / 100)}</span>` : ''}` : '',
       ctx.showCost && p.margin_pct !== null && p.margin_pct !== undefined
         ? (p.margin_pct < 0 ? `<span style="color:#B91C1C; font-weight:700;">⚠️ ${p.margin_pct}% ${T.whs_below_cost}</span>` : `<span class="mg">+${p.margin_pct}%</span>`) : '',
       missingPrice ? `<span style="color:#B3241C; font-weight:700;">⚠️ ${T.branch_missing_price.replace(':', '')}</span>` : '',
@@ -5059,16 +5147,7 @@ function toggleSupMenu(e) {
 function closeSupMenu() { const m = document.getElementById('spMenu'); if (m) m.classList.remove('open'); }
 document.addEventListener('click', e => { if (!e.target.closest || !e.target.closest('.sp-menu-wrap')) closeSupMenu(); });
 
-function openSupRate() {
-  const inp = document.getElementById('usd_rate_input_sup');
-  document.getElementById('supRateModal').classList.add('open');
-  setTimeout(() => { inp.focus(); inp.select && inp.select(); }, 50);
-}
-async function saveSupRate() {
-  await saveUsdRate('usd_rate_input_sup', 'usdRateSaved_sup');
-  renderSupRatePill();
-  setTimeout(() => closeWhModal('supRateModal'), 700);
-}
+function openSupRate() { showTab('rate'); }
 
 async function openSupArchive() {
   const m = document.getElementById('supCardModal');
@@ -6262,11 +6341,14 @@ function openEditProductModal(key, productId) {
   document.getElementById('ep_name').value = p.name;
   document.getElementById('ep_sell').value = p.sell_price ?? '';
   document.getElementById('ep_buy').value = canBuy ? (p.purchase_price ?? '') : '';
-  document.getElementById('ep_buy_usd').value = '';
+  const isUsd = canBuy && p.purchase_currency === 'USD' && p.purchase_usd_cents != null;
+  document.getElementById('ep_buy_usd').value = isUsd ? p.purchase_usd_cents / 100 : '';
   document.getElementById('ep_sell_usd').value = '';
   document.getElementById('ep_sell_usd_wrap').style.display = USD_RATE ? '' : 'none';
   document.getElementById('ep_buy_wrap').style.display = canBuy ? '' : 'none';
-  document.getElementById('ep_usd_wrap').style.display = canBuy && USD_RATE ? '' : 'none';
+  document.getElementById('ep_cur_wrap').style.display = canBuy && (USD_RATE || isUsd) ? '' : 'none';
+  curSet('ep', isUsd ? 'USD' : 'UZS');
+  document.getElementById('ep_usd_wrap').style.display = canBuy && (USD_RATE || isUsd) ? '' : 'none';
   document.getElementById('ep_price_hint').style.display = canBuy ? '' : 'none';
   document.getElementById('ep_unit').textContent = whUnit(p.unit);
   document.getElementById('ep_stock').value = Math.round(epBaseQty(editingProduct) * 100) / 100;
@@ -6303,6 +6385,21 @@ async function submitEditProduct() {
   if (name !== p.name) payload.name = name;
   if (sell !== String(p.sell_price ?? '')) payload.sell_price = sell;
   if (canBuy && buy !== String(p.purchase_price ?? '')) payload.purchase_price = buy;
+  if (canBuy) {
+    const cur = curGet('ep');
+    const wasUsd = p.purchase_currency === 'USD' && p.purchase_usd_cents != null;
+    if (cur === 'USD') {
+      const usd = curUsdValue('ep');
+      if (usd == null) { showMsg(T.usd_cur_need_usd, false); return; }
+      if (!wasUsd || Math.round(usd * 100) !== p.purchase_usd_cents) {
+        payload.purchase_currency = 'USD';
+        payload.purchase_usd = usd;
+        delete payload.purchase_price;
+      }
+    } else if (wasUsd) {
+      payload.purchase_currency = 'UZS';
+    }
+  }
   if (Math.abs(parseFloat(stock) - epBaseQty(editingProduct)) > 1e-9) {
     payload.stock_qty = epStoreMode(editingProduct)
       ? String(Math.round((parseFloat(stock) + (p.shop_qty || 0)) * 1000) / 1000) : stock;
@@ -6514,47 +6611,174 @@ function onSumFieldEdited(sumFieldId, usdFieldId) {
   if (usdField) usdField.value = '';
 }
 
-async function saveUsdRate(inputId, savedId) {
-  inputId = inputId || 'usd_rate_input';
-  savedId = savedId || 'usdRateSaved';
-  const rateInput = document.getElementById(inputId);
-  const rate = rateInput.value;
-  const res = await fetch('/api/usd_rate', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({rate})
-  });
-  const data = await res.json();
-  if (data.ok) {
-    USD_RATE = data.effective ?? data.rate;
-    renderUsdInheritHint(data.rate);
-    // синхронизируем оба виджета курса, если на странице есть второй (Расходы)
-    ['usd_rate_input', 'usd_rate_input_exp', 'usd_rate_input_sup'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el && id !== inputId) el.value = data.rate ?? '';
-    });
-    if (SUP.loaded) { SUP.rate = USD_RATE; renderSuppliers(); }
-    const saved = document.getElementById(savedId);
-    saved.style.display = 'block';
-    setTimeout(() => { saved.style.display = 'none'; }, 1500);
-  } else {
-    showMsg(T.usd_rate_error || data.error, false);
-  }
+// ---------- Единый курс доллара ----------
+const RATE = { setup: null, sel: new Set(), sugg: [], seq: 0 };
+function rateFmt(n) { return Number(n || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 }); }
+function rateDate(s) { s = String(s || ''); return s.length >= 10 ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : s; }
+function fmtUsdShort(x) { return x == null ? '' : '$' + Number(x).toLocaleString('ru-RU', { maximumFractionDigits: Math.abs(x) >= 100 ? 0 : 2 }); }
+function usdApprox(x) { return x == null ? '' : '≈ ' + fmtUsdShort(x); }
+
+async function loadRateTab() {
+  const seq = ++RATE.seq;
+  let data;
+  try { data = await (await fetch('/api/usd_rate')).json(); } catch (e) { return; }
+  if (seq !== RATE.seq || !data.ok) return;
+  USD_RATE = data.rate || null;
+  renderRateNow(data);
+  if (!IS_BRANCH) loadRateSetup();
 }
 
-function renderUsdInheritHint(ownRate) {
-  // филиал без своего курса пересчитывает $ по курсу главной точки — пишем это явно
-  document.querySelectorAll('.usd-inherit-hint').forEach(el => {
-    if (IS_BRANCH && !ownRate && HEAD_USD_RATE) {
-      el.innerHTML = `${T.usd_head_used} <b>${Number(HEAD_USD_RATE).toLocaleString('ru-RU')}</b>. ${T.usd_head_own}`;
-      el.style.display = '';
-    } else if (IS_BRANCH && !ownRate) {
-      el.textContent = T.usd_none;
-      el.style.display = '';
-    } else {
-      el.style.display = 'none';
-    }
-  });
+function renderRateNow(data) {
+  document.getElementById('rateNow').textContent = data.rate ? rateFmt(data.rate) : '—';
+  const scope = document.getElementById('rateScope');
+  if (scope) scope.textContent = IS_BRANCH ? T.usd_scope_branch : (RATE.hasBranches ? T.usd_scope_head : T.usd_scope_single);
+  const inp = document.getElementById('rate_input');
+  if (inp && !inp.value && data.rate) inp.placeholder = String(data.rate);
+  const hist = data.history || [];
+  const el = document.getElementById('rateHistory');
+  if (!el) return;
+  el.innerHTML = hist.length ? `<div class="wh-att-title">${T.usd_hist_title}</div>` + hist.map(h => {
+    const up = h.prev_rate && h.rate > h.prev_rate;
+    const pct = h.prev_rate ? ((h.rate - h.prev_rate) / h.prev_rate * 100) : null;
+    const reval = !IS_BRANCH && h.reval_amount ? ` · ${T.usd_hist_reval} ${h.reval_amount > 0 ? '+' : '−'}${fmtShort(Math.abs(h.reval_amount))}` : '';
+    return `<div class="rate-h"><span>${rateDate(h.set_at)}${h.prev_rate ? ` · ${rateFmt(h.prev_rate)} →` : ''} <b>${rateFmt(h.rate)}</b></span>
+      <span class="${up ? 'up' : 'down'}">${pct !== null ? (pct > 0 ? '+' : '') + pct.toFixed(1) + '%' : ''}${reval}</span></div>`;
+  }).join('') : `<div class="hint-text" style="margin:0;">${T.usd_hist_empty}</div>`;
 }
-renderUsdInheritHint({{ usd_rate_own|tojson }});
+
+async function saveNetworkRate() {
+  const inp = document.getElementById('rate_input');
+  const rate = parseFloat(String(inp.value).replace(',', '.'));
+  if (!(rate > 0)) { showMsg(T.usd_rate_error, false); return; }
+  if (RATE.setup && !RATE.setup.done && RATE.setup.products.length && !confirm(T.usd_setup_first)) return;
+  const res = await fetch('/api/usd_rate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ rate }) });
+  const data = await res.json();
+  if (!data.ok) { showMsg(T.usd_rate_error + (data.error ? ': ' + data.error : ''), false); return; }
+  USD_RATE = data.rate;
+  inp.value = '';
+  renderRateNow({ rate: data.rate, history: data.history });
+  if (typeof SUP !== 'undefined' && SUP.loaded) { SUP.rate = USD_RATE; renderSuppliers(); }
+  let msg = T.usd_rate_saved;
+  if (data.reval) msg += ` · ${T.usd_hist_reval} ${data.reval > 0 ? '+' : '−'}${fmtShort(Math.abs(data.reval))} ${T.currency}`;
+  showMsg(msg, true);
+  loadRateSetup();
+  if (data.suggestions && data.suggestions.length) openRatePrices(data);
+}
+
+function openRatePrices(data) {
+  RATE.sugg = data.suggestions.map(x => ({ ...x, on: true }));
+  document.getElementById('rpTitle').textContent = T.usd_rp_title.replace('{pct}', String(data.pct).replace('.', ','));
+  document.getElementById('rpSub').textContent = T.usd_rp_sub.replace('{n}', RATE.sugg.length);
+  renderRatePrices();
+  document.getElementById('ratePriceModal').classList.add('open');
+}
+
+function renderRatePrices() {
+  let lastShop = null;
+  const multi = new Set(RATE.sugg.map(x => x.shop_id)).size > 1;
+  document.getElementById('rpList').innerHTML = RATE.sugg.map((x, i) => {
+    const head = multi && x.shop_id !== lastShop ? `<div class="rate-shop">${escapeHtml(x.shop_name || '')}</div>` : '';
+    lastShop = x.shop_id;
+    const mg = x.margin_pct != null ? `${T.usd_rp_margin} ${x.margin_pct}% → ${x.new_margin_pct}%` : '';
+    return head + `<div class="rate-row" onclick="if (event.target.tagName !== 'INPUT') { const c = this.querySelector('input[type=checkbox]'); c.checked = !c.checked; RATE.sugg[${i}].on = c.checked; }">
+      <input type="checkbox" ${x.on ? 'checked' : ''} onchange="RATE.sugg[${i}].on = this.checked">
+      <div class="rr-main"><b>${escapeHtml(x.name)}</b><span>${fmtNum(x.sell_price)} → ${mg}</span></div>
+      <div class="rr-price"><input type="number" inputmode="numeric" value="${x.proposed}" oninput="RATE.sugg[${i}].proposed = this.value"></div>
+    </div>`;
+  }).join('');
+}
+function rpSelect(on) { RATE.sugg.forEach(x => { x.on = on; }); renderRatePrices(); }
+
+async function applyRatePrices() {
+  const items = RATE.sugg.filter(x => x.on && parseFloat(x.proposed) > 0).map(x => ({ product_id: x.product_id, sell_price: x.proposed }));
+  if (!items.length) { closeWhModal('ratePriceModal'); return; }
+  const data = await (await fetch('/api/usd_rate/apply_prices', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ items }) })).json();
+  if (!data.ok) { showMsg(T.msg_error + ' ' + (data.error || ''), false); return; }
+  closeWhModal('ratePriceModal');
+  showMsg(T.usd_rp_done.replace('{n}', data.updated), true);
+}
+
+async function loadRateSetup() {
+  const card = document.getElementById('rateSetupCard');
+  if (!card) return;
+  let data;
+  try { data = await (await fetch('/api/usd_rate/setup')).json(); } catch (e) { return; }
+  if (!data.ok) { card.style.display = 'none'; return; }
+  RATE.setup = data;
+  RATE.hasBranches = new Set(data.products.map(p => p.shop_id)).size > 1 || data.products.some(p => !p.is_head);
+  const scope = document.getElementById('rateScope');
+  if (scope) scope.textContent = RATE.hasBranches ? T.usd_scope_head : T.usd_scope_single;
+  RATE.sel = new Set(data.products.filter(p => p.purchase_currency === 'USD').map(p => p.id));
+  const ent = document.getElementById('rate_setup_entered');
+  if (ent && !ent.value && data.rate) ent.value = data.rate;
+  card.style.display = data.products.length ? '' : 'none';
+  document.getElementById('rateSetupBanner').innerHTML = data.done
+    ? `<div class="rate-banner ok"><i class="fa-solid fa-circle-check"></i> ${T.usd_setup_done}</div>`
+    : `<div class="rate-banner"><i class="fa-solid fa-triangle-exclamation"></i> ${T.usd_setup_todo}</div>`;
+  document.querySelectorAll('[data-badge="rate"]').forEach(b => { b.textContent = data.done || !data.products.length ? '' : '!'; });
+  renderRateSetup();
+}
+
+function renderRateSetup() {
+  if (!RATE.setup) return;
+  const q = (document.getElementById('rateSetupSearch').value || '').trim().toLowerCase();
+  const list = RATE.setup.products.filter(p => !q || (p.name || '').toLowerCase().includes(q));
+  const multi = new Set(RATE.setup.products.map(p => p.shop_id)).size > 1;
+  let lastShop = null;
+  document.getElementById('rateSetupList').innerHTML = list.map(p => {
+    const head = multi && p.shop_id !== lastShop ? `<div class="rate-shop">${escapeHtml(p.shop_name || '')}</div>` : '';
+    lastShop = p.shop_id;
+    const isUsd = p.purchase_currency === 'USD' && p.purchase_usd_cents != null;
+    const price = p.purchase_price == null ? `<span style="color:#B45309;">${T.usd_setup_no_price}</span>`
+      : `${fmtNum(p.purchase_price)}<br><span class="hint-text" style="margin:0;">${isUsd ? fmtUsdShort(p.purchase_usd_cents / 100) : (USD_RATE ? usdApprox(p.purchase_price / USD_RATE) : '')}</span>`;
+    return head + `<div class="rate-row" onclick="if (event.target.tagName !== 'INPUT') { const c = this.querySelector('input'); if (!c.disabled) { c.checked = !c.checked; rateSetupToggle(${p.id}, c.checked); } }">
+      <input type="checkbox" ${RATE.sel.has(p.id) ? 'checked' : ''} ${p.purchase_price == null ? 'disabled' : ''} onchange="rateSetupToggle(${p.id}, this.checked)">
+      <div class="rr-main"><b>${escapeHtml(p.name)}</b><span>${whCatName(p.category)} · ${whQty(p.stock_qty)} ${whUnit(p.unit)}</span></div>
+      <div class="rr-price">${price}</div>
+    </div>`;
+  }).join('') || `<div class="hint-text">${T.wh_no_restocks}</div>`;
+  document.getElementById('rateSetupCount').textContent = T.usd_setup_count.replace('{n}', RATE.sel.size);
+}
+function rateSetupToggle(id, on) { if (on) RATE.sel.add(id); else RATE.sel.delete(id); document.getElementById('rateSetupCount').textContent = T.usd_setup_count.replace('{n}', RATE.sel.size); }
+function rateSetupSelect(on) {
+  const q = (document.getElementById('rateSetupSearch').value || '').trim().toLowerCase();
+  RATE.setup.products.filter(p => p.purchase_price != null && (!q || (p.name || '').toLowerCase().includes(q)))
+    .forEach(p => { if (on) RATE.sel.add(p.id); else RATE.sel.delete(p.id); });
+  renderRateSetup();
+}
+
+async function saveRateSetup() {
+  const entered = parseFloat(String(document.getElementById('rate_setup_entered').value).replace(',', '.'));
+  if (!(entered > 0)) { showMsg(T.usd_setup_err_rate, false); return; }
+  const res = await fetch('/api/usd_rate/setup', { method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ product_ids: [...RATE.sel], entered_rate: entered }) });
+  const data = await res.json();
+  if (!data.ok) { showMsg(T.msg_error + ' ' + (data.error || ''), false); return; }
+  let msg = T.usd_setup_saved.replace('{n}', data.marked);
+  if (data.reval) msg += ` · ${T.usd_hist_reval} ${data.reval > 0 ? '+' : '−'}${fmtShort(Math.abs(data.reval))} ${T.currency}`;
+  showMsg(msg, true);
+  loadRateSetup();
+}
+
+// переключатель «закупка в сумах / в $» в формах товара
+function curGet(prefix) { const b = document.querySelector(`#${prefix}_cur button.on`); return b ? b.dataset.cur : 'UZS'; }
+function curSet(prefix, cur) {
+  document.querySelectorAll(`#${prefix}_cur button`).forEach(b => b.classList.toggle('on', b.dataset.cur === cur));
+  const sumEl = document.getElementById(prefix === 'ep' ? 'ep_buy' : 'wh_new_purchase_price');
+  const usdWrap = document.getElementById(prefix === 'ep' ? 'ep_usd_wrap' : 'wh_new_purchase_usd_wrap');
+  if (usdWrap) usdWrap.style.display = (cur === 'USD' || USD_RATE) ? '' : 'none';
+  if (sumEl) sumEl.readOnly = cur === 'USD';
+  const hint = document.getElementById(prefix + '_cur_hint');
+  if (hint) hint.textContent = cur === 'USD' ? T.usd_cur_hint_usd : T.usd_cur_hint_uzs;
+}
+function curUsdValue(prefix) {
+  const usdEl = document.getElementById(prefix === 'ep' ? 'ep_buy_usd' : 'wh_new_purchase_usd');
+  const sumEl = document.getElementById(prefix === 'ep' ? 'ep_buy' : 'wh_new_purchase_price');
+  const v = parseFloat(usdEl.value);
+  if (!isNaN(v)) return Math.round(v * 100) / 100;
+  const s = parseFloat(sumEl.value);
+  return !isNaN(s) && USD_RATE ? Math.round(s / USD_RATE * 100) / 100 : null;
+}
 
 async function createProduct() {
   const catEl = document.getElementById('wh_new_category');
@@ -6570,6 +6794,13 @@ async function createProduct() {
     purchase_price: document.getElementById('wh_new_purchase_price').value || null,
     initial_stock: document.getElementById('wh_new_stock').value || 0,
   };
+  if (!IS_BRANCH && curGet('wh_new') === 'USD') {
+    const usd = curUsdValue('wh_new');
+    if (usd == null) { showMsg(T.usd_cur_need_usd, false); return; }
+    if (!USD_RATE) { showMsg(T.usd_cur_need_rate, false); return; }
+    payload.purchase_currency = 'USD';
+    payload.purchase_usd = usd;
+  }
   const res = await fetch('/api/products', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
   });
@@ -6577,6 +6808,7 @@ async function createProduct() {
   if (data.ok) {
     showMsg(T.wh_product_added, true);
     ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_purchase_usd','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
+    if (!IS_BRANCH) curSet('wh_new', 'UZS');
     document.getElementById('wh_new_unit_row').style.display = 'none';
     closeWhModal('addProductModal');
     loadWarehouse();
@@ -6619,6 +6851,7 @@ async function submitRestock() {
   const payload = {
     quantity: document.getElementById('restock_qty').value,
     purchase_price: document.getElementById('restock_price').value || null,
+    purchase_usd: (document.getElementById('restock_price_usd') || {}).value || null,
     restock_date: document.getElementById('restock_date').value || null,
   };
   const url = restockingShopId
@@ -6836,6 +7069,7 @@ function renderNetProfitHtml(np) {
     </div>
     <div style="text-align:center; margin-top:12px; padding-top:12px; border-top:1px dashed #86EFAC;">
       <div style="font-size:24px; font-weight:700; font-family:var(--font-mono); color:${isNegative ? '#B3241C' : '#15803D'};">${np.net_profit.toLocaleString('ru-RU')} ${T.currency}</div>
+      ${np.net_profit_usd != null ? `<div style="font-size:13px; font-family:var(--font-mono); color:var(--hint); margin-top:2px;">${usdApprox(np.net_profit_usd)} · ${T.usd_by_day_rate}</div>` : ''}
       <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
     </div>
     ${unpriced > 0 ? `
@@ -7102,7 +7336,7 @@ function renderStatCard(o) {
         <div class="st-split"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i>${debtOut ? `<i style="width:${debtOut / paySum * 100}%; background:#F59E0B;"></i>` : ''}</div>
         <div class="st-legend"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span>${debtOut ? `<span style="--dot:#F59E0B;">${T.st_debt_part} ${fmtShort(debtOut)}</span>` : ''}</div>
       </div>` : ''}
-      ${o.profit !== null && o.profit !== undefined ? `<div class="st-row profit"><span>${T.st_profit}</span><b>${fmtNum(o.profit)} ${T.currency}</b></div>` : ''}
+      ${o.profit !== null && o.profit !== undefined ? `<div class="st-row profit"><span>${T.st_profit}</span><b>${fmtNum(o.profit)} ${T.currency}${o.profitUsd != null ? `<small style="display:block; font-weight:500; color:var(--hint); font-size:11.5px;">${usdApprox(o.profitUsd)}</small>` : ''}</b></div>` : ''}
       `}
     </div>`;
 }
@@ -7166,7 +7400,7 @@ async function loadNetwork() {
     renderTodayStrip(data.stats.today, data.profit.today) +
     `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
       label, d: data.stats[key], cmp: data.comparison[key], cmpNote: note,
-      profit: data.profit[key], orange: isAll,
+      profit: data.profit[key], profitUsd: data.profit_usd ? data.profit_usd[key] : null, orange: isAll,
     })).join('')}</div>`;
 
   document.getElementById('netNetProfit').innerHTML = renderNetProfitHtml(data.net_profit);
@@ -7303,7 +7537,7 @@ async function loadStats() {
     renderTodayStrip(s.today, profit ? profit.today : null) +
     `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
       label, d: s[key], cmp: s.comparison && s.comparison[key], cmpNote: note,
-      profit: profit ? profit[key] : null,
+      profit: profit ? profit[key] : null, profitUsd: profit && profit.usd ? profit.usd[key] : null,
     })).join('')}</div>`;
 
   if (!IS_BRANCH) {
@@ -7425,10 +7659,10 @@ async function applyStatsRange() {
   if (!data.ok) { document.getElementById('statsRangeResult').innerHTML = ''; return; }
   const hasProfit = data.profit !== undefined;
   document.getElementById('statsRangeResult').innerHTML = `
-    ${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data, profit: hasProfit ? data.profit : null })}
+    ${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data, profit: hasProfit ? data.profit : null, profitUsd: hasProfit ? data.profit_usd : null })}
     ${hasProfit ? `
     <div class="stats-card" style="margin-top:10px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
-      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit })}
+      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit, net_profit_usd: data.net_profit_usd })}
     </div>
     ` : ''}
     <div class="stats-card" style="margin-top:10px;">
@@ -9977,7 +10211,7 @@ function guardOnce(names) {
 }
 guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarCompletely',
   'payDebt', 'cancelDebtPayment', 'confirmWriteoff', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
-  'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveUsdRate',
+  'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveNetworkRate', 'saveRateSetup', 'applyRatePrices',
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
   'submitCatalog', 'applyImport', 'editBranchPrice', 'submitStoreMove', 'submitStoreQty',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
@@ -11413,29 +11647,89 @@ def _head_usd_rate(shop):
 
 
 def _effective_usd_rate(shop):
-    """Свой курс точки; у филиала без своего курса — курс главной точки."""
+    """Единый курс сети: у филиала действует курс главной точки (свой — только
+    если у главной курс ещё не задан)."""
     if not shop:
         return None
-    return shop.get("usd_rate") or _head_usd_rate(shop)
+    return _head_usd_rate(shop) or shop.get("usd_rate")
+
+
+def _usd_head_id():
+    """Чей курс меняем: главная/самостоятельная точка — свой; филиал не меняет."""
+    return None if g.is_branch or g.is_employee else g.shop_id
+
+
+@app.route("/api/usd_rate", methods=["GET"])
+@login_required
+@employee_blocked
+def api_get_usd_rate():
+    """Раздел «Курс доллара»: текущий курс сети и история изменений."""
+    shop = db.get_shop(g.shop_id)
+    hist = db.get_usd_rate_history(g.shop_id)
+    if g.is_branch:
+        for h in hist:
+            h.pop("reval_amount", None)
+            h.pop("usd_products", None)
+    return jsonify({"ok": True, "rate": _effective_usd_rate(shop), "can_edit": _usd_head_id() is not None,
+                    "history": hist})
 
 
 @app.route("/api/usd_rate", methods=["POST"])
 @login_required
 @employee_blocked
 def api_set_usd_rate():
-    """Курс доллара точки. Филиал тоже может задать свой (для цен продажи и
-    расходов в $); пустое значение у филиала = снова брать курс главной точки."""
-    data = request.get_json(force=True)
+    """Новый курс доллара — для всей сети (главная + филиалы). Задаёт только
+    главная или самостоятельная точка. Долларовые товары переоцениваются,
+    в ответе — предложения поднять цены продажи."""
+    head = _usd_head_id()
+    if head is None:
+        return jsonify({"ok": False, "error": "курс задаёт главная точка"}), 403
+    data = request.get_json(force=True) or {}
     try:
-        rate = float(data.get("rate")) if data.get("rate") not in (None, "") else None
-        if rate is not None and rate <= 0:
+        rate = float(data.get("rate"))
+        if not (0 < rate < 1_000_000):
             raise ValueError()
     except (TypeError, ValueError):
         return jsonify({"ok": False, "error": "укажите положительное число"}), 400
-    db.set_shop_usd_rate(g.shop_id, rate)
-    shop = db.get_shop(g.shop_id)
-    return jsonify({"ok": True, "rate": rate, "effective": _effective_usd_rate(shop),
-                    "head_rate": _head_usd_rate(shop)})
+    res = db.set_network_usd_rate(head, rate)
+    res.update({"ok": True, "effective": rate, "history": db.get_usd_rate_history(head)})
+    return jsonify(res)
+
+
+@app.route("/api/usd_rate/apply_prices", methods=["POST"])
+@login_required
+@profit_blocked
+def api_usd_apply_prices():
+    data = request.get_json(force=True) or {}
+    n = db.apply_price_suggestions(g.shop_id, data.get("items") or [])
+    return jsonify({"ok": True, "updated": n})
+
+
+@app.route("/api/usd_rate/setup", methods=["GET"])
+@login_required
+@profit_blocked
+def api_usd_setup_get():
+    res = db.usd_setup_products(g.shop_id)
+    res.update({"ok": True, "rate": _effective_usd_rate(db.get_shop(g.shop_id))})
+    return jsonify(res)
+
+
+@app.route("/api/usd_rate/setup", methods=["POST"])
+@login_required
+@profit_blocked
+def api_usd_setup_save():
+    """Разметка товаров: какие закупаются в $ и по какому курсу их вводили."""
+    data = request.get_json(force=True) or {}
+    try:
+        entered = float(data.get("entered_rate"))
+        if not (0 < entered < 1_000_000):
+            raise ValueError()
+        ids = [int(x) for x in data.get("product_ids") or []]
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "укажите курс, по которому вводили товары"}), 400
+    res = db.mark_usd_products(g.shop_id, ids, entered)
+    res["ok"] = True
+    return jsonify(res)
 
 
 
@@ -12377,6 +12671,9 @@ def api_stats_range():
         result["unpriced"] = pb["unpriced"]
         result["expenses"] = expenses
         result["net_profit"] = pb["profit"] - expenses
+        usd = db.profit_usd_range(g.shop_id, date_from, date_to)
+        result["profit_usd"] = usd["profit_usd"]
+        result["net_profit_usd"] = usd["net_usd"]
     return jsonify(result)
 
 
@@ -12517,9 +12814,14 @@ def api_create_product():
         if g.is_branch:
             purchase_price = None  # филиал не вписывает цену закупки — это делает только главный аккаунт
         initial_stock = float(data["initial_stock"]) if data.get("initial_stock") not in (None, "") else 0
+        purchase_currency = "USD" if data.get("purchase_currency") == "USD" and not g.is_branch else None
+        purchase_usd = float(data["purchase_usd"]) if purchase_currency and data.get("purchase_usd") not in (None, "") else None
+        if purchase_usd is not None and purchase_usd < 0:
+            raise ValueError("bad price")
     except (KeyError, ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
-    product = db.create_product(g.shop_id, category, name, unit, sell_price, purchase_price, initial_stock)
+    product = db.create_product(g.shop_id, category, name, unit, sell_price, purchase_price, initial_stock,
+                                purchase_currency=purchase_currency, purchase_usd=purchase_usd)
     # новинка, заведённая прямо из заказа поставщику, сразу закрепляется за ним
     if data.get("supplier_id") not in (None, "") and not g.is_branch:
         try:
@@ -12551,10 +12853,13 @@ def _apply_product_edit(shop_id: int, product_id: int, data: dict, allow_purchas
         purchase_price = _int(data.get("purchase_price")) if allow_purchase else None
         clear_purchase = allow_purchase and "purchase_price" in data and data.get("purchase_price") in (None, "")
         stock_qty = float(data["stock_qty"]) if data.get("stock_qty") not in (None, "") else None
+        currency = data.get("purchase_currency") if allow_purchase and data.get("purchase_currency") in ("USD", "UZS") else None
+        purchase_usd = float(data["purchase_usd"]) if currency == "USD" and data.get("purchase_usd") not in (None, "") else None
     except (ValueError, TypeError):
         return jsonify({"ok": False, "error": "неверные данные"}), 400
     ok, err = db.update_product(product_id, shop_id, name=name, sell_price=sell_price,
-                                purchase_price=purchase_price, clear_purchase_price=clear_purchase)
+                                purchase_price=purchase_price, clear_purchase_price=clear_purchase,
+                                purchase_currency=currency, purchase_usd=purchase_usd)
     if not ok:
         return jsonify({"ok": False, "error": PRODUCT_EDIT_ERRORS.get(err, err)}), (404 if err == "not_found" else 400)
     if stock_qty is not None:
@@ -12601,12 +12906,14 @@ def api_restock_product(product_id):
     try:
         quantity = float(data["quantity"])
         purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        purchase_usd = float(data["purchase_usd"]) if data.get("purchase_usd") not in (None, "") else None
         if g.is_branch:
             purchase_price = None  # филиал не вписывает цену закупки при пополнении — только главный аккаунт
+            purchase_usd = None
         restock_date = data.get("restock_date") or None
     except (KeyError, ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
-    ok = db.restock_product(product_id, g.shop_id, quantity, purchase_price, restock_date)
+    ok = db.restock_product(product_id, g.shop_id, quantity, purchase_price, restock_date, purchase_usd=purchase_usd)
     if not ok:
         return jsonify({"ok": False, "error": "товар не найден"}), 404
     return jsonify({"ok": True})
@@ -12622,6 +12929,9 @@ def api_warehouse_overview():
     if denied:
         return denied
     result = db.get_warehouse_overview(g.shop_id)
+    if not g.is_branch:
+        result["summary"]["usd_reval"] = db.last_usd_revaluation(g.shop_id)
+        result["summary"]["usd_setup_done"] = db.usd_setup_products(g.shop_id)["done"]
     if g.is_branch:
         for p in result["products"]:
             p.pop("purchase_price", None)
@@ -12672,10 +12982,11 @@ def api_branch_restock(branch_id, product_id):
         if quantity <= 0:
             raise ValueError
         purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
+        purchase_usd = float(data["purchase_usd"]) if data.get("purchase_usd") not in (None, "") else None
         restock_date = data.get("restock_date") or None
     except (KeyError, ValueError, TypeError):
         return jsonify({"ok": False, "error": "неверные данные"}), 400
-    ok = db.restock_product(product_id, branch_id, quantity, purchase_price, restock_date)
+    ok = db.restock_product(product_id, branch_id, quantity, purchase_price, restock_date, purchase_usd=purchase_usd)
     if not ok:
         return jsonify({"ok": False, "error": "товар не найден"}), 404
     return jsonify({"ok": True})
@@ -13340,7 +13651,9 @@ def api_distribute_order(order_id):
 @login_required
 @profit_blocked
 def api_profit_stats():
-    return jsonify(db.get_profit_stats(g.shop_id))
+    res = db.get_profit_stats(g.shop_id)
+    res["usd"] = db.profit_stats_usd(g.shop_id)
+    return jsonify(res)
 
 
 @app.route("/api/export")
