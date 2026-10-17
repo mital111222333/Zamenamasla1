@@ -2276,6 +2276,122 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .af-bar-total span { display:block; font-size:11px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; }
   .af-bar-total b { display:block; font-size:21px; font-weight:800; font-family:var(--font-mono); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .af-save { flex:none; border:0; border-radius:14px; padding:13px 20px; background:linear-gradient(135deg, #E63946, #C1121F); color:#fff; font-size:15px; font-weight:800; font-family:var(--font-display); cursor:pointer; box-shadow:0 6px 14px rgba(230,57,70,.30); }
+  /* ---- Ввод замены: компактная карточка клиента ---- */
+  .known-client.kc-compact { border:1.5px solid #A7DCC4; box-shadow:none; padding:10px 12px; border-radius:16px; }
+  .kc-compact .kc-top { display:flex; align-items:center; gap:10px; }
+  .kc-compact .kc-avatar { width:40px; height:40px; font-size:15px; border:0; background:#E7F6EF; color:#0F6B4C; }
+  .kc-compact .kc-top-main { flex:1; min-width:0; }
+  .kc-compact .kc-name { font-size:15.5px; }
+  .kc-compact .kc-visits { font-size:12px; font-weight:700; color:#0F6B4C; white-space:nowrap; }
+  .kc-compact .kc-meta { font-size:12.5px; margin-top:1px; }
+  .kc-more-btn { flex:none; border:0; background:transparent; color:var(--blue); font:inherit; font-size:13px; font-weight:700; padding:8px 4px; cursor:pointer; white-space:nowrap; }
+  .kc-more-btn i { font-size:10px; transition:transform .15s; }
+  .kc-more-btn.open i { transform:rotate(180deg); }
+  .kc-last-line { margin-top:8px; font-size:12.5px; color:#334155; background:#F4F7FA; border-radius:10px; padding:7px 10px; line-height:1.4; }
+  .kc-last-line b { font-family:var(--font-mono); }
+  .kc-quick { display:flex; gap:6px; margin-top:8px; overflow-x:auto; scrollbar-width:none; }
+  .kc-quick::-webkit-scrollbar { display:none; }
+  .kc-quick:empty { display:none; }
+  .kc-compact .kc-repeat { width:auto; flex:none; margin:0; padding:10px 14px; font-size:13.5px; border-radius:11px; }
+  .kc-presets { display:flex; gap:6px; }
+  .kc-presets:empty { display:none; }
+  .kc-preset { flex:none; border:1.5px solid #BFDBFE; background:#F5F9FF; color:#1E3A8A; border-radius:11px; padding:9px 12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .kc-details { margin-top:10px; border-top:1px dashed var(--border); padding-top:10px; }
+  .kc-details[hidden] { display:none; }
+  .kc-detail-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+  .kc-edit-data { border:1px solid var(--border); background:#fff; border-radius:10px; padding:8px 12px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+  .add-form.kc-known .af-owner { display:none; }
+  /* масло: литры кнопками −/+ */
+  .lit-step { display:flex; align-items:center; gap:4px; flex:1.2; min-width:0; }
+  .lit-step input { flex:1; min-width:0; text-align:center; font-family:var(--font-mono); font-weight:700; }
+  .lit-step button { flex:none; width:34px; height:36px; border:1px solid #BFDBFE; border-radius:9px; background:#fff; color:var(--blue); font-size:17px; font-weight:800; cursor:pointer; font-family:inherit; }
+  /* поле товара: на телефоне — открываем свою шторку вместо системного списка */
+  .pick-wrap { position:relative; flex:1.6; min-width:0; display:flex; }
+  .pick-wrap select { flex:1; width:100%; }
+  .pick-ov { display:none; position:absolute; inset:0; border:0; background:transparent; cursor:pointer; }
+  /* фильтры и работы — плитки-галочки */
+  .flt-tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; margin:4px 0 8px; }
+  @media (min-width:600px) { .flt-tiles { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .flt-tile { text-align:left; border:1.5px solid var(--border); background:#fff; border-radius:12px; padding:9px 11px; min-height:50px; font:inherit; color:var(--text); cursor:pointer; display:flex; flex-direction:column; justify-content:center; gap:2px; }
+  .flt-tile b { font-size:13.5px; font-weight:700; }
+  .flt-tile span { font-size:11.5px; color:var(--hint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .flt-tile.on { border-color:var(--blue); background:#EFF6FF; }
+  .flt-tile.on b::before { content:'✓ '; color:var(--blue); }
+  .flt-tile.add b { color:var(--blue); }
+  .labor-btn { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #FDE68A; background:#FFFBEB; color:#92400E; border-radius:999px; padding:7px 13px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; margin:2px 0 8px; }
+  .debt-terms { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 10px; }
+  .debt-terms button { border:1px solid #F5D9A8; background:#fff; color:#8A4B06; border-radius:999px; padding:7px 12px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
+  .debt-terms button.on { background:#8A4B06; color:#fff; border-color:#8A4B06; }
+  /* шторки (выбор товара, чек) и экран «Сохранено» */
+  .ob-sheet-bg { position:fixed; inset:0; background:rgba(11,27,63,.5); z-index:80; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .ob-sheet-bg.open { opacity:1; pointer-events:auto; }
+  .ob-sheet { position:fixed; left:0; right:0; bottom:0; z-index:81; background:#fff; border-radius:22px 22px 0 0; max-height:88vh; display:flex; flex-direction:column; transform:translateY(105%); transition:transform .25s ease; box-shadow:0 -10px 30px rgba(15,23,42,.18); padding-bottom:env(safe-area-inset-bottom, 0px); }
+  .ob-sheet:not(.open) { visibility:hidden; transition:transform .25s ease, visibility 0s .25s; }
+  .ob-sheet.open { transform:translateY(0); visibility:visible; }
+  @media (min-width:900px) { .ob-sheet { left:50%; right:auto; width:480px; margin-left:-240px; bottom:auto; top:50%; border-radius:20px; transform:translateY(-40%); opacity:0; } .ob-sheet.open { transform:translateY(-50%); opacity:1; } }
+  .ob-sheet-h { display:flex; align-items:center; gap:10px; padding:10px 16px 8px; }
+  .ob-sheet-h::before { content:''; position:absolute; top:7px; left:50%; width:40px; height:5px; margin-left:-20px; border-radius:3px; background:#CBD5E1; }
+  .ob-sheet-h b { flex:1; font-family:'Sora', var(--font-display), sans-serif; font-size:18px; font-weight:800; margin-top:6px; }
+  .ob-sheet-x { width:40px; height:40px; border:0; border-radius:20px; background:#F1F5F9; font-size:16px; cursor:pointer; margin-top:6px; }
+  .ob-sheet-body { overflow-y:auto; padding:4px 16px 12px; flex:1; -webkit-overflow-scrolling:touch; }
+  .ob-sheet-foot { padding:10px 16px 14px; border-top:1px solid #EEF2F7; }
+  .ps-grp { font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--hint); text-transform:uppercase; margin:12px 0 6px; }
+  .ps-item { width:100%; display:flex; align-items:center; gap:10px; min-height:58px; text-align:left; border:1.5px solid var(--border); background:#fff; border-radius:14px; padding:8px 12px; margin-bottom:6px; font:inherit; color:var(--text); cursor:pointer; }
+  .ps-item.on { border-color:var(--blue); background:#EFF6FF; }
+  .ps-item.out { opacity:.55; }
+  .ps-item div { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .ps-item b { font-size:14.5px; overflow-wrap:anywhere; }
+  .ps-item small { font-size:12px; color:#047857; }
+  .ps-item small.low { color:#B45309; }
+  .ps-item small.none { color:var(--hint); }
+  .ps-item em { font-style:normal; font-family:var(--font-mono); font-weight:600; font-size:14px; }
+  .ps-search { width:100%; height:46px; margin-top:2px; }
+  .ps-lit { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:6px; margin-bottom:10px; }
+  .ps-lit button { height:44px; border:1px solid var(--border); border-radius:10px; background:#fff; font:inherit; font-weight:700; font-size:15px; cursor:pointer; }
+  .ps-lit button.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .ps-go, .sv-next { width:100%; height:54px; border:0; border-radius:14px; background:#0B1B3F; color:#fff; font:inherit; font-size:16px; font-weight:800; cursor:pointer; }
+  .rc-line { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px dashed var(--border); }
+  .rc-line div { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .rc-line b { font-size:14px; overflow-wrap:anywhere; }
+  .rc-line span { font-size:12px; color:var(--hint); }
+  .rc-line span a { color:var(--blue); font-weight:700; text-decoration:none; cursor:pointer; }
+  .rc-line em { font-style:normal; font-family:var(--font-mono); font-weight:600; font-size:15px; white-space:nowrap; }
+  .rc-x { flex:none; width:34px; height:34px; border:0; border-radius:9px; background:#F1F5F9; color:#64748B; font-size:13px; cursor:pointer; }
+  .rc-total { display:flex; justify-content:space-between; align-items:baseline; margin:12px 0 6px; }
+  .rc-total span { color:var(--hint); font-size:14px; }
+  .rc-total b { font-family:var(--font-mono); font-size:28px; font-weight:600; }
+  #rcPayHost .af-sec { border:0; box-shadow:none; padding:0; margin:8px 0 0; }
+  .sv-wrap { position:fixed; inset:0; z-index:90; background:#F3F5FA; display:flex; flex-direction:column; align-items:center; overflow-y:auto; padding:40px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .sv-wrap[hidden] { display:none; }
+  .sv-in { width:100%; max-width:440px; display:flex; flex-direction:column; gap:12px; }
+  .sv-ok { width:76px; height:76px; border-radius:50%; background:#0F6B4C; color:#fff; display:flex; align-items:center; justify-content:center; font-size:34px; margin:0 auto; }
+  .sv-title { text-align:center; font-family:'Sora', var(--font-display), sans-serif; font-size:24px; font-weight:800; }
+  .sv-sub { text-align:center; color:var(--hint); font-size:14px; margin-top:-6px; }
+  .sv-card { background:#fff; border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; font-size:14px; }
+  .sv-card div { display:flex; justify-content:space-between; gap:10px; }
+  .sv-card div span { color:var(--hint); }
+  .sv-card div b { text-align:right; }
+  .sv-send { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+  .sv-send a, .sv-send button { height:50px; border:0; border-radius:14px; color:#fff; font:inherit; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; cursor:pointer; }
+  .sv-tg { background:#229ED9; } .sv-wa { background:#1FA855; } .sv-qr { background:#475569; }
+  .sv-note { font-size:13px; color:#047857; text-align:center; }
+  .sv-next { background:var(--btn); height:58px; font-size:17px; margin-top:6px; }
+  .sv-row { display:flex; gap:8px; }
+  .sv-row button { flex:1; height:46px; border:1px solid var(--border); border-radius:14px; background:#fff; font:inherit; font-size:14px; font-weight:700; cursor:pointer; color:var(--text); }
+  .sv-row .sv-undo { color:var(--danger); border-color:#F3C4C7; }
+  .sv-row .sv-undo:disabled { opacity:.45; cursor:default; }
+  @media (max-width: 899px) {
+    .pick-ov { display:block; }
+    .af-bar-total { cursor:pointer; }
+    .af-bar-total span::after { content:' ▲'; font-size:10px; }
+    .add-form #fluidsList .item-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) 30px; grid-template-areas:"n n x" "s s s" "p l l"; gap:6px 6px; align-items:center; background:#F8FAFC; border-radius:12px; padding:8px; }
+    .add-form #fluidsList .item-row > .item-name { grid-area:n; font-weight:700; color:#334155; }
+    .add-form #fluidsList .item-row > .row-x { grid-area:x; }
+    .add-form #fluidsList .item-row > .pick-wrap, .add-form #fluidsList .item-row > select, .add-form #fluidsList .item-row > input[id^="fluid_brand_"] { grid-area:s; }
+    .add-form #fluidsList .item-row > input[id^="fluid_price_"] { grid-area:p; }
+    .add-form #fluidsList .item-row > .lit-step { grid-area:l; }
+    .add-form #fluidsList .item-row > .pick-wrap select { padding:10px; font-size:14px; font-weight:600; }
+  }
   /* Колонки формы: на телефоне — обычный поток (display:contents сохраняет
      липкую панель «Итого» внизу), на компьютере — форма слева, чек справа */
   .af-main, .af-side { display:contents; }
@@ -2987,6 +3103,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
         </div>
         <div id="knownClientPanel"></div>
       </div>
+      <div class="af-owner" id="afOwner">
       <div class="field">
         <label><i class="fa-solid fa-user"></i>{{ T.field_owner_name }}</label>
         <input id="owner_name" placeholder="Имя Фамилия">
@@ -3014,6 +3131,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div id="vinHint" hidden></div>
       <div id="specCard" hidden></div>
       <a class="oil-lesson" href="/course/4"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.oil_lesson_link }}</span><i class="fa-solid fa-chevron-right"></i></a>
+      </div>
     </div>
 
     <div class="af-sec">
@@ -3054,9 +3172,12 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       </div>
       {% endif %}
       <div id="fluidsList"></div>
+      <div class="af-sub">{{ T.af_filters_title }}</div>
+      <div class="flt-tiles" id="filterTiles"></div>
       <div id="filtersList"></div>
       <div class="af-add" id="itemAddChips"></div>
       <div class="af-sub">{{ T.section_other }}</div>
+      <button type="button" class="labor-btn" onclick="addLabor()"><i class="fa-solid fa-screwdriver-wrench"></i> {{ T.labor_btn }}</button>
       <div class="row2">
         <div class="field">
           <input id="other_name" placeholder="{{ T.field_other_name_ph }}" aria-label="{{ T.field_other_name }}">
@@ -3116,15 +3237,56 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
             <input id="debt_interval_days" type="number" placeholder="14">
           </div>
         </div>
+        <div class="af-sub" style="margin-top:14px;">{{ T.debt_term_label }}</div>
+        <div class="debt-terms" id="debtTerms">
+          <button type="button" data-d="7" onclick="setDebtTerm(7)">{{ T.debt_1w }}</button>
+          <button type="button" data-d="14" onclick="setDebtTerm(14)">{{ T.debt_2w }}</button>
+          <button type="button" data-d="30" onclick="setDebtTerm(30)">{{ T.debt_1m }}</button>
+        </div>
       </div>
       <div class="af-sub" style="margin-top:14px;">{{ T.field_notes }}</div>
       <textarea id="notes" rows="2" placeholder="{{ T.notes_ph }}"></textarea>
     </div>
 
     <div class="af-bar">
-      <div class="af-bar-total"><span>{{ T.field_total }}</span><b id="totalCost">0</b></div>
+      <div class="af-bar-total" onclick="openReceiptSheet()" role="button" tabindex="0"><span id="barCount">{{ T.field_total }}</span><b id="totalCost">0</b></div>
       <button class="af-save" onclick="submitCar()"><i class="fa-solid fa-check"></i> {{ T.btn_save }}<kbd class="af-kbd">{{ T.kbd_save }}</kbd></button>
     </div>
+    </div>
+  </div>
+
+  <!-- шторки формы замены (телефон) и экран «Сохранено» -->
+  <div class="ob-sheet-bg" id="obSheetBg" onclick="closeObSheets()"></div>
+  <div class="ob-sheet" id="pickSheet" role="dialog" aria-modal="true" aria-labelledby="pickSheetTitle">
+    <div class="ob-sheet-h"><b id="pickSheetTitle"></b><button type="button" class="ob-sheet-x" onclick="closeObSheets()" aria-label="{{ T.close }}">✕</button></div>
+    <div class="ob-sheet-body">
+      <input id="pickSheetSearch" class="ps-search" type="search" placeholder="🔍 {{ T.pick_search_ph }}" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="renderPickSheet()">
+      <div id="pickSheetList"></div>
+    </div>
+    <div class="ob-sheet-foot" id="pickSheetFoot"></div>
+  </div>
+  <div class="ob-sheet" id="rcSheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
+    <div class="ob-sheet-h"><b id="rcSheetTitle">{{ T.rcpt_title }}</b><span id="rcSheetPlate" style="font-family:var(--font-mono); color:var(--hint); margin-top:6px;"></span><button type="button" class="ob-sheet-x" onclick="closeObSheets()" aria-label="{{ T.close }}">✕</button></div>
+    <div class="ob-sheet-body">
+      <div id="rcSheetLines"></div>
+      <button type="button" class="labor-btn" style="margin-top:10px;" onclick="closeObSheets(); addLabor()"><i class="fa-solid fa-screwdriver-wrench"></i> {{ T.labor_btn }}</button>
+      <div class="rc-total"><span>{{ T.field_total }}</span><b id="rcSheetTotal">0</b></div>
+      <div id="rcPayHost"></div>
+    </div>
+    <div class="ob-sheet-foot"><button type="button" class="af-save" style="width:100%; padding:16px;" onclick="closeObSheets(); submitCar()"><i class="fa-solid fa-check"></i> {{ T.btn_save }}</button></div>
+  </div>
+  <div class="sv-wrap" id="savedScreen" hidden role="dialog" aria-modal="true" aria-labelledby="svTitle">
+    <div class="sv-in">
+      <div class="sv-ok"><i class="fa-solid fa-check"></i></div>
+      <div class="sv-title" id="svTitle">{{ T.sv_title }}</div>
+      <div class="sv-sub" id="svSub"></div>
+      <div class="sv-card" id="svCard"></div>
+      <div id="svSend"></div>
+      <button type="button" class="sv-next" onclick="closeSaved(true)">+ {{ T.sv_next_car }}</button>
+      <div class="sv-row">
+        <button type="button" onclick="closeSaved(false)">{{ T.close }}</button>
+        <button type="button" class="sv-undo" id="svUndo" onclick="undoSaved()"></button>
+      </div>
     </div>
   </div>
 
@@ -7929,7 +8091,11 @@ function brandFieldHtml(key, fieldId, onPickHandler) {
       return `<option value="${p.id}" data-price="${p.sell_price || ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${whQty(sellQty(p))} ${unitLabel}${stockWarn}${mainTail(p, unitLabel)})</option>`;
     })
   ).join('');
-  return `<select id="${fieldId}" data-is-product="1" onchange="${onPickHandler}">${options}</select>`;
+  const sel = `<select id="${fieldId}" data-is-product="1" onchange="${onPickHandler}">${options}</select>`;
+  // в основной форме на телефоне поверх списка лежит прозрачная кнопка —
+  // она открывает удобную шторку выбора (поиск, остатки, прошлый товар сверху)
+  if (fieldId.indexOf('svc_') === 0) return sel;
+  return `<span class="pick-wrap">${sel}<button type="button" class="pick-ov" onclick="openPickSheet('${key}')" aria-label="${T.psh_choose}"></button></span>`;
 }
 
 function readBrandField(fieldId) {
@@ -8246,7 +8412,7 @@ function renderItemLists() {
       <span class="item-name">${T[key]}</span>
       ${brandFieldHtml(key, `fluid_brand_${i}`, `onFluidProductPicked(${i})`)}
       <input id="fluid_price_${i}" type="number" placeholder="${T.price_per_liter_ph}" oninput="updateTotal()">
-      <input id="fluid_liters_${i}" type="number" step="0.1" placeholder="${T.liters_ph}" oninput="updateTotal()">
+      <span class="lit-step"><button type="button" onclick="stepLiters(${i}, -0.5)" aria-label="−0,5">−</button><input id="fluid_liters_${i}" type="number" inputmode="decimal" step="0.1" placeholder="${T.liters_ph}" oninput="updateTotal()"><button type="button" onclick="stepLiters(${i}, 0.5)" aria-label="+0,5">+</button></span>
       <button type="button" class="row-x" onclick="closeItemRow('${key}')" aria-label="${T.af_remove}">✕</button>
     </div>
   `).join('');
@@ -8270,7 +8436,7 @@ function renderItemLists() {
 // масляный фильтр, остальные — кнопками «+ АКПП», «+ Антифриз»… Строка с
 // заполненным значением видна всегда (после «Повторить прошлую», выбора из
 // поиска по складу и т.п.). ✕ очищает строку и прячет её.
-const ROW_DEFAULT = ['fluid_0', 'filter_0'];
+const ROW_DEFAULT = ['fluid_0'];
 let ROW_OPEN = new Set(ROW_DEFAULT);
 function rowFieldIds(key) {
   const fi = FLUID_KEYS.indexOf(key), ti = FILTER_KEYS.indexOf(key);
@@ -8292,7 +8458,73 @@ function syncItemRows() {
     if (!vis) hidden.push(key);
   });
   const box = document.getElementById('itemAddChips');
-  if (box) box.innerHTML = hidden.map(k => `<button type="button" onclick="openItemRow('${k}')"><i class="fa-solid fa-plus"></i>${T[k]}</button>`).join('');
+  // фильтры — плитками (renderFilterTiles), здесь только остальные жидкости
+  if (box) box.innerHTML = hidden.filter(k => FILTER_KEYS.indexOf(k) < 0).map(k => `<button type="button" onclick="openItemRow('${k}')"><i class="fa-solid fa-plus"></i>${T[k]}</button>`).join('');
+  renderFilterTiles();
+}
+
+// ---- Фильтры плитками: нажал — фильтр в чеке, ещё раз — убран ----
+function renderFilterTiles() {
+  const box = document.getElementById('filterTiles');
+  if (!box) return;
+  box.innerHTML = FILTER_KEYS.map((key, i) => {
+    const on = rowHasValue(key);
+    const prods = productsForCategory(key);
+    let sub = '';
+    if (on) {
+      const { brand } = readBrandField(`filter_brand_${i}`);
+      const pr = parseFloat((document.getElementById(`filter_price_${i}`) || {}).value) || 0;
+      sub = [brand, pr ? pr.toLocaleString('ru-RU') : ''].filter(Boolean).join(' · ');
+    } else if (prods.length === 1 && prods[0].sell_price) {
+      sub = Number(prods[0].sell_price).toLocaleString('ru-RU');
+    } else if (prods.length > 1) {
+      sub = prods.length + ' ' + T.psh_variants;
+    }
+    return `<button type="button" class="flt-tile${on ? ' on' : ''}" aria-pressed="${on}" onclick="toggleFilterTile('${key}')"><b>${T[key]}</b>${sub ? `<span>${escapeHtml(sub)}</span>` : ''}</button>`;
+  }).join('');
+}
+function toggleFilterTile(key) {
+  const ti = FILTER_KEYS.indexOf(key);
+  if (ti < 0) return;
+  if (rowHasValue(key)) { closeItemRow(key); return; }
+  const prods = productsForCategory(key);
+  const sel = document.getElementById(`filter_brand_${ti}`);
+  if (sel && sel.tagName === 'SELECT') {
+    if (prods.length === 1) { setProductInField(key, prods[0].id); return; }
+    openPickSheet(key);
+    return;
+  }
+  openItemRow(key);
+}
+
+// литры кнопками −/+ по 0,5 л
+function stepLiters(i, d) {
+  const el = document.getElementById(`fluid_liters_${i}`);
+  if (!el) return;
+  const cur = parseFloat(String(el.value).replace(',', '.')) || 0;
+  const v = Math.max(0, Math.round((cur + d) * 10) / 10);
+  el.value = v ? String(v) : '';
+  updateTotal();
+}
+
+// «Работа / услуга» отдельной кнопкой: подставляет название и ставит курсор в цену
+function addLabor() {
+  const n = document.getElementById('other_name'), pr = document.getElementById('other_price');
+  if (!n || !pr) return;
+  if (!n.value.trim()) n.value = T.labor_name;
+  pr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  setTimeout(() => pr.focus(), 250);
+}
+
+// долг: «вернёт через 1 нед / 2 нед / 1 мес» — одним платежом весь остаток
+function setDebtTerm(days) {
+  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
+  const card = parseFloat(document.getElementById('pay_card').value) || 0;
+  const rest = Math.max(0, Math.round(total - cash - card));
+  document.getElementById('debt_interval_days').value = days;
+  if (rest > 0) document.getElementById('debt_installment_amount').value = rest;
+  document.querySelectorAll('#debtTerms button').forEach(b => b.classList.toggle('on', b.dataset.d === String(days)));
 }
 function openItemRow(key) {
   ROW_OPEN.add(key);
@@ -8304,6 +8536,250 @@ function closeItemRow(key) {
   rowFieldIds(key).forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   ROW_OPEN.delete(key);
   updateTotal();
+}
+
+// ---- Шторки формы замены (телефон) ----
+const PSH = { key: '', liters: 0 };
+function openObSheet(id) {
+  const sh = document.getElementById(id), bg = document.getElementById('obSheetBg');
+  if (!sh || !bg) return;
+  bg.classList.add('open'); sh.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeObSheets() {
+  document.querySelectorAll('.ob-sheet.open').forEach(x => x.classList.remove('open'));
+  const bg = document.getElementById('obSheetBg');
+  if (bg) bg.classList.remove('open');
+  document.body.style.overflow = '';
+  // блок «Оплата» возвращаем на место в форме
+  const pay = document.querySelector('#rcPayHost .af-pay');
+  const bar = document.querySelector('#view-add .af-bar');
+  if (pay && bar) bar.parentNode.insertBefore(pay, bar);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.querySelector('.ob-sheet.open')) closeObSheets(); });
+
+function brandFieldIdFor(key) {
+  const fi = FLUID_KEYS.indexOf(key), ti = FILTER_KEYS.indexOf(key);
+  return fi >= 0 ? `fluid_brand_${fi}` : (ti >= 0 ? `filter_brand_${ti}` : '');
+}
+function openPickSheet(key) {
+  PSH.key = key;
+  const fi = FLUID_KEYS.indexOf(key);
+  PSH.liters = fi >= 0 ? (parseFloat((document.getElementById(`fluid_liters_${fi}`) || {}).value) || 0) : 0;
+  if (fi >= 0 && !PSH.liters) {
+    const prev = (LAST_VISIT_ITEMS || []).find(it => it.key === key);
+    if (prev && prev.qty) PSH.liters = Number(prev.qty) || 0;
+  }
+  document.getElementById('pickSheetTitle').textContent = T[key] || '';
+  const inp = document.getElementById('pickSheetSearch');
+  inp.value = '';
+  renderPickSheet();
+  openObSheet('pickSheet');
+}
+function renderPickSheet() {
+  const key = PSH.key;
+  const list = document.getElementById('pickSheetList');
+  const foot = document.getElementById('pickSheetFoot');
+  if (!list) return;
+  const words = (document.getElementById('pickSheetSearch').value || '').trim().split(' ').map(pickNorm).filter(Boolean);
+  const sel = document.getElementById(brandFieldIdFor(key));
+  const cur = sel && sel.tagName === 'SELECT' ? sel.value : '';
+  const prevIds = new Set((LAST_VISIT_ITEMS || []).filter(it => it.key === key && it.product_id).map(it => String(it.product_id)));
+  const prods = productsForCategory(key).filter(p => !words.length || words.every(w => pickNorm(p.name).includes(w)));
+  const unitOf = p => p.unit === 'pc' ? T.unit_pc : T.unit_l;
+  // в режиме «Склад магазина» недостающее берётся с основного склада — считаем оба
+  const availOf = p => (sellQty(p) || 0) + (STORE_ENABLED ? (mainQtyOf(p) || 0) : 0);
+  const row = p => {
+    const q = availOf(p);
+    const cls = !(q > 0) ? 'none' : (q <= (FLUID_KEYS.indexOf(key) >= 0 ? 8 : 3) ? 'low' : '');
+    const stock = !(q > 0) ? T.psh_out : `${T.psh_instock} ${whQty(q)} ${unitOf(p)}${cls === 'low' ? ' · ' + T.psh_low : ''}`;
+    return `<button type="button" class="ps-item${String(p.id) === cur ? ' on' : ''}${!(q > 0) ? ' out' : ''}" onclick="pickSheetChoose(${p.id})">
+      <div><b>${escapeHtml(p.name)}</b><small class="${cls}">${stock}</small></div><em>${p.sell_price ? Number(p.sell_price).toLocaleString('ru-RU') : '—'}</em></button>`;
+  };
+  const prev = prods.filter(p => prevIds.has(String(p.id)));
+  const rest = prods.filter(p => !prevIds.has(String(p.id)))
+    .sort((a, b) => ((availOf(b) > 0) - (availOf(a) > 0)) || String(a.name).localeCompare(String(b.name)));
+  let html = '';
+  if (prev.length) html += `<div class="ps-grp">${T.psh_last}</div>` + prev.map(row).join('');
+  if (rest.length) html += `<div class="ps-grp">${prev.length ? T.psh_other : T.psh_all}</div>` + rest.map(row).join('');
+  list.innerHTML = html || `<div class="pick-note">${T.pick_nothing}</div>`;
+  const fi = FLUID_KEYS.indexOf(key);
+  if (fi >= 0) {
+    const opts = [3, 3.5, 4, 4.5, 5, 6];
+    foot.innerHTML = `<div class="ps-grp" style="margin-top:0;">${T.psh_liters}</div><div class="ps-lit">` +
+      opts.map(v => `<button type="button" class="${PSH.liters === v ? 'on' : ''}" onclick="PSH.liters=${v}; renderPickSheet()">${String(v).replace('.', ',')}</button>`).join('') + `</div>` +
+      (cur ? `<button type="button" class="ps-go" onclick="pickSheetChoose(${cur})">${T.psh_done}${PSH.liters ? ' · ' + String(PSH.liters).replace('.', ',') + ' ' + T.unit_l : ''}</button>` : '');
+  } else {
+    foot.innerHTML = '';
+  }
+}
+function setProductInField(key, id, liters) {
+  const sel = document.getElementById(brandFieldIdFor(key));
+  if (!sel || sel.tagName !== 'SELECT') return false;
+  sel.value = String(id);
+  if (sel.value !== String(id)) return false;
+  sel.dispatchEvent(new Event('change'));
+  const fi = FLUID_KEYS.indexOf(key);
+  if (fi >= 0 && liters) document.getElementById(`fluid_liters_${fi}`).value = liters;
+  ROW_OPEN.add(key);
+  paymentSplitTouched = false;
+  updateTotal();
+  return true;
+}
+function pickSheetChoose(id) {
+  const fi = FLUID_KEYS.indexOf(PSH.key);
+  // для масла: если литры ещё не выбраны — сначала отмечаем товар и ждём литры
+  if (fi >= 0 && !PSH.liters) {
+    setProductInField(PSH.key, id);
+    renderPickSheet();
+    return;
+  }
+  setProductInField(PSH.key, id, fi >= 0 ? PSH.liters : 0);
+  closeObSheets();
+}
+
+// ---- Чек-шторка: все позиции, ✕ и цена, оплата ----
+function openReceiptSheet() {
+  if (window.matchMedia && window.matchMedia('(min-width: 1200px)').matches) return;
+  renderReceiptSheet();
+  const pay = document.querySelector('#view-add .af-pay');
+  const host = document.getElementById('rcPayHost');
+  if (pay && host) host.appendChild(pay);
+  openObSheet('rcSheet');
+}
+function renderReceiptSheet() {
+  const box = document.getElementById('rcSheetLines');
+  if (!box) return;
+  const items = collectItems();
+  const plate = (document.getElementById('plate').value || '').trim().toUpperCase();
+  document.getElementById('rcSheetPlate').textContent = plate;
+  const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+  box.innerHTML = items.length ? items.map((it, i) => {
+    const title = it.brand || it.name;
+    const q = it.qty && it.qty !== 1 ? `${String(it.qty).replace('.', ',')} × ${money(it.unit_price)}` : `1 × ${money(it.unit_price)}`;
+    const canEdit = it.key !== 'other_stock';
+    return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div><em>${money(it.total)}</em>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
+  }).join('') : `<div class="rcpt-empty" style="display:block;">${T.rcpt_empty}</div>`;
+  document.getElementById('rcSheetTotal').textContent = money(items.reduce((a, it) => a + it.total, 0));
+}
+function rcPriceField(it) {
+  const fi = FLUID_KEYS.indexOf(it.key), ti = FILTER_KEYS.indexOf(it.key);
+  if (fi >= 0) return document.getElementById(`fluid_price_${fi}`);
+  if (ti >= 0) return document.getElementById(`filter_price_${ti}`);
+  if (it.key === 'other') return document.getElementById('other_price');
+  return null;
+}
+function rcPrice(i) {
+  const it = collectItems()[i];
+  const el = it && rcPriceField(it);
+  if (!el) return;
+  const raw = prompt(T.rc_price_prompt + ' ' + (it.brand || it.name), el.value || '');
+  if (raw === null) return;
+  const v = parseInt(String(raw).replace(/\\D/g, ''));
+  if (!(v >= 0)) return;
+  el.value = v;
+  paymentSplitTouched = false;
+  updateTotal();
+  renderReceiptSheet();
+}
+function rcRemove(i) {
+  const it = collectItems()[i];
+  if (!it) return;
+  if (it.key === 'other') {
+    document.getElementById('other_name').value = '';
+    document.getElementById('other_price').value = '';
+    updateTotal();
+  } else {
+    closeItemRow(it.key);
+  }
+  renderReceiptSheet();
+}
+
+// ---- Экран «Сохранено»: итог, отправить клиенту, отмена 10 секунд ----
+const SAVED = { id: null, timer: null, left: 0 };
+function showSaved(data, payload, items) {
+  const scr = document.getElementById('savedScreen');
+  if (!scr) return false;
+  const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+  const total = items.reduce((a, it) => a + it.total, 0);
+  const debt = Number(payload.debt_amount) || 0;
+  document.getElementById('svSub').textContent = [String(payload.plate || '').toUpperCase(), payload.owner_name, money(total) + ' ' + T.currency].filter(Boolean).join(' · ');
+  const rows = [];
+  const nm = parseInt(payload.next_mileage) || 0;
+  rows.push([T.sv_next_change, (data.next_date || '—') + (nm ? ' · ' + nm.toLocaleString('ru-RU') + ' ' + T.km_short : '')]);
+  if (debt > 0) rows.push([T.sv_debt, money(debt) + ' ' + T.currency]);
+  const left = items.filter(it => it.product_id).map(it => {
+    const p = productsCache.find(x => x.id === it.product_id);
+    if (!p) return '';
+    const avail = (sellQty(p) || 0) + (STORE_ENABLED ? (mainQtyOf(p) || 0) : 0);
+    return `${p.name} — ${whQty(Math.max(0, avail - (Number(it.qty) || 0)))} ${p.unit === 'pc' ? T.unit_pc : T.unit_l}`;
+  }).filter(Boolean);
+  if (left.length) rows.push([T.sv_stock_left, left.slice(0, 2).join('<br>')]);
+  document.getElementById('svCard').innerHTML = rows.map(r => `<div><span>${r[0]}</span><b>${r[1].indexOf('<br>') >= 0 ? r[1].split('<br>').map(escapeHtml).join('<br>') : escapeHtml(r[1])}</b></div>`).join('');
+  const send = document.getElementById('svSend');
+  if (data.client_link) {
+    const link = data.client_link;
+    let wa = '';
+    if (payload.owner_phone) {
+      let digits = String(payload.owner_phone).replace(/\\D/g, '');
+      if (digits && !digits.startsWith('998') && digits.length <= 9) digits = '998' + digits;
+      wa = `<a class="sv-wa" target="_blank" rel="noopener" href="https://wa.me/${digits}?text=${encodeURIComponent(T.share_text_wa + ' ' + link)}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>`;
+    }
+    send.innerHTML = `<div class="ps-grp" style="margin-top:4px;">${T.sv_send}</div><div class="sv-send">
+      <a class="sv-tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(T.share_text_tg)}"><i class="fa-brands fa-telegram"></i> Telegram</a>
+      ${wa || `<button type="button" class="sv-qr" onclick="openModal(${escapeHtml(JSON.stringify(String(payload.plate || '')))}, ${escapeHtml(JSON.stringify(link))}, '')"><i class="fa-solid fa-qrcode"></i> QR</button>`}</div>`;
+  } else {
+    send.innerHTML = `<div class="sv-note"><i class="fa-brands fa-telegram"></i> ${T.sv_sent_tg}</div>`;
+  }
+  SAVED.id = data.oc_id || null;
+  clearInterval(SAVED.timer);
+  const undo = document.getElementById('svUndo');
+  if (SAVED.id && !data.duplicate) {
+    SAVED.left = 10;
+    undo.hidden = false; undo.disabled = false;
+    const tick = () => {
+      undo.textContent = `${T.sv_undo} · ${SAVED.left} ${T.sv_sec}`;
+      if (SAVED.left <= 0) { clearInterval(SAVED.timer); undo.disabled = true; undo.textContent = T.sv_undo; }
+      SAVED.left--;
+    };
+    tick();
+    SAVED.timer = setInterval(tick, 1000);
+  } else {
+    undo.hidden = true;
+  }
+  scr.hidden = false;
+  document.body.style.overflow = 'hidden';
+  return true;
+}
+function closeSaved(next) {
+  clearInterval(SAVED.timer);
+  SAVED.id = null;
+  const scr = document.getElementById('savedScreen');
+  if (scr) scr.hidden = true;
+  document.body.style.overflow = '';
+  showTab('add');
+  window.scrollTo(0, 0);
+  if (next) setTimeout(() => { const pl = document.getElementById('plate'); if (pl) pl.focus(); }, 80);
+}
+async function undoSaved() {
+  if (!SAVED.id || SAVED.left < 0) return;
+  const id = SAVED.id;
+  clearInterval(SAVED.timer);
+  const undo = document.getElementById('svUndo');
+  undo.disabled = true;
+  let ok = false;
+  try {
+    const res = await fetch('/api/oil_change/' + id, { method: 'DELETE' });
+    const d = await res.json();
+    ok = !!d.ok;
+  } catch (e) {}
+  SAVED.id = null;
+  const scr = document.getElementById('savedScreen');
+  if (scr) scr.hidden = true;
+  document.body.style.overflow = '';
+  showTab('add');
+  showMsg(ok ? T.sv_undone : T.sv_undo_fail, ok);
+  if (ok && typeof fetchProducts === 'function') { try { fetchProducts(); } catch (e) {} }
 }
 
 // Оплата одной кнопкой: наличные / карта / наличные + карта / в долг.
@@ -8464,6 +8940,7 @@ let LAST_LOOKED_PLATE = '';  // номер, для которого карточ
 
 function startNewOwner() {
   NEW_OWNER = true;
+  setKnownMode(false);
   document.getElementById('owner_name').value = '';
   document.getElementById('owner_phone').value = '';
   const box = document.getElementById('kcPersonBox');
@@ -8670,17 +9147,33 @@ async function loadPresets() {
 }
 function renderPresets() {
   const box = document.getElementById('presetBox');
-  if (!box) return;
-  if (!PRESETS.sets.length) { box.hidden = true; box.innerHTML = ''; return; }
+  const kc = document.getElementById('kcPresets');
   const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+  const sets = PRESETS.sets || [];
+  const describe = set => {
+    const fl = set.items.filter(it => String(it.key).indexOf('fluid_') === 0);
+    const fi = set.items.filter(it => String(it.key).indexOf('filter_') === 0);
+    return {
+      head: fl.map(it => `${it.brand || it.name} · ${String(it.qty).replace('.', ',')} ${T.unit_l}`).join(' + '),
+      tail: fi.map(it => T[it.key] || it.name).join(', '),
+      sum: set.items.reduce((a, it) => a + (Number(it.total) || 0), 0),
+      nf: fi.length,
+    };
+  };
+  // у узнанного клиента наборы — короткими кнопками в его карточке
+  if (kc) {
+    kc.innerHTML = sets.map((set, i) => {
+      const d = describe(set);
+      const label = d.nf ? `${T.preset_short_oil} + ${d.nf} ${T.preset_short_filters}` : T.preset_short_oil;
+      return `<button type="button" class="kc-preset" title="${escapeHtml(d.head + (d.tail ? ' + ' + d.tail : ''))}" onclick="applyPreset(${i})">${label} · ${money(d.sum)}</button>`;
+    }).join('');
+  }
+  if (!box) return;
+  if (kc || !sets.length) { box.hidden = true; box.innerHTML = ''; return; }
   box.innerHTML = `<div class="preset-h">${T.preset_title}<small>— ${T.preset_hint}</small></div><div class="preset-list">` +
-    PRESETS.sets.map((set, i) => {
-      const fl = set.items.filter(it => String(it.key).indexOf('fluid_') === 0);
-      const fi = set.items.filter(it => String(it.key).indexOf('filter_') === 0);
-      const head = fl.map(it => `${it.brand || it.name} · ${String(it.qty).replace('.', ',')} ${T.unit_l}`).join(' + ');
-      const tail = fi.map(it => T[it.key] || it.name).join(', ');
-      const sum = set.items.reduce((a, it) => a + (Number(it.total) || 0), 0);
-      return `<button type="button" class="preset-btn" onclick="applyPreset(${i})"><b>${escapeHtml(head)}</b>${tail ? `<span>+ ${escapeHtml(tail)}</span>` : ''}<em>${money(sum)}<small>${set.count} ${T.preset_times}</small></em></button>`;
+    sets.map((set, i) => {
+      const d = describe(set);
+      return `<button type="button" class="preset-btn" onclick="applyPreset(${i})"><b>${escapeHtml(d.head)}</b>${d.tail ? `<span>+ ${escapeHtml(d.tail)}</span>` : ''}<em>${money(d.sum)}<small>${set.count} ${T.preset_times}</small></em></button>`;
     }).join('') + '</div>';
   box.hidden = false;
 }
@@ -8942,7 +9435,7 @@ async function lookupPlate(force) {
   LAST_LOOKED_PLATE = plate;
   KNOWN_OWNER = null;
   NEW_OWNER = false;
-  if (!plate) { panel.innerHTML = ''; lastKnownNextMileage = null; DK.last = null; applyDailyKm(); checkMileageVsDue(); return; }
+  if (!plate) { panel.innerHTML = ''; setKnownMode(false); lastKnownNextMileage = null; DK.last = null; applyDailyKm(); checkMileageVsDue(); return; }
   try {
     const res = await fetch('/api/history/' + encodeURIComponent(plate));
     const data = await res.json();
@@ -8951,6 +9444,7 @@ async function lookupPlate(force) {
 
     if (!data.car) {
       panel.innerHTML = crossHtml;
+      setKnownMode(false);
       lastKnownNextMileage = null;
       DK.last = null;
       applyDailyKm();
@@ -9008,37 +9502,69 @@ async function lookupPlate(force) {
         </div>
         ${mileageParts.length ? `<div class="kc-lv-mileage">${mileageParts.join(' · ')}</div>` : ''}
         ${lastItemsHtml}
-        ${LAST_VISIT_ITEMS.length ? `<button type="button" class="kc-repeat" onclick="repeatLastVisit()"><i class="fa-solid fa-rotate-right"></i> ${T.kc_repeat}</button>` : ''}
       </div>
     ` : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
 
+    // компактная карточка: имя + машина + одна строка «прошлый раз» +
+    // быстрые кнопки; подробная история раскрывается по «История ›»
+    const lastShort = last ? [
+        last.change_date,
+        last.mileage ? last.mileage.toLocaleString('ru-RU') + ' ' + T.km_short : '',
+        LAST_VISIT_ITEMS.map(it => (it.brand || it.name) + (it.qty && it.qty !== 1 ? ' ' + String(it.qty).replace('.', ',') + ' ' + T.unit_l : '')).join(' + '),
+      ].filter(Boolean).join(' · ') : T.kc_no_history;
     panel.innerHTML = `
-      <div class="known-client">
-        <div class="kc-header"><i class="fa-solid fa-circle-check"></i><span>${T.kc_found_title}</span></div>
-        <div class="kc-body">
-          <div id="kcPersonBox">
-            <div class="kc-person">
-              <div class="kc-avatar">${escapeHtml(initials)}</div>
-              <div>
-                <div class="kc-name">${escapeHtml(name)}</div>
-                <div class="kc-meta">${kcMetaHtml(data.car.owner_phone, carLine)}</div>
-              </div>
-            </div>
-            <button type="button" class="kc-new-owner" onclick="startNewOwner()"><i class="fa-solid fa-user-pen"></i>${T.kc_new_owner_btn}</button>
+      <div class="known-client kc-compact">
+        <div class="kc-top">
+          <div class="kc-avatar">${escapeHtml(initials)}</div>
+          <div class="kc-top-main">
+            <div class="kc-name">${escapeHtml(name)}${visitCount ? ` <span class="kc-visits">✓ ${visitCount} ${T.kc_visits_short}</span>` : ''}</div>
+            <div class="kc-meta">${kcMetaHtml(data.car.owner_phone, carLine)}</div>
+          </div>
+          <button type="button" class="kc-more-btn" onclick="toggleKcDetails(this)" aria-expanded="false">${T.kc_history_btn} <i class="fa-solid fa-chevron-down"></i></button>
+        </div>
+        <div class="kc-last-line">${escapeHtml(lastShort)}${last && last.cost ? ` · <b>${last.cost.toLocaleString('ru-RU')}</b>` : ''}</div>
+        ${LAST_VISIT_ITEMS.length ? `<div class="kc-quick"><button type="button" class="kc-repeat" onclick="repeatLastVisit()"><i class="fa-solid fa-rotate-right"></i> ${T.kc_repeat_short}<kbd class="af-kbd">F4</kbd></button><div id="kcPresets" class="kc-presets"></div></div>` : '<div class="kc-quick"><div id="kcPresets" class="kc-presets"></div></div>'}
+        <div class="kc-details" hidden>
+          <div class="kc-detail-actions">
+            <button type="button" class="kc-edit-data" onclick="showOwnerFields()"><i class="fa-solid fa-pen"></i> ${T.kc_edit_data}</button>
+            <div id="kcPersonBox"><button type="button" class="kc-new-owner" onclick="startNewOwner()"><i class="fa-solid fa-user-pen"></i>${T.kc_new_owner_btn}</button></div>
           </div>
           <div class="kc-history-label">${T.kc_history_label}</div>
           ${lastVisitHtml}
-          <button type="button" class="kc-action-btn" onclick="focusNextEntry()"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
-          <div class="kc-action-hint">${T.kc_add_service_hint}</div>
         </div>
       </div>
     ` + crossHtml;
+    setKnownMode(!!(data.car.owner_name || '').trim());
+    if (typeof renderPresets === 'function') renderPresets();
   } catch (e) {
     LAST_LOOKED_PLATE = '';
     panel.innerHTML = '';
+    setKnownMode(false);
     lastKnownNextMileage = null;
     checkMileageVsDue();
   }
+}
+
+// Постоянный клиент: поля имени/телефона/модели уже заполнены — прячем их,
+// чтобы на телефоне сразу было видно пробег и масло. «Изменить данные» —
+// показать снова.
+function setKnownMode(on) {
+  const v = document.getElementById('view-add');
+  if (v) v.classList.toggle('kc-known', !!on);
+}
+function showOwnerFields() {
+  setKnownMode(false);
+  const el = document.getElementById('owner_name');
+  if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => el.focus(), 250); }
+}
+
+function toggleKcDetails(btn) {
+  const card = btn.closest('.known-client');
+  const box = card && card.querySelector('.kc-details');
+  if (!box) return;
+  box.hidden = !box.hidden;
+  btn.setAttribute('aria-expanded', String(!box.hidden));
+  btn.classList.toggle('open', !box.hidden);
 }
 
 function renderCrossNetworkHistory(crossHistory) {
@@ -9314,7 +9840,10 @@ async function submitCar() {
     lastKnownNextMileage = null;
     document.getElementById('mileageCompare').innerHTML = '';
     document.getElementById('knownClientPanel').innerHTML = '';
-    if (data.client_link) {
+    setKnownMode(false);
+    document.querySelectorAll('#debtTerms button').forEach(b => b.classList.remove('on'));
+    // экран «Сохранено»: следующая замена, отправить клиенту, отмена 10 с
+    if (!showSaved(data, payload, items) && data.client_link) {
       openModal(payload.plate, data.client_link, payload.owner_phone);
     }
   } else {
@@ -12382,20 +12911,25 @@ def api_add():
                 if shop:
                     shop["_receipt_telegram_id"] = car_after["telegram_id"]
                     # чек в Telegram — в фоне: не задерживаем ответ и не держим запрос
-                    def _bg_receipt(shop=shop, plate=plate, items=items, cash=cash_amount, card=card_amount, nd=next_date):
+                    def _bg_receipt(shop=shop, plate=plate, items=items, cash=cash_amount, card=card_amount, nd=next_date, oc=oc_id, sid=g.shop_id):
                         try:
+                            # 12 с ждём: мастер может нажать «Отменить» на экране
+                            # «Сохранено» — тогда чек клиенту не уходит
+                            time.sleep(12)
+                            if not db.get_oil_change_for_shop(oc, sid):
+                                return
                             _send_service_receipt(shop, plate, items, cash, card, nd)
                         except Exception as ex:
                             logger.warning(f"чек не отправлен: {ex}")
                     threading.Thread(target=_bg_receipt, daemon=True).start()
         except Exception as e:
             logger.warning(f"после сохранения замены: {e}")
-        result = {"ok": True, "next_date": next_date, "client_link": link}
+        result = {"ok": True, "next_date": next_date, "client_link": link, "oc_id": oc_id}
         try:
             db.save_add_token_result(g.shop_id, add_token, result)
         except Exception as e:
             logger.warning(f"не удалось запомнить номер отправки: {e}")
-        return jsonify({"ok": True, "next_date": next_date, "client_link": link})
+        return jsonify(result)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
