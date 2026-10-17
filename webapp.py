@@ -1984,24 +1984,34 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   /* ---- навигация: планшет и компьютер ---- */
   @media (min-width: 900px) {
     .bottom-bar, .more-sheet, .more-backdrop, .topbar { display:none !important; }
-    .container { padding-bottom:24px; margin-left:240px; max-width:1100px; padding-left:24px; padding-right:24px; }
-    .side-nav { display:flex; flex-direction:column; position:fixed; top:6px; left:0; bottom:0; width:232px; background:#fff; border-right:1px solid var(--border); padding:16px 12px; z-index:40; overflow-y:auto; }
-    .side-brand { display:flex; align-items:center; gap:10px; padding:4px 6px 16px; border-bottom:1px solid #F1F5F9; margin-bottom:10px; }
-    .side-shop { font-family:var(--font-display); font-weight:800; font-style:italic; font-size:18px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .side-list { display:flex; flex-direction:column; gap:2px; }
-    .side-item { position:relative; display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; font-size:14px; font-weight:600; color:#475569; cursor:pointer; }
-    .side-item i { width:18px; text-align:center; color:#94A3B8; }
-    .side-item:hover { background:#F8FAFC; }
-    .side-item.active { background:#EFF6FF; color:var(--blue); }
-    .side-item.active i { color:var(--blue); }
-    .side-add { background:var(--danger-bg); color:var(--btn); margin-bottom:8px; }
-    .side-add i { color:var(--btn); }
-    .side-add.active { background:var(--btn); color:#fff; }
-    .side-add.active i { color:#fff; }
+    .container { padding-bottom:24px; margin-left:248px; max-width:1100px; padding-left:28px; padding-right:28px; }
+    /* ПК: тёмно-синее меню, пункты разбиты на группы */
+    .side-nav { display:flex; flex-direction:column; position:fixed; top:6px; left:0; bottom:0; width:248px; background:#0B1B3F; color:#DCE4F5; padding:18px 14px; z-index:40; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#22345F transparent; }
+    .side-brand { display:flex; align-items:center; gap:10px; padding:2px 6px 16px; margin-bottom:6px; border-bottom:1px solid #1C2E57; }
+    .side-brand .logo-badge { background:#1D4ED8; color:#fff; transform:none; box-shadow:none; width:38px; height:38px; border-radius:11px; }
+    .side-shop { font-family:var(--font-display); font-weight:700; font-size:16px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .side-brand .wordmark .wm-oil { background:none; -webkit-background-clip:initial; background-clip:initial; color:#7FB2FF; }
+    .side-brand .wordmark .wm-book { color:#fff; }
+    .side-brand .role-tag { color:#FFD34D; }
+    .side-list { display:flex; flex-direction:column; gap:1px; }
+    .side-group { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#7D91BB; padding:14px 12px 5px; }
+    .side-item { position:relative; display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:9px; font-size:14px; font-weight:500; color:#C9D4EC; cursor:pointer; transition:background .12s; }
+    .side-item i { width:18px; text-align:center; color:#8296BF; }
+    .side-item:hover { background:#152A55; color:#fff; }
+    .side-item.active { background:#1D4ED8; color:#fff; font-weight:600; }
+    .side-item.active i { color:#fff; }
+    .side-add { background:#E0262F; color:#fff; font-weight:700; font-size:15px; padding:12px 14px; border-radius:12px; margin:4px 0 4px; }
+    .side-add i { color:#fff; }
+    .side-add:hover { background:#C81E27; }
+    .side-add.active { background:#E0262F; box-shadow:0 0 0 3px rgba(224,38,47,.35); }
+    .side-kbd { margin-left:auto; font-family:var(--font-mono); font-size:11px; font-weight:600; background:rgba(255,255,255,.2); border-radius:6px; padding:2px 6px; }
     .side-item .nav-badge { position:static; margin-left:auto; }
-    .side-foot { margin-top:auto; padding-top:14px; border-top:1px solid #F1F5F9; display:flex; flex-direction:column; gap:8px; }
+    .side-foot { margin-top:auto; padding-top:14px; border-top:1px solid #1C2E57; display:flex; flex-direction:column; gap:8px; }
     .side-foot .lang-btn, .side-foot .logout { text-align:center; padding:9px 10px; display:block; }
+    .side-foot .lang-btn { background:#152A55; border-color:#22345F; color:#fff; }
+    .side-foot .logout { background:transparent; color:#FF9AA0; }
   }
+  @media (min-width: 1200px) { .container { max-width:1340px; } }
   .subtabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
   .subtab {
     flex:1 1 0; min-width:0; text-align:center; padding:10px 8px; border-radius:10px; background:var(--field-bg);
@@ -2266,6 +2276,47 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .af-bar-total span { display:block; font-size:11px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; }
   .af-bar-total b { display:block; font-size:21px; font-weight:800; font-family:var(--font-mono); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .af-save { flex:none; border:0; border-radius:14px; padding:13px 20px; background:linear-gradient(135deg, #E63946, #C1121F); color:#fff; font-size:15px; font-weight:800; font-family:var(--font-display); cursor:pointer; box-shadow:0 6px 14px rgba(230,57,70,.30); }
+  /* Колонки формы: на телефоне — обычный поток (display:contents сохраняет
+     липкую панель «Итого» внизу), на компьютере — форма слева, чек справа */
+  .af-main, .af-side { display:contents; }
+  .af-rcpt, .af-keys, .af-kbd { display:none; }
+  .preset-box { margin:12px 0 0; }
+  .preset-box[hidden] { display:none; }
+  .preset-h { font-size:12px; color:var(--hint); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; display:flex; gap:6px; align-items:baseline; flex-wrap:wrap; }
+  .preset-h small { text-transform:none; letter-spacing:0; font-size:12px; }
+  .preset-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:8px; }
+  .preset-btn { text-align:left; border:1.5px solid #BFDBFE; background:#F5F9FF; border-radius:14px; padding:10px 12px; cursor:pointer; font-family:inherit; color:var(--text); display:flex; flex-direction:column; gap:3px; }
+  .preset-btn:hover { border-color:var(--blue); background:#EFF6FF; }
+  .preset-btn b { font-size:13.5px; line-height:1.25; }
+  .preset-btn span { font-size:12px; color:#475569; line-height:1.3; }
+  .preset-btn em { font-style:normal; font-family:var(--font-mono); font-weight:600; font-size:14px; color:var(--darkblue); display:flex; justify-content:space-between; gap:6px; }
+  .preset-btn em small { font-family:var(--font-body); font-weight:600; font-size:11px; color:#1D4ED8; }
+  @media (min-width: 1200px) {
+    .add-form { max-width:none; display:grid; grid-template-columns:minmax(0, 1fr) 380px; gap:0 20px; align-items:start; }
+    .af-title { grid-column:1 / -1; }
+    .af-keys { display:inline; margin-left:auto; font-family:var(--font-body); font-style:normal; text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:500; color:var(--hint); }
+    .af-main, .af-side { display:block; min-width:0; }
+    .af-side { position:sticky; top:14px; display:flex; flex-direction:column; gap:12px; }
+    .af-side .af-sec { margin-bottom:0; }
+    .af-rcpt { display:block; background:#fff; border:1px solid #E2E8F0; border-radius:18px; padding:16px 18px; box-shadow:0 4px 14px -6px rgba(15,82,186,.10); }
+    .af-rcpt-h { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; font-size:15px; font-weight:800; color:#0F172A; }
+    .af-rcpt-h b { font-family:var(--font-mono); font-size:14px; font-weight:600; letter-spacing:.06em; color:#475569; }
+    #rcptLines { max-height:calc(100vh - 470px); min-height:60px; overflow-y:auto; }
+    .rcpt-line { display:flex; gap:10px; align-items:baseline; padding:9px 0; border-bottom:1px dashed #E2E8F0; }
+    .rcpt-line:last-child { border-bottom:0; }
+    .rcpt-line div { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .rcpt-line div b { font-size:14px; font-weight:700; overflow-wrap:anywhere; }
+    .rcpt-line div span { font-size:12px; color:var(--hint); }
+    .rcpt-line > em { font-style:normal; font-family:var(--font-mono); font-size:15px; font-weight:600; white-space:nowrap; }
+    .rcpt-empty { font-size:13px; color:var(--hint); padding:14px 0; line-height:1.45; }
+    .af-bar { position:static; flex-direction:column; align-items:stretch; padding:16px 18px; gap:12px; margin-top:0; box-shadow:0 4px 14px -6px rgba(15,82,186,.10); }
+    .af-bar-total { display:flex; justify-content:space-between; align-items:baseline; }
+    .af-bar-total b { font-size:30px; }
+    .af-save { padding:16px 20px; font-size:17px; display:flex; align-items:center; justify-content:center; gap:10px; }
+    .af-kbd { display:inline; font-family:var(--font-mono); font-size:11px; font-weight:600; background:rgba(255,255,255,.22); border-radius:6px; padding:2px 7px; }
+    .pay-seg { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .add-form .row2 .field { min-width:0; }
+  }
   .known-client .kc-lv-item {
     display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
     padding:3px 0;
@@ -2832,23 +2883,26 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     </div>
   </div>
   <nav class="side-list">
-    <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span></div>
+    <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span><kbd class="side-kbd">F2</kbd></div>
+    <div class="side-group">{{ T.nav_grp_work }}</div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
+    <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+    <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
+    {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
+    {% if not is_employee or (warehouse_enabled and store_enabled) %}<div class="side-group">{{ T.nav_grp_business }}</div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-stats" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
     {% if warehouse_enabled and (not is_employee or store_enabled) %}<div class="side-item" id="tab-warehouse" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid {{ 'fa-store' if is_employee else 'fa-boxes-stacked' }}"></i><span>{{ T.st_tab if is_employee else T.tab_warehouse }}</span></div>{% endif %}
     {% if warehouse_enabled and not is_employee and not is_branch %}<div class="side-item" id="tab-suppliers" data-tab="suppliers" onclick="showTab('suppliers')"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
-    <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     {% if not is_employee %}<div class="side-item" id="tab-expenses" data-tab="expenses" onclick="showTab('expenses')"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-rate" data-tab="rate" onclick="showTab('rate')"><i class="fa-solid fa-dollar-sign"></i><span>{{ T.usd_rate_title }}</span><b class="nav-badge" data-badge="rate"></b></div>{% endif %}
-    <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
-    {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
-    <div class="side-item" id="tab-course" data-tab="course" onclick="showTab('course')"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
-    <div class="side-item" id="tab-help" data-tab="help" onclick="showTab('help')"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
     {% if not is_employee %}<div class="side-item" id="tab-export" data-tab="export" onclick="showTab('export')"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
+    <div class="side-group">{{ T.nav_grp_settings }}</div>
     {% if not is_employee %}<div class="side-item" id="tab-staff" data-tab="staff" onclick="showTab('staff')"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
     {% if not is_employee %}<div class="side-item" id="tab-myshop" data-tab="myshop" onclick="showTab('myshop')"><i class="fa-solid fa-store"></i><span>{{ T.tab_myshop }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/subscription'"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></div>{% endif %}
     {% if is_sub_owner %}<div class="side-item" onclick="location.href='/referral'"><i class="fa-solid fa-gift"></i><span>{{ T.ref_menu }}</span></div>{% endif %}
+    <div class="side-item" id="tab-course" data-tab="course" onclick="showTab('course')"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
+    <div class="side-item" id="tab-help" data-tab="help" onclick="showTab('help')"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
   </nav>
   <div class="side-foot">
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
@@ -2918,8 +2972,9 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   <div id="msg"></div>
 
   <div id="view-add" class="add-form">
-    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}</div>
+    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<span class="af-keys">{{ T.rcpt_keys }}</span></div>
 
+    <div class="af-main">
     <div class="af-sec">
       <div class="af-h"><i class="fa-solid fa-car"></i>{{ T.af_car }}</div>
       <div class="field">
@@ -2954,6 +3009,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
         </div>
       </div>
       <div class="qm-row" id="quickModels"></div>
+      <div id="presetBox" class="preset-box" hidden></div>
       <input id="vin" type="hidden" value="">
       <div id="vinHint" hidden></div>
       <div id="specCard" hidden></div>
@@ -3015,8 +3071,14 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <button type="button" class="af-ghost" onclick="addOtherStockRow('other')">{{ T.wh_add_row }}</button>
       {% endif %}
     </div>
+    </div>
 
-    <div class="af-sec">
+    <div class="af-side">
+    <div class="af-rcpt" aria-live="polite">
+      <div class="af-rcpt-h"><span>{{ T.rcpt_title }}</span><b id="rcptPlate"></b></div>
+      <div id="rcptLines"><div class="rcpt-empty">{{ T.rcpt_empty }}</div></div>
+    </div>
+    <div class="af-sec af-pay">
       <div class="af-h"><i class="fa-solid fa-wallet"></i>{{ T.af_payment }}</div>
       <div class="pay-seg" id="paySeg">
         <button type="button" data-m="cash" class="on" onclick="setPayMode('cash')"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</button>
@@ -3061,7 +3123,8 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
 
     <div class="af-bar">
       <div class="af-bar-total"><span>{{ T.field_total }}</span><b id="totalCost">0</b></div>
-      <button class="af-save" onclick="submitCar()"><i class="fa-solid fa-check"></i> {{ T.btn_save }}</button>
+      <button class="af-save" onclick="submitCar()"><i class="fa-solid fa-check"></i> {{ T.btn_save }}<kbd class="af-kbd">{{ T.kbd_save }}</kbd></button>
+    </div>
     </div>
   </div>
 
@@ -4051,7 +4114,7 @@ let historyDataCache = {};  // { plate: [entry, entry, ...] } — чтобы к�
 let CURRENT_TAB = 'add';
 function showTab(t, keepScroll) {
   CURRENT_TAB = t;
-  document.getElementById('view-add').style.display = t === 'add' ? 'block' : 'none';
+  document.getElementById('view-add').style.display = t === 'add' ? '' : 'none';
   document.getElementById('view-table').style.display = t === 'table' ? 'block' : 'none';
   document.getElementById('view-debts').style.display = t === 'debts' ? 'block' : 'none';
   document.getElementById('view-broadcast').style.display = t === 'broadcast' ? 'block' : 'none';
@@ -8310,8 +8373,25 @@ function collectItems() {
 
 let paymentSplitTouched = false;
 
+// Чек справа (на компьютере): те же позиции, что уйдут в запись
+function renderReceipt(items) {
+  const box = document.getElementById('rcptLines');
+  if (!box) return;
+  const pl = document.getElementById('rcptPlate'), plate = document.getElementById('plate');
+  if (pl && plate) pl.textContent = (plate.value || '').trim().toUpperCase();
+  if (!items.length) { box.innerHTML = `<div class="rcpt-empty">${T.rcpt_empty}</div>`; return; }
+  const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+  box.innerHTML = items.map(it => {
+    const title = it.brand ? it.brand : it.name;
+    const sub = (it.brand ? it.name + ' · ' : '') + (it.qty && it.qty !== 1 ? `${it.qty} × ${money(it.unit_price)}` : '1 × ' + money(it.unit_price));
+    return `<div class="rcpt-line"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div><em>${money(it.total)}</em></div>`;
+  }).join('');
+}
+
 function updateTotal() {
-  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const _items = collectItems();
+  renderReceipt(_items);
+  const total = _items.reduce((sum, i) => sum + i.total, 0);
   document.getElementById('totalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
   const payCash = document.getElementById('pay_cash');
   const payCard = document.getElementById('pay_card');
@@ -8400,7 +8480,7 @@ function startNewOwner() {
 // товар, цену и литры в строку «Моторное масло».
 const SPEC = { timer: null, seq: 0, list: [], cur: 0, hiddenFor: '' };
 // Подбор масла отключён: карточка не показывается и справочник не запрашивается
-function specSchedule(delay) { clearTimeout(SPEC.timer); }
+function specSchedule(delay) { clearTimeout(SPEC.timer); if (typeof presetsSchedule === 'function') presetsSchedule(delay); }
 async function loadSpecs() {
   const model = (document.getElementById('car_model').value || '').trim();
   const brand = document.getElementById('car_brand').value || '';
@@ -8506,10 +8586,11 @@ function fillFromSpec() {
   if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
-function repeatLastVisit() {
+function repeatLastVisit(itemsArg, doneMsg) {
   // «Как в прошлый раз»: те же масло/фильтры/литры, цены — текущие со склада
   // (если товар есть на складе), иначе цена прошлого визита.
-  const items = LAST_VISIT_ITEMS || [];
+  // С аргументами — то же для «Готового набора» (itemsArg — его позиции).
+  const items = Array.isArray(itemsArg) ? itemsArg : (LAST_VISIT_ITEMS || []);
   if (!items.length) return;
   FLUID_KEYS.forEach((_, i) => {
     ['fluid_brand_', 'fluid_price_', 'fluid_liters_'].forEach(pfx => { const el = document.getElementById(pfx + i); if (el) el.value = ''; });
@@ -8561,10 +8642,81 @@ function repeatLastVisit() {
   paymentSplitTouched = false;
   updateTotal();
   if (missing.length) showMsg(`${T.kc_repeat_missing} ${missing.join(', ')}`, false);
-  else showMsg(T.kc_repeat_done, true);
+  else showMsg(doneMsg || T.kc_repeat_done, true);
   const mileageEl = document.getElementById('mileage');
   if (mileageEl) { mileageEl.focus(); mileageEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
 }
+
+// «Готовые наборы»: частые сочетания масла и фильтров этой точки для модели
+// машины (сервер считает по истории за год). Клик — форма заполнена.
+const PRESETS = { timer: null, seq: 0, model: '', sets: [] };
+function presetsSchedule(delay) {
+  clearTimeout(PRESETS.timer);
+  PRESETS.timer = setTimeout(loadPresets, delay == null ? 450 : delay);
+}
+async function loadPresets() {
+  const box = document.getElementById('presetBox');
+  if (!box) return;
+  const model = (document.getElementById('car_model').value || '').trim();
+  if (model.toLowerCase() === PRESETS.model) return;
+  PRESETS.model = model.toLowerCase();
+  const seq = ++PRESETS.seq;
+  if (model.length < 2) { PRESETS.sets = []; renderPresets(); return; }
+  let data = null;
+  try { data = await (await fetch('/api/entry_presets?model=' + encodeURIComponent(model))).json(); } catch (e) { return; }
+  if (seq !== PRESETS.seq) return;
+  PRESETS.sets = (data && data.sets) || [];
+  renderPresets();
+}
+function renderPresets() {
+  const box = document.getElementById('presetBox');
+  if (!box) return;
+  if (!PRESETS.sets.length) { box.hidden = true; box.innerHTML = ''; return; }
+  const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+  box.innerHTML = `<div class="preset-h">${T.preset_title}<small>— ${T.preset_hint}</small></div><div class="preset-list">` +
+    PRESETS.sets.map((set, i) => {
+      const fl = set.items.filter(it => String(it.key).indexOf('fluid_') === 0);
+      const fi = set.items.filter(it => String(it.key).indexOf('filter_') === 0);
+      const head = fl.map(it => `${it.brand || it.name} · ${String(it.qty).replace('.', ',')} ${T.unit_l}`).join(' + ');
+      const tail = fi.map(it => T[it.key] || it.name).join(', ');
+      const sum = set.items.reduce((a, it) => a + (Number(it.total) || 0), 0);
+      return `<button type="button" class="preset-btn" onclick="applyPreset(${i})"><b>${escapeHtml(head)}</b>${tail ? `<span>+ ${escapeHtml(tail)}</span>` : ''}<em>${money(sum)}<small>${set.count} ${T.preset_times}</small></em></button>`;
+    }).join('') + '</div>';
+  box.hidden = false;
+}
+function applyPreset(i) {
+  const set = PRESETS.sets[i];
+  if (set) repeatLastVisit(set.items, T.preset_done);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const p = document.getElementById('plate');
+  if (p) p.addEventListener('input', () => { const pl = document.getElementById('rcptPlate'); if (pl) pl.textContent = (p.value || '').trim().toUpperCase(); });
+});
+
+// Горячие клавиши (компьютер): F2 — новая замена, Ctrl+Enter — сохранить,
+// F4 — «как в прошлый раз» для узнанного клиента.
+document.addEventListener('keydown', e => {
+  if (e.isComposing || e.altKey || e.metaKey) return;
+  const addView = document.getElementById('view-add');
+  const addOpen = addView && addView.style.display !== 'none' && addView.offsetParent !== null;
+  if (e.key === 'F2' && !e.ctrlKey && !e.shiftKey) {
+    if (document.querySelector('.modal-overlay.open')) return;
+    e.preventDefault();
+    showTab('add');
+    setTimeout(() => { const pl = document.getElementById('plate'); if (pl) pl.focus(); }, 60);
+    return;
+  }
+  if (!addOpen) return;
+  if (e.key === 'Enter' && e.ctrlKey) {
+    e.preventDefault(); e.stopImmediatePropagation();
+    submitCar();
+    return;
+  }
+  if (e.key === 'F4' && !e.ctrlKey && !e.shiftKey && LAST_VISIT_ITEMS.length) {
+    e.preventDefault();
+    repeatLastVisit();
+  }
+}, true);
 
 // Следующая замена по пробегу: +5 тыс. / +8 тыс. / свой шаг. Выбор запоминается
 // на этом телефоне. Если мастер сам поправил поле — больше его не перезаписываем.
@@ -9012,6 +9164,7 @@ function discardAddDraft() {
   setPayMode('cash');
   document.getElementById('msg').innerHTML = '';
   SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint(); renderQuickModels();
+  presetsSchedule(0);
 }
 function restoreAddDraft() {
   let d = null;
@@ -12013,6 +12166,19 @@ def api_history(plate):
         history = _strip_cost_price(history)
     cross_history = db.get_cross_network_history(plate, g.shop_id)
     return jsonify({"car": car, "history": history, "cross_history": cross_history})
+
+
+@app.route("/api/entry_presets")
+@login_required
+def api_entry_presets():
+    """Готовые наборы для формы замены — частые сочетания масла и фильтров
+    этой точки для выбранной модели (только позиции и цены продажи)."""
+    model = (request.args.get("model") or "").strip()[:60]
+    try:
+        sets = db.get_popular_item_sets(g.shop_id, model)
+    except Exception:
+        sets = []
+    return jsonify({"sets": sets})
 
 
 @app.route("/api/oil_change/<int:oc_id>", methods=["PUT"])

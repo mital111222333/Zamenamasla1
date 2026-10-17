@@ -1766,6 +1766,73 @@ def get_car_history(shop_id: int, plate_number: str):
         return dict(row), [dict(h) for h in history]
 
 
+def get_popular_item_sets(shop_id: int, car_model: str, limit: int = 3, days: int = 365):
+    """«Готовые наборы» для быстрого ввода: самые частые сочетания масла и
+    фильтров, которые эта точка ставила на такую же модель машины за год.
+    Ничего настраивать не нужно — наборы появляются сами из истории.
+    Наружу отдаём только то, что нужно для заполнения формы (без закупки)."""
+    model = (car_model or "").strip().lower()
+    if len(model) < 2:
+        return []
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json, oc.change_date, oc.id
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND lower(trim(c.car_model))=? AND oc.change_date>=?
+              AND oc.items_json IS NOT NULL AND oc.items_json<>''
+            ORDER BY oc.change_date DESC, oc.id DESC
+            LIMIT 400
+        """, (shop_id, model, since)).fetchall()
+    groups = {}
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"] or "[]") or []
+        except (TypeError, ValueError):
+            continue
+        picked = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            key = str(it.get("key") or "")
+            if not (key.startswith("fluid_") or key.startswith("filter_")):
+                continue
+            try:
+                qty = float(it.get("qty") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty <= 0:
+                continue
+            ident = str(it.get("product_id") or "") or str(it.get("brand") or "").strip().upper()
+            if not ident:
+                continue
+            picked.append((key, ident, round(qty, 2) if key.startswith("fluid_") else 1, it))
+        if not picked or not any(p[0].startswith("fluid_") for p in picked):
+            continue
+        picked.sort(key=lambda p: (p[0], p[1]))
+        sig = tuple((p[0], p[1], p[2]) for p in picked)
+        g = groups.get(sig)
+        if g is None:
+            clean = []
+            for key, _ident, qty, it in picked:
+                try:
+                    price = float(it.get("unit_price") or 0)
+                except (TypeError, ValueError):
+                    price = 0
+                clean.append({
+                    "key": key, "name": str(it.get("name") or "")[:120],
+                    "brand": str(it.get("brand") or "")[:80] or None,
+                    "product_id": it.get("product_id"),
+                    "qty": qty, "unit_price": price, "total": round(price * qty),
+                })
+            groups[sig] = {"count": 1, "items": clean}
+        else:
+            g["count"] += 1
+    sets = [g for g in groups.values() if g["count"] >= 2]
+    sets.sort(key=lambda g: -g["count"])
+    return sets[:limit]
+
+
 # Интервалы замены расходников (км, месяцев) — для подсказки «пора менять»
 # на табло у входа и мастеру. Моторное масло и масляный фильтр сюда не входят:
 # их срок уже посчитан в самой записи (next_change_date / next_mileage).

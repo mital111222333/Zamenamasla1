@@ -3022,3 +3022,33 @@ UZ.update({
     "st_err_not_found": "Mahsulot topilmadi",
     "st_err_not_enough": "{name}: faqat {n} o'tkazish mumkin",
 })
+
+# ---- Редизайн для компьютера: группы меню, чек, готовые наборы, горячие клавиши ----
+RU.update({
+    "nav_grp_work": "Работа",
+    "nav_grp_business": "Бизнес",
+    "nav_grp_settings": "Настройки",
+    "rcpt_title": "Чек",
+    "rcpt_empty": "Выберите масло и фильтры — позиции появятся здесь",
+    "rcpt_total": "Итого",
+    "rcpt_keys": "Ctrl+Enter — сохранить · F4 — как в прошлый раз",
+    "preset_title": "Готовые наборы",
+    "preset_hint": "Частые сочетания вашей точки для этой модели — один клик заполняет всё",
+    "preset_times": "раз",
+    "preset_done": "Набор заполнен — проверьте пробег и сохраните",
+    "kbd_save": "Ctrl+Enter",
+})
+UZ.update({
+    "nav_grp_work": "Ish",
+    "nav_grp_business": "Biznes",
+    "nav_grp_settings": "Sozlamalar",
+    "rcpt_title": "Chek",
+    "rcpt_empty": "Moy va filtrlarni tanlang — pozitsiyalar shu yerda chiqadi",
+    "rcpt_total": "Jami",
+    "rcpt_keys": "Ctrl+Enter — saqlash · F4 — o'tgan safargidek",
+    "preset_title": "Tayyor to'plamlar",
+    "preset_hint": "Nuqtangizda shu model uchun ko'p qilingan to'plamlar — bir bosishda to'ldiriladi",
+    "preset_times": "marta",
+    "preset_done": "To'plam to'ldirildi — probegni tekshirib saqlang",
+    "kbd_save": "Ctrl+Enter",
+})
