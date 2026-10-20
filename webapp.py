@@ -1239,13 +1239,21 @@ def public_passport_pdf(token):
     car, history = db.get_car_by_passport_token(token)
     if not car:
         return "Паспорт не найден", 404
-    output_path = f"/tmp/passport_{token}.pdf"
+    import tempfile
+    fd, output_path = tempfile.mkstemp(prefix="passport_", suffix=".pdf")
+    os.close(fd)
+    # номер может быть на кириллице (А123ВС77), а в filename="..." допустим
+    # только ASCII — иначе сервер падал с ошибкой 500. Настоящее имя — в filename*
+    filename = f"passport_{car['plate_number']}.pdf"
     try:
         _generate_passport_pdf(car, history, output_path)
+        with open(output_path, "rb") as f:
+            body = f.read()
         return Response(
-            open(output_path, "rb").read(),
+            body,
             mimetype="application/pdf",
-            headers={"Content-Disposition": f"inline; filename=passport_{car['plate_number']}.pdf"}
+            headers={"Content-Disposition": f"inline; filename=\"passport.pdf\"; "
+                                            f"filename*=UTF-8''{urllib.parse.quote(filename)}"}
         )
     finally:
         if os.path.exists(output_path):
@@ -1257,10 +1265,8 @@ def service_worker():
     """Service worker обязательно отдаётся с корня (не из /static/), иначе
     его область действия (scope) ограничится только папкой /static/ и он
     не сможет ничего перехватывать на реальных страницах приложения."""
-    response = Response(
-        open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "sw.js")).read(),
-        mimetype="application/javascript",
-    )
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "sw.js"), encoding="utf-8") as f:
+        response = Response(f.read(), mimetype="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
     return response
 

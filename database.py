@@ -2351,26 +2351,6 @@ def get_debt_summary(shop_id: int) -> dict:
     }
 
 
-def get_daily_revenue(shop_id: int, days: int = 30):
-    """Выручка по дням за последние `days` дней — для графика динамики на
-    dashboard. Дни без единой продажи всё равно включены в список с total=0,
-    чтобы график не 'перепрыгивал' через пропуски."""
-    start_date = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-    with get_conn() as conn:
-        rows = conn.execute("""
-            SELECT oc.change_date as date, COALESCE(SUM(oc.cost), 0) as total
-            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ?
-            GROUP BY oc.change_date
-        """, (shop_id, start_date)).fetchall()
-    by_date = {r["date"]: r["total"] for r in rows}
-    result = []
-    for i in range(days):
-        d = (datetime.now() - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
-        result.append({"date": d, "total": by_date.get(d, 0)})
-    return result
-
-
 def get_daily_revenue_range(shop_id: int, date_from: str, date_to: str):
     """Выручка по дням за произвольный период (включительно с обеих сторон)
     — для графика динамики, что на dashboard (30 дней), что при выборе

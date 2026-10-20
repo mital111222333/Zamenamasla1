@@ -67,6 +67,8 @@ def send_sms(shop_id: int, email: str, password: str, phone: str, text: str):
             )
         resp.raise_for_status()
         return True, None
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, KeyError, TypeError, ValueError) as e:
+        # KeyError/TypeError/ValueError — Eskiz ответил не тем JSON, что ждали;
+        # наружу не бросаем, иначе обрывается рассылка напоминаний всем точкам
         logger.warning(f"Ошибка отправки SMS через Eskiz (точка {shop_id}): {e}")
         return False, str(e)
