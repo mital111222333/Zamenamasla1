@@ -8220,7 +8220,7 @@ function collectOtherStockItems(prefix) {
     if (!selectEl || !priceEl || !qtyEl) return;
     const price = parseFloat(priceEl.value) || 0;
     const qty = parseFloat(qtyEl.value) || 0;
-    if (price > 0 && qty > 0 && selectEl.value) {
+    if (qty > 0 && selectEl.value) {
       const opt = selectEl.options[selectEl.selectedIndex];
       items.push({
         key: 'other_stock', name: opt.dataset.name || '', brand: null, product_id: parseInt(selectEl.value),
@@ -8828,8 +8828,10 @@ function collectItems() {
   FLUID_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`fluid_price_${i}`).value) || 0;
     const liters = parseFloat(document.getElementById(`fluid_liters_${i}`).value) || 0;
-    if (price > 0 && liters > 0) {
-      const { brand, product_id } = readBrandField(`fluid_brand_${i}`);
+    const { brand, product_id } = readBrandField(`fluid_brand_${i}`);
+    // товар со склада списывается и при цене 0 (бесплатно, по гарантии) —
+    // раньше такая позиция пропадала, и литры не уходили со склада
+    if (liters > 0 && (price > 0 || product_id)) {
       items.push({
         key, name: T[key], brand, product_id,
         unit_price: price, qty: liters, total: Math.round(price * liters),
@@ -8838,9 +8840,9 @@ function collectItems() {
   });
   FILTER_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`filter_price_${i}`).value) || 0;
-    if (price > 0) {
-      const brandEl = document.getElementById(`filter_brand_${i}`);
-      const { brand, product_id } = brandEl ? readBrandField(`filter_brand_${i}`) : { brand: null, product_id: null };
+    const brandEl = document.getElementById(`filter_brand_${i}`);
+    const { brand, product_id } = brandEl ? readBrandField(`filter_brand_${i}`) : { brand: null, product_id: null };
+    if (price > 0 || product_id) {
       items.push({key, name: T[key], brand, product_id, unit_price: price, qty: 1, total: Math.round(price)});
     }
   });
@@ -8885,6 +8887,12 @@ function updateTotal() {
       payCash.value = total || '';
       payCard.value = '';
     }
+  } else if (payCash && payCard && !(document.getElementById('debt_enabled') || {}).checked) {
+    // оплату уже меняли вручную, а потом добавили/изменили позиции — без
+    // долга нал + карта должны оставаться равны сумме (карту не трогаем)
+    const card = Math.min(parseFloat(payCard.value) || 0, total);
+    payCard.value = card || '';
+    payCash.value = Math.max(0, Math.round(total - card)) || '';
   }
   updateDebtRemaining();
   if (typeof syncItemRows === 'function') syncItemRows();
@@ -10626,8 +10634,10 @@ function collectSvcItems() {
   FLUID_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`svc_fluid_price_${i}`).value) || 0;
     const liters = parseFloat(document.getElementById(`svc_fluid_liters_${i}`).value) || 0;
-    if (price > 0 && liters > 0) {
-      const { brand, product_id } = readBrandField(`svc_fluid_brand_${i}`);
+    const { brand, product_id } = readBrandField(`svc_fluid_brand_${i}`);
+    // товар со склада списывается и при цене 0 (бесплатно, по гарантии) —
+    // раньше такая позиция пропадала, и литры не уходили со склада
+    if (liters > 0 && (price > 0 || product_id)) {
       items.push({
         key, name: T[key], brand, product_id,
         unit_price: price, qty: liters, total: Math.round(price * liters),
@@ -10636,9 +10646,9 @@ function collectSvcItems() {
   });
   FILTER_KEYS.forEach((key, i) => {
     const price = parseFloat(document.getElementById(`svc_filter_price_${i}`).value) || 0;
-    if (price > 0) {
-      const brandEl = document.getElementById(`svc_filter_brand_${i}`);
-      const { brand, product_id } = brandEl ? readBrandField(`svc_filter_brand_${i}`) : { brand: null, product_id: null };
+    const brandEl = document.getElementById(`svc_filter_brand_${i}`);
+    const { brand, product_id } = brandEl ? readBrandField(`svc_filter_brand_${i}`) : { brand: null, product_id: null };
+    if (price > 0 || product_id) {
       items.push({key, name: T[key], brand, product_id, unit_price: price, qty: 1, total: Math.round(price)});
     }
   });
@@ -10652,6 +10662,7 @@ function collectSvcItems() {
 }
 
 let svcPaymentSplitTouched = false;
+let svcHasDebt = false;  // открыта на исправление запись, по которой есть долг
 
 function updateSvcTotal() {
   const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
@@ -10661,6 +10672,11 @@ function updateSvcTotal() {
   if (payCash && payCard && !svcPaymentSplitTouched) {
     payCash.value = total || '';
     payCard.value = '';
+  } else if (payCash && payCard && !svcHasDebt) {
+    // запись без долга: после изменения позиций нал + карта = новая сумма
+    const card = Math.min(parseFloat(payCard.value) || 0, total);
+    payCard.value = card || '';
+    payCash.value = Math.max(0, Math.round(total - card)) || '';
   }
 }
 
@@ -10752,11 +10768,13 @@ function openEditModal(plate, entry) {
   document.getElementById('svc_pay_cash').value = entry.cash_amount ?? entry.cost ?? '';
   document.getElementById('svc_pay_card').value = entry.card_amount ?? '';
   svcPaymentSplitTouched = true;  // это реальная сохранённая разбивка, не пересчитывать автоматически
+  svcHasDebt = (entry.cost || 0) > (entry.cash_amount || 0) + (entry.card_amount || 0);
   document.getElementById('editModal').classList.add('open');
 }
 
 function openAddServiceModal(plate) {
   svcModal = { mode: 'add', id: null, plate };
+  svcHasDebt = false;
   document.getElementById('svcModalTitle').textContent = T.add_service_title;
   document.getElementById('edit_mileage').value = '';
   document.getElementById('edit_next_mileage').value = '';
@@ -12889,8 +12907,15 @@ def api_add():
 
             oc_id, next_date = db.add_oil_change(
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
-                next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount
+                next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount,
+                allow_debt=debt_amount > 0
             )
+            if debt_amount > 0:
+                # сумму долга считает сервер: сумма замены − нал − карта (раньше
+                # бралась из браузера и могла не совпасть с самой записью)
+                _saved = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
+                debt_amount = max(0, (_saved.get("cost") or 0) - (_saved.get("cash_amount") or 0)
+                                  - (_saved.get("card_amount") or 0))
             if vin and car_model:
                 try:
                     db.vin_learn(vin, car_brand, car_model)
@@ -13615,6 +13640,8 @@ def api_restock_product(product_id):
     data = request.get_json(force=True)
     try:
         quantity = float(data["quantity"])
+        if not (quantity > 0 and quantity < 10 ** 7):
+            return jsonify({"ok": False, "error": "количество должно быть больше нуля"}), 400
         purchase_price = int(data["purchase_price"]) if data.get("purchase_price") not in (None, "") else None
         purchase_usd = float(data["purchase_usd"]) if data.get("purchase_usd") not in (None, "") else None
         if g.is_branch:

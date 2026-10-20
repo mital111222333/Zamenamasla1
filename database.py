@@ -1452,6 +1452,11 @@ def restock_product(product_id: int, shop_id: int, quantity: float, purchase_pri
     existing = get_product(product_id, shop_id)
     if not existing:
         return False
+    try:
+        if not (math.isfinite(float(quantity)) and float(quantity) > 0):
+            return False  # пополнение только положительным количеством
+    except (TypeError, ValueError):
+        return False
     if not restock_date:
         restock_date = datetime.now().strftime("%Y-%m-%d")
     with get_conn() as conn:
@@ -1491,6 +1496,59 @@ _SALE_SQL = """UPDATE products SET
                     THEN MAX(0, shop_qty - ?) ELSE shop_qty END,
     stock_qty = stock_qty - ?
     WHERE id=?"""
+
+
+def _sale_take(conn, product_id: int, qty: float) -> float:
+    """Списывает qty товара в ТЕКУЩЕЙ транзакции и возвращает, сколько из
+    этого взято из магазина (остальное — с основного склада). Это число
+    сохраняется в позиции замены, чтобы при удалении/исправлении записи
+    товар вернулся туда же, откуда был взят (раньше всё возвращалось в
+    магазин, и там появлялся товар, которого физически нет)."""
+    row = conn.execute("""SELECT p.shop_qty, COALESCE(s.store_enabled, 0) AS store_on
+                          FROM products p LEFT JOIN shops s ON s.id = p.shop_id WHERE p.id=?""",
+                       (product_id,)).fetchone()
+    store_part = 0.0
+    if row and row["store_on"] and qty > 0:
+        store_part = min(max(row["shop_qty"] or 0, 0), qty)
+    conn.execute("UPDATE products SET shop_qty = MAX(0, shop_qty - ?), stock_qty = stock_qty - ? WHERE id=?",
+                 (store_part, qty, product_id))
+    return round(store_part, 3)
+
+
+def _sale_return(conn, product_id: int, qty: float, store_part=None):
+    """Возврат на склад товара удалённой/исправленной продажи. store_part —
+    сколько было взято из магазина (если запись старая и этого не знает —
+    как раньше: всё в магазин, если он включён)."""
+    if store_part is None:
+        conn.execute(_SALE_SQL, (-qty, -qty, product_id))
+        return
+    row = conn.execute("""SELECT COALESCE(s.store_enabled, 0) AS store_on FROM products p
+                          LEFT JOIN shops s ON s.id = p.shop_id WHERE p.id=?""", (product_id,)).fetchone()
+    back_to_store = min(max(store_part, 0), qty) if row and row["store_on"] else 0
+    conn.execute("UPDATE products SET shop_qty = shop_qty + ?, stock_qty = stock_qty + ? WHERE id=?",
+                 (back_to_store, qty, product_id))
+
+
+def reconcile_payment(cost, cash, card, with_debt: bool = False):
+    """Приводит оплату в соответствие с суммой замены: нал + карта (+ долг)
+    всегда = сумма. Раньше, если после ввода оплаты добавляли/меняли позиции,
+    разница никуда не попадала — ни в нал, ни в карту, ни в долг (выручка
+    была больше, чем пришло денег), а переплата завышала наличные.
+    Без долга недостающее считается наличными; переплата срезается
+    (сначала с наличных). Возвращает (cash, card, debt)."""
+    cost = max(int(round(cost or 0)), 0)
+    cash = max(int(round(cash or 0)), 0)
+    card = max(int(round(card or 0)), 0)
+    if cash + card > cost:
+        extra = cash + card - cost
+        cut = min(extra, cash)
+        cash -= cut
+        card -= extra - cut
+    debt = cost - cash - card
+    if debt > 0 and not with_debt:
+        cash += debt
+        debt = 0
+    return cash, card, debt
 
 
 @_serialized
@@ -2034,7 +2092,8 @@ def get_all_cars_overview(shop_id: int):
 @_serialized
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
-                    next_mileage=None, items=None, cash_amount=None, card_amount=None):
+                    next_mileage=None, items=None, cash_amount=None, card_amount=None,
+                    allow_debt=False):
     """items (необязательно) — детализированный список позиций вида
     [{"name": "Моторное масло", "brand": "MITANOL", "unit_price": 45000, "qty": 4, "total": 180000}, ...]
     Если передан — стоимость и итоговое описание считаются по нему, а service_type/oil_brand/cost
@@ -2083,13 +2142,21 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
     else:
         cash_amount = cash_amount or 0
         card_amount = card_amount or 0
+    if items:
+        # без долга нал + карта = сумма (долг, если есть, — сумма минус оплата;
+        # его оформляет вызывающий код по reconcile_payment)
+        cash_amount, card_amount, _debt = reconcile_payment(cost, cash_amount, card_amount, with_debt=allow_debt)
 
     with get_conn() as conn:
         # всё ниже — одна транзакция: либо сохранится и запись, и списание
         # со склада, либо ничего (раньше склад списывался отдельно и при сбое
         # сохранения записи товар «пропадал»)
-        for pid, qty in stock_moves:
-            conn.execute(_SALE_SQL, (qty, qty, pid))
+        if stock_moves:
+            for item in items:
+                pid = item.get("product_id")
+                if pid and any(pid == m[0] for m in stock_moves):
+                    item["store_qty"] = _sale_take(conn, pid, item.get("qty") or 0)
+            items_json = json.dumps(items, ensure_ascii=False)
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
@@ -2143,29 +2210,33 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
     if notes is not None:
         fields["notes"] = notes
 
+    stock_returns, new_moves = [], []
     if items:
         # Склад: сначала возвращаем то, что было списано старыми позициями
         # (если товар всё ещё существует и принадлежит этой точке), потом
         # списываем заново по новым позициям — так редактирование количества
         # или замена бренда правильно отражается на остатках, а не задваивает
-        # списание.
+        # списание. Само движение склада — ниже, в ОДНОЙ транзакции с записью.
         old_items = json.loads(existing["items_json"]) if existing.get("items_json") else []
         for old_item in old_items:
             pid = old_item.get("product_id")
             if pid and get_product(pid, shop_id, active_only=False):
-                adjust_stock(pid, -(old_item.get("qty") or 0))
+                stock_returns.append((pid, old_item.get("qty") or 0, old_item.get("store_qty")))
         # цена закупки уже проданного товара не должна меняться задним числом:
         # если позиция была в записи раньше — оставляем её прежний cost_price,
         # текущую цену склада берём только для новых позиций
         old_cost = {o.get("product_id"): o.get("cost_price") for o in old_items
                     if o.get("product_id") and "cost_price" in o}
+        old_pids = {o.get("product_id") for o in old_items if o.get("product_id")}
         for item in items:
             pid = item.get("product_id")
             if pid:
-                product = get_product(pid, shop_id)
+                # товар, который уже был в этой записи, мог быть с тех пор
+                # убран со склада — позиция всё равно остаётся связанной с ним
+                product = get_product(pid, shop_id, active_only=pid not in old_pids)
                 if product:
                     item["cost_price"] = old_cost[pid] if pid in old_cost else product.get("purchase_price")
-                    adjust_stock(pid, item.get("qty") or 0)
+                    new_moves.append(item)
                 else:
                     item["product_id"] = None
 
@@ -2203,6 +2274,17 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
     if not fields:
         return True
 
+    if "cost" in fields or "cash_amount" in fields or "card_amount" in fields:
+        # нал + карта не могут быть больше суммы; без долга — ровно сумма
+        with get_conn() as _c:
+            has_plan = _c.execute("""SELECT 1 FROM installment_plans WHERE oil_change_id=? AND shop_id=?
+                                     AND status IN ('active','completed')""", (oc_id, shop_id)).fetchone() is not None
+        new_cash, new_card, _d = reconcile_payment(
+            fields.get("cost", existing.get("cost")),
+            fields.get("cash_amount", existing.get("cash_amount")),
+            fields.get("card_amount", existing.get("card_amount")), with_debt=has_plan)
+        fields["cash_amount"], fields["card_amount"] = new_cash, new_card
+
     def _debt_of(cost_v, cash_v, card_v):
         return max(0, (cost_v or 0) - (cash_v or 0) - (card_v or 0))
     old_debt = _debt_of(existing.get("cost"), existing.get("cash_amount"), existing.get("card_amount"))
@@ -2210,8 +2292,14 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
                         fields.get("cash_amount", existing.get("cash_amount")),
                         fields.get("card_amount", existing.get("card_amount")))
 
-    set_clause = ", ".join(f"{k}=?" for k in fields)
     with get_conn() as conn:
+        for pid, qty, store_part in stock_returns:
+            _sale_return(conn, pid, qty, store_part)
+        if items:
+            for item in new_moves:
+                item["store_qty"] = _sale_take(conn, item["product_id"], item.get("qty") or 0)
+            fields["items_json"] = json.dumps(items, ensure_ascii=False)
+        set_clause = ", ".join(f"{k}=?" for k in fields)
         conn.execute(f"UPDATE oil_changes SET {set_clause} WHERE id=?", (*fields.values(), oc_id))
         if new_debt != old_debt:
             _sync_debt_after_edit(conn, oc_id, shop_id, new_debt - old_debt)
@@ -2258,7 +2346,7 @@ def delete_oil_change(oc_id: int, shop_id: int):
         for item in json.loads(existing["items_json"]):
             pid = item.get("product_id")
             if pid and get_product(pid, shop_id, active_only=False):
-                returns.append((pid, item.get("qty") or 0))
+                returns.append((pid, item.get("qty") or 0, item.get("store_qty")))
 
     with get_conn() as conn:
         # рассрочка по этой замене: пока по ней не было денег — удаляется вместе
@@ -2277,8 +2365,8 @@ def delete_oil_change(oc_id: int, shop_id: int):
         for p in plans:
             conn.execute("DELETE FROM installment_payments WHERE plan_id=?", (p["id"],))
             conn.execute("DELETE FROM installment_plans WHERE id=?", (p["id"],))
-        for pid, qty in returns:
-            conn.execute(_SALE_SQL, (-qty, -qty, pid))
+        for pid, qty, store_part in returns:
+            _sale_return(conn, pid, qty, store_part)
         if existing["status"] == "active":
             next_row = conn.execute(
                 "SELECT id FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC LIMIT 1",
