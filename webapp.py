@@ -2518,6 +2518,28 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .st-today-amount small, .st-amount small { font-size:0.55em; font-weight:600; color:#64748B; margin-left:3px; }
   .st-today-chips { display:flex; gap:6px; flex-wrap:wrap; }
   .st-chip { background:#F1F5F9; border-radius:999px; padding:5px 11px; font-size:12.5px; color:#334155; }
+  .st-day-btn { border:1.5px solid #0F52BA; background:#EFF6FF; color:#0F52BA; border-radius:999px; padding:6px 14px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .st-day-btn:hover { background:#0F52BA; color:#fff; }
+  #dayDetailsModal .modal { max-width:640px; }
+  .dd-date { display:flex; justify-content:center; gap:8px; align-items:center; margin:-4px 0 12px; }
+  .dd-date input { width:auto; padding:6px 10px; font-size:13px; }
+  .dd-tot { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-bottom:14px; }
+  .dd-tot div { background:#F8FAFC; border:1px solid var(--border); border-radius:12px; padding:9px 11px; }
+  .dd-tot span { display:block; font-size:11.5px; color:#64748B; }
+  .dd-tot b { font-size:16px; font-family:var(--font-mono); }
+  .dd-sec { font-size:14px; font-weight:700; margin:16px 0 8px; display:flex; justify-content:space-between; gap:8px; }
+  .dd-sec small { font-weight:600; color:#64748B; }
+  .dd-item { border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+  .dd-item-h { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .dd-plate { font-family:var(--font-mono); font-weight:800; font-size:14px; }
+  .dd-sub { color:#64748B; font-size:12px; margin-top:2px; }
+  .dd-lines { margin:6px 0 0; padding:0; list-style:none; }
+  .dd-lines li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed var(--border); }
+  .dd-pay { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+  .dd-pay span { border-radius:999px; padding:3px 9px; font-size:11.5px; background:#F1F5F9; }
+  .dd-pay .debt { background:#FEF3C7; color:#92400E; font-weight:700; }
+  .dd-row { display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+  .dd-empty { color:#94A3B8; font-size:13px; padding:4px 0 2px; }
   .st-chip b { color:var(--text); }
   .st-empty { font-size:13px; color:#94A3B8; }
   .st-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; }
@@ -3516,6 +3538,15 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
 
     <div id="statsOwnView">
       <div id="statsGrid">{{ T.stats_loading }}</div>
+
+      <div class="modal-overlay" id="dayDetailsModal" onclick="if (event.target === this) closeWhModal('dayDetailsModal')">
+        <div class="modal modal-wide" style="text-align:left;">
+          <h3 style="text-align:center; margin-top:0;"><i class="fa-solid fa-list-check" style="color:#0F52BA;"></i> {{ T.dd_title }}</h3>
+          <div class="dd-date"><input type="date" id="ddDate" onchange="loadDayDetails(this.value)"></div>
+          <div id="ddBody">{{ T.stats_loading }}</div>
+          <button class="close-btn" onclick="closeWhModal('dayDetailsModal')">{{ T.modal_close }}</button>
+        </div>
+      </div>
 
       {% if not is_employee %}
       <div class="card" style="margin-top:16px;">
@@ -7584,7 +7615,7 @@ function renderStatCard(o) {
     </div>`;
 }
 
-function renderTodayStrip(d, profit) {
+function renderTodayStrip(d, profit, withDetails) {
   d = d || {};
   const cl = d.clients || {};
   const chips = d.count ? `
@@ -7601,6 +7632,7 @@ function renderTodayStrip(d, profit) {
       <div class="st-today-main">
         <span class="st-today-label">${T.stats_today}</span>
         <span class="st-today-amount">${fmtNum(d.total)}<small>${T.currency}</small></span>
+        ${withDetails ? `<button type="button" class="st-day-btn" onclick="openDayDetails()"><i class="fa-solid fa-list-ul"></i> ${T.dd_btn}</button>` : ''}
       </div>
       ${chips}
     </div>`;
@@ -7777,7 +7809,7 @@ async function loadStats() {
     profit = await pRes.json();
   }
   document.getElementById('statsGrid').innerHTML =
-    renderTodayStrip(s.today, profit ? profit.today : null) +
+    renderTodayStrip(s.today, profit ? profit.today : null, true) +
     `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
       label, d: s[key], cmp: s.comparison && s.comparison[key], cmpNote: note,
       profit: profit ? profit[key] : null, profitUsd: profit && profit.usd ? profit.usd[key] : null,
@@ -7799,6 +7831,81 @@ async function loadStats() {
       }
     } catch (e) { /* не главный аккаунт или ошибка - просто не показываем подвкладку */ }
   }
+}
+
+function openDayDetails() {
+  const inp = document.getElementById('ddDate');
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  inp.max = today;
+  inp.value = today;
+  document.getElementById('dayDetailsModal').classList.add('open');
+  loadDayDetails(today);
+}
+
+async function loadDayDetails(day) {
+  // подробно за день: машины и работы, оплаты, долги, расходы, поставщики
+  const body = document.getElementById('ddBody');
+  body.innerHTML = T.stats_loading;
+  const seq = (window.DD_SEQ = (window.DD_SEQ || 0) + 1);
+  let data;
+  try {
+    data = await (await fetch('/api/stats/day?date=' + encodeURIComponent(day || ''))).json();
+  } catch (e) { body.innerHTML = `<div class="dd-empty">${T.dd_load_error}</div>`; return; }
+  if (seq !== window.DD_SEQ) return;  // пока грузилось, выбрали другой день
+  if (!data.ok) { body.innerHTML = `<div class="dd-empty">${escapeHtml(data.error || '')}</div>`; return; }
+  const t = data.totals;
+  const money = n => `${fmtNum(n || 0)} ${T.currency}`;
+  const tile = (label, val, color) => `<div><span>${label}</span><b${color ? ` style="color:${color};"` : ''}>${fmtNum(val || 0)}</b></div>`;
+  let html = `<div class="dd-tot">
+    ${tile(T.st_m_revenue, t.revenue)}
+    ${tile(T.dd_income, t.income, '#15803D')}
+    ${tile(T.dd_outcome, t.outcome, '#B91C1C')}
+    ${tile(T.dd_balance, t.balance, t.balance < 0 ? '#B91C1C' : '#0F52BA')}
+    ${tile(T.st_cash, t.cash)}
+    ${tile(T.st_card, t.card)}
+    ${t.debt_out ? tile(T.st_debt_part, t.debt_out, '#92400E') : ''}
+    ${t.repaid ? tile(T.dd_repaid, t.repaid, '#15803D') : ''}
+  </div>`;
+
+  html += `<div class="dd-sec"><span>🚗 ${T.dd_services}</span><small>${t.count} · ${money(t.revenue)}</small></div>`;
+  html += data.services.length ? data.services.map(s => {
+    const car = [s.car_brand, s.car_model].filter(Boolean).join(' ');
+    const owner = [s.owner_name, s.owner_phone].filter(Boolean).join(' · ');
+    const lines = (s.items || []).map(i => {
+      const unit = i.unit === 'pc' ? ' ' + T.unit_pc : (i.unit === 'l' ? ' ' + T.unit_l : '');
+      const qty = i.qty ? ` × ${String(i.qty).replace('.', ',')}${unit}` : '';
+      const brand = i.brand && i.brand !== i.name ? ` <span class="dd-sub" style="display:inline;">${escapeHtml(i.brand)}</span>` : '';
+      return `<li><span>${escapeHtml(i.name || '')}${brand}${qty}</span><b>${fmtNum(i.total || 0)}</b></li>`;
+    }).join('');
+    const pays = [
+      s.cash ? `<span>${T.st_cash}: <b>${fmtNum(s.cash)}</b></span>` : '',
+      s.card ? `<span>${T.st_card}: <b>${fmtNum(s.card)}</b></span>` : '',
+      s.debt ? `<span class="debt">${T.st_debt_part}: ${fmtNum(s.debt)}</span>` : '',
+    ].join('');
+    return `<div class="dd-item">
+      <div class="dd-item-h"><span class="dd-plate">${escapeHtml(s.plate || '')}</span><b>${money(s.cost)}</b></div>
+      ${car || owner ? `<div class="dd-sub">${escapeHtml(car)}${car && owner ? ' — ' : ''}${escapeHtml(owner)}</div>` : ''}
+      ${s.mileage ? `<div class="dd-sub">${T.dd_mileage}: ${fmtNum(s.mileage)} ${T.dd_km}</div>` : ''}
+      ${lines ? `<ul class="dd-lines">${lines}</ul>` : (s.service_type ? `<div class="dd-sub">${escapeHtml(s.service_type)}</div>` : '')}
+      ${s.notes ? `<div class="dd-sub">📝 ${escapeHtml(s.notes)}</div>` : ''}
+      ${pays ? `<div class="dd-pay">${pays}</div>` : ''}
+    </div>`;
+  }).join('') : `<div class="dd-empty">${T.dd_no_services}</div>`;
+
+  if (data.repaid.length) {
+    html += `<div class="dd-sec"><span>💰 ${T.dd_repaid}</span><small>${money(t.repaid)}</small></div>`;
+    html += data.repaid.map(p => `<div class="dd-row"><span><b class="dd-plate" style="font-size:13px;">${escapeHtml(p.plate || '')}</b> ${escapeHtml(p.owner_name || '')}${p.remaining > 0 ? ` <span class="dd-sub" style="display:inline;">(${T.dd_left} ${fmtNum(p.remaining)})</span>` : ''}</span><b style="color:#15803D;">+${fmtNum(p.amount)}</b></div>`).join('');
+  }
+  html += `<div class="dd-sec"><span>🧾 ${T.dd_expenses}</span><small>${money(t.expenses)}</small></div>`;
+  html += data.expenses.length
+    ? data.expenses.map(e => `<div class="dd-row"><span>${escapeHtml(e.category || '')}${e.name ? ` — ${escapeHtml(e.name)}` : ''}</span><b style="color:#B91C1C;">−${fmtNum(e.amount)}</b></div>`).join('')
+    : `<div class="dd-empty">${T.dd_none}</div>`;
+  if (data.supplier_payments.length) {
+    html += `<div class="dd-sec"><span>🚚 ${T.dd_suppliers}</span><small>${money(t.suppliers)}</small></div>`;
+    html += data.supplier_payments.map(p => `<div class="dd-row"><span>${escapeHtml(p.supplier || '')}${p.note ? ` — ${escapeHtml(p.note)}` : ''}</span><b style="color:#B91C1C;">−${fmtNum(p.amount)}</b></div>`).join('');
+  }
+  body.innerHTML = html;
 }
 
 function showStatsSubTab(t) {
@@ -13317,6 +13424,22 @@ def api_broadcast_create():
 def api_stats():
     result = db.get_revenue_stats(g.shop_id)
     result["comparison"] = db.get_revenue_comparison(g.shop_id)
+    return jsonify(result)
+
+
+@app.route("/api/stats/day")
+@login_required
+@employee_blocked
+def api_stats_day():
+    """Подробно за день (по умолчанию — сегодня): машины и работы, оплаты,
+    погашенные долги, расходы, оплаты поставщикам. Цен закупки в ответе нет."""
+    day = (request.args.get("date") or "").strip()[:10] or datetime.now().strftime("%Y-%m-%d")
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"ok": False, "error": "неверная дата"}), 400
+    result = db.get_day_details(g.shop_id, day)
+    result["ok"] = True
     return jsonify(result)
 
 

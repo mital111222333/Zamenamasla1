@@ -2137,7 +2137,9 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         oil_brand = motor_oil["brand"] if motor_oil and motor_oil.get("brand") else None
         filter_changed = any((i.get("key") or "").startswith("filter_") for i in items)
 
-    if cash_amount is None and card_amount is None:
+    if cash_amount is None and card_amount is None and not allow_debt:
+        # «в долг» без предоплаты — оплата 0, а не «всё наличными»: иначе долг
+        # получался нулевым и не попадал ни в «Долги», ни в статистику
         cash_amount, card_amount = cost, 0
     else:
         cash_amount = cash_amount or 0
@@ -3272,6 +3274,74 @@ def get_revenue_stats(shop_id: int) -> dict:
             result[key]["clients"] = _client_split(conn, shop_id, d_from, d_to)
             result[key].update(_debt_flow(conn, shop_id, d_from, d_to))
         return result
+
+
+def get_day_details(shop_id: int, day: str) -> dict:
+    """Подробно за один день — для кнопки «Подробнее» в статистике: какие
+    машины обслужили и что сделали (с оплатой и долгом), какие долги
+    погасили, какие были расходы и оплаты поставщикам. Итоги «пришло» и
+    «ушло» считаются из этих же списков, чтобы цифры сходились."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.id, oc.mileage, oc.service_type, oc.cost, oc.cash_amount, oc.card_amount,
+                   oc.items_json, oc.notes, c.plate_number, c.car_brand, c.car_model,
+                   cl.full_name AS owner_name, cl.phone AS owner_phone,
+                   (SELECT COALESCE(SUM(ip.total_amount), 0) FROM installment_plans ip
+                    WHERE ip.oil_change_id = oc.id AND ip.shop_id = c.shop_id) AS debt
+            FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            LEFT JOIN clients cl ON cl.id = c.client_id
+            WHERE c.shop_id=? AND oc.change_date=?
+            ORDER BY oc.id
+        """, (shop_id, day)).fetchall()
+        services = []
+        for r in rows:
+            try:
+                items = json.loads(r["items_json"]) if r["items_json"] else []
+            except (TypeError, ValueError):
+                items = []
+            services.append({
+                "id": r["id"], "plate": r["plate_number"], "car_brand": r["car_brand"],
+                "car_model": r["car_model"], "owner_name": r["owner_name"], "owner_phone": r["owner_phone"],
+                "mileage": r["mileage"], "service_type": r["service_type"], "notes": r["notes"],
+                "items": [{"name": i.get("name"), "brand": i.get("brand"), "qty": i.get("qty"),
+                           "unit": i.get("unit"), "total": i.get("total")} for i in items if isinstance(i, dict)],
+                "cost": r["cost"] or 0, "cash": r["cash_amount"] or 0, "card": r["card_amount"] or 0,
+                "debt": r["debt"] or 0,
+            })
+        repaid = [dict(r) for r in conn.execute("""
+            SELECT p.id, p.amount, c.plate_number AS plate, cl.full_name AS owner_name,
+                   (ip.total_amount - ip.paid_amount - COALESCE(ip.written_off_amount, 0)) AS remaining
+            FROM installment_payments p
+            JOIN installment_plans ip ON ip.id = p.plan_id
+            LEFT JOIN cars c ON c.id = ip.car_id
+            LEFT JOIN clients cl ON cl.id = c.client_id
+            WHERE ip.shop_id=? AND p.status='active' AND p.paid_date=?
+            ORDER BY p.id
+        """, (shop_id, day)).fetchall()]
+        expenses = [dict(r) for r in conn.execute(
+            "SELECT id, category, name, amount FROM expense_entries WHERE shop_id=? AND expense_date=? ORDER BY id",
+            (shop_id, day)).fetchall()]
+        supplier_payments = [dict(r) for r in conn.execute("""
+            SELECT sp.id, sp.amount, sp.note, s.name AS supplier
+            FROM supplier_payments sp LEFT JOIN suppliers s ON s.id = sp.supplier_id
+            WHERE sp.shop_id=? AND sp.kind='payment' AND COALESCE(sp.status, 'active')='active' AND sp.pay_date=?
+            ORDER BY sp.id
+        """, (shop_id, day)).fetchall()]
+    cash = sum(s["cash"] for s in services)
+    card = sum(s["card"] for s in services)
+    repaid_sum = sum(p["amount"] for p in repaid)
+    expenses_sum = sum(e["amount"] for e in expenses)
+    suppliers_sum = sum(p["amount"] for p in supplier_payments)
+    totals = {
+        "revenue": sum(s["cost"] for s in services), "count": len(services),
+        "cash": cash, "card": card, "debt_out": sum(s["debt"] for s in services),
+        "repaid": repaid_sum, "income": cash + card + repaid_sum,
+        "expenses": expenses_sum, "suppliers": suppliers_sum, "outcome": expenses_sum + suppliers_sum,
+    }
+    totals["balance"] = totals["income"] - totals["outcome"]
+    return {"date": day, "services": services, "repaid": repaid, "expenses": expenses,
+            "supplier_payments": supplier_payments, "totals": totals}
 
 
 def _pct_change(current, previous):
