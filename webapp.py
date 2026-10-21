@@ -2178,6 +2178,14 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     display:flex; align-items:center; gap:8px;
   }
   .known-client .kc-header i { font-size:15px; }
+  .known-client .kc-header .kc-close { margin-left:auto; width:32px; height:32px; flex:none; border:none; border-radius:50%; background:rgba(255,255,255,.2); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+  .known-client .kc-header .kc-close i { font-size:17px; }
+  .known-client .kc-header .kc-close:active { background:rgba(255,255,255,.35); }
+  .kc-pass-row { display:flex; justify-content:center; align-items:center; gap:8px; margin-top:10px; }
+  .kc-pass-tg { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:none; border-radius:999px; background:#229ED9; color:#fff; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
+  .kc-pass-tg i { font-size:15px; }
+  .kc-pass-open { width:34px; height:34px; border:1px solid #DBEAFE; border-radius:50%; background:#EFF6FF; color:var(--blue); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+  .kc-pass-tg:active, .kc-pass-open:active { transform:scale(.96); }
   .known-client .kc-header span { font-family:var(--font-display); font-weight:700; font-style:italic; font-size:14px; text-transform:uppercase; letter-spacing:0.3px; }
   .known-client .kc-body { padding:16px; }
   .known-client .kc-person { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
@@ -10470,7 +10478,8 @@ async function toggleHistory(plate) {
 
   body.innerHTML = `
     <div class="known-client">
-      <div class="kc-header"><i class="fa-solid fa-user"></i><span>${T.kc_history_card_title}</span></div>
+      <div class="kc-header"><i class="fa-solid fa-user"></i><span>${T.kc_history_card_title}</span>
+        <button type="button" class="kc-close" onclick="closeClientCard()" aria-label="${T.kc_close}"><i class="fa-solid fa-xmark"></i></button></div>
       <div class="kc-body">
         <div class="kc-person">
           <div class="kc-avatar">${escapeHtml(initials)}</div>
@@ -10480,8 +10489,9 @@ async function toggleHistory(plate) {
           </div>
         </div>
         <button type="button" class="kc-action-btn" onclick="openAddServiceModal(${escapeHtml(JSON.stringify(plate))})"><i class="fa-solid fa-plus"></i>${T.kc_add_service_btn}</button>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <button type="button" class="history-toggle" style="flex:1;" onclick="sharePassport(${escapeHtml(JSON.stringify(car.passport_token || ''))})"><i class="fa-solid fa-shield-halved"></i> ${T.kc_passport_btn}</button>
+        <div class="kc-pass-row">
+          <button type="button" class="kc-pass-tg" onclick="sendPassportTg(${escapeHtml(JSON.stringify(plate))}, ${car.telegram_id ? 'true' : 'false'}, ${escapeHtml(JSON.stringify(car.passport_token || ''))})"><i class="fa-brands fa-telegram"></i> ${T.kc_passport_tg_btn}</button>
+          <button type="button" class="kc-pass-open" onclick="sharePassport(${escapeHtml(JSON.stringify(car.passport_token || ''))})" title="${T.kc_passport_btn}" aria-label="${T.kc_passport_btn}"><i class="fa-solid fa-eye"></i></button>
         </div>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button type="button" class="history-toggle" style="flex:1;" onclick="toggleCarEditForm()">${T.kc_edit_car_btn}</button>
@@ -10546,6 +10556,35 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function closeClientCard() {
+  const panel = document.getElementById('clientCardPanel');
+  panel.style.display = 'none';
+  panel.innerHTML = '';
+  openHistoryRow = null;
+  const list = document.getElementById('table-body');
+  if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Паспорт — клиенту в Telegram через бота. Если клиент ещё не подключён
+// к боту, открываем «Поделиться» в Telegram — можно отправить вручную.
+async function sendPassportTg(plate, linked, token) {
+  if (!linked) {
+    if (!token) { showMsg(T.kc_passport_no_token, false); return; }
+    if (!confirm(T.kc_passport_tg_not_linked)) return;
+    const link = window.location.origin + '/passport/' + token;
+    window.open('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(T.kc_passport_btn + ' · ' + plate), '_blank');
+    return;
+  }
+  try {
+    const res = await fetch('/api/passport/send_tg/' + encodeURIComponent(plate), { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) showMsg(T.kc_passport_tg_sent, true);
+    else showMsg(data.error || T.kc_passport_tg_failed, false);
+  } catch (e) {
+    showMsg(T.kc_passport_tg_failed, false);
+  }
 }
 
 function sharePassport(token) {
@@ -10919,7 +10958,7 @@ function guardOnce(names) {
     window[name] = wrapped;
   });
 }
-guardOnce(['submitCar', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarCompletely',
+guardOnce(['submitCar', 'sendPassportTg', 'saveEdit', 'saveCarEdit', 'deleteEntry', 'deleteCarCompletely',
   'payDebt', 'cancelDebtPayment', 'confirmWriteoff', 'submitExpense', 'createRecurringExpense', 'payRecurringExpense', 'deleteRecurringExpenseBtn',
   'saveExpenseEdit', 'deleteExpenseEntry', 'sendBroadcast', 'saveSmsSettings', 'saveNetworkRate', 'saveRateSetup', 'applyRatePrices',
   'createProduct', 'deleteProduct', 'submitRestock', 'submitEditProduct', 'submitTransfer', 'submitShip',
@@ -12719,6 +12758,54 @@ def api_history(plate):
         history = _strip_cost_price(history)
     cross_history = db.get_cross_network_history(plate, g.shop_id)
     return jsonify({"car": car, "history": history, "cross_history": cross_history})
+
+
+@app.route("/api/passport/send_tg/<plate>", methods=["POST"])
+@login_required
+def api_passport_send_tg(plate):
+    """Отправить клиенту ссылку на сервисный паспорт машины через бота.
+    Только машины своей точки; клиент должен быть подключён к боту."""
+    car, _history = db.get_car_history(g.shop_id, plate)
+    if not car:
+        return jsonify({"ok": False, "error": g.T.get("kc_passport_tg_failed", "kc_passport_tg_failed")}), 404
+    if not car.get("telegram_id"):
+        return jsonify({"ok": False, "error": g.T.get("kc_passport_tg_no_client", "kc_passport_tg_no_client")}), 400
+    if not car.get("passport_token"):
+        return jsonify({"ok": False, "error": g.T.get("kc_passport_no_token", "kc_passport_no_token")}), 400
+    origin = (PUBLIC_URL or request.host_url).rstrip("/")
+    link = f"{origin}/passport/{car['passport_token']}"
+    shop = db.get_shop(g.shop_id) or {}
+    lang = "uz" if (shop.get("language") == "uz") else "ru"
+    shop_name = shop.get("shop_name") or "OilBook"
+    car_line = " ".join(x for x in [car.get("car_brand"), car.get("car_model")] if x)
+    if lang == "uz":
+        text = (f"🛡 Avtomobilingiz servis pasporti\n"
+                f"{car['plate_number']}{(' · ' + car_line) if car_line else ''}\n\n"
+                f"Barcha almashtirishlar tarixi «{shop_name}»da. Havolani ochib ko'ring yoki PDF yuklab oling.")
+        btn = "Pasportni ochish"
+    else:
+        text = (f"🛡 Сервисный паспорт вашей машины\n"
+                f"{car['plate_number']}{(' · ' + car_line) if car_line else ''}\n\n"
+                f"Вся история замен в «{shop_name}». Откройте ссылку или скачайте PDF.")
+        btn = "Открыть паспорт"
+    if not BOT_TOKEN:
+        return jsonify({"ok": False, "error": g.T.get("kc_passport_tg_failed", "kc_passport_tg_failed")}), 500
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": car["telegram_id"], "text": text,
+                  "reply_markup": {"inline_keyboard": [[{"text": btn, "url": link}]]}},
+            timeout=10,
+        )
+        ok = resp.ok
+        if not ok:
+            logger.warning(f"Паспорт не отправлен chat_id={car['telegram_id']}: HTTP {resp.status_code} — {resp.text[:300]}")
+    except Exception as e:
+        logger.error(f"Паспорт не отправлен: {e}")
+        ok = False
+    if not ok:
+        return jsonify({"ok": False, "error": g.T.get("kc_passport_tg_failed", "kc_passport_tg_failed")}), 502
+    return jsonify({"ok": True})
 
 
 @app.route("/api/entry_presets")
