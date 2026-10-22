@@ -652,6 +652,9 @@ if ('serviceWorker' in navigator) {
   .reg-link { display:block; text-align:center; margin-top:16px; padding:11px; border:1px solid #2a2e37; border-radius:10px; color:#e6e6e6; font-size:14px; text-decoration:none; }
   .app-link { display:block; text-align:center; margin-top:16px; padding:10px 18px; border-radius:22px; background:rgba(56,189,248,.10); border:1px solid rgba(56,189,248,.30); color:#7DD3FC; font-size:14px; font-weight:600; text-decoration:none; }
   @media (display-mode: standalone) { .app-link { display:none; } }
+  .video-link { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:10px; padding:10px 18px; border-radius:22px; background:rgba(255,0,51,.10); border:1px solid rgba(255,0,51,.35); color:#FF8A9B; font-size:14px; font-weight:600; text-decoration:none; }
+  .video-link i { font-style:normal; width:22px; height:16px; border-radius:5px; background:#FF0033; color:#fff; font-size:9px; display:flex; align-items:center; justify-content:center; }
+  .video-link:hover { background:rgba(255,0,51,.16); }
 </style>
 </head>
 <body>
@@ -674,6 +677,7 @@ if ('serviceWorker' in navigator) {
     <a class="lang-link" href="/login?lang={{ other_lang }}">{{ T.lang_switch }}</a>
   </form>
   <a class="app-link" href="/app?lang={{ lang }}">{{ T.inst_login_link }}</a>
+  <a class="video-link" href="https://youtu.be/4p436_6TxIM" target="_blank" rel="noopener"><i>▶</i>{{ T.login_video_link }}</a>
 
   <div class="box" id="forgotBox" style="display:none;">
     <h1>🔑 {{ T.forgot_title }}</h1>

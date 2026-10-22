@@ -2733,6 +2733,7 @@ RU.update({
     "inst_login": "Войти в OilBook",
     "inst_menu": "Установить приложение",
     "inst_login_link": "📲 Скачать приложение на телефон",
+    "login_video_link": "Видеоурок: как пользоваться OilBook",
 })
 UZ.update({
     "inst_title": "OilBook ilovasi",
@@ -2767,6 +2768,7 @@ UZ.update({
     "inst_login": "OilBook'ga kirish",
     "inst_menu": "Ilovani o'rnatish",
     "inst_login_link": "📲 Ilovani telefonga yuklab olish",
+    "login_video_link": "Videodars: OilBook dan qanday foydalanish",
 })
 
 
