@@ -297,6 +297,7 @@ def init_db():
         _migrate_subscription(conn)
         _migrate_name_aliases(conn)
         _migrate_daily_km(conn)
+        _migrate_client_documents(conn)
         _migrate_course(conn)
         _migrate_registration(conn)
         _migrate_referral(conn)
@@ -7799,3 +7800,221 @@ def _copy_currency(conn, src, dst_id):
                      (src["purchase_usd_cents"], dst_id))
     elif src.get("purchase_price") is not None:
         conn.execute("UPDATE products SET purchase_currency='UZS', purchase_usd_cents=NULL WHERE id=?", (dst_id,))
+
+
+# ======================================================================
+# Мини-приложение клиента (Telegram Mini App): «Мой гараж» и документы.
+# Клиент входит по своему Telegram ID — и видит СВОИ машины из всех точек
+# OilBook (у каждой точки своя строка clients, но Telegram ID один и тот же).
+# Чужие данные сюда не попадают: всё выбирается только по telegram_id.
+# ======================================================================
+
+CLIENT_DOC_KINDS = ("insurance", "inspection", "gas", "tint", "proxy", "other")
+CLIENT_DOC_STAGES = (30, 7, 1)  # за сколько дней до конца срока напоминаем
+CLIENT_DOCS_MAX = 50
+
+
+def _migrate_client_documents(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS client_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            title TEXT,
+            plate TEXT,
+            expires_on TEXT NOT NULL,
+            lang TEXT,
+            notified_stage INTEGER,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_client_docs_tg ON client_documents(telegram_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_client_docs_exp ON client_documents(expires_on)")
+    conn.commit()
+
+
+def _public_shop(shop) -> dict:
+    """Только то, что клиент и так видит в боте по кнопке «О пункте»."""
+    if not shop:
+        return {}
+    return {"id": shop["id"], "name": shop["shop_name"] or "", "phone": shop["phone"] or "",
+            "address": shop["address"] or "", "hours": shop["hours"] or "",
+            "lat": shop["lat"], "lon": shop["lon"]}
+
+
+def miniapp_garage(telegram_id: int) -> dict:
+    """Машины клиента из всех точек OilBook: одна карточка на госномер, даже
+    если машину обслуживали в нескольких точках. Для каждой — оценка «до
+    замены» (по сроку и пробегу) и сервисная книжка без внутренних данных
+    точки (закупочных цен и т.п.)."""
+    today = datetime.now().date()
+    with get_conn() as conn:
+        clients = conn.execute("""
+            SELECT cl.id, cl.full_name, cl.shop_id FROM clients cl
+            JOIN shops s ON s.id = cl.shop_id
+            WHERE cl.telegram_id=? AND s.is_active=1
+        """, (telegram_id,)).fetchall()
+        if not clients:
+            return {"name": None, "cars": [], "shop": None}
+        shops = {}
+        merged = {}
+        for cl in clients:
+            if cl["shop_id"] not in shops:
+                shops[cl["shop_id"]] = conn.execute("SELECT * FROM shops WHERE id=?", (cl["shop_id"],)).fetchone()
+            cars = conn.execute("SELECT * FROM cars WHERE client_id=? AND shop_id=?",
+                                (cl["id"], cl["shop_id"])).fetchall()
+            for car in cars:
+                plate = normalize_plate(car["plate_number"] or "")
+                entry = merged.setdefault(plate, {"plate": plate, "rows": [], "history": []})
+                entry["rows"].append(dict(car))
+                for h in conn.execute("SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC",
+                                      (car["id"],)).fetchall():
+                    h = dict(h)
+                    h["_shop_id"] = car["shop_id"]
+                    h["_passport"] = car["passport_token"]
+                    entry["history"].append(h)
+    result_cars = []
+    for plate, entry in merged.items():
+        history = sorted(entry["history"], key=lambda h: (h.get("change_date") or "", h["id"]), reverse=True)
+        rows = entry["rows"]
+        brand = next((r["car_brand"] for r in rows if r.get("car_brand")), None)
+        model = next((r["car_model"] for r in rows if r.get("car_model")), None)
+        last = history[0] if history else None
+        shop_id = last["_shop_id"] if last else rows[0]["shop_id"]
+        passport = (last or {}).get("_passport") or rows[0].get("passport_token")
+        health = car_health(history, today) if history else {"est_km": None, "oil": None}
+        next_day = _day(last.get("next_change_date")) if last else None
+        km_left = None
+        if last and last.get("next_mileage") and health.get("est_km") is not None:
+            km_left = last["next_mileage"] - health["est_km"]
+        book = []
+        for h in history:
+            items = [{"name": i.get("name"), "brand": i.get("brand"), "qty": i.get("qty"), "unit": i.get("unit")}
+                     for i in _service_items(h)]
+            shop_row = shops.get(h["_shop_id"])
+            book.append({
+                "date": h.get("change_date"), "shop": shop_row["shop_name"] if shop_row else "",
+                "mileage": h.get("mileage"), "service": h.get("service_type"), "oil": h.get("oil_brand"),
+                "filter": bool(h.get("filter_changed")), "items": items, "cost": h.get("cost"),
+                "next_date": h.get("next_change_date"), "next_mileage": h.get("next_mileage"),
+            })
+        result_cars.append({
+            "plate": plate, "brand": brand, "model": model, "passport": passport,
+            "shop": _public_shop(shops.get(shop_id)),
+            "last_date": last.get("change_date") if last else None,
+            "last_mileage": last.get("mileage") if last else None,
+            "next_date": last.get("next_change_date") if last else None,
+            "next_mileage": last.get("next_mileage") if last else None,
+            "days_left": (next_day - today).days if next_day else None,
+            "km_left": km_left, "est_km": health.get("est_km"),
+            "oil_ratio": round(health["oil"], 3) if health.get("oil") is not None else None,
+            "history": book,
+        })
+    # сначала те, кому замена нужна раньше
+    result_cars.sort(key=lambda c: (c["oil_ratio"] is None, -(c["oil_ratio"] or 0)))
+    newest = max(clients, key=lambda c: c["id"])
+    main_shop = result_cars[0]["shop"] if result_cars else _public_shop(shops.get(newest["shop_id"]))
+    return {"name": newest["full_name"], "cars": result_cars, "shop": main_shop}
+
+
+def _clean_doc(kind, title, plate, expires_on):
+    if kind not in CLIENT_DOC_KINDS:
+        return None, "bad_kind"
+    try:
+        d = datetime.strptime(str(expires_on or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None, "bad_date"
+    if d.year < 2000 or d.year > 2100:
+        return None, "bad_date"
+    title = (str(title or "").strip()[:60]) or None
+    plate = normalize_plate(str(plate or ""))[:15] or None
+    return {"kind": kind, "title": title, "plate": plate, "expires_on": d.strftime("%Y-%m-%d")}, None
+
+
+def list_client_documents(telegram_id: int) -> list:
+    today = datetime.now().date()
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, kind, title, plate, expires_on FROM client_documents "
+                            "WHERE telegram_id=? ORDER BY expires_on, id", (telegram_id,)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["days_left"] = (_day(d["expires_on"]) - today).days
+        out.append(d)
+    return out
+
+
+@_serialized
+def save_client_document(telegram_id: int, data: dict, doc_id: int = None, lang: str = None) -> dict:
+    """Добавить или изменить документ клиента. Изменили срок — напоминания
+    начнутся заново (за 30, 7 и 1 день до нового срока)."""
+    doc, err = _clean_doc(data.get("kind"), data.get("title"), data.get("plate"), data.get("expires_on"))
+    if err:
+        return {"ok": False, "error": err}
+    lang = lang if lang in ("ru", "uz") else None
+    with get_conn() as conn:
+        if doc_id:
+            cur = conn.execute("SELECT expires_on FROM client_documents WHERE id=? AND telegram_id=?",
+                               (doc_id, telegram_id)).fetchone()
+            if not cur:
+                return {"ok": False, "error": "not_found"}
+            reset = cur["expires_on"] != doc["expires_on"]
+            conn.execute(f"""UPDATE client_documents SET kind=?, title=?, plate=?, expires_on=?,
+                             lang=COALESCE(?, lang){', notified_stage=NULL' if reset else ''}
+                             WHERE id=? AND telegram_id=?""",
+                         (doc["kind"], doc["title"], doc["plate"], doc["expires_on"], lang, doc_id, telegram_id))
+            new_id = doc_id
+        else:
+            n = conn.execute("SELECT COUNT(*) FROM client_documents WHERE telegram_id=?", (telegram_id,)).fetchone()[0]
+            if n >= CLIENT_DOCS_MAX:
+                return {"ok": False, "error": "too_many"}
+            new_id = conn.execute("INSERT INTO client_documents (telegram_id, kind, title, plate, expires_on, lang) "
+                                  "VALUES (?, ?, ?, ?, ?, ?)",
+                                  (telegram_id, doc["kind"], doc["title"], doc["plate"], doc["expires_on"], lang)).lastrowid
+        conn.commit()
+    return {"ok": True, "id": new_id}
+
+
+@_serialized
+def delete_client_document(telegram_id: int, doc_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM client_documents WHERE id=? AND telegram_id=?", (doc_id, telegram_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def due_client_document_reminders(today=None) -> list:
+    """Документы, по которым пора напомнить: до конца срока осталось 30, 7
+    или 1 день (или меньше, если документ добавили уже поздно), и об этом
+    рубеже ещё не напоминали. Просроченные не трогаем."""
+    today = today or datetime.now().date()
+    horizon = (today + timedelta(days=max(CLIENT_DOC_STAGES))).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM client_documents WHERE expires_on >= ? AND expires_on <= ?",
+                            (today.strftime("%Y-%m-%d"), horizon)).fetchall()
+    due = []
+    for r in rows:
+        d = dict(r)
+        days_left = (_day(d["expires_on"]) - today).days
+        stage = min(s for s in CLIENT_DOC_STAGES if days_left <= s)
+        if d["notified_stage"] is None or stage < d["notified_stage"]:
+            d["days_left"], d["stage"] = days_left, stage
+            due.append(d)
+    return due
+
+
+@_serialized
+def mark_client_document_notified(doc_id: int, stage: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE client_documents SET notified_stage=? WHERE id=?", (stage, doc_id))
+        conn.commit()
+
+
+def client_lang_by_telegram(telegram_id: int) -> str:
+    """Язык клиента — язык точки, к которой он привязан последним."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT s.language FROM clients cl JOIN shops s ON s.id = cl.shop_id
+            WHERE cl.telegram_id=? ORDER BY cl.linked_at DESC, cl.id DESC LIMIT 1
+        """, (telegram_id,)).fetchone()
+    return (row["language"] if row else None) or "ru"

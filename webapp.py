@@ -20128,6 +20128,470 @@ def api_admin_employee_active(employee_id):
     return jsonify({"ok": True})
 
 
+# ---------- Мини-приложение клиента в Telegram (/m) ----------
+# Открывается кнопкой «OilBook» в боте. Логина нет: Telegram сам подписывает
+# данные о пользователе (initData) ключом бота, сервер проверяет подпись —
+# подделать чужой Telegram ID нельзя. Клиент видит только свои машины,
+# историю и свои документы.
+
+TG_INIT_MAX_AGE = 7 * 24 * 3600
+
+
+def _tg_verify_init_data(raw: str):
+    """Проверка подписи Telegram Mini App (core.telegram.org/bots/webapps).
+    Возвращает словарь пользователя или None."""
+    import hmac
+    import hashlib
+    if not raw or not BOT_TOKEN or len(raw) > 4096:
+        return None
+    data = dict(urllib.parse.parse_qsl(raw, keep_blank_values=True))
+    received = data.pop("hash", "")
+    if not received:
+        return None
+    check = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
+    secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    calc = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(calc, received):
+        return None
+    try:
+        if time.time() - int(data.get("auth_date", "0")) > TG_INIT_MAX_AGE:
+            return None
+        user = json.loads(data.get("user") or "{}")
+        user["id"] = int(user["id"])
+    except (ValueError, KeyError, TypeError):
+        return None
+    return user
+
+
+def tg_client_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = _tg_verify_init_data(request.headers.get("X-Telegram-Init-Data") or "")
+        if not user:
+            return jsonify({"ok": False, "error": "tg_auth"}), 401
+        g.tg_id = user["id"]
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def _miniapp_texts(lang):
+    return {k[3:]: v for k, v in i18n.get_texts(lang).items() if k.startswith("ma_")}
+
+
+@app.route("/m")
+def miniapp_page():
+    texts = {"ru": _miniapp_texts("ru"), "uz": _miniapp_texts("uz")}
+    return render_template_string(MINIAPP_PAGE, ma_json=json.dumps(texts, ensure_ascii=False))
+
+
+@app.route("/api/m/garage")
+@tg_client_required
+def api_miniapp_garage():
+    garage = db.miniapp_garage(g.tg_id)
+    garage["docs"] = db.list_client_documents(g.tg_id)
+    garage["lang"] = db.client_lang_by_telegram(g.tg_id) if garage["cars"] else None
+    garage["ok"] = True
+    return jsonify(garage)
+
+
+@app.route("/api/m/documents", methods=["POST"])
+@app.route("/api/m/documents/<int:doc_id>", methods=["PUT"])
+@tg_client_required
+def api_miniapp_save_document(doc_id=None):
+    data = request.get_json(force=True, silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    res = db.save_client_document(g.tg_id, data, doc_id, lang=data.get("lang"))
+    if not res["ok"]:
+        return jsonify(res), (404 if res["error"] == "not_found" else 400)
+    res["docs"] = db.list_client_documents(g.tg_id)
+    return jsonify(res)
+
+
+@app.route("/api/m/documents/<int:doc_id>", methods=["DELETE"])
+@tg_client_required
+def api_miniapp_delete_document(doc_id):
+    if not db.delete_client_document(g.tg_id, doc_id):
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True, "docs": db.list_client_documents(g.tg_id)})
+
+
+MINIAPP_PAGE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>OilBook</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #F1F5F9);
+    --card: var(--tg-theme-bg-color, #FFFFFF);
+    --text: var(--tg-theme-text-color, #0F172A);
+    --hint: var(--tg-theme-hint-color, #64748B);
+    --accent: var(--tg-theme-button-color, #0EA5E9);
+    --accent-text: var(--tg-theme-button-text-color, #FFFFFF);
+    --line: rgba(100, 116, 139, .18);
+    --ok: #16A34A; --warn: #D97706; --bad: #DC2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; }
+  body { padding: 0 0 calc(76px + env(safe-area-inset-bottom)); min-height: 100vh; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 14px 16px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .drop { width: 38px; height: 38px; border-radius: 12px; background: #0B1B3A; display: flex;
+    align-items: center; justify-content: center; flex: none; }
+  .wm { font-weight: 800; font-size: 20px; letter-spacing: -.4px; line-height: 1.1; }
+  .wm .o { color: #38BDF8; }
+  .shopline { font-size: 12.5px; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lang { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
+    padding: 5px 11px; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
+  h2 { font-size: 17px; margin: 4px 0 10px; }
+  .hint { color: var(--hint); font-size: 13px; line-height: 1.45; }
+  .card { background: var(--card); border-radius: 16px; padding: 14px; margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
+  .car { cursor: pointer; }
+  .car-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .plate { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; font-size: 18px;
+    letter-spacing: .5px; border: 2px solid var(--text); border-radius: 7px; padding: 1px 8px; }
+  .model { color: var(--hint); font-size: 13.5px; text-align: right; }
+  .bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 14px 0 8px; }
+  .bar i { display: block; height: 100%; border-radius: 999px; }
+  .left { font-weight: 700; font-size: 15px; }
+  .left.ok { color: var(--ok); } .left.warn { color: var(--warn); } .left.bad { color: var(--bad); }
+  .meta { display: flex; justify-content: space-between; gap: 8px; color: var(--hint); font-size: 12.5px; margin-top: 4px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .btn { flex: 1 1 140px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: none; border-radius: 12px; padding: 11px 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+    background: var(--accent); color: var(--accent-text); text-decoration: none; }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+  .btn.danger { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); }
+  .back { background: none; border: none; color: var(--accent); font-size: 15px; font-weight: 600;
+    padding: 0 0 10px; cursor: pointer; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .kv:last-child { border-bottom: none; }
+  .kv span { color: var(--hint); }
+  .visit { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 12px 0; }
+  .visit-h { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 14px; }
+  .visit ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
+  .visit .hint { font-size: 12.5px; }
+  .doc { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .doc-ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex: none; background: var(--bg); }
+  .doc-b { flex: 1; min-width: 0; }
+  .doc-t { font-weight: 700; font-size: 14.5px; }
+  .doc-s { font-size: 12.5px; font-weight: 700; flex: none; text-align: right; }
+  .doc-s.ok { color: var(--ok); } .doc-s.warn { color: var(--warn); } .doc-s.bad { color: var(--bad); }
+  label.f { display: block; font-size: 12.5px; color: var(--hint); margin: 12px 0 6px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1.5px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
+    padding: 7px 12px; font-size: 13px; cursor: pointer; }
+  .chip.on { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 700; }
+  input, select { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line);
+    background: var(--card); color: var(--text); font-size: 15px; font-family: inherit; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 10px; min-height: 1em; }
+  .empty { text-align: center; padding: 28px 18px; }
+  .empty .big { font-size: 44px; }
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card);
+    border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); z-index: 5; }
+  .nav button { flex: 1; background: none; border: none; color: var(--hint); font-size: 11.5px; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; cursor: pointer; }
+  .nav button b { font-size: 20px; line-height: 1; }
+  .nav button.on { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="drop"><svg width="18" height="21" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1C13 1 2 13.5 2 19.5A11 11 0 0 0 24 19.5C24 13.5 13 1 13 1Z" fill="#0EA5E9"/></svg></div>
+      <div style="min-width:0;">
+        <div class="wm"><span class="o">Oil</span>Book</div>
+        <div class="shopline" id="shopLine"></div>
+      </div>
+    </div>
+    <button class="lang" id="langBtn" onclick="toggleLang()">UZ</button>
+  </div>
+  <div id="view"></div>
+</div>
+<nav class="nav">
+  <button id="nav-garage" class="on" onclick="go('garage')"><b>🚗</b><span id="navGarage"></span></button>
+  <button id="nav-docs" onclick="go('docs')"><b>📄</b><span id="navDocs"></span></button>
+</nav>
+<script>
+const TX = {{ ma_json|safe }};
+const tg = window.Telegram && window.Telegram.WebApp;
+const INIT = (tg && tg.initData) || new URLSearchParams(location.hash.slice(1)).get('tgWebAppData') || '';
+const S = { tab: 'garage', data: null, car: null, doc: null, lang: 'ru' };
+const KINDS = [['insurance', '🛡️'], ['inspection', '🔧'], ['gas', '🔥'], ['tint', '🕶️'], ['proxy', '📝'], ['other', '📄']];
+const KIND_IC = Object.fromEntries(KINDS);
+
+function savedLang() { try { return localStorage.getItem('ma_lang'); } catch (e) { return null; } }
+(function initLang() {
+  let l = savedLang();
+  if (!l) {
+    const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+    l = u && /^uz/.test(u.language_code || '') ? 'uz' : 'ru';
+  }
+  S.lang = l === 'uz' ? 'uz' : 'ru';
+})();
+function T(k) { return (TX[S.lang] && TX[S.lang][k]) || TX.ru[k] || k; }
+function toggleLang() {
+  S.lang = S.lang === 'ru' ? 'uz' : 'ru';
+  try { localStorage.setItem('ma_lang', S.lang); } catch (e) {}
+  render();
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function num(n) { return Number(n || 0).toLocaleString('ru-RU'); }
+function dt(s) { if (!s) return '—'; const p = String(s).slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : s; }
+function haptic() { try { tg && tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch (e) {} }
+
+async function api(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ 'X-Telegram-Init-Data': INIT, 'Content-Type': 'application/json' }, opts.headers || {});
+  const res = await fetch(path, opts);
+  let body = {};
+  try { body = await res.json(); } catch (e) {}
+  if (res.status === 401) throw new Error('auth');
+  return body;
+}
+
+async function load() {
+  document.getElementById('view').innerHTML = `<div class="empty hint">${T('loading')}</div>`;
+  if (!INIT) { S.error = 'auth'; render(); return; }
+  try {
+    const d = await api('/api/m/garage');
+    if (!d.ok) throw new Error('load');
+    S.data = d; S.error = null;
+    if (d.lang && !savedLang()) S.lang = d.lang;
+  } catch (e) { S.error = e.message === 'auth' ? 'auth' : 'load'; }
+  render();
+}
+
+function go(tab) { haptic(); S.tab = tab; S.car = null; S.doc = null; render(); window.scrollTo(0, 0); }
+
+function setBack(on) {
+  if (!tg || !tg.BackButton) return;
+  if (on) tg.BackButton.show(); else tg.BackButton.hide();
+}
+
+function render() {
+  document.getElementById('langBtn').textContent = S.lang === 'ru' ? 'UZ' : 'RU';
+  document.getElementById('navGarage').textContent = T('tab_garage');
+  document.getElementById('navDocs').textContent = T('tab_docs');
+  document.getElementById('nav-garage').classList.toggle('on', S.tab === 'garage');
+  document.getElementById('nav-docs').classList.toggle('on', S.tab === 'docs');
+  const shop = S.data && S.data.shop;
+  document.getElementById('shopLine').textContent = shop && shop.name ? `${T('your_shop')}: ${shop.name}` : '';
+  const v = document.getElementById('view');
+  if (S.error) {
+    v.innerHTML = `<div class="card empty"><div class="big">🔒</div><p class="hint">${S.error === 'auth' ? T('open_from_bot') : T('load_error')}</p>
+      ${S.error === 'auth' ? '' : `<button class="btn" onclick="load()">${T('retry')}</button>`}</div>`;
+    setBack(false);
+    return;
+  }
+  if (!S.data) return;
+  if (S.tab === 'garage') v.innerHTML = S.car ? carView(S.car) : garageView();
+  else v.innerHTML = S.doc ? docForm(S.doc) : docsView();
+  setBack(!!(S.car || S.doc));
+}
+
+function forecast(c) {
+  const r = c.oil_ratio;
+  const due = (r != null && r >= 1) || (c.days_left != null && c.days_left <= 0) || (c.km_left != null && c.km_left <= 0);
+  if (due) return { cls: 'bad', text: T('change_now'), pct: 100, color: 'var(--bad)' };
+  const parts = [];
+  if (c.km_left != null) parts.push(`≈ ${num(c.km_left)} ${T('km')}`);
+  if (c.days_left != null) parts.push(`${c.days_left} ${T('days')}`);
+  if (!parts.length) return { cls: '', text: T('no_forecast'), pct: 0, color: 'var(--line)' };
+  const pct = Math.max(4, Math.min(100, Math.round((r || 0) * 100)));
+  const cls = (r || 0) >= 0.8 ? 'warn' : 'ok';
+  return { cls, text: `${parts.join(' · ')} ${T('until_change')}`, pct, color: cls === 'warn' ? 'var(--warn)' : 'var(--ok)' };
+}
+
+function garageView() {
+  const d = S.data;
+  if (!d.cars.length) {
+    return `<div class="card empty"><div class="big">🚗</div><h2>${T('garage_empty_title')}</h2>
+      <p class="hint">${T('garage_empty')}</p></div>
+      <div class="card"><h2>📄 ${T('docs_title')}</h2><p class="hint">${T('docs_hint')}</p>
+      <div class="btns"><button class="btn" onclick="go('docs')">${T('add_doc')}</button></div></div>`;
+  }
+  const hello = d.name ? `<p class="hint" style="margin:0 0 10px;">${T('hello')}, ${esc(d.name)}!</p>` : '';
+  return hello + d.cars.map((c, i) => {
+    const f = forecast(c);
+    return `<div class="card car" onclick="openCar(${i})">
+      <div class="car-h"><span class="plate">${esc(c.plate)}</span><span class="model">${esc([c.brand, c.model].filter(Boolean).join(' '))}</span></div>
+      <div class="bar"><i style="width:${f.pct}%; background:${f.color};"></i></div>
+      <div class="left ${f.cls}">${f.text}</div>
+      <div class="meta"><span>${T('last_visit')}: ${dt(c.last_date)}</span><span>${esc((c.shop || {}).name || '')}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function openCar(i) { haptic(); S.car = S.data.cars[i]; render(); window.scrollTo(0, 0); }
+
+function unitText(u) { return u === 'l' ? ' ' + T('l') : (u === 'pc' ? ' ' + T('pc') : ''); }
+
+function carView(c) {
+  const f = forecast(c);
+  const shop = c.shop || {};
+  const phone = (shop.phone || '').replace(/[^0-9+]/g, '');
+  const rows = [
+    [T('next_change'), c.next_date ? dt(c.next_date) : '—'],
+    c.next_mileage ? [T('mileage'), `${num(c.next_mileage)} ${T('km')}`] : null,
+    c.est_km ? [T('est_mileage'), `${num(c.est_km)} ${T('km')}`] : null,
+    [T('last_visit'), `${dt(c.last_date)}${c.last_mileage ? ' · ' + num(c.last_mileage) + ' ' + T('km') : ''}`],
+  ].filter(Boolean);
+  const visits = c.history.length ? c.history.map(h => {
+    const items = (h.items || []).filter(i => i.name).map(i => {
+      const qty = i.qty ? ` × ${String(i.qty).replace('.', ',')}${unitText(i.unit)}` : '';
+      return `<li>${esc(i.name)}${i.brand && i.brand !== i.name ? ' — ' + esc(i.brand) : ''}${qty}</li>`;
+    }).join('');
+    return `<div class="visit">
+      <div class="visit-h"><span>${dt(h.date)}</span><span>${h.cost ? num(h.cost) + ' ' + T('sum') : ''}</span></div>
+      <div class="hint">${esc(h.shop || '')}${h.mileage ? ' · ' + num(h.mileage) + ' ' + T('km') : ''}</div>
+      ${items ? `<ul>${items}</ul>` : `<div class="hint">${esc(h.service || '')}${h.oil ? ' — ' + esc(h.oil) : ''}${h.filter ? ', ' + T('filter') : ''}</div>`}
+    </div>`;
+  }).join('') : `<p class="hint">${T('no_history')}</p>`;
+  return `<button class="back" onclick="closeView()">‹ ${T('back')}</button>
+    <div class="card">
+      <div class="car-h"><span class="plate">${esc(c.plate)}</span><span class="model">${esc([c.brand, c.model].filter(Boolean).join(' '))}</span></div>
+      <div class="bar"><i style="width:${f.pct}%; background:${f.color};"></i></div>
+      <div class="left ${f.cls}">${f.text}</div>
+      <div style="margin-top:10px;">${rows.map(r => `<div class="kv"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}</div>
+      <div class="btns">
+        ${c.passport ? `<button class="btn" onclick="sharePassport()">📤 ${T('share_passport')}</button>` : ''}
+        ${c.passport ? `<button class="btn ghost" onclick="openPassport()">${T('open_passport')}</button>` : ''}
+      </div>
+    </div>
+    ${shop.name ? `<div class="card">
+      <div class="kv"><span>${T('your_shop')}</span><b>${esc(shop.name)}</b></div>
+      ${shop.address ? `<div class="kv"><span>📍</span><b style="text-align:right;">${esc(shop.address)}</b></div>` : ''}
+      ${shop.hours ? `<div class="kv"><span>🕘</span><b>${esc(shop.hours)}</b></div>` : ''}
+      <div class="btns">
+        ${phone ? `<a class="btn" href="tel:${esc(phone)}">📞 ${T('call_shop')}</a>` : ''}
+        ${shop.lat && shop.lon ? `<button class="btn ghost" onclick="openRoute(${Number(shop.lat)}, ${Number(shop.lon)})">🧭 ${T('route')}</button>` : ''}
+      </div>
+    </div>` : ''}
+    <div class="card"><h2>📘 ${T('service_book')}</h2>${visits}</div>`;
+}
+
+function passportUrl() { return `${location.origin}/passport/${encodeURIComponent(S.car.passport)}`; }
+function openLink(url) { if (tg && tg.openLink) tg.openLink(url); else window.open(url, '_blank'); }
+function openPassport() { openLink(passportUrl()); }
+function openRoute(lat, lon) { openLink(`https://yandex.uz/maps/?rtext=~${lat},${lon}&rtt=auto`); }
+function sharePassport() {
+  const url = `https://t.me/share/url?url=${encodeURIComponent(passportUrl())}&text=${encodeURIComponent(T('share_text').replace('{plate}', S.car.plate))}`;
+  if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
+}
+
+function docStatus(d) {
+  if (d.days_left < 0) return { cls: 'bad', text: `${T('expired')} ${-d.days_left} ${T('days')}` };
+  if (d.days_left === 0) return { cls: 'bad', text: T('today') };
+  if (d.days_left <= 30) return { cls: 'warn', text: `${T('left')} ${d.days_left} ${T('days')}` };
+  return { cls: 'ok', text: T('until_date').replace('{date}', dt(d.expires_on)) };
+}
+function docName(d) { return d.kind === 'other' && d.title ? d.title : T('doc_' + d.kind); }
+
+function docsView() {
+  const docs = S.data.docs || [];
+  const list = docs.length ? docs.map((d, i) => {
+    const st = docStatus(d);
+    return `<div class="card doc" onclick="editDoc(${i})">
+      <div class="doc-ic">${KIND_IC[d.kind] || '📄'}</div>
+      <div class="doc-b"><div class="doc-t">${esc(docName(d))}</div>
+        <div class="hint">${d.plate ? esc(d.plate) + ' · ' : ''}${dt(d.expires_on)}</div></div>
+      <div class="doc-s ${st.cls}">${st.text}</div>
+    </div>`;
+  }).join('') : `<div class="card empty"><div class="big">📄</div><p class="hint">${T('docs_empty')}</p></div>`;
+  return `<h2>${T('docs_title')}</h2><p class="hint" style="margin-top:0;">${T('docs_hint')}</p>${list}
+    <div class="btns"><button class="btn" onclick="editDoc(-1)">＋ ${T('add_doc')}</button></div>`;
+}
+
+function editDoc(i) {
+  haptic();
+  const plates = (S.data.cars || []).map(c => c.plate);
+  S.doc = i >= 0 ? Object.assign({}, S.data.docs[i]) : { kind: 'insurance', title: '', plate: plates.length === 1 ? plates[0] : '', expires_on: '' };
+  render(); window.scrollTo(0, 0);
+}
+function closeView() { S.car = null; S.doc = null; render(); window.scrollTo(0, 0); }
+function keepForm() {
+  const t = document.getElementById('docTitle'), p = document.getElementById('docPlate'), d = document.getElementById('docDate');
+  if (t) S.doc.title = t.value;
+  if (p) S.doc.plate = p.value;
+  if (d) S.doc.expires_on = d.value;
+}
+function setKind(k) { keepForm(); S.doc.kind = k; render(); }
+
+function docForm(d) {
+  const plates = (S.data.cars || []).map(c => c.plate);
+  if (d.plate && plates.indexOf(d.plate) < 0) plates.push(d.plate);
+  return `<button class="back" onclick="closeView()">‹ ${T('back')}</button>
+    <div class="card">
+      <h2>${d.id ? esc(docName(d)) : T('add_doc')}</h2>
+      <label class="f">${T('doc_kind')}</label>
+      <div class="chips">${KINDS.map(([k, ic]) => `<button class="chip ${d.kind === k ? 'on' : ''}" onclick="setKind('${k}')">${ic} ${T('doc_' + k)}</button>`).join('')}</div>
+      ${d.kind === 'other' ? `<label class="f">${T('doc_title')}</label><input id="docTitle" maxlength="60" placeholder="${T('doc_title_ph')}" value="${esc(d.title || '')}">` : ''}
+      <label class="f">${T('doc_car')}</label>
+      <select id="docPlate"><option value="">${T('doc_no_car')}</option>${plates.map(p => `<option ${p === d.plate ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+      <label class="f">${T('doc_date')}</label>
+      <input id="docDate" type="date" value="${esc(d.expires_on || '')}">
+      <div class="err" id="docErr"></div>
+      <div class="btns">
+        <button class="btn" id="docSave" onclick="saveDoc()">${T('save')}</button>
+        ${d.id ? `<button class="btn danger" onclick="deleteDoc()">${T('delete')}</button>` : `<button class="btn ghost" onclick="closeView()">${T('cancel')}</button>`}
+      </div>
+    </div>`;
+}
+
+async function saveDoc() {
+  keepForm();
+  const d = S.doc;
+  const body = { kind: d.kind, title: (d.title || '').trim(), plate: d.plate || '', expires_on: d.expires_on || '', lang: S.lang };
+  const err = document.getElementById('docErr');
+  if (!body.expires_on) { err.textContent = T('err_date'); return; }
+  if (d.kind === 'other' && !body.title) { err.textContent = T('err_title'); return; }
+  const btn = document.getElementById('docSave');
+  btn.disabled = true;
+  try {
+    const r = await api(d.id ? `/api/m/documents/${d.id}` : '/api/m/documents', { method: d.id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+    if (!r.ok) { err.textContent = r.error === 'too_many' ? T('err_too_many') : (r.error === 'bad_date' ? T('err_date') : T('err_save')); btn.disabled = false; return; }
+    S.data.docs = r.docs; S.doc = null;
+    try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) {}
+    render();
+  } catch (e) { err.textContent = e.message === 'auth' ? T('open_from_bot') : T('err_save'); btn.disabled = false; }
+}
+
+function deleteDoc() {
+  const run = async ok => {
+    if (!ok) return;
+    try {
+      const r = await api(`/api/m/documents/${S.doc.id}`, { method: 'DELETE' });
+      if (r.ok) { S.data.docs = r.docs; S.doc = null; render(); }
+    } catch (e) { document.getElementById('docErr').textContent = T('err_save'); }
+  };
+  if (tg && tg.showConfirm && tg.platform && tg.platform !== 'unknown') tg.showConfirm(T('delete_confirm'), run);
+  else run(confirm(T('delete_confirm')));
+}
+
+if (tg) {
+  try { tg.ready(); tg.expand(); } catch (e) {}
+  if (tg.BackButton) tg.BackButton.onClick(closeView);
+}
+render();
+load();
+</script>
+</body>
+</html>
+"""
+
+
 def run_webapp():
     port = int(os.environ.get("PORT", 8000))
     db.init_db()

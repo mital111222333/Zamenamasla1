@@ -30,7 +30,8 @@ import logging
 from datetime import datetime, time as dtime
 
 from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton,
-                      ReplyKeyboardRemove)
+                      ReplyKeyboardRemove, MenuButtonWebApp, WebAppInfo)
+from telegram.error import Forbidden
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes,
     ConversationHandler, filters, CallbackQueryHandler
@@ -64,6 +65,26 @@ def client_menu(lang: str) -> ReplyKeyboardMarkup:
         [[KeyboardButton(i18n.t("menu_history", lang)), KeyboardButton(i18n.t("menu_shop_info", lang))]],
         resize_keyboard=True
     )
+
+
+def miniapp_url():
+    """Адрес мини-приложения клиента. Telegram открывает Mini App только по
+    https — без PUBLIC_URL на https кнопки просто не показываем."""
+    base = (webapp.PUBLIC_URL or "").rstrip("/")
+    return f"{base}/m" if base.startswith("https://") else None
+
+
+def app_button(lang: str):
+    url = miniapp_url()
+    if not url:
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("bot_app_btn", lang), web_app=WebAppInfo(url=url))]])
+
+
+async def send_app_intro(update: Update, lang: str):
+    markup = app_button(lang)
+    if markup:
+        await update.message.reply_text(i18n.t("bot_app_intro", lang), reply_markup=markup)
 
 
 def get_client_lang(telegram_id: int) -> str:
@@ -169,12 +190,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                        shop=shop_name, plates=plates),
                 reply_markup=client_menu(lang),
             )
+            await send_app_intro(update, lang)
             return ConversationHandler.END
 
     existing = db.get_client_by_telegram_id(user.id)
     if existing:
         lang = get_client_lang(user.id)
         await update.message.reply_text(i18n.t("bot_welcome_back", lang), reply_markup=client_menu(lang))
+        await send_app_intro(update, lang)
         return ConversationHandler.END
 
     await update.message.reply_text(i18n.t("bot_need_link", "ru"))
@@ -613,6 +636,30 @@ def _daytime() -> bool:
     return SEND_FROM_HOUR <= datetime.now().hour < SEND_TO_HOUR
 
 
+async def check_document_reminders(context: ContextTypes.DEFAULT_TYPE):
+    """Сроки документов из мини-приложения: напоминаем за 30, 7 и 1 день.
+    Каждый рубеж — один раз (отмечается после отправки)."""
+    if not _daytime():
+        return
+    due = await asyncio.to_thread(db.due_client_document_reminders)
+    for doc in due:
+        await asyncio.sleep(0.05)
+        lang = doc.get("lang") or await asyncio.to_thread(db.client_lang_by_telegram, doc["telegram_id"])
+        name = doc["title"] if doc["kind"] == "other" and doc.get("title") else i18n.t(f"ma_doc_{doc['kind']}", lang)
+        plate = f" ({doc['plate']})" if doc.get("plate") else ""
+        date = "{2}.{1}.{0}".format(*doc["expires_on"].split("-"))
+        key = "bot_doc_reminder_today" if doc["days_left"] <= 0 else "bot_doc_reminder"
+        text = i18n.t(key, lang, doc=name, plate=plate, date=date, days=doc["days_left"])
+        try:
+            await context.bot.send_message(chat_id=doc["telegram_id"], text=text, reply_markup=app_button(lang))
+        except Forbidden:
+            pass  # клиент остановил бота — не пытаемся каждый час заново
+        except Exception as e:
+            logger.error(f"Не удалось отправить напоминание о документе {doc['id']}: {e}")
+            continue
+        await asyncio.to_thread(db.mark_client_document_notified, doc["id"], doc["stage"])
+
+
 async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     if not _daytime():
         return
@@ -979,11 +1026,23 @@ async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 
+async def setup_menu_button(application):
+    """Кнопка «OilBook» слева от поля ввода — открывает мини-приложение."""
+    url = miniapp_url()
+    if not url:
+        logger.info("Мини-приложение: PUBLIC_URL не на https — кнопка OilBook в меню не включена")
+        return
+    try:
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="OilBook", web_app=WebAppInfo(url=url)))
+    except Exception as e:
+        logger.warning(f"Не удалось включить кнопку OilBook в меню бота: {e}")
+
+
 def main():
     db.init_db()
     webapp.run_webapp_in_thread()  # веб-панель поднимается в этом же процессе
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(setup_menu_button).build()
 
     add_conv = ConversationHandler(
         entry_points=[CommandHandler("add", add_start)],
@@ -1044,6 +1103,7 @@ def main():
     job_queue.run_repeating(check_and_send_installment_reminders, interval=3600, first=90)
     job_queue.run_repeating(check_supplier_debts, interval=3600, first=120)
     job_queue.run_repeating(check_subscription_notices, interval=3600, first=150)
+    job_queue.run_repeating(check_document_reminders, interval=3600, first=180)
     # 1:00 по времени сервера (обычно UTC) — около 6 утра в Узбекистане, тихий час
     job_queue.run_daily(send_daily_backup, time=dtime(hour=1, minute=0))
     # 4:00 UTC = 9:00 по Ташкенту; внутри проверяется, что сегодня понедельник
