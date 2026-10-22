@@ -1905,8 +1905,8 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap"></noscript>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap"></noscript>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <style>
@@ -2997,29 +2997,53 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .staff-btns button.del { color:#B3241C; border-color:#F5C2BE; background:#FDECEA; }
 
   /* ---------- Обучение: карта курса ---------- */
-  .course-wrap { background:#0A2350; color:#fff; border-radius:22px; padding:18px 16px 22px; position:relative; overflow:hidden; }
-  .course-sub { font-size:13px; font-weight:700; color:#9CC4FF; }
-  .course-head { font-size:22px; font-weight:800; line-height:1.2; margin:4px 0 2px; }
-  .course-note { font-size:12.5px; color:#C9D8F2; margin-top:6px; }
-  .course-map { position:relative; margin:14px auto 0; max-width:520px; }
+  /* дизайн «Dala» (DESIGN.md): чёрная пустота, один фиолетовый акцент, янтарные подписи, Inter 400/300 */
+  .course-wrap { --iris:#8052ff; --iris-2:#a98bff; --saffron:#ffb829; --ash:#9a9a9a; --silver:#bdbdbd; --hair:rgba(255,255,255,.12); --hair-2:rgba(255,255,255,.07);
+    background:#000; color:#fff; border-radius:24px; padding:34px 22px 40px; position:relative; overflow:hidden;
+    font-family:"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight:300; font-feature-settings:"ss01" on; -webkit-font-smoothing:antialiased; }
+  .course-wrap > *:not(.dala-fx) { position:relative; z-index:1; }
+  .course-top { position:relative; margin:-34px -22px 0; padding:34px 22px 10px; min-height:220px; }
+  .course-top > *:not(.dala-fx) { position:relative; z-index:1; max-width:620px; }
+  .course-sub { font-size:13px; font-weight:600; color:var(--saffron); text-transform:uppercase; letter-spacing:.025em; }
+  .course-head { font-size:clamp(32px, 5.4vw, 64px); font-weight:400; line-height:1.04; letter-spacing:-.04em; margin:12px 0 0; max-width:640px; }
+  .course-note { font-size:15px; color:var(--silver); margin-top:12px; }
+  .course-prog { display:flex; align-items:center; gap:12px; margin-top:22px; max-width:420px; font-size:12px; font-weight:600; color:var(--ash); text-transform:uppercase; letter-spacing:.025em; font-variant-numeric:tabular-nums; }
+  .course-prog i { flex:1; height:2px; background:var(--hair); position:relative; }
+  .course-prog i b { position:absolute; inset:0 auto 0 0; background:var(--iris); }
+  .course-map { position:relative; margin:30px auto 0; max-width:520px; }
   .course-map svg.course-path { position:absolute; left:0; top:0; pointer-events:none; }
-  .cnode { position:absolute; width:48px; height:48px; margin-left:-24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; text-decoration:none; border:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .cnode.done { background:#15A35B; color:#fff; }
-  .cnode.open { background:#1E3F7A; color:#CFE0FF; }
-  .cnode.cur { width:64px; height:64px; margin-left:-32px; background:#fff; color:#1463E6; box-shadow:0 0 0 6px #1FB5F2; font-size:22px; }
-  .cnode .cscore { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); font-size:11px; font-weight:800; color:#7EE2AE; white-space:nowrap; }
-  .ccard { position:absolute; width:140px; box-sizing:border-box; background:#fff; color:#0A2350; border-radius:14px; padding:10px 12px; box-shadow:0 8px 20px rgba(0,0,0,0.25); display:flex; flex-direction:column; gap:6px; }
-  .ccard .cc-meta { font-size:11px; font-weight:800; color:#1463E6; }
-  .ccard .cc-title { font-size:13.5px; font-weight:800; line-height:1.25; }
-  .ccard a { display:block; background:#1463E6; color:#fff; text-decoration:none; text-align:center; border-radius:10px; padding:9px 0; font-weight:800; font-size:13px; }
-  .course-list { margin:14px auto 0; max-width:520px; display:flex; flex-direction:column; gap:6px; }
-  .course-row { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.06); border-radius:12px; padding:10px 12px; color:#fff; text-decoration:none; font-size:14px; font-weight:600; }
-  .course-row b { width:26px; height:26px; border-radius:8px; background:#1E3F7A; display:flex; align-items:center; justify-content:center; font-size:12px; flex:none; }
-  .course-row.done b { background:#15A35B; }
-  .course-row span.cr-t { flex:1; min-width:0; }
-  .course-row span.cr-s { font-size:12px; font-weight:800; color:#7EE2AE; }
+  .cnode { position:absolute; width:46px; height:46px; margin-left:-23px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:400; font-size:16px; text-decoration:none; cursor:pointer; -webkit-tap-highlight-color:transparent; font-variant-numeric:tabular-nums; transition:border-color .2s, color .2s; }
+  .cnode.done { background:#000; color:#fff; border:1px solid var(--iris); }
+  .cnode.open { background:#000; color:var(--ash); border:1px solid var(--hair); }
+  .cnode.open:hover, .cnode.done:hover { border-color:var(--iris-2); color:#fff; }
+  .cnode.cur { width:64px; height:64px; margin-left:-32px; background:var(--iris); color:#fff; border:0; box-shadow:0 0 0 8px rgba(128,82,255,.18), 0 0 40px rgba(128,82,255,.45); font-size:22px; }
+  .cnode .cscore { position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); font-size:11px; font-weight:600; color:var(--saffron); white-space:nowrap; letter-spacing:.025em; }
+  .ccard { position:absolute; width:150px; box-sizing:border-box; background:#000; color:#fff; border:1px solid var(--hair); border-radius:24px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .ccard .cc-meta { font-size:11px; font-weight:600; color:var(--saffron); text-transform:uppercase; letter-spacing:.025em; }
+  .ccard .cc-title { font-size:15px; font-weight:400; line-height:1.25; letter-spacing:-.01em; }
+  .ccard a { display:block; background:var(--iris); color:#fff; text-decoration:none; text-align:center; border-radius:24px; padding:11px 0; font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.025em; }
+  .ccard a:hover { background:#6d3ff5; }
+  .course-list { margin:38px auto 0; max-width:620px; display:flex; flex-direction:column; border-top:1px solid var(--hair-2); }
+  .course-row { display:flex; align-items:center; gap:16px; padding:16px 4px; color:#fff; text-decoration:none; font-size:16px; font-weight:300; border-bottom:1px solid var(--hair-2); transition:padding .2s; }
+  .course-row:hover { padding-left:10px; }
+  .course-row:hover span.cr-t { color:#fff; }
+  .course-row b { width:28px; flex:none; font-size:13px; font-weight:600; color:var(--ash); font-variant-numeric:tabular-nums; letter-spacing:.025em; }
+  .course-row.done b { color:var(--iris-2); }
+  .course-row span.cr-t { flex:1; min-width:0; color:#e6e6e6; }
+  .course-row span.cr-s { font-size:12px; font-weight:600; color:var(--saffron); letter-spacing:.025em; }
+  .course-bonus { display:block; margin:46px auto 0; max-width:620px; text-decoration:none; color:#fff; border:1px solid var(--hair); border-radius:24px; padding:26px 22px; position:relative; overflow:hidden; transition:border-color .2s; }
+  .course-bonus:hover { border-color:rgba(128,82,255,.7); }
+  .course-bonus > *:not(.dala-fx) { position:relative; z-index:1; }
+  .course-bonus .cb-tag { display:block; font-size:12px; font-weight:600; color:var(--saffron); text-transform:uppercase; letter-spacing:.025em; }
+  .course-bonus .cb-t { display:block; font-size:clamp(24px, 3.4vw, 36px); font-weight:400; line-height:1.1; letter-spacing:-.04em; margin:10px 0 8px; max-width:420px; }
+  .course-bonus .cb-d { display:block; font-size:15px; color:var(--silver); max-width:400px; }
+  .course-bonus .cb-foot { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px; }
+  .course-bonus .cb-btn { background:var(--iris); color:#fff; border-radius:24px; padding:11px 18px; font-size:12.5px; font-weight:600; text-transform:uppercase; letter-spacing:.025em; }
+  .course-bonus .cb-m { font-size:12px; font-weight:600; color:var(--ash); text-transform:uppercase; letter-spacing:.025em; }
+  @media (max-width:560px) { .course-wrap { padding:26px 16px 30px; } .course-top { margin:-26px -16px 0; padding:26px 16px 10px; min-height:0; } }
 """ + HELP_CSS + """
 </style>
+<script src="/static/course/dala-fx.js?v=5" defer></script>
 </head>
 <body>
 <div class="speedline"></div>
@@ -3480,11 +3504,15 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
 
   <div id="view-course" style="display:none;">
     <div class="course-wrap">
-      <div class="course-sub">{{ T.course_sub }}</div>
-      <div class="course-head" id="courseHead">&nbsp;</div>
-      {% if lang != 'uz' %}<div class="course-note">{{ T.course_lang_note }}</div>{% endif %}
+      <div class="course-top" id="courseTop">
+        <div class="course-sub">{{ T.course_sub }}</div>
+        <div class="course-head" id="courseHead">&nbsp;</div>
+        {% if lang != 'uz' %}<div class="course-note">{{ T.course_lang_note }}</div>{% endif %}
+        <div class="course-prog" id="courseProg" hidden><span id="courseProgN"></span><i><b id="courseProgBar"></b></i></div>
+      </div>
       <div class="course-map" id="courseMap"></div>
       <div class="course-list" id="courseList"></div>
+      <div id="courseBonus"></div>
     </div>
   </div>
 
@@ -4607,8 +4635,8 @@ async function loadCourse() {
     donePath += ' C' + a.x + ' ' + my + ', ' + b.x + ' ' + my + ', ' + b.x + ' ' + b.y;
   }
   let html = '<svg class="course-path" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">'
-    + '<path d="' + path + '" fill="none" stroke="#1E3F7A" stroke-width="12" stroke-linecap="round"/>'
-    + (curIdx > 0 ? '<path d="' + donePath + '" fill="none" stroke="#1FB5F2" stroke-width="12" stroke-linecap="round"/>' : '')
+    + '<path d="' + path + '" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1.5" stroke-dasharray="2 7" stroke-linecap="round"/>'
+    + (curIdx > 0 ? '<path d="' + donePath + '" fill="none" stroke="#8052ff" stroke-width="2" stroke-linecap="round"/>' : '')
     + '</svg>';
   mods.forEach((m, i) => {
     const p = pts[i];
@@ -4625,14 +4653,35 @@ async function loadCourse() {
     const toRight = (k === 2 || k === 3);
     const CW = Math.min(140, Math.round(W * 0.4));
     const left = toRight ? Math.min(p.x + 40, W - CW - 4) : Math.max(p.x - 40 - CW, 4);
-    html += '<div class="ccard" style="left:' + left + 'px; top:' + (p.y - 40) + 'px; width:' + CW + 'px">'
+    html += '<div class="ccard" style="left:' + left + 'px; top:' + (p.y - 58) + 'px; width:' + CW + 'px">'
       + '<span class="cc-meta">' + cur.n + ' · ' + cur.mins + ' ' + T.course_min + '</span>'
       + '<span class="cc-title">' + escapeHtml(cur.title) + '</span>'
       + '<a href="/course/' + cur.n + '">' + (cur.opened ? T.course_continue : T.course_start) + '</a></div>';
   }
   map.innerHTML = html;
-  list.innerHTML = mods.map(m => '<a class="course-row' + (m.passed ? ' done' : '') + '" href="/course/' + m.n + '"><b>' + m.n + '</b><span class="cr-t">' + escapeHtml(m.title) + '</span>'
+  list.innerHTML = mods.map(m => '<a class="course-row' + (m.passed ? ' done' : '') + '" href="/course/' + m.n + '"><b>' + String(m.n).padStart(2, '0') + '</b><span class="cr-t">' + escapeHtml(m.title) + '</span>'
     + (m.best != null ? '<span class="cr-s">' + m.best + '/10</span>' : '') + '</a>').join('');
+  const prog = document.getElementById('courseProg');
+  if (prog) {
+    prog.hidden = false;
+    document.getElementById('courseProgN').textContent = done + ' / ' + mods.length;
+    document.getElementById('courseProgBar').style.width = Math.round(done * 100 / mods.length) + '%';
+  }
+  const bonusBox = document.getElementById('courseBonus');
+  const b = d.bonus;
+  if (bonusBox && b) {
+    bonusBox.innerHTML = '<a class="course-bonus" id="courseBonusCard" href="/course/' + b.n + '">'
+      + '<span class="cb-tag">' + escapeHtml(T.course_bonus_tag) + (b.passed ? ' · ' + b.best + '/10' : '') + '</span>'
+      + '<span class="cb-t">' + escapeHtml(b.title) + '</span>'
+      + '<span class="cb-d">' + escapeHtml(T.course_bonus_desc) + '</span>'
+      + '<span class="cb-foot"><span class="cb-btn">' + (b.opened ? T.course_continue : T.course_start) + '</span>'
+      + '<span class="cb-m">' + b.mins + ' ' + T.course_min + '</span></span></a>';
+    if (window.DalaFX) DalaFX.attach(document.getElementById('courseBonusCard'), { brain: true, seed: 5, cx: 0.86, r: 0.12 });
+  }
+  if (window.DalaFX) {
+    DalaFX.attach(map.closest('.course-wrap'), { brain: false, seed: 3 });
+    DalaFX.attach(document.getElementById('courseTop'), { brain: true, seed: 11 });
+  }
 }
 
 // Данные на экране не должны «застревать»: если приложение было свёрнуто
@@ -12377,10 +12426,45 @@ COURSE_MODULES = [
     (12, "Shoxobchani reklama qilish", 45),
 ]
 COURSE_EMPLOYEE_MAX = 7
+# Бонус-урок (доступен всем, вне основной карты): электромобили и гибриды.
+COURSE_BONUS = (13, "Elektromobil reduktorlari uchun moylar", 195)
+COURSE_BONUS_FILE = "bonus-ev.html"
 
 
 def _course_max() -> int:
     return COURSE_EMPLOYEE_MAX if g.is_employee else len(COURSE_MODULES)
+
+
+def _course_allowed(n: int) -> bool:
+    return 1 <= n <= _course_max() or n == COURSE_BONUS[0]
+
+
+# Дизайн «Dala» (DESIGN.md): уроки написаны в старой сине-голубой палитре.
+# Перекрашиваем их на лету (жёсткие цвета в CSS/SVG) и снижаем жирность
+# шрифта; остальное делает общий static/course/dala.css.
+_DALA_COLORS = {
+    "#1463E6": "#8052FF", "#1F8BEA": "#8052FF", "#1FB5F2": "#A98BFF", "#0A2A5E": "#34343E",
+    "#15A35B": "#2FBF9F", "#F2A20C": "#FFB829", "#E5484D": "#FF6B6B", "#9DB4D6": "#55555F",
+    "#0A2350": "#FFFFFF", "#6B7F9E": "#9A9A9A", "#3E5479": "#BDBDBD", "#E8F0FC": "#FFFFFF",
+    "#B9C9E2": "#BDBDBD", "#8CA0C0": "#9A9A9A", "#22396A": "#2A2A32", "#16305F": "#18181E",
+    "#11234A": "#0C0C10", "#0A1730": "#000000", "#E3EEFD": "#18181E", "#D9E4F2": "#2A2A32",
+    "#EEF4FB": "#000000",
+}
+_DALA_COLOR_RE = re.compile("|".join(_DALA_COLORS), re.I)
+_DALA_WEIGHT = {"900": "400", "800": "500", "700": "500"}
+_DALA_WEIGHT_RE = re.compile(r"font-weight:\s*(900|800|700)")
+_DALA_HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
+              '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+              '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap">'
+              '<link rel="stylesheet" href="/static/course/dala.css?v=2">')
+_DALA_SCRIPT = '<script src="/static/course/dala-fx.js?v=5" defer></script>'
+
+
+def _dala_lesson(html: str) -> str:
+    html = _DALA_COLOR_RE.sub(lambda m: _DALA_COLORS[m.group(0).upper()], html)
+    html = _DALA_WEIGHT_RE.sub(lambda m: "font-weight:" + _DALA_WEIGHT[m.group(1)], html)
+    html = html.replace("<body>", '<body class="ob-les">', 1)
+    return html
 
 
 def _course_user_key() -> str:
@@ -12428,21 +12512,70 @@ _COURSE_HOOK = """<script>
 })();
 </script>"""
 
+# Бонус-урок — самостоятельное мини-приложение со своим тестом: результат
+# итогового теста (из его localStorage) пересчитываем в баллы из 10.
+_COURSE_BONUS_HOOK = """<script>
+(function () {
+  var M = %d, L10 = %s, KEY = 'ev-oil-course-uz-v1', sent = null;
+  function report() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY) || '{}'), done = s.done || {};
+      var fin = (window.L || []).filter(function (l) { return l.final; })[0];
+      if (!fin || done[fin.id] == null) return;
+      var score = Math.round(done[fin.id] * 10 / fin.quiz.length);
+      if (score === sent) return;
+      sent = score;
+      fetch('/api/course/progress', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: M, event: 'quiz', score: score }) });
+    } catch (e) {}
+  }
+  try {
+    fetch('/api/course/progress', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: M, event: 'open' }) });
+    var orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) { orig.apply(this, arguments); if (k === KEY) report(); };
+  } catch (e) {}
+  function fix() {
+    var bar = document.querySelector('.topbar-in');
+    if (bar && !document.getElementById('obBackEv')) {
+      var a = document.createElement('a');
+      a.id = 'obBackEv'; a.href = '/?tab=course'; a.textContent = '\\u2190 ' + L10.back;
+      var menu = document.getElementById('menuBtn');
+      bar.insertBefore(a, menu || null);
+    }
+    report();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fix); else fix();
+})();
+</script>"""
+
+
+def _inject(html: str, head: str, tail: str) -> str:
+    i = html.find("</head>")
+    html = html[:i] + head + html[i:] if i != -1 else head + html
+    i = html.rfind("</body>")
+    return html[:i] + tail + html[i:] if i != -1 else html + tail
+
 
 @app.route("/course/<int:n>")
 @login_required
 def course_page(n):
-    if n < 1 or n > _course_max():
+    if not _course_allowed(n):
         return redirect("/?tab=course")
-    path = os.path.join(COURSE_DIR, "modul-%d.html" % n)
+    bonus = n == COURSE_BONUS[0]
+    path = os.path.join(COURSE_DIR, COURSE_BONUS_FILE if bonus else "modul-%d.html" % n)
     if not os.path.isfile(path):
         return redirect("/?tab=course")
     with open(path, encoding="utf-8") as f:
         html = f.read()
-    labels = json.dumps({"back": g.T["tab_course"], "next": g.T["course_next"], "map": g.T["course_to_map"]})
-    hook = _COURSE_HOOK % (n, _course_max(), labels)
-    i = html.rfind("</body>")
-    html = html[:i] + hook + html[i:] if i != -1 else html + hook
+    if bonus:
+        hook = _COURSE_BONUS_HOOK % (n, json.dumps({"back": g.T["tab_course"]}))
+    else:
+        html = _dala_lesson(html)
+        labels = json.dumps({"back": g.T["tab_course"], "next": g.T["course_next"], "map": g.T["course_to_map"]})
+        hook = _COURSE_HOOK % (n, _course_max(), labels)
+    html = _inject(html, _DALA_HEAD, _DALA_SCRIPT + hook)
     return Response(html, mimetype="text/html")
 
 
@@ -12455,7 +12588,11 @@ def api_course():
         p = prog.get(n) or {}
         mods.append({"n": n, "title": title, "mins": mins, "opened": bool(p.get("opened")),
                      "best": p.get("best"), "passed": bool(p.get("passed"))})
-    return jsonify({"ok": True, "modules": mods})
+    n, title, mins = COURSE_BONUS
+    p = prog.get(n) or {}
+    bonus = {"n": n, "title": title, "mins": mins, "opened": bool(p.get("opened")),
+             "best": p.get("best"), "passed": bool(p.get("passed"))}
+    return jsonify({"ok": True, "modules": mods, "bonus": bonus})
 
 
 @app.route("/api/course/progress", methods=["POST"])
@@ -12466,7 +12603,7 @@ def api_course_progress():
         n = int(data.get("module"))
     except (TypeError, ValueError):
         return jsonify({"ok": False, "error": "module"}), 400
-    if n < 1 or n > _course_max():
+    if not _course_allowed(n):
         return jsonify({"ok": False, "error": "module"}), 403
     event = data.get("event")
     score = None
@@ -14710,8 +14847,8 @@ if ('serviceWorker' in navigator) {
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap"></noscript>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap"></noscript>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <style>
@@ -18053,7 +18190,7 @@ DISPLAY_PAGE = """
 <title>{{ T.app_title }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
   * { box-sizing: border-box; margin:0; padding:0; }
   /* Светлая тема: голубой фон, тёмно-синий текст, белые плашки; украшения
@@ -19139,7 +19276,7 @@ SUB_PAGE = r"""<!DOCTYPE html>
 <title>{{ T.sub_title }} · OilBook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
 :root { --line:#E3E8F0; --text:#0B1F3A; --muted:#5B6B82; --blue:#1D6FE0; --blue-bg:#F0F6FF; --green:#0E6B3E; --green-bg:#E3F4EA;
@@ -19440,7 +19577,7 @@ REFERRAL_PAGE = r"""<!DOCTYPE html>
 <title>{{ T.ref_title }} · OilBook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <style>
 :root { --line:#E3E8F0; --text:#0B1F3A; --muted:#5B6B82; --blue:#1D6FE0; --blue-bg:#F0F6FF; --green:#0E6B3E; --green-bg:#E3F4EA;

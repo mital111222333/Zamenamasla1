@@ -1,0 +1,198 @@
+/* =========================================================
+   OilBook taʼlimi — «Dala» dizayni (DESIGN.md asosida)
+   Qora fon, yagona binafsha tugma (#8052ff), amber yorliqlar
+   (#ffb829), Inter: sarlavhalar 400, matn 300.
+   12 ta modul (body.ob-les) va bonus dars (body.ob-ev) uchun.
+   ========================================================= */
+
+:root, :root[data-theme="dark"], :root[data-theme="light"] {
+  --void:#000000; --iris:#8052ff; --iris-2:#a98bff; --saffron:#ffb829; --verdant:#15846e;
+  --ash:#9a9a9a; --silver:#bdbdbd; --hair:rgba(255,255,255,.12); --hair-2:rgba(255,255,255,.07);
+  --dala-font:"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme:dark;
+}
+
+html, body { background:#000 !important; }
+body { color:#fff; font-family:var(--dala-font) !important; font-weight:300; font-feature-settings:"ss01" on; -webkit-font-smoothing:antialiased; }
+::selection { background:rgba(128,82,255,.45); color:#fff; }
+:focus-visible { outline:2px solid var(--iris-2) !important; outline-offset:2px; }
+
+/* ---------- uchburchak zarrachalar foni ---------- */
+.dala-fx { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+
+/* =========================================================
+   1–12 MODULLAR
+   ========================================================= */
+body.ob-les {
+  --ink:#ffffff; --ink-2:#bdbdbd; --muted:#9a9a9a; --bg:#000000; --card:#0c0c10;
+  --line:rgba(255,255,255,.12); --blue:#8052ff; --cyan:#a98bff; --soft:rgba(128,82,255,.14);
+  --red:#ff6b6b; --amber:#ffb829; --green:#2fbf9f; --grad:#8052ff; --font:var(--dala-font);
+  font-size:17px; line-height:1.6;
+}
+.ob-les p, .ob-les li { font-weight:300; }
+.ob-les b, .ob-les strong { font-weight:500; }
+.ob-les a:not([class]) { color:var(--saffron); }
+
+/* yuqori panel: qora, ingichka chiziq bilan */
+.ob-les .bar { background:rgba(0,0,0,.92) !important; border-bottom:1px solid var(--hair-2) !important; }
+.ob-les .brand-word { font-family:var(--dala-font) !important; font-weight:500 !important; letter-spacing:-.04em; }
+.ob-les .brand-word .o { background:none !important; -webkit-background-clip:border-box; background-clip:border-box; color:var(--iris-2) !important; }
+.ob-les .brand-word .b { color:#fff !important; }
+.ob-les .crumb { border-left-color:var(--hair) !important; color:var(--ash); }
+.ob-les .crumb b { font-weight:400; color:#fff; }
+.ob-les .progress { background:var(--iris) !important; height:2px; }
+.ob-les .toc a { background:transparent !important; color:var(--ash) !important; border:1px solid var(--hair-2);
+  text-transform:uppercase; letter-spacing:.025em; font-size:12px; font-weight:600; }
+.ob-les .toc a.on { color:#fff !important; border-color:rgba(128,82,255,.7); background:rgba(128,82,255,.16) !important; }
+#obBack { background:var(--iris) !important; border-radius:24px !important; text-transform:uppercase; letter-spacing:.025em;
+  font-size:12.5px !important; font-weight:600 !important; padding:9px 14px !important; font-family:var(--dala-font); }
+
+/* hero: qora «bo'shliq», o'ngda yulduz turkumi */
+.ob-les .hero { background:#000 !important; color:#fff; border-bottom:1px solid var(--hair-2); }
+.ob-les .hero::after { display:none !important; }
+.ob-les .hero .wrap { padding-top:56px; padding-bottom:56px; }
+.ob-les .mod-tag { background:transparent !important; padding:0 !important; color:var(--saffron); text-transform:uppercase;
+  letter-spacing:.025em; font-size:13px; font-weight:600 !important; }
+.ob-les .hero h1 { font-weight:400 !important; font-size:clamp(38px,8vw,78px) !important; line-height:1.02 !important;
+  letter-spacing:-.04em !important; max-width:720px; }
+.ob-les .hero .lead { color:var(--silver); opacity:1 !important; font-weight:300; font-size:18px; max-width:520px; }
+.ob-les .meta span { background:transparent !important; border:1px solid var(--hair); border-radius:9999px !important; color:var(--silver); font-weight:400 !important; }
+.ob-les .formula-hero { background:transparent !important; border:1px solid var(--hair); border-radius:24px !important; }
+.ob-les .fh { background:transparent !important; color:#fff !important; border:1px solid var(--hair); font-weight:400 !important; }
+.ob-les .fh small { color:var(--ash) !important; }
+.ob-les .fop { color:var(--saffron); font-weight:300 !important; }
+
+/* kartalar: fon yo'q, faqat ingichka chiziq */
+.ob-les .goals, .ob-les .part-card { background:transparent !important; box-shadow:none !important;
+  border:1px solid var(--hair-2) !important; border-radius:24px !important; }
+.ob-les .goals { margin-top:24px; }
+.ob-les .part-card { padding:30px 22px; }
+.ob-les section.part { padding-top:48px; }
+.ob-les .pn { background:transparent !important; border:1px solid rgba(255,184,41,.5); color:var(--saffron) !important; font-weight:500 !important; border-radius:9999px !important; }
+.ob-les h1, .ob-les h2, .ob-les h3, .ob-les h4 { font-weight:400 !important; color:#fff; }
+.ob-les .part h2 { font-size:clamp(28px,5vw,42px) !important; line-height:1.08 !important; letter-spacing:-.04em !important; }
+.ob-les .part h3 { font-size:24px !important; letter-spacing:-.02em; }
+.ob-les .goals h2, .ob-les .done-card h2 { letter-spacing:-.03em; }
+.ob-les .kicker { font-weight:300 !important; font-size:21px !important; color:#fff !important; letter-spacing:-.01em; }
+.ob-les .who span { background:transparent !important; border:1px solid var(--hair); color:var(--saffron) !important; text-transform:uppercase; letter-spacing:.025em; font-weight:600 !important; }
+.ob-les .goals li i { background:transparent !important; border:1px solid var(--hair); color:var(--saffron) !important; font-weight:500 !important; border-radius:9999px; }
+
+/* rasm/sxema maydoni */
+.ob-les .fig { background:rgba(255,255,255,.025) !important; border:1px solid var(--hair-2); border-radius:24px !important; }
+.ob-les .fig-t { font-weight:600 !important; text-transform:uppercase; letter-spacing:.025em; font-size:13px !important; color:var(--saffron) !important; }
+.ob-les .ex { background:transparent !important; border:1px solid rgba(255,184,41,.4); color:var(--saffron) !important; }
+
+/* eslatmalar: fon o'rniga chap chiziq */
+.ob-les .note { background:transparent !important; border:1px solid var(--hair-2) !important; border-left:2px solid var(--iris) !important; border-radius:4px 18px 18px 4px !important; }
+.ob-les .note.case { border-left-color:var(--green) !important; }
+.ob-les .note.warn { border-left-color:var(--red) !important; }
+.ob-les .note.tip  { border-left-color:var(--iris-2) !important; }
+.ob-les .note.app  { border-left-color:var(--saffron) !important; }
+.ob-les .note b { font-weight:500 !important; }
+
+/* tugmalar: yagona binafsha «tabletka» */
+.ob-les .btn { background:var(--iris) !important; color:#fff !important; border-radius:24px !important; text-transform:uppercase;
+  letter-spacing:.025em; font-size:14px !important; font-weight:600 !important; padding:14px 20px !important; }
+.ob-les .btn:hover { background:#6d3ff5 !important; }
+.ob-les .btn.white { background:transparent !important; color:#fff !important; border:1px solid var(--hair) !important; }
+
+/* katta raqamli bloklar: binafsha to'ldirish o'rniga chiziq */
+.ob-les .total, .ob-les .result { background:transparent !important; border:1px solid rgba(128,82,255,.55); border-radius:24px !important; color:#fff !important; }
+.ob-les .total b, .ob-les .result b { font-weight:400 !important; letter-spacing:-.04em; color:#fff; }
+.ob-les .big-num b { color:#fff !important; font-weight:400 !important; letter-spacing:-.04em; }
+.ob-les .mp .a { background:rgba(128,82,255,.16) !important; border:1px solid rgba(128,82,255,.5); }
+
+/* test */
+.ob-les .q, .ob-les .case-card, .ob-les .myth { background:transparent !important; border:1px solid var(--hair-2); border-radius:24px !important; }
+.ob-les .q-n { color:var(--saffron) !important; text-transform:uppercase; letter-spacing:.025em; font-weight:600 !important; }
+.ob-les .q-t { font-weight:400 !important; font-size:18px !important; }
+.ob-les .opt, .ob-les .can button, .ob-les .choice button { background:transparent !important; border:1px solid var(--hair) !important; border-radius:16px !important; font-weight:300 !important; }
+.ob-les .opt:hover:not([disabled]), .ob-les .can button:hover:not([disabled]) { border-color:var(--iris-2) !important; }
+.ob-les .opt.ok, .ob-les .can button.ok { border-color:var(--green) !important; background:rgba(47,191,159,.1) !important; }
+.ob-les .opt.no, .ob-les .can button.no { border-color:var(--red) !important; background:rgba(255,107,107,.08) !important; }
+.ob-les .choice button[aria-pressed="true"] { background:var(--iris) !important; border-color:var(--iris) !important; color:#fff; }
+
+/* maydonlar */
+.ob-les input, .ob-les textarea, .ob-les select { background:#0b0b0e !important; border:1px solid var(--hair) !important; border-radius:14px !important; color:#fff !important; font-weight:400 !important; }
+.ob-les input:focus, .ob-les textarea:focus { border-color:var(--iris) !important; }
+
+/* qolgan «karta»lar — umumiy yumshatish */
+.ob-les .tl, .ob-les .leak, .ob-les .fn, .ob-les .type, .ob-les .sd, .ob-les .fcard, .ob-les .cell, .ob-les .add,
+.ob-les .explain, .ob-les .bubble, .ob-les .task li, .ob-les .req { border-radius:18px; }
+.ob-les .bubble { font-weight:300 !important; }
+.ob-les .done-card small, .ob-les footer { color:var(--ash); }
+.ob-les .done-card h2 { font-size:clamp(28px,5vw,42px) !important; }
+
+/* =========================================================
+   BONUS DARS — Elektr yuritma moylari
+   ========================================================= */
+body.ob-ev {
+  --bg:#000000; --surface:#08080b; --sunk:#111116; --ink:#ffffff; --muted:#9a9a9a; --line:rgba(255,255,255,.12);
+  --copper:#ffb829; --copper-soft:rgba(255,184,41,.09); --teal:#a98bff; --teal-soft:rgba(128,82,255,.14);
+  --good:#2fbf9f; --good-soft:rgba(47,191,159,.12); --bad:#ff6b6b; --bad-soft:rgba(255,107,107,.1);
+  --display:var(--dala-font); --body:var(--dala-font);
+  font-weight:300;
+}
+.ob-ev .topbar { background:rgba(0,0,0,.92) !important; border-bottom:1px solid var(--hair-2) !important; }
+.ob-ev .brand-name { font-weight:500 !important; font-size:14px !important; letter-spacing:-.01em !important; }
+.ob-ev .brand-name small { color:var(--saffron) !important; font-weight:600; }
+.ob-ev .bar i { background:var(--iris) !important; }
+.ob-ev h1, .ob-ev h2, .ob-ev h3 { font-weight:400 !important; letter-spacing:-.04em !important; color:#fff; }
+.ob-ev h1 { font-size:clamp(38px,6.6vw,78px) !important; line-height:1.02 !important; }
+.ob-ev h2 { font-size:clamp(28px,4vw,42px) !important; line-height:1.1 !important; }
+.ob-ev h3 { font-size:clamp(20px,2.4vw,24px) !important; letter-spacing:-.02em !important; }
+.ob-ev p, .ob-ev li { color:#d9d9d9; }
+.ob-ev .lead { color:var(--silver) !important; font-size:18px; }
+.ob-ev strong { font-weight:500 !important; color:#fff; }
+.ob-ev .eyebrow, .ob-ev .side h4, .ob-ev th, .ob-ev .note .tag { text-transform:uppercase; letter-spacing:.025em !important; font-weight:600 !important; }
+.ob-ev .eyebrow { color:var(--saffron) !important; font-size:13px; }
+.ob-ev .nav a.on { background:rgba(128,82,255,.16) !important; }
+.ob-ev .nav a:hover { background:rgba(255,255,255,.04) !important; }
+.ob-ev .dot.done { background:var(--iris) !important; border-color:var(--iris) !important; }
+.ob-ev .fact, .ob-ev .toc a, .ob-ev .q, .ob-ev .tbl, .ob-ev .fig, .ob-ev .pager a, .ob-ev .cert, .ob-ev .result {
+  background:transparent !important; border:1px solid var(--hair-2) !important; border-radius:24px !important; }
+.ob-ev .tbl, .ob-ev .fig { border-radius:18px !important; }
+.ob-ev .fact b { color:#fff !important; font-weight:400 !important; letter-spacing:-.04em; font-size:30px !important; }
+.ob-ev .toc a:hover, .ob-ev .pager a:hover { border-color:rgba(128,82,255,.6) !important; }
+.ob-ev .note { background:transparent !important; border:1px solid var(--hair-2) !important; border-left:2px solid var(--iris-2) !important; border-radius:4px 18px 18px 4px !important; }
+.ob-ev .note.biz { border-left-color:var(--saffron) !important; }
+.ob-ev .note.warn { border-left-color:var(--bad) !important; }
+.ob-ev .btn { background:var(--iris) !important; color:#fff !important; border-radius:24px !important; text-transform:uppercase;
+  letter-spacing:.025em; font-size:14px !important; font-weight:600 !important; padding:14px 20px !important; border:0 !important; }
+.ob-ev .btn:hover { background:#6d3ff5 !important; filter:none; }
+.ob-ev .btn.ghost { background:transparent !important; color:#fff !important; border:1px solid var(--hair) !important; }
+.ob-ev .opt { background:transparent !important; border-radius:16px !important; font-weight:300 !important; }
+.ob-ev .opt.ok { background:var(--good-soft) !important; }
+.ob-ev .opt.no { background:var(--bad-soft) !important; }
+.ob-ev .quiz { border-top:1px solid var(--hair) !important; }
+.ob-ev .result { border-color:rgba(128,82,255,.55) !important; }
+.ob-ev .result b { font-weight:400 !important; letter-spacing:-.04em; }
+.ob-ev .flt button { background:transparent !important; border-radius:9999px !important; }
+.ob-ev .flt button.on { background:rgba(128,82,255,.18) !important; border-color:var(--iris) !important; color:#fff !important; }
+.ob-ev .menu-btn { background:transparent !important; border:1px solid var(--hair) !important; border-radius:24px !important; color:#fff; }
+.ob-ev input { background:#0b0b0e; border:1px solid var(--hair); border-radius:14px; color:#fff; padding:10px 12px; }
+.ob-ev .side { background:#000; }
+.ob-ev .hero { position:relative; }
+.ob-ev .hero > *:not(.dala-fx) { position:relative; z-index:1; }
+#obBackEv { flex:none; margin-left:12px; font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.025em;
+  color:#fff; background:var(--iris); text-decoration:none; border-radius:24px; padding:9px 14px; white-space:nowrap; }
+#obBackEv:hover { background:#6d3ff5; }
+@media (max-width:560px) { .ob-ev .progress .lbl { display:none; } #obBackEv { padding:8px 11px; font-size:11.5px; } }
+
+/* 2-modul: SAE yozuvi — oq karta o'rniga chiziqli */
+.ob-les .sae-big { background:transparent !important; border:1px solid var(--hair); border-radius:24px !important; }
+.ob-les .sae-row { font-weight:400 !important; letter-spacing:-.04em !important; }
+.ob-les .sae-row .h { color:#fff !important; }
+.ob-les .sae-cap { color:var(--silver) !important; font-weight:400 !important; }
+.ob-les .sae-cap span+span { border-color:#fff !important; }
+
+/* oq fonli maketlar (telefon, Telegram xabar, usta kartasi, sertifikat) — qora sirtga */
+.ob-les .tgmsg, .ob-les .phone, .ob-les .mc, .ob-les .cert { background:#0c0c10 !important; color:#fff !important; box-shadow:none !important; }
+.ob-les .tgmsg, .ob-les .mc { border:1px solid var(--hair) !important; }
+.ob-les .phone { border:6px solid #2a2a32 !important; }
+.ob-les .phone .plate { border-color:var(--hair) !important; }
+.ob-les .cert { border:1px solid rgba(128,82,255,.55) !important; border-radius:24px !important; background-clip:border-box !important; }
+.ob-les .cert::before { display:none !important; }
+.ob-les .cert .t1 { color:var(--saffron) !important; text-transform:uppercase; letter-spacing:.025em !important; font-weight:600 !important; }
+.ob-les .mc-photo { background:rgba(128,82,255,.18) !important; border:1px solid rgba(128,82,255,.4); }
+.ob-les .advice .iv, .ob-les .pk-sum .plus, .ob-les .sign .tel { background:transparent !important; color:#fff !important; border:1px solid var(--hair); }

@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bonus dars. Elektr yuritma moylari — OilBook taʼlimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: учебник с боковым оглавлением уроков слева и колонкой чтения ~68ch справа; медь = ключевая тема курса (обмотки), петроль-зелёный = масло/структура */
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --sunk:#E4EAE8; --ink:#14201E; --muted:#56635F; --line:#D2DBD8;
+  --copper:#A9531F; --copper-soft:#F6E5D9; --teal:#0D5B57; --teal-soft:#DCEDEA;
+  --good:#1D7A45; --good-soft:#DDF1E4; --bad:#B3261E; --bad-soft:#F9DEDB;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Onest","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1312; --surface:#131C1B; --sunk:#0F1716; --ink:#E3EBE8; --muted:#94A39F; --line:#25312F;
+  --copper:#E58B54; --copper-soft:#3A2418; --teal:#5BBDB4; --teal-soft:#14302D;
+  --good:#5CCB8A; --good-soft:#15301F; --bad:#F2867D; --bad-soft:#3A1A17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1312; --surface:#131C1B; --sunk:#0F1716; --ink:#E3EBE8; --muted:#94A39F; --line:#25312F;
+  --copper:#E58B54; --copper-soft:#3A2418; --teal:#5BBDB4; --teal-soft:#14302D;
+  --good:#5CCB8A; --good-soft:#15301F; --bad:#F2867D; --bad-soft:#3A1A17; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--teal)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--copper);outline-offset:2px;border-radius:4px}
+
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.topbar-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:16px;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);min-width:0}
+.brand-mark{width:30px;height:30px;flex:none}
+.brand-name{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.02em;line-height:1.2}
+.brand-name small{display:block;font-family:var(--body);font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.progress{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{width:120px;height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--copper);width:0;transition:width .4s}
+.menu-btn{display:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-size:14px;cursor:pointer}
+
+.shell{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:290px minmax(0,1fr);gap:40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 80px}
+.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 70px);align-self:start;max-height:calc(100vh - 90px);overflow:auto}
+.side h4{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px 10px;font-weight:600}
+.nav{list-style:none;margin:0 0 20px;padding:0;display:grid;gap:2px}
+.nav a{display:grid;grid-template-columns:28px minmax(0,1fr) 14px;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;text-decoration:none;color:var(--ink);font-size:14px;line-height:1.35}
+.nav a:hover{background:var(--sunk)}
+.nav a.on{background:var(--teal-soft)}
+.nav .num{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.nav a.on .num{color:var(--teal)}
+.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line)}
+.dot.done{background:var(--copper);border-color:var(--copper)}
+
+main{min-width:0}
+.page{max-width:760px}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--copper);font-weight:600;margin:0 0 10px}
+h1,h2{font-family:var(--display);font-weight:700;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.12;margin:0 0 18px}
+h2{font-size:clamp(22px,3vw,30px);line-height:1.2;margin:0 0 14px}
+h3{font-size:19px;line-height:1.3;margin:38px 0 10px;font-weight:700;text-wrap:balance}
+h3 .sec{font-family:var(--mono);font-size:13px;color:var(--copper);font-weight:600;margin-right:8px}
+p{margin:0 0 14px}
+.lead{font-size:18px;color:var(--muted);max-width:62ch}
+ul.list,ol.list{margin:0 0 16px;padding-left:22px}
+ul.list li,ol.list li{margin-bottom:6px}
+strong{font-weight:650}
+code,.mono{font-family:var(--mono);font-size:.88em}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted);margin:0 0 26px}
+.meta b{color:var(--ink);font-weight:600}
+
+.tbl{overflow-x:auto;margin:6px 0 20px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;line-height:1.5}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--sunk)}
+tr:last-child td{border-bottom:none}
+td.n{font-family:var(--mono);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+.note{border-left:3px solid var(--teal);background:var(--teal-soft);padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0}
+.note.biz{border-color:var(--copper);background:var(--copper-soft)}
+.note.warn{border-color:var(--bad);background:var(--bad-soft)}
+.note .tag{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:4px;color:var(--teal)}
+.note.biz .tag{color:var(--copper)}
+.note.warn .tag{color:var(--bad)}
+.note p:last-child,.note ul:last-child{margin-bottom:0}
+
+.fig{margin:10px 0 24px;overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:14px}
+.fig svg{display:block;width:100%;min-width:540px;height:auto}
+.fig figcaption{font-size:13px;color:var(--muted);margin-top:8px}
+svg .bx{fill:var(--sunk);stroke:var(--line);stroke-width:1.5}
+svg .bx-hl{fill:var(--copper-soft);stroke:var(--copper);stroke-width:1.5}
+svg .bx-t{fill:var(--teal-soft);stroke:var(--teal);stroke-width:1.5}
+svg .t{fill:var(--ink);font-family:var(--body);font-size:14px;font-weight:600}
+svg .ts{fill:var(--muted);font-family:var(--body);font-size:12px}
+svg .tc{fill:var(--copper);font-family:var(--body);font-size:12.5px;font-weight:600}
+svg .tt{fill:var(--teal);font-family:var(--body);font-size:12.5px;font-weight:600}
+svg .ln{stroke:var(--muted);stroke-width:1.6;fill:none}
+svg .ln-c{stroke:var(--copper);stroke-width:2.2;fill:none;stroke-dasharray:6 5}
+svg .ln-t{stroke:var(--teal);stroke-width:2;fill:none}
+svg .ar{fill:var(--muted)}
+svg .ar-c{fill:var(--copper)}
+svg .ar-t{fill:var(--teal)}
+
+/* models reference */
+.wide{max-width:1000px}
+.lvl{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.lvl.a{background:var(--good-soft);color:var(--good)}
+.lvl.b{background:var(--teal-soft);color:var(--teal)}
+.lvl.c{background:var(--bad-soft);color:var(--bad)}
+.tbl.models table{min-width:860px}
+.tbl.models td:first-child{min-width:150px}
+td .src{display:block;font-size:12px;margin-top:4px}
+
+/* catalog filter */
+.flt{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+.flt button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 14px;font-size:13.5px;cursor:pointer}
+.flt button:hover{border-color:var(--teal)}
+.flt button.on{background:var(--teal);color:var(--surface);border-color:var(--teal)}
+.tbl.models.cat table{min-width:1000px}
+
+.nav .modh{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--copper);font-weight:700;padding:12px 10px 4px}
+
+.lang{font-size:13px;font-weight:600;text-decoration:none;color:var(--teal);border:1px solid var(--line);border-radius:99px;padding:5px 12px;white-space:nowrap}
+.lang:hover{border-color:var(--teal)}
+
+/* hero */
+.hero{padding:10px 0 8px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:26px 0 30px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.fact b{display:block;font-family:var(--display);font-size:24px;line-height:1.1;color:var(--teal)}
+.fact span{font-size:13px;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--teal);color:var(--surface);border:none;border-radius:9px;padding:11px 18px;font-weight:600;cursor:pointer;text-decoration:none;font-size:15px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--teal);border:1px solid var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0 26px}
+.toc a{display:grid;grid-template-columns:34px minmax(0,1fr);gap:6px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink);font-size:14.5px;line-height:1.35}
+.toc a:hover{border-color:var(--teal)}
+.toc .num{font-family:var(--mono);color:var(--copper);font-size:13px;padding-top:1px}
+.toc small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+
+/* quiz */
+.quiz{margin-top:44px;border-top:2px solid var(--ink);padding-top:22px}
+.quiz-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+.quiz-head h2{margin:0}
+.quiz-head span{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 14px;margin-top:14px}
+.q-t{font-weight:600;margin:0 0 12px;display:grid;grid-template-columns:30px minmax(0,1fr);gap:4px}
+.q-t .num{font-family:var(--mono);color:var(--copper);font-size:13px;padding-top:3px}
+.opts{display:grid;gap:8px}
+.opt{display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer;line-height:1.45;font-size:15px}
+.opt:hover:not([disabled]){border-color:var(--teal)}
+.opt[disabled]{cursor:default}
+.opt.ok{background:var(--good-soft);border-color:var(--good);color:var(--ink)}
+.opt.no{background:var(--bad-soft);border-color:var(--bad)}
+.opt.ok::before{content:"Toʻgʻri · ";font-weight:700;color:var(--good)}
+.opt.no::before{content:"Notoʻgʻri · ";font-weight:700;color:var(--bad)}
+.why{margin:12px 0 2px;font-size:14.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:12px}
+.result{margin-top:18px;padding:18px 20px;border-radius:12px;background:var(--teal-soft);border:1px solid var(--teal)}
+.result b{font-family:var(--display);font-size:22px}
+.result.fail{background:var(--bad-soft);border-color:var(--bad)}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:40px;flex-wrap:wrap}
+.pager a{flex:1 1 220px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink);background:var(--surface);font-size:14.5px;line-height:1.35}
+.pager a:hover{border-color:var(--teal)}
+.pager a small{display:block;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px}
+.pager a.next{text-align:right}
+.cert{margin-top:16px;padding:22px;border:2px solid var(--copper);border-radius:12px;background:var(--surface);text-align:center}
+.cert h3{margin:4px 0 6px;font-family:var(--display);font-size:22px}
+.cert input{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:min(320px,100%)}
+.small{font-size:13px;color:var(--muted)}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:0;padding-block:18px 60px}
+  .side{display:none;position:static;max-height:none;margin-bottom:18px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 6px 2px}
+  .side.open{display:block}
+  .menu-btn{display:inline-block}
+  .bar{width:70px}
+  .toc{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .facts{grid-template-columns:minmax(0,1fr)}
+  .brand-name small{display:none}
+  .progress .lbl{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body class="ob-ev">
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#home">
+      <svg class="brand-mark" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="none" stroke="var(--teal)" stroke-width="2.5"/><circle cx="15" cy="15" r="6" fill="none" stroke="var(--copper)" stroke-width="2.5"/><g stroke="var(--teal)" stroke-width="2.5"><line x1="15" y1="2" x2="15" y2="6"/><line x1="15" y1="24" x2="15" y2="28"/><line x1="2" y1="15" x2="6" y2="15"/><line x1="24" y1="15" x2="28" y2="15"/></g></svg>
+      <span class="brand-name">Elektr yuritma moylari<small>Bonus dars · OilBook taʼlimi</small></span>
+    </a>
+    <div class="progress"><span class="lbl">Oʻtildi</span><span id="pcount">0 / 10</span><div class="bar"><i id="pbar"></i></div></div>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="side">Darslar</button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="side" id="side">
+    <h4>Dastur</h4>
+    <ul class="nav" id="nav"></ul>
+    <h4>Maʼlumotnoma</h4>
+    <ul class="nav" id="nav2"></ul>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+var L = [];
+
+/* ============ 1-DARS ============ */
+L.push({id:"l1",title:"Elektr yuritma qanday tuzilgan va nega u yerda moy boshqacha",min:15,body:`
+<p class="lead">Avval «temir»ni koʻrib chiqamiz. Tuzilishni tushunmasdan turib ustaga elektromobilga nega birinchi uchragan transmissiya moyini quyib boʻlmasligini tushuntira olmaysiz.</p>
+
+<h3><span class="sec">1.1</span>Dvigatel va uzatmalar qutisi oʻrnida nima turadi</h3>
+<p>Ichki yonuv dvigatelli (IYoD) mashinada ikkita alohida agregat bor: dvigatel (motor moyi) va uzatmalar qutisi (ATF, CVT suyuqligi yoki transmissiya moyi). Elektromobilda ularning oʻrnini <strong>elektr yuritma</strong> egallaydi. Uni EDU (electric drive unit), e-axle yoki «3-in-1 yuritma» deb atashadi.</p>
+<div class="tbl"><table>
+<tr><th>Uzel</th><th>Nima qiladi</th></tr>
+<tr><td><strong>Invertor</strong></td><td>Batareyaning oʻzgarmas tokini (400–800 V) motor uchun uch fazali oʻzgaruvchan tokka aylantiradi, quvvat va rekuperatsiyani boshqaradi</td></tr>
+<tr><td><strong>Elektr motor</strong></td><td>Valni aylantiradi. Koʻpincha doimiy magnitli sinxron, kamroq asinxron</td></tr>
+<tr><td><strong>Reduktor</strong></td><td>Aylanishlar sonini kamaytiradi va momentni oshiradi. Odatda <strong>bitta uzatma</strong>, uzatish soni taxminan 8–11:1, ichiga differensial oʻrnatilgan</td></tr>
+</table></div>
+
+<figure class="fig">
+<svg viewBox="0 0 680 230" role="img" aria-label="Elektr yuritma sxemasi: batareya, invertor, motor, reduktor, gʻildiraklar; motor va reduktor uchun umumiy moy">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ar"/></marker>
+    <marker id="a1c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ar-c"/></marker>
+  </defs>
+  <rect x="146" y="22" width="388" height="128" rx="12" fill="none" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="340" y="16" text-anchor="middle" class="tt">EDU «3-in-1» — bitta agregat</text>
+  <rect x="14" y="58" width="104" height="56" rx="8" class="bx"/><text x="66" y="83" text-anchor="middle" class="t">Batareya</text><text x="66" y="101" text-anchor="middle" class="ts">400–800 V</text>
+  <rect x="162" y="58" width="104" height="56" rx="8" class="bx"/><text x="214" y="83" text-anchor="middle" class="t">Invertor</text><text x="214" y="101" text-anchor="middle" class="ts">DC → AC</text>
+  <rect x="290" y="58" width="104" height="56" rx="8" class="bx-hl"/><text x="342" y="83" text-anchor="middle" class="t">Motor</text><text x="342" y="101" text-anchor="middle" class="ts">20 000+ ayl/min gacha</text>
+  <rect x="418" y="58" width="104" height="56" rx="8" class="bx-hl"/><text x="470" y="83" text-anchor="middle" class="t">Reduktor</text><text x="470" y="101" text-anchor="middle" class="ts">≈ 8–11 : 1</text>
+  <rect x="562" y="58" width="104" height="56" rx="8" class="bx"/><text x="614" y="83" text-anchor="middle" class="t">Gʻildiraklar</text><text x="614" y="101" text-anchor="middle" class="ts">moment ×10</text>
+  <line x1="118" y1="86" x2="158" y2="86" class="ln" marker-end="url(#a1)"/>
+  <line x1="266" y1="86" x2="286" y2="86" class="ln" marker-end="url(#a1)"/>
+  <line x1="394" y1="86" x2="414" y2="86" class="ln" marker-end="url(#a1)"/>
+  <line x1="522" y1="86" x2="558" y2="86" class="ln" marker-end="url(#a1)"/>
+  <path d="M470 116 V136 H342 V120" class="ln-c" marker-end="url(#a1c)"/>
+  <text x="406" y="176" text-anchor="middle" class="tc">Bitta moy: tishli gʻildiraklarni moylaydi va motor chulgʻamlarini sovutadi</text>
+  <text x="406" y="196" text-anchor="middle" class="ts">(«hoʻl» motorlarda; «quruq» motorlarda moy faqat reduktorda)</text>
+</svg>
+<figcaption>Odatiy «3-in-1» yuritma. Mis rangida moy tegadigan qismlar belgilangan.</figcaption>
+</figure>
+
+<h3><span class="sec">1.2</span>1-farq: juda yuqori aylanishlar</h3>
+<div class="tbl"><table>
+<tr><th></th><th>IYoD li mashina</th><th>Elektromobil</th></tr>
+<tr><td>Qutiga kirishdagi aylanishlar</td><td class="n">6 000–7 000 ayl/min</td><td class="n">15 000–20 000+ ayl/min</td></tr>
+<tr><td>Eng yangi platformalar</td><td>—</td><td>Xitoy ishlab chiqaruvchilari 25 000–30 000 ayl/min li motorlarni koʻrsatmoqda</td></tr>
+</table></div>
+<p>Bu moy uchun nimani anglatadi:</p>
+<ul class="list">
+<li>Bunday tezlikda tishli gʻildiraklar <strong>moyni koʻpirtiradi</strong>: u koʻpiklanadi va havoga toʻyinadi.</li>
+<li>Moyni aralashtirishga energiya sarflanadi. Moy qanchalik quyuq boʻlsa, yoʻqotishlar shuncha koʻp va <strong>yurish zaxirasi shuncha kam</strong>.</li>
+<li>Podshipniklar oddiy qutilarda boʻlmaydigan tezliklarda ishlaydi.</li>
+</ul>
+<p>Shu sababli EV suyuqliklari <strong>kam qovushqoq</strong>, koʻpincha ATF ga yaqin. Klassik 75W-90 zamonaviy yuritmalarning koʻpchiligi uchun juda quyuq.</p>
+
+<h3><span class="sec">1.3</span>2-farq: bir zumda beriladigan moment</h3>
+<p>Elektr motor toʻliq momentni noldan beradi. Keskin start, rekuperatsiya (motor bilan tormozlash) va yuklama yoʻnalishining doimiy oʻzgarishi tishlarga <strong>zarbali yuklama</strong> beradi. Moy suyuq boʻlsa ham tishlarni zadir va uvalanishdan himoya qilishi kerak.</p>
+<p>Bundan birinchi qarama-qarshilik kelib chiqadi: <strong>moy suyuq, lekin himoya kuchli boʻlishi kerak</strong>.</p>
+
+<h3><span class="sec">1.4</span>3-farq: yonida elektr va mis</h3>
+<p>Bu butun kursning asosiy nuqtasi. Tuzilmalar ikki xil boʻladi:</p>
+<div class="tbl"><table>
+<tr><th>Turi</th><th>Motor qanday sovutiladi</th><th>Moy nimaga tegadi</th></tr>
+<tr><td><strong>«Quruq» motor</strong></td><td>Statorning tashqarisidagi antifriz koʻylagi</td><td>Faqat reduktor tishli gʻildiraklari va podshipniklari</td></tr>
+<tr><td><strong>«Hoʻl» motor</strong> (moy bilan sovutish)</td><td>Reduktor moyi chulgʻamlarga purkaladi va/yoki rotorning ichi boʻsh vali orqali oʻtadi</td><td>Tishli gʻildiraklar, podshipniklar, <strong>mis chulgʻamlar, izolyatsiya, datchiklar</strong></td></tr>
+</table></div>
+<p>Yangi platformalarning koʻpchiligi (Tesla, BYD va koʻplab xitoy yuritma ishlab chiqaruvchilari) moy bilan sovutishdan foydalanadi: u samaraliroq, motor ixchamroq va kuchliroq boʻladi.</p>
+<p>«Hoʻl» motorda bitta moy:</p>
+<ol class="list">
+<li>tishli gʻildiraklar va podshipniklarni moylaydi;</li>
+<li>motorni <strong>sovutadi</strong>;</li>
+<li><strong>mis</strong>, izolyatsiya laki, plastmassa va datchiklarga tegadi;</li>
+<li><strong>yuqori kuchlanish</strong> yonida ishlaydi.</li>
+</ol>
+<p>Bundan ikkinchi, asosiy qarama-qarshilik kelib chiqadi. Oltingugurt va fosfor asosidagi zadirga qarshi qoʻshimchalar tishli gʻildiraklarni himoya qiladi, lekin <strong>misni yemiradi</strong>. EV moyi tishli gʻildiraklarni himoya qilishi va misga zarar yetkazmasligi kerak. Bu haqda 3- va 5-darslarda batafsil.</p>
+
+<h3><span class="sec">1.5</span>Nega «birorta transmissiya moyini» quyib boʻlmaydi</h3>
+<div class="tbl"><table>
+<tr><th>Talab</th><th>Oddiy MKPP/koʻprik moyi (GL-4/GL-5)</th><th>EV yuritma suyuqligi</th></tr>
+<tr><td>Qovushqoqlik</td><td>Yuqori (75W-90)</td><td>Past (FIK va sovutish uchun)</td></tr>
+<tr><td>Misni himoya qilish</td><td>Kerak emas; GL-5 koʻpincha misga agressiv</td><td><strong>Majburiy</strong></td></tr>
+<tr><td>Elektr xossalari</td><td>Meʼyorlanmaydi</td><td>Meʼyorlanadi (izolyatsiya, oʻtkazuvchanlik)</td></tr>
+<tr><td>Issiqlikni olib ketish</td><td>Ikkinchi darajali</td><td>Muhim, ayniqsa «hoʻl» motorlar uchun</td></tr>
+<tr><td>20 000 ayl/min dagi koʻpik</td><td>Hisoblanmagan</td><td>Hisoblangan</td></tr>
+<tr><td>Chulgʻam laki bilan moslik</td><td>Tekshirilmaydi</td><td>Tekshiriladi</td></tr>
+</table></div>
+<div class="note"><span class="tag">Esda tuting</span><p>EV suyuqliklari uchun API GL darajasidagi yagona <strong>jahon</strong> standarti hozircha yoʻq (Xitoyda oʻz standarti bor, 9-dars). Bozor <strong>avtomobil ishlab chiqaruvchilarining talablariga</strong> tayanadi, shuning uchun tanlash doim marka, model va aniq yuritma boʻyicha qilinadi. Bu 6- va 7-darslar.</p></div>
+
+<h3><span class="sec">1.6</span>Biznes uchun bu nimani anglatadi</h3>
+<div class="note biz"><span class="tag">Savdo uchun</span>
+<ul class="list">
+<li>Oʻzbekistonda xitoy elektromobillari va gibridlari parki tez oʻsmoqda: BYD, Chery, Geely, Li Auto, Leapmotor, Zeekr, xitoy VW ID. Koʻp mashinalar dilerlar orqali kirib kelmagan va <strong>servislar koʻpincha nima quyishni bilmaydi</strong>. Bu aynan bizning boʻsh joyimiz (nisha).</li>
+<li>Agar servis «hoʻl» motorga oddiy transmissiya moyini quysa, u minglab dollarlik yuritmani xavf ostiga qoʻyadi. <strong>Buni tushunadigan agent oddiy sotuvchi emas, maslahatchi sifatida ishlaydi</strong>.</li>
+</ul></div>
+`,quiz:[
+{q:"«3-in-1» yuritma qaysi uzellardan iborat?",o:["Motor, batareya, reduktor","Invertor, motor, reduktor","Invertor, batareya, zaryadlash qurilmasi"],a:1,w:"Batareya va zaryadlash qurilmasi alohida uzellar. Bitta agregatga invertor, motor va reduktor birlashtirilgan."},
+{q:"Nega EV yuritma suyuqliklari kam qovushqoq?",o:["Ishlab chiqarish arzonroq","Yuqori aylanishlarda aralashtirishga yoʻqotish kamroq va sovutish yaxshiroq","Almashtirishda moy tezroq oqib chiqishi uchun"],a:1,w:"15–20 ming ayl/min da quyuq moy energiyani yeydi (yurish zaxirasi kamayadi) va sovutish tizimi orqali yomonroq haydaladi."},
+{q:"«Hoʻl» motor — bu…",o:["Ichiga suv kirgan motor","Reduktorni moylaydigan moyning oʻzi bilan sovutiladigan motor","Antifriz koʻylagi bilan sovutiladigan motor"],a:1,w:"«Hoʻl» moy bilan sovutishni anglatadi: moy toʻgʻridan-toʻgʻri chulgʻamlarga tushadi va/yoki rotor orqali oʻtadi."},
+{q:"EV suyuqligi tarkibidagi asosiy qarama-qarshilik nimada?",o:["Zadirga qarshi qoʻshimchalar tishli gʻildiraklarni himoya qiladi, lekin misni yemiradi","Narx va sifat","Moyning rangi va hidi"],a:0,w:"Zadirga qarshi qoʻshimchalardagi oltingugurt va fosfor mis bilan reaksiyaga kirishadi. Tishli gʻildiraklar va mis himoyasi oʻrtasida muvozanat topish kerak."},
+{q:"Usta: «BYD ga oddiy 75W-90 GL-5 quyaman, moy — moy-da». Eng yaxshi javob:",o:["«Ha, mayli, faqat tez-tez almashtiring»","«Ishlab chiqaruvchi talabidagi suyuqlik kerak: GL-5 juda quyuq va motor moy bilan sovutilsa, misni yemirishi mumkin»","«Yaxshisi 5W-30 motor moyini quying»"],a:1,w:"GL-5 ning qovushqoqligi, mis bilan mosligi va elektr xossalari toʻgʻri kelmaydi. Faqat yuritma spetsifikatsiyasi boʻyicha tanlash."}
+]});
+
+/* ============ 2-DARS ============ */
+L.push({id:"l2",title:"Yuqori aylanishlardagi tishli gʻildiraklar va podshipniklar, FIK va yurish zaxirasi",min:15,body:`
+<p class="lead">Moy tishli gʻildiraklar ilashuvida nima qilishini, nega uni shunchaki «suyuqroq» qilib boʻlmasligini va u yurish zaxirasiga qanday taʼsir qilishini koʻrib chiqamiz.</p>
+
+<h3><span class="sec">2.1</span>Moy pardasi: ilashuv nimaga tayanadi</h3>
+<p>Tishlar bir-biriga metall bilan tegmasligi kerak. Ular orasida moy qalinligi <strong>mikronning oʻndan bir qismidan bir mikrongacha</strong> boʻlgan parda hosil qiladi. Tegish nuqtasidagi ulkan bosim ostida moy bir lahzaga deyarli qattiq holatga keladi va bu yuzalarni ushlab turadi. Bu rejim <strong>elastogidrodinamik (EGD, EHL)</strong> deb ataladi.</p>
+<div class="tbl"><table>
+<tr><th>Moylash rejimi</th><th>Qachon boʻladi</th><th>Kim himoya qiladi</th></tr>
+<tr><td>Gidrodinamik / EGD</td><td>Normal tezlik, oʻrtacha yuklama</td><td>Moy qovushqoqligi, parda qalinligi</td></tr>
+<tr><td>Aralash</td><td>Yuqori yuklama, past tezlik</td><td>Parda va qoʻshimchalar birga</td></tr>
+<tr><td>Chegaraviy</td><td>Joyidan qoʻzgʻalish, eng yuqori moment, rekuperatsiya</td><td>Faqat <strong>qoʻshimchalar</strong>: ular metallda himoya qatlam hosil qiladi</td></tr>
+</table></div>
+<p>Parda qalinligi <strong>qovushqoqlik</strong> va <strong>tezlik</strong> bilan ortadi. EV ning kirish bosqichida tezlik ulkan va bu pardaga yordam beradi. <strong>Chiqish bosqichi va differensialda</strong> aylanishlar 8–11 marta past, moment esa 8–11 marta yuqori. Aynan u yerda parda eng yupqa.</p>
+
+<h3><span class="sec">2.2</span>Tishli gʻildiraklar qanday shikastlanadi</h3>
+<div class="tbl"><table>
+<tr><th>Shikast</th><th>Koʻrinishi</th><th>Sababi</th><th>Nima himoya qiladi</th></tr>
+<tr><td><strong>Zadir</strong> (scuffing)</td><td>Tish boʻylab yirtilgan chiziqlar, payvandlanish izlari</td><td>Ortiqcha yuklama, qizib ketish, pardaning uzilishi</td><td>Zadirga qarshi (EP) qoʻshimchalar</td></tr>
+<tr><td><strong>Pitting</strong></td><td>Ishchi yuzadagi chuqurchalar</td><td>Tsiklik yuklamadan metall charchashi</td><td>Parda qalinligi, moy tozaligi</td></tr>
+<tr><td><strong>Mikropitting</strong></td><td>Xira «kulrang dogʻlar»</td><td>Juda yupqa parda, gʻadir-budurlik</td><td>Qovushqoqlik, maxsus qoʻshimchalar, yuza sifati</td></tr>
+<tr><td><strong>Yeyilish</strong></td><td>Tish profilining oʻzgarishi, tiqin magnitidagi qirindi</td><td>Abraziv, zarrachalar, chegaraviy rejim</td><td>Yeyilishga qarshi (AW) qoʻshimchalar, tozalik</td></tr>
+</table></div>
+<p>Qanday tekshiriladi: <strong>FZG</strong> — tishli gʻildiraklar bilan stenddagi sinov. Moy yuklama bosqichlaridan oʻtadi (12 va undan yuqori), zadirsiz bosqich qanchalik baland boʻlsa, shunchalik yaxshi. Pitting va mikropitting uchun alohida FZG usullari bor.</p>
+
+<h3><span class="sec">2.3</span>Nega qovushqoqlikni cheksiz pasaytirib boʻlmaydi</h3>
+<p>Qovushqoqlik qanchalik past boʻlsa, yoʻqotishlar shuncha kam va yurish zaxirasi shuncha katta, lekin parda shuncha yupqa. Toʻgʻri qoʻshimchalarsiz juda suyuq moy pitting va mikropittingga olib keladi. Shuning uchun ishlab chiqaruvchilar qovushqoqlikni <strong>faqat quyidagilar bilan birga</strong> pasaytiradi:</p>
+<ul class="list">
+<li>maxsus qoʻshimchalar paketi;</li>
+<li>jilvirlangan va superfinishlangan tishlar;</li>
+<li>optimallashtirilgan ilashuv geometriyasi.</li>
+</ul>
+<div class="note"><span class="tag">Esda tuting</span><p>EV yuritmasidagi qovushqoqlik konstruktor tomonidan aniq tishli gʻildiraklarga moslab tanlangan. «Ishonchlilik uchun quyuqroq» quyish ham, «tejash uchun suyuqroq» quyish ham birdek yomon.</p></div>
+
+<h3><span class="sec">2.4</span>Energiya qayerga ketadi: FIK va yurish zaxirasi</h3>
+<div class="tbl"><table>
+<tr><th>Yoʻqotish turi</th><th>Qayerdan</th><th>Moyga bogʻliqligi</th></tr>
+<tr><td>Yuklamali</td><td>Yuklama ostida ilashuvdagi ishqalanish</td><td>Ishqalanish modifikatorlari, bazaviy moy turi</td></tr>
+<tr><td>Yuklamasiz</td><td>Tishli gʻildiraklar moyni aralashtirishi (barbotaj), podshipnik va zichlagichlardagi qarshilik</td><td>Qovushqoqlikka <strong>kuchli</strong> bogʻliq</td></tr>
+</table></div>
+<p>Elektromobil koʻp vaqt qisman yuklama bilan yuradi: shaharda va tekis yoʻlda. Shuning uchun yuklamasiz yoʻqotishlar ulushi sezilarli va qovushqoqlik energiya sarfiga bevosita taʼsir qiladi. Moy ishlab chiqaruvchilari FIK va yurish zaxirasining <strong>bir necha foiz</strong> oshishini daʼvo qiladi. Raqamlar turli sharoitlarda olingan, shuning uchun doim manbaga qarang.</p>
+
+<h3><span class="sec">2.5</span>Sovuq va issiq</h3>
+<p>−20 °C da moyning qovushqoqligi ish haroratidagiga nisbatan <strong>oʻnlab marta</strong> oshadi: yoʻqotishlar oʻsadi, nasos moyni chulgʻamlarga haydashi qiyinlashadi. Fargʻona vodiysida qishda −10…−20 °C, yozda +40…+45 °C boʻladi, agregat ichida esa moy 100 °C dan yuqori qizishi mumkin. Suyuqlik butun diapazonda ishlashi kerak.</p>
+
+<h3><span class="sec">2.6</span>Podshipniklar, koʻpik va barqarorlik</h3>
+<ul class="list">
+<li><strong>Podshipniklar.</strong> Yuqori aylanishlarda sharchalar sirpanishi mumkin, moy yetishmasa «moylash ochligi» boshlanadi. Podshipniklarning elektr eroziyasi — 3-dars mavzusi.</li>
+<li><strong>Koʻpik va havo.</strong> 15–20 ming ayl/min dagi tishli gʻildiraklar havo ushlaydi. Moydagi havo pardani va issiqlik olib ketishni yomonlashtiradi, nasos kavitatsiyasini keltirib chiqaradi va oksidlanishni tezlashtiradi. Sinovlar: koʻpiklanish <code>ASTM D892</code>, havo ajralishi <code>ASTM D3427</code>.</li>
+<li><strong>Siljishga barqarorlik.</strong> Moydagi polimer quyuqlashtirgichlar ilashuvda «uziladi» va qovushqoqlik tushadi. KRL sinovi (<code>CEC L-45</code>) moy qancha qovushqoqlik yoʻqotishini koʻrsatadi. EV uchun bu muhim: qovushqoqlik zaxirasi baribir minimal.</li>
+<li><strong>Shovqin.</strong> Dvigatel eshitilmaydi, shuning uchun tishli gʻildiraklarning gʻuvullashi seziladi. Asosiy omil — geometriya, lekin notoʻgʻri moy ham shovqin qoʻshishi mumkin. «Almashtirgandan keyin gʻuvullay boshladi» degan shikoyat — nima quyilganini tekshirish uchun sabab.</li>
+</ul>
+
+<div class="note biz"><span class="tag">Savdo uchun</span><p>Mijoz: «Probeg kichik boʻlsa, nega almashtirish kerak?» Javob: EV yuritmasidagi yeyilish faqat kilometrga emas, moment va aylanishlarga bogʻliq. Yeyilish mahsulotlari moyda qoladi va podshipniklar orqali, «hoʻl» motorlarda esa chulgʻamlar orqali ham oʻtadi. Bundan tashqari moy haroratdan eskiradi.</p></div>
+`,quiz:[
+{q:"Ortiqcha yuklamada tish yuzalarining bir zumda «payvandlanishi» va yirtilishi qanday ataladi?",o:["Pitting","Zadir","Korroziya"],a:1,w:"Zadir (scuffing) — parda uzilganda tez sodir boʻladigan shikast. Pitting — metallning sekin charchashi."},
+{q:"EV reduktorida moy pardasi qayerda eng yupqa?",o:["18 000 ayl/min dagi kirish valida","Chiqish bosqichi va differensialda: tezlik past, moment yuqori","Hamma joyda bir xil"],a:1,w:"Parda tezlik bilan oʻsadi. Chiqish bosqichi sekin va kuchli yuklangan, shuning uchun u yerda pitting xavfi yuqoriroq."},
+{q:"Nega yurish zaxirasi uchun qovushqoqlikni cheksiz pasaytirib boʻlmaydi?",o:["Moy yorugʻlik chiqara boshlaydi","Parda juda yupqa boʻlib qoladi: pitting, mikropitting, yeyilish","Moy qimmatroq boʻladi"],a:1,w:"Qovushqoqlikni faqat qoʻshimchalar va tishli gʻildiraklarning sifatli ishlovi bilan birga pasaytirish mumkin."},
+{q:"KRL sinovi (CEC L-45) nimani koʻrsatadi?",o:["Moy siljishdan qancha qovushqoqlik yoʻqotishini","Mis korroziyasini","Koʻpiklanishni"],a:0,w:"KRL — siljishga barqarorlik sinovi. Koʻpik ASTM D892, mis ASTM D130 boʻyicha tekshiriladi."},
+{q:"Qaysi yoʻqotishlar qovushqoqlikka eng kuchli bogʻliq?",o:["Yuklamali — ilashuvdagi ishqalanish","Yuklamasiz — moyni aralashtirish va podshipniklardagi qarshilik","Batareyadagi yoʻqotishlar"],a:1,w:"Aralashtirish (barbotaj) bevosita qovushqoqlikka bogʻliq, EV esa koʻp vaqt qisman yuklama bilan yuradi."}
+]});
+
+/* ============ 3-DARS ============ */
+L.push({id:"l3",title:"Moyning elektr xossalari va mis korroziyasi",min:18,body:`
+<p class="lead">Eng «elektromobilga xos» dars. Bu talablar IYoD li mashinalar uchun hech bir moyda yoʻq va servislar aynan shu yerda koʻp xato qiladi.</p>
+
+<h3><span class="sec">3.1</span>Moy elektr bilan qayerda uchrashadi</h3>
+<p>«Hoʻl» yuritmada moy stator chulgʻamlarini (hozir koʻpincha toʻgʻri burchakli simdan, hairpin texnologiyasi), mis shinalar va chiqishlarni, harorat va rotor holati datchiklarini yuvadi. Invertor motorga juda tik frontli impulslar beradi: zamonaviy SiC tranzistorlarda kuchlanish nanosekundlarda yuzlab voltga oʻzgaradi. Bu izolyatsiyani yuklaydi va kutilmagan joylarda toklar hosil qiladi.</p>
+
+<h3><span class="sec">3.2</span>Uchta elektr koʻrsatkichi</h3>
+<div class="tbl"><table>
+<tr><th>Koʻrsatkich</th><th>Nimani anglatadi</th><th>Usullar</th></tr>
+<tr><td><strong>Teshilish kuchlanishi</strong> (dielektrik mustahkamlik), kV</td><td>Elektrodlar orasidagi moy qaysi kuchlanishda uchqun bilan «teshiladi». Qanchalik yuqori boʻlsa, moy izolyator sifatida shunchalik yaxshi</td><td class="n">ASTM D877, D1816<br>IEC 60156</td></tr>
+<tr><td><strong>Solishtirma hajmiy qarshilik / oʻtkazuvchanlik</strong></td><td>Moy tokni qanchalik oʻtkazadi</td><td class="n">IEC 60247<br>ASTM D1169</td></tr>
+<tr><td><strong>Dielektrik singdiruvchanlik</strong></td><td>Moy izolyatsiyadagi elektr maydon taqsimotiga qanday taʼsir qiladi</td><td class="n">IEC 60247</td></tr>
+</table></div>
+<p>Moy <strong>yaxshi izolyator boʻlishi kerak, lekin mutlaq emas</strong>. Juda oʻtkazuvchan moy oqishlarga sabab boʻladi va korroziyani tezlashtiradi. Umuman oʻtkazmaydigan moy statik zaryad toʻplashi mumkin. Tadqiqotlar oʻrtacha oʻtkazuvchanlik zaryadning valdan yumshoqroq «oqib ketishiga» yordam berishini koʻrsatadi. Aniq qiymatlar oynasini yuritma ishlab chiqaruvchisi belgilaydi.</p>
+<div class="note warn"><span class="tag">Muhim</span><p><strong>Suv</strong> va metall zarrachalar teshilish kuchlanishini keskin pasaytiradi. Hatto foizning bir qismi namlik izolyatorni oʻtkazgichga aylantiradi. Moy eskirganda oʻtkazuvchanlik <strong>oshadi</strong>. Shuning uchun EV suyuqligini oʻz vaqtida almashtirish va yopiq saqlash, servisda esa sapun va zichlagichlarni kuzatish kerak.</p></div>
+
+<h3><span class="sec">3.3</span>Podshipniklardagi toklar: elektr eroziyasi</h3>
+<p>Invertor impulslari motor valida kuchlanish hosil qiladi. U korpusga yoʻl qidiradi va podshipnikdagi yupqa moy pardasini teshib oʻtadi. Har bir razryad mikrokrater kuydiradi.</p>
+<ul class="list">
+<li><strong>Xiralik</strong> (frosting) — dumalash yoʻlakchasi yaltiroqligini yoʻqotadi.</li>
+<li><strong>Qovurgʻalanish</strong> (fluting) — kir yuvish taxtasidagi kabi koʻndalang chiziqlar.</li>
+<li>Belgisi: podshipnikning kuchayib boruvchi gʻuvullashi yoki chiyillashi.</li>
+</ul>
+<p>Asosiy himoya — konstruktiv: keramik sharchalar, valni yerga ulash choʻtkalari, izolyatsiyalangan podshipniklar. Moy — ikkinchi omil, uning elektr xossalari razryad qanday oʻtishiga taʼsir qiladi.</p>
+
+<h3><span class="sec">3.4</span>Mis: asosiy xavf zonasi</h3>
+<p>Mis chulgʻamlarda, shinalarda, kavsharlarda, datchik simlarida, baʼzan vtulka va shaybalarda bor. Zadirga qarshi qoʻshimchalardagi faol oltingugurt mis bilan reaksiyaga kirishib <strong>mis sulfidini</strong> hosil qiladi. Bu ikki sababga koʻra xavfli:</p>
+<ol class="list">
+<li>yupqa oʻtkazgichlar va kavsharlar asta-sekin yemiriladi;</li>
+<li>mis sulfidi <strong>tok oʻtkazadi</strong>: uning choʻkmalari tok oʻtkazuvchi koʻprikchalar hosil qilib, qisqa tutashuvga olib kelishi mumkin.</li>
+</ol>
+<p>Alohida xavf — <strong>bugʻ fazasidagi korroziya</strong>. Oltingugurtning uchuvchan birikmalari issiq moydan bugʻlanib, <strong>moy sathidan yuqoridagi</strong> misga hujum qiladi, u yerni suyuqlik yuvmaydi.</p>
+
+<h3><span class="sec">3.5</span>Mis himoyasi qanday tekshiriladi</h3>
+<div class="tbl"><table>
+<tr><th>Sinov</th><th>Mohiyati</th><th>EV suyuqligidan nima kutiladi</th></tr>
+<tr><td><strong>Mis plastinka</strong> <code>ASTM D130</code></td><td>Silliqlangan mis plastinka issiq moyda, keyin rangi 1a…4c etalon shkalasi bilan solishtiriladi</td><td>1a–1b, koʻpincha qattiq sharoitda (yuqoriroq harorat, uzoqroq vaqt)</td></tr>
+<tr><td><strong>Mis sim sinovi</strong></td><td>Ingichka mis sim issiq moyda yoki uning bugʻida; elektr qarshiligining oʻsishi oʻlchanadi</td><td>Qarshilikning minimal oʻsishi. Bu avtomobil va qoʻshimcha ishlab chiqaruvchilarining tarmoq usullari</td></tr>
+<tr><td><strong>Bugʻ fazasi</strong></td><td>Mis issiq moy ustida osib qoʻyiladi</td><td>Qorayish va choʻkmalar yoʻq</td></tr>
+</table></div>
+
+<h3><span class="sec">3.6</span>Materiallar bilan moslik</h3>
+<p>Moy quyidagilarni yumshatmasligi, eritmasligi, shishirmasligi yoki quritmasligi kerak:</p>
+<ul class="list">
+<li><strong>sim emali</strong> (poliamid-imid, poliefir-imid va boshq.) va <strong>shimdiruvchi laklar</strong> yoki smolalar;</li>
+<li>stator pazlaridagi izolyatsion qogʻoz va plyonkalar (aramid, PET);</li>
+<li>korpus va ulagichlar plastmassalari (PA66, PPS);</li>
+<li>zichlagichlar (FKM, ACM, HNBR).</li>
+</ul>
+<p>Tekshiruv: namunalar issiq moyda yuzlab soat saqlanadi, keyin mustahkamlik, massa, qattiqlik va elektr xossalari oldingisi bilan solishtiriladi.</p>
+
+<div class="note"><span class="tag">Adashtirmang</span><p>Reduktor moyi, batareyalarni immersion sovutish suyuqligi va batareya hamda invertor uchun antifriz — <strong>uchta turli mahsulot</strong>. EV uchun antifriz koʻpincha past elektr oʻtkazuvchanlik bilan talab qilinadi, lekin u chulgʻamlarga tegmaydi.</p></div>
+<div class="note biz"><span class="tag">Savdo uchun</span><p>Mis haqidagi dalilni usta darhol tushunadi: «GL-5 da tishli gʻildiraklar uchun faol oltingugurt koʻp. «Hoʻl» motorda bu oltingugurt mis chulgʻamlarni yeydi, motorni taʼmirlash esa yuzta moy almashtirishdan qimmatroq».</p></div>
+`,quiz:[
+{q:"Moyning teshilish kuchlanishini nima keskin pasaytiradi?",o:["Past harorat","Suv va metall zarrachalar","Sintetik asos"],a:1,w:"Hatto foizning bir qismi namlik izolyatorni oʻtkazgichga aylantiradi."},
+{q:"Nega faol oltingugurt «hoʻl» motor uchun xavfli?",o:["Moy yomon hid chiqaradi","Mis sulfidi hosil boʻladi: u simni yemiradi va tok oʻtkazuvchi choʻkmalar beradi","Oltingugurt qovushqoqlikni oshiradi"],a:1,w:"Mis sulfidi tok oʻtkazadi, shuning uchun choʻkmalar qisqa tutashuvga olib kelishi mumkin. Yupqa oʻtkazgichlar esa korroziyaga uchraydi."},
+{q:"Podshipnik yoʻlakchalarining qovurgʻalanishi (fluting) nimaning oqibati?",o:["Moy yetishmasligi","Podshipnik orqali elektr razryadlari","Qum kirishi"],a:1,w:"Valdagi induksiyalangan kuchlanish podshipnik pardasi orqali razryadlanadi va mikrokraterlar kuydiradi. Shunday qilib «kir yuvish taxtasi» naqshi paydo boʻladi."},
+{q:"ASTM D130 boʻyicha nima tekshiriladi?",o:["Plastinkadagi mis korroziyasi","Teshilish kuchlanishi","Qovushqoqlik yoʻqotilishi"],a:0,w:"Mis plastinka: 1a…4c shkalasi boʻyicha baho. EV uchun 1a–1b kutiladi."},
+{q:"Moy eskirganda uning oʻtkazuvchanligi qanday oʻzgaradi?",o:["Oshadi","Kamayadi","Oʻzgarmaydi"],a:0,w:"Oksidlanish va yeyilish mahsulotlari oʻtkazuvchanlikni oshiradi, shuning uchun elektr xossalari vaqt oʻtishi bilan yomonlashadi."}
+]});
+
+/* ============ 4-DARS ============ */
+L.push({id:"l4",title:"Moy «hoʻl» motorlar uchun sovutish suyuqligi sifatida",min:14,body:`
+<p class="lead">«Hoʻl» yuritmada moy issiqlik tashuvchi boʻlib ishlaydi. U issiqlikni qanchalik yaxshi olib ketishiga quvvat, chulgʻamlar va magnitlarning resursi bogʻliq.</p>
+
+<h3><span class="sec">4.1</span>Issiqlik qayerdan keladi va uni olib ketish nega qiyin</h3>
+<p>Elektr motorning FIK yuqori, taxminan 90–97%, lekin 150–300 kVt quvvatda hatto bir necha foiz yoʻqotish ham kilovattlab issiqlik demakdir:</p>
+<ul class="list">
+<li><strong>chulgʻamlarda</strong> (misdagi yoʻqotishlar), ayniqsa peshona qismlarida — oʻzakdan tashqariga chiqib turgan chulgʻam halqalarida;</li>
+<li><strong>poʻlat oʻzakda</strong> (qayta magnitlanishdagi yoʻqotishlar);</li>
+<li><strong>rotor va magnitlarda</strong>. Magnitlar (NdFeB) qizib ketganda kuchini yoʻqotadi, qaytmas magnitsizlanishgacha.</li>
+</ul>
+<p>Antifriz koʻylagi statorni tashqaridan sovutadi, chulgʻamlarning peshona qismlari va rotorga esa deyarli yetmaydi. Antifriz tok oʻtkazadi, uni chulgʻamlarga quyib boʻlmaydi. Moy — dielektrik, uni <strong>toʻgʻridan-toʻgʻri issiq joylarga berish mumkin</strong>.</p>
+
+<h3><span class="sec">4.2</span>Moy konturi qanday tuzilgan</h3>
+<figure class="fig">
+<svg viewBox="0 0 680 240" role="img" aria-label="Moy konturi: poddon, nasos, filtr, issiqlik almashtirgich, chulgʻamlar va ichi boʻsh valga berish, poddonga qaytish">
+  <defs>
+    <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ar-c"/></marker>
+  </defs>
+  <rect x="14" y="40" width="110" height="56" rx="8" class="bx"/><text x="69" y="65" text-anchor="middle" class="t">Poddon</text><text x="69" y="83" text-anchor="middle" class="ts">reduktorning</text>
+  <rect x="150" y="40" width="110" height="56" rx="8" class="bx"/><text x="205" y="65" text-anchor="middle" class="t">Nasos</text><text x="205" y="83" text-anchor="middle" class="ts">elektr./mexan.</text>
+  <rect x="286" y="40" width="110" height="56" rx="8" class="bx"/><text x="341" y="65" text-anchor="middle" class="t">Filtr</text><text x="341" y="83" text-anchor="middle" class="ts">yoki setka</text>
+  <rect x="422" y="40" width="110" height="56" rx="8" class="bx-t"/><text x="477" y="65" text-anchor="middle" class="t">Issiqlik almash.</text><text x="477" y="83" text-anchor="middle" class="ts">moy ↔ antifriz</text>
+  <rect x="558" y="18" width="110" height="44" rx="8" class="bx-hl"/><text x="613" y="45" text-anchor="middle" class="t">Chulgʻamlar</text>
+  <rect x="558" y="76" width="110" height="44" rx="8" class="bx-hl"/><text x="613" y="103" text-anchor="middle" class="t">Ichi boʻsh val</text>
+  <line x1="124" y1="68" x2="146" y2="68" class="ln-c" style="stroke-dasharray:none" marker-end="url(#a4)"/>
+  <line x1="260" y1="68" x2="282" y2="68" class="ln-c" style="stroke-dasharray:none" marker-end="url(#a4)"/>
+  <line x1="396" y1="68" x2="418" y2="68" class="ln-c" style="stroke-dasharray:none" marker-end="url(#a4)"/>
+  <path d="M532 60 L554 42" class="ln-c" style="stroke-dasharray:none" marker-end="url(#a4)"/>
+  <path d="M532 76 L554 96" class="ln-c" style="stroke-dasharray:none" marker-end="url(#a4)"/>
+  <path d="M613 120 V150 H69 V100" class="ln-c" marker-end="url(#a4)"/>
+  <text x="340" y="170" text-anchor="middle" class="tc">Moy poddonga qaytib oqadi va yana tishli gʻildiraklarni moylaydi</text>
+  <line x1="477" y1="96" x2="477" y2="196" class="ln-t" stroke-dasharray="3 3"/>
+  <text x="477" y="216" text-anchor="middle" class="tt">Issiqlik antifriz konturi va radiatorga ketadi</text>
+</svg>
+<figcaption>Soddalashtirilgan sxema. Turli yuritmalarda elementlar toʻplami farq qiladi: qayerdadir alohida filtr yoʻq, qayerdadir moy stator kanallari orqali beriladi.</figcaption>
+</figure>
+<div class="tbl"><table>
+<tr><th>Usul</th><th>Nimani sovutadi</th></tr>
+<tr><td>Forsunka yoki trubkalardan purkash</td><td>Chulgʻamlarning peshona qismlari, statorning eng issiq joyi</td></tr>
+<tr><td>Rotorning ichi boʻsh vali orqali berish</td><td>Rotor va magnitlarni ichkaridan</td></tr>
+<tr><td>Stator kanallari</td><td>Chulgʻamning paz qismi</td></tr>
+</table></div>
+
+<h3><span class="sec">4.3</span>Moy issiqlik tashuvchi sifatida: kuchli va zaif tomonlari</h3>
+<div class="tbl"><table>
+<tr><th>Xossa</th><th>Moy</th><th>Suv-glikol (antifriz)</th></tr>
+<tr><td>Issiqlik oʻtkazuvchanlik</td><td class="n">≈ 0,13–0,15 Vt/(m·K)</td><td class="n">≈ 0,4 Vt/(m·K)</td></tr>
+<tr><td>Issiqlik sigʻimi</td><td class="n">≈ 2 kJ/(kg·K)</td><td class="n">≈ 3,3–3,6 kJ/(kg·K)</td></tr>
+<tr><td>Chulgʻamlarga quyish mumkinmi</td><td><strong>Ha</strong> (dielektrik)</td><td>Yoʻq (tok oʻtkazadi)</td></tr>
+</table></div>
+<p>Suyuqlik sifatida moy issiqlikni antifrizdan yomonroq olib ketadi, lekin <strong>toʻgʻridan-toʻgʻri issiqlik manbaiga</strong> tushgani hisobiga yutadi. Qovushqoqlik qanchalik past boʻlsa, moy shunchalik tez oqadi, devor yonidagi qatlam yupqaroq va issiqlik berish yuqoriroq. Bu EV suyuqliklari suyuq boʻlishining yana bir sababi.</p>
+
+<h3><span class="sec">4.4</span>Harorat, oksidlanish va lak</h3>
+<ul class="list">
+<li>Moy hajmda odatda 60–120 °C da ishlaydi, issiq chulgʻamlar yuzasida esa mahalliy ravishda kuchliroq qiziydi. Chulgʻamlar izolyatsiyasi 180 °C va undan yuqori issiqbardoshlik sinflariga moʻljallangan.</li>
+<li>Yuqori harorat <strong>oksidlanishni</strong> tezlashtiradi: kislota soni va qovushqoqlik oshadi, <strong>lak va shlam</strong> paydo boʻladi.</li>
+<li>Forsunka va kanallardagi lak moy berilishini kamaytiradi va chulgʻamlarning <strong>mahalliy qizib ketishiga</strong> olib keladi. Qizib ketish oksidlanishni tezlashtiradi va doira yopiladi.</li>
+<li>Oksidlanish barqarorligi, masalan, ATF uchun keng qoʻllaniladigan ISOT sinovi (<code>JIS K 2514</code>) bilan tekshiriladi.</li>
+</ul>
+<p>Bir qator yuritmalarda almashtiriladigan filtr yoki setka bor. U bormi va qachon almashtiriladi — servis hujjatlariga qarang.</p>
+
+<div class="note biz"><span class="tag">Savdo uchun</span><p>Oʻzbekiston — ogʻir sharoit: +40…+45 °C issiq, chang, tirbandliklar, katta probegli taksilar. Qizib ketganda yuritma <strong>quvvatni cheklaydi</strong> (derating): issiqda mashina «sustlashadi». Taksi parki uchun yangi toʻgʻri suyuqlik — bekor turishlarning oldini olishning bir qismi.</p></div>
+`,quiz:[
+{q:"Nega chulgʻamlar toʻgʻridan-toʻgʻri antifriz bilan emas, moy bilan sovutiladi?",o:["Moy arzonroq","Moy — dielektrik, uni toʻgʻridan-toʻgʻri chulgʻamlarga berish mumkin","Antifriz muzlaydi"],a:1,w:"Antifriz tok oʻtkazadi. Moyni kuchlanish ostidagi misga quyish mumkin."},
+{q:"Qaysi suyuqlik oʻz-oʻzidan issiqlikni yaxshiroq olib ketadi?",o:["Moy","Suv-glikol (antifriz)","Bir xil"],a:1,w:"Antifrizning issiqlik oʻtkazuvchanligi va issiqlik sigʻimi yuqoriroq. Moy faqat toʻgʻridan-toʻgʻri issiqlik manbaiga tushgani bilan yutadi."},
+{q:"Nega moy rotorning ichi boʻsh vali orqali beriladi?",o:["Shlitslarni moylash uchun","Rotor va magnitlarni ichkaridan sovutish uchun","Shovqinni kamaytirish uchun"],a:1,w:"Magnitlar qizib ketganda kuchini yoʻqotadi. Valning ichidan sovutish ularni himoya qilish usullaridan biri."},
+{q:"Forsunkalarda lak yigʻilsa nima boʻladi?",o:["Hech narsa","Moy berilishi kamayadi, chulgʻamlar mahalliy qiziydi","Yurish zaxirasi oshadi"],a:1,w:"Oksidlanish lak beradi, lak qizishga, qizish esa oksidlanishni tezlashtiradi. Shuning uchun moy barqarorligi va almashtirish intervali muhim."},
+{q:"Derating nima?",o:["Model reytingining pasayishi","Qizib ketganda yuritmaning quvvatni cheklashi","Qoʻshimcha turi"],a:1,w:"Elektronika motor va invertorni himoya qilib, quvvatni kamaytiradi. Haydovchi buni ayniqsa yozda sezadi."}
+]});
+
+/* ============ 5-DARS ============ */
+L.push({id:"l5",title:"Kimyo: bazaviy moylar va qoʻshimchalar",min:16,body:`
+<p class="lead">Har qanday moylash moyi — bazaviy moy va qoʻshimchalar paketi. EV suyuqliklari nimadan qilinishini va kimyogarlar «tishli gʻildiraklar va mis» qarama-qarshiligini qanday hal qilishini koʻramiz.</p>
+
+<h3><span class="sec">5.1</span>Bazaviy moylar</h3>
+<div class="tbl"><table>
+<tr><th>API guruhi</th><th>Bu nima</th><th>EV suyuqliklarida</th></tr>
+<tr><td class="n">I</td><td>Mineral, selektiv tozalash</td><td>Deyarli ishlatilmaydi</td></tr>
+<tr><td class="n">II</td><td>Gidrotozalangan, oltingugurt kam</td><td>Baʼzan aralashmalarda</td></tr>
+<tr><td class="n">III / III+</td><td>Gidrokreking, yuqori qovushqoqlik indeksi; GTL moylari ham shu guruhga kiradi</td><td><strong>Koʻp</strong> EV suyuqliklarining asosi</td></tr>
+<tr><td class="n">IV</td><td>PAO (polialfaolefinlar), toʻliq sintetika</td><td>Premium suyuqliklar: sovuqda aʼlo oquvchanlik va barqarorlik</td></tr>
+<tr><td class="n">V</td><td>Qolgan hammasi: efirlar, PAG va boshq.</td><td>Efirlar qoʻshimcha sifatida: qutblilik, qoʻshimchalarni eritish. Gidroliz va moslikka tekshiruv talab qiladi</td></tr>
+</table></div>
+
+<h3><span class="sec">5.2</span>Qovushqoqlik raqamlarda</h3>
+<div class="tbl"><table>
+<tr><th>Suyuqlik</th><th>100 °C dagi kinematik qovushqoqlik</th></tr>
+<tr><td>SAE 90 (masalan, 75W-90)</td><td class="n">13,5 – 18,5 mm²/s</td></tr>
+<tr><td>SAE 80</td><td class="n">11,0 – 13,5 mm²/s</td></tr>
+<tr><td>Odatiy zamonaviy ATF</td><td class="n">≈ 5,5 – 7,5 mm²/s</td></tr>
+<tr><td>Koʻp EV suyuqliklari</td><td class="n">≈ 4 – 8 mm²/s (yangi ishlanmalar yanada past)</td></tr>
+<tr><td>Castrol ON EV W5 (BYD BOT383, yangi yuritmalar)</td><td class="n">≈ 4,3 mm²/s</td></tr>
+</table></div>
+<p>Kam qovushqoq moylarning oʻz muammosi bor: <strong>bugʻlanuvchanlik</strong> (Noack sinovi) va <strong>chaqnash harorati</strong>. Yengil fraksiyalar uchib ketadi, moy quyuqlashadi, sarf oʻsadi. Shuning uchun EV uchun tor fraksiyali sifatli bazaviy moylar olinadi.</p>
+
+<h3><span class="sec">5.3</span>Qoʻshimchalar paketi</h3>
+<div class="tbl"><table>
+<tr><th>Qoʻshimcha</th><th>Vazifasi</th><th>EV dagi xususiyati</th></tr>
+<tr><td><strong>Yeyilishga va zadirga qarshi</strong> (AW/EP)</td><td>Chegaraviy rejimda metallda himoya qatlam</td><td>Fosfor birikmalariga urgʻu, <strong>faol oltingugurt</strong> minimal. Bu asosiy murosa</td></tr>
+<tr><td><strong>Metall passivatorlari</strong> (mis korroziyasi ingibitorlari)</td><td>Misda yupqa himoya parda. Benzotriazol, toliltriazol, tiadiazol hosilalari</td><td>«Hoʻl» motorlar uchun asosiy</td></tr>
+<tr><td><strong>Antioksidantlar</strong></td><td>Eskirishni sekinlashtiradi (aminli, fenolli)</td><td>Issiq chulgʻamlar tufayli muhim</td></tr>
+<tr><td><strong>Dispersantlar</strong></td><td>Eskirish mahsulotlarini muallaq holatda ushlab, lakning choʻkishiga yoʻl qoʻymaydi</td><td>Forsunka va sovutish kanallarining tozaligi</td></tr>
+<tr><td><strong>Ishqalanish modifikatorlari</strong></td><td>Ishqalanishni boshqaradi</td><td>Yoʻqotishlarni kamaytiradi; gibridlar va 2 bosqichli qutilarda muftalar ishiga javob beradi</td></tr>
+<tr><td><strong>Koʻpikka qarshi</strong></td><td>Koʻpikni soʻndiradi (silikonli, akrilatli)</td><td>Silikon ortiqcha boʻlsa <strong>havo ajralishi yomonlashadi</strong>, muvozanat kerak</td></tr>
+<tr><td><strong>Quyuqlashtiruvchi polimerlar</strong> (odatda PMA)</td><td>Qovushqoqlik indeksini oshiradi</td><td>Siljishga chidashi kerak (KRL sinovi)</td></tr>
+<tr><td>Depressantlar, zichlagich shishirish agentlari</td><td>Sovuqda oquvchanlik, salniklarni saqlash</td><td>Yuritma elastomerlari bilan moslik</td></tr>
+</table></div>
+<p>EV uchun qoʻshimcha paketlarini yirik qoʻshimcha ishlab chiqaruvchi kompaniyalar (Lubrizol, Afton, Infineum, Chevron Oronite va boshq.) ishlab chiqadi, moy kompaniyalari esa ularni oʻz bazaviy moylari bilan aralashtiradi.</p>
+
+<h3><span class="sec">5.4</span>Murosalar uchburchagi</h3>
+<figure class="fig">
+<svg viewBox="0 0 680 280" role="img" aria-label="Murosalar uchburchagi: tishli gʻildiraklar himoyasi, elektr va mis, FIK va sovutish">
+  <polygon points="340,40 120,240 560,240" fill="none" stroke="var(--line)" stroke-width="2"/>
+  <circle cx="340" cy="40" r="7" fill="var(--teal)"/><circle cx="120" cy="240" r="7" fill="var(--copper)"/><circle cx="560" cy="240" r="7" fill="var(--teal)"/>
+  <text x="340" y="22" text-anchor="middle" class="t">Tishli gʻildiraklar himoyasi</text>
+  <text x="120" y="268" text-anchor="middle" class="t">Elektr va mis</text>
+  <text x="560" y="268" text-anchor="middle" class="t">FIK va sovutish</text>
+  <text x="216" y="126" text-anchor="end" class="ts">oltingugurt/fosfor koʻproq →</text>
+  <text x="216" y="142" text-anchor="end" class="tc">mis uchun xavf</text>
+  <text x="464" y="126" class="ts">qovushqoqlik yuqoriroq →</text>
+  <text x="464" y="142" class="tc">FIK past, sovutish yomon</text>
+  <text x="340" y="228" text-anchor="middle" class="ts">qutbli qoʻshimchalar moylashni yaxshilaydi, lekin elektrni oʻzgartiradi</text>
+  <text x="340" y="160" text-anchor="middle" class="tt">EV suyuqligi — ichkaridagi</text>
+  <text x="340" y="178" text-anchor="middle" class="tt">muvozanat nuqtasi</text>
+</svg>
+<figcaption>Bir choʻqqining har qanday «yaxshilanishi» boshqasini oʻziga tortadi. Shuning uchun faqat aniq yuritmaga muvozanatlangan suyuqlik toʻgʻri keladi.</figcaption>
+</figure>
+
+<h3><span class="sec">5.5</span>Nega EV ga tarixan ATF quyilgan</h3>
+<p>Koʻp ilk elektromobillar (masalan, Nissan Leaf) reduktorda ATF ishlatgan. Mantiq tushunarli: ATF allaqachon kam qovushqoq, uning paketi AKPP ning mis va bronza detallari bilan ishlashga moʻljallangan, oksidlanish barqarorligi yaxshi. Lekin <strong>har qanday ATF ham toʻgʻri kelavermaydi</strong>: 800 V li yangi «hoʻl» motorlarda yuqori haroratda elektr xossalari va mis himoyasi muhim, oddiy ATF esa bunga tekshirilmaydi.</p>
+<div class="note"><span class="tag">Esda tuting</span><p>Yorliqdagi «sintetika» soʻzining oʻzi EV bilan moslik haqida hech narsa demaydi. <strong>Qoʻshimchalar paketi va ishlab chiqaruvchi talabiga tasdiqlangan muvofiqlik</strong> hal qiladi.</p></div>
+`,quiz:[
+{q:"Qaysi API guruhi — PAO (polialfaolefinlar)?",o:["III guruh","IV guruh","V guruh"],a:1,w:"PAO — IV guruh. Efirlar va PAG V guruhga, gidrokreking va GTL III guruhga kiradi."},
+{q:"Koʻp EV suyuqliklarining 100 °C dagi odatiy qovushqoqligi:",o:["≈ 4–8 mm²/s","13,5–18,5 mm²/s","30 mm²/s va undan yuqori"],a:0,w:"13,5–18,5 mm²/s — bu SAE 90 sinfi (75W-90). EV suyuqliklari ATF ga yaqin yoki undan ham suyuq; BYD ning W5 moyi — 4,3."},
+{q:"Benzotriazol va toliltriazol hosilalari nima uchun kerak?",o:["Rang uchun","Ular misda himoya parda hosil qiladi (passivatorlar)","Quyuqlashtirish uchun"],a:1,w:"Mis passivatorlari — «hoʻl» motorlar uchun paketning asosiy qismi."},
+{q:"Silikonli koʻpikka qarshi qoʻshimchaning ortiqchaligi nimasi bilan yomon?",o:["Moy yopishqoq boʻladi","Moydan havo ajralishi yomonlashadi","Sovuqda moy loyqalanadi"],a:1,w:"Silikon koʻpikni soʻndiradi, lekin mayda pufakchalar moyda uzoqroq qoladi. Muvozanat kerak."},
+{q:"Nega tarixan EV reduktorlariga koʻpincha ATF quyilgan?",o:["ATF kam qovushqoq, misga ehtiyotkor va barqaror","ATF eng arzon","ATF qizil, oqishni koʻrish oson"],a:0,w:"ATF paketi mis va bronza detallar bilan ishlashga moʻljallangan. Lekin yangi «hoʻl» motorlar uchun elektr va misni tekshirish kerak."}
+]});
+
+/* ============ 6-DARS ============ */
+L.push({id:"l6",title:"Spetsifikatsiyalar, ruxsatnomalar va texnik kartani qanday oʻqish",min:16,body:`
+<p class="lead">Bu agentning asosiy amaliy koʻnikmasi: toʻgʻri suyuqlikni tanlash va mijozga qanday asosda tanlanganini halol tushuntirish.</p>
+
+<h3><span class="sec">6.1</span>Jahon standarti yoʻq, lekin Xitoyda u paydo boʻldi</h3>
+<p>Motor moylari uchun API, ACEA va ILSAC, transmissiya moylari uchun API GL-4/GL-5 bor. Elektr yuritma moylari uchun yagona <strong>jahon</strong> toifasi hozircha yoʻq. Xitoyda motorni suv va moy bilan sovutish uchun alohida talablarga ega <strong>NB/SH/T 6042-2021</strong> «Toza elektr avtomobillar reduktorlari uchun moylar» tarmoq standarti amal qiladi (9-dars). ASTM, SAE va CEC mis va elektr xossalari boʻyicha sinov usullarini ishlab chiqmoqda.</p>
+<p>Amalda tanlash <strong>avtomobil ishlab chiqaruvchilarining spetsifikatsiyalariga</strong> asoslanadi: har birida oʻz kodi yoki firma suyuqligi bor. BYD Castrol BOT383 va BOT384 kodlarini, Tesla — KAF1, Hyundai va Kia — ATF SP4M-1 ni koʻrsatadi.</p>
+
+<h3><span class="sec">6.2</span>Yuritmani aslida kim qiladi</h3>
+<p>Koʻp avtomobil ishlab chiqaruvchilari yuritmalarni yetkazib beruvchilardan sotib oladi. Yiriklari orasida: BYD (FinDreams), Huawei (DriveONE), Inovance, ZF, Bosch, BorgWarner, Vitesco, Nidec, Aisin. Bitta yuritma turli markadagi mashinalarda turishi mumkin va unga suyuqlik talablari bir xil. Va aksincha: bitta modelda turli yuritmalar boʻlishi mumkin.</p>
+
+<h3><span class="sec">6.3</span>Tanlash algoritmi</h3>
+<ol class="list">
+<li><strong>VIN va komplektatsiya.</strong> Old, orqa yoki toʻliq yuritma (ikki agregat!), EV yoki gibrid (BYD da DM-i va EV — butunlay boshqa agregatlar), ishlab chiqarilgan yil.</li>
+<li><strong>Foydalanish qoʻllanmasi yoki servis hujjatlari</strong>, «Suyuqliklar va hajmlar» boʻlimi: spetsifikatsiya nomi yoki raqami, hajmi, intervali.</li>
+<li><strong>Agregatdagi lavha yoki yorliq</strong>, original suyuqlik raqami.</li>
+<li>Moy ishlab chiqaruvchisining <strong>tanlash dasturi</strong>: model va VIN boʻyicha onlayn katalog.</li>
+<li><strong>Maʼlumot boʻlmasa — tajriba qilmang.</strong> Moy yetkazib beruvchisining texnik yordamidan soʻrang.</li>
+</ol>
+
+<h3><span class="sec">6.4</span>Muvofiqlikning uch darajasi</h3>
+<div class="tbl"><table>
+<tr><th>Hujjatdagi ifoda</th><th>Nimani anglatadi</th><th>Kuchi</th></tr>
+<tr><td><strong>Approved / rasmiy ruxsatnoma</strong></td><td>Avtomobil ishlab chiqaruvchisi suyuqlikni sinab, oʻz roʻyxatiga kiritgan</td><td>Eng kuchli</td></tr>
+<tr><td><strong>Meets / talablarga mos</strong></td><td>Moy ishlab chiqaruvchisi suyuqlik talabga mosligini daʼvo qiladi. Javobgarlik unda</td><td>Oʻrtacha</td></tr>
+<tr><td><strong>Recommended for / suitable for / tavsiya etiladi</strong></td><td>Qoʻllash boʻyicha umumiy tavsiya</td><td>Eng kuchsiz</td></tr>
+</table></div>
+<div class="note biz"><span class="tag">Savdo uchun</span><p>Darajani halol ayting. Agar mahsulotda «mos keladi» deyilgan boʻlsa, «ruxsatnoma bor» demang. Bitta shunday xato — va servis sizning hech bir soʻzingizga ishonmaydi.</p></div>
+
+<h3><span class="sec">6.5</span>Texnik kartani (TDS) qanday oʻqish</h3>
+<div class="tbl"><table>
+<tr><th>Parametr</th><th>Usul</th><th>Nimaga qarash</th></tr>
+<tr><td>40 va 100 °C dagi kinematik qovushqoqlik</td><td class="n">ASTM D445</td><td>Yuritma talabiga mos kelishi</td></tr>
+<tr><td>Qovushqoqlik indeksi</td><td class="n">ASTM D2270</td><td>Yuqoriroq — qovushqoqlik harorat bilan kamroq oʻzgaradi</td></tr>
+<tr><td>−40 °C da Brukfild boʻyicha qovushqoqlik</td><td class="n">ASTM D2983</td><td>Pastroq — sovuqda oquvchanlik yaxshiroq</td></tr>
+<tr><td>Chaqnash / qotish harorati</td><td class="n">ASTM D92 / D97</td><td>Chaqnash yuqoriroq, qotish pastroq</td></tr>
+<tr><td>Mis plastinka korroziyasi</td><td class="n">ASTM D130</td><td>1a–1b; sinov sharoitiga qarang (harorat, soat)</td></tr>
+<tr><td>Koʻpiklanish</td><td class="n">ASTM D892</td><td>Uchala seriya boʻyicha kam koʻpik</td></tr>
+<tr><td>Teshilish kuchlanishi</td><td class="n">ASTM D877 / D1816, IEC 60156</td><td>kV dagi qiymat va usul (turli usullar natijalari solishtirilmaydi)</td></tr>
+<tr><td>Solishtirma qarshilik / oʻtkazuvchanlik</td><td class="n">IEC 60247</td><td>Yuritma ishlab chiqaruvchisi belgilagan oynaga tushishi</td></tr>
+<tr><td>FZG, zadir bosqichi</td><td class="n">ISO 14635-1</td><td>Yuqoriroq — tishli gʻildiraklar himoyasi yaxshiroq</td></tr>
+<tr><td>Siljishga barqarorlik (KRL)</td><td class="n">CEC L-45</td><td>Qovushqoqlik yoʻqotilishi kamroq, %</td></tr>
+</table></div>
+
+<h3><span class="sec">6.6</span>Oʻquv misoli: shartli kartani tahlil qilish</h3>
+<div class="note"><span class="tag">Shartli misol, haqiqiy mahsulot emas</span>
+<p><span class="mono">«E-Drive Fluid X»: KV100 = 5,8 mm²/s · VI = 165 · Brukfild −40 °C = 9 000 mPa·s · D130 = 1a (150 °C, 168 soat) · teshilish = 45 kV (D1816) · FZG &gt; 12 · «BYD … talablariga mos, … uchun tavsiya etiladi»</span></p>
+<ul class="list">
+<li>ATF sinfidagi qovushqoqlik, yuqori indeks — FIK va sovuq uchun yaxshi.</li>
+<li>Mis qattiq sharoitda tekshirilgan — «hoʻl» motorlar uchun mos.</li>
+<li>Elektr maʼlumotlari va usul bor — jiddiy mahsulot.</li>
+<li>«Mos keladi», «ruxsatnoma» emas. Mijozga shunday aytamiz.</li>
+</ul></div>
+<div class="note warn"><span class="tag">Tuzoq</span><p>EV suyuqligi yorligʻidagi «API GL-4/GL-5» mis va elektr haqida hech narsani isbotlamaydi. Bu oddiy transmissiyalar uchun toifalar.</p></div>
+
+<h3><span class="sec">6.7</span>Haqiqiy misol: Castrol ON EV W5 (BYD BOT383)</h3>
+<div class="tbl"><table>
+<tr><th>Parametr</th><th>Qiymat</th><th>Bu nimani anglatadi</th></tr>
+<tr><td>100 °C dagi qovushqoqlik</td><td class="n">4,3 mm²/s</td><td>Juda past: koʻpchilik ATF dan past</td></tr>
+<tr><td>40 °C dagi qovushqoqlik</td><td class="n">19 mm²/s</td><td>100 °C dagidan katta — maʼlumotlar mos</td></tr>
+<tr><td>Qovushqoqlik indeksi</td><td class="n">139</td><td>Bu sinf uchun odatiy</td></tr>
+<tr><td>Brukfild −40 °C</td><td class="n">4 400 mPa·s</td><td>Sovuqda yaxshi oquvchanlik</td></tr>
+<tr><td>Qotish</td><td class="n">−48 °C</td><td>Oʻzbekiston uchun zaxira bilan</td></tr>
+<tr><td>20 soat KRL dagi qovushqoqlik yoʻqotilishi</td><td class="n">2% dan kam</td><td>Siljishga yuqori chidamlilik</td></tr>
+<tr><td>Mis</td><td>«juda yaxshi himoya»</td><td>Topilgan tavsifda raqam yoʻq — uni soʻrash kerak</td></tr>
+<tr><td>Qoʻllanilishi</td><td>«Hoʻl» motorli qutilar</td><td>Bu C profili (7-dars)</td></tr>
+</table></div>
+<p>Bu yerda muvofiqlik darajasi eng kuchli: moy BYD qoʻllanmalarida toʻgʻridan-toʻgʻri koʻrsatilgan.</p>
+`,quiz:[
+{q:"EV yuritmasi uchun suyuqlik tanlashda eng muhimi nima?",o:["API GL sinfi","Aniq yuritma uchun ishlab chiqaruvchi spetsifikatsiyasi","SAE boʻyicha qovushqoqlik"],a:1,w:"Yagona jahon toifasi yoʻq, shuning uchun aniq agregat uchun avtomobil ishlab chiqaruvchisining talabi hal qiladi."},
+{q:"«Meets requirements» nimani anglatadi?",o:["Avtomobil ishlab chiqaruvchisining rasmiy ruxsatnomasi","Moy ishlab chiqaruvchisining muvofiqlik haqidagi bayonoti","Original kanistrdagi moy"],a:1,w:"Bu oʻrta daraja: javobgarlik moy ishlab chiqaruvchisida. Rasmiy ruxsatnoma — «approved»."},
+{q:"Nega VIN muhim?",o:["Soliq hisobi uchun","Bitta modelda turli yuritmalar boʻladi: EV yoki gibrid, bitta yoki ikkita motor","Muhim emas"],a:1,w:"Song Plus EV va Song Plus DM-i — butunlay boshqa agregatlar va suyuqliklar."},
+{q:"−40 °C da Brukfild boʻyicha qovushqoqlik nimani koʻrsatadi?",o:["Qattiq sovuqdagi oquvchanlikni","Koʻpiklanishni","Elektr mustahkamlikni"],a:0,w:"Qiymat qanchalik past boʻlsa, moy sovuqda shunchalik oson haydaladi."},
+{q:"Model uchun suyuqlik haqida hech qayerda maʼlumot yoʻq. Nima qilish kerak?",o:["Istalgan ATF quyish","Tajriba qilmaslik va yetkazib beruvchining texnik yordamidan soʻrash","«Ishonchlilik uchun» 75W-90 quyish"],a:1,w:"Xato yuritma narxiga tushishi mumkin. Mijoz va obroʻni yoʻqotgandan koʻra bir kun yoʻqotgan yaxshi."}
+]});
+
+/* ============ 7-DARS ============ */
+L.push({id:"l7",title:"Yuritma turlari va moy tanlash profillari (A–E)",min:18,body:`
+<p class="lead">Kursning asosiy amaliy darsi: aniq mashinaning yuritma turini qanday aniqlash va bu tur uchun moy qanday xususiyatlarga ega boʻlishi kerak.</p>
+
+<h3><span class="sec">7.1</span>Olti turdagi yuritma</h3>
+<div class="tbl"><table>
+<tr><th>Tur</th><th>Ichida nima bor</th><th>Moy nimaga tegadi</th><th>Hujjatlardan misollar</th></tr>
+<tr><td><strong>1. Bir bosqichli reduktor + quruq motor</strong></td><td>Bir juft tishli gʻildirak va differensial; motor antifriz bilan sovutiladi</td><td>Tishli gʻildiraklar, podshipniklar, zichlagichlar</td><td>Nissan Leaf (Matic S ATF); BYD Dolphin (BOT384, bilvosita maʼlumotlarga koʻra — quruq)</td></tr>
+<tr><td><strong>2. Bir bosqichli reduktor + hoʻl motor</strong></td><td>Xuddi shunday, lekin moy chulgʻamlar va rotorni sovutadi</td><td>1-turdagining hammasi + mis, izolyatsiya, datchiklar, yuqori kuchlanish</td><td>BYD Seal, Sealion 7, Atto 3 EVO (W5 moyi, filtr bilan birga almashtiriladi)</td></tr>
+<tr><td><strong>3. Ikki bosqichli quti</strong></td><td>Ikki uzatma, baʼzan hoʻl mufta</td><td>Tishli gʻildiraklar, sinxronizatorlar, muftalar</td><td>Porsche Taycan orqa oʻqi (umummaʼlum misol)</td></tr>
+<tr><td><strong>4. Gibrid transmissiya (DHT, EHS)</strong></td><td>IYoD yonida motor, generator va mufta</td><td>Tishli gʻildiraklar, muftalar, ikki mashina chulgʻamlari</td><td>BYD Seal U DM-i: EHSF-2LV moyi</td></tr>
+<tr><td><strong>5. Planetar quvvat taqsimlagich</strong></td><td>Planetar qator va ikkita motor-generator</td><td>Tishli gʻildiraklar, podshipniklar, chulgʻamlar</td><td>Toyota va Lexus (THS)</td></tr>
+<tr><td><strong>6. Har bir oʻqqa alohida yuritma</strong></td><td>Ikki agregat: old va orqa</td><td>Har bir agregat uchun 1- yoki 2-turdagidek</td><td>Tesla AWD, BYD Seal AWD, Kia EV6 AWD, Zeekr 001 AWD</td></tr>
+</table></div>
+<div class="note"><span class="tag">Qoʻllanmalar nimani koʻrsatdi</span><p>Topilgan barcha ikki motorli mashinalarda (Tesla, BYD Seal, Sealion 7, Atto 3 EVO, Kia EV6) <strong>old va orqa reduktorga bir xil moy quyiladi</strong>, faqat hajmi farq qiladi. Bu qonun emas: har bir yangi modelda qoʻllanma boʻyicha tekshiring.</p></div>
+
+<h3><span class="sec">7.2</span>Aniq mashinada yuritma turini qanday aniqlash</h3>
+<ol class="list">
+<li><strong>VIN va komplektatsiya:</strong> nechta motor (old, orqa, toʻliq yuritma), elektromobil yoki gibrid, ishlab chiqarilgan yil.</li>
+<li><strong>Qoʻllanma:</strong> «Tavsiya etilgan moylar va hajmlar» boʻlimi va texnik xizmat reglamenti.</li>
+<li><strong>Hoʻl motor belgilari:</strong> reduktor moyi bilan birga <strong>filtr</strong> almashtiriladi; moy hoʻl motorlar kodi bilan belgilangan (BYD da — W5 / BOT383); tavsifda motorni moy bilan sovutish bor.</li>
+<li><strong>«Faqat original» belgisi:</strong> zavod firma suyuqligini nomlaydi (Tesla KAF1, Nissan Matic S, Hyundai va Kia ATF SP4M-1).</li>
+<li><strong>Hujjat boʻlmasa:</strong> moy ishlab chiqaruvchilari modelni qaysi moyga kiritganiga qarang, lekin ular xato qilishi mumkinligini unutmang (9-dars).</li>
+</ol>
+
+<h3><span class="sec">7.3</span>Moyning beshta profili</h3>
+<p>Profil — moy qidiriladigan xususiyatlar toʻplami. Diapazonlar haqiqiy texnik kartalar (Mobil, Castrol, Lopal) va BYD qoʻllanmalaridan olingan. Bu standart meʼyorlari emas, <strong>bozor boʻyicha moʻljallar</strong>.</p>
+<div class="tbl"><table>
+<tr><th>Profil</th><th>Qaysi yuritma uchun</th><th>KV100, mm²/s</th><th>VI</th><th>Sovuq −40 °C, mPa·s</th><th>Mis va elektr</th><th>Misol</th></tr>
+<tr><td><strong>A</strong></td><td>1-tur: quruq motor</td><td class="n">4,6–6,3</td><td class="n">≥ 150</td><td class="n">qanchalik past, shuncha yaxshi</td><td>Mis 1a–1b boʻlgani maʼqul; elektr majburiy emas</td><td>Castrol ON Dry D2 (6,3), Lopal E26 (5,27)</td></tr>
+<tr><td><strong>B</strong></td><td>2-tur: hoʻl motor, oddiy qovushqoqlik</td><td class="n">5,0–5,9</td><td class="n">150–160</td><td class="n">≈ 5 000–5 400</td><td><strong>Majburiy:</strong> 150 °C da mis 1a–1B, elektr maʼlumotlari</td><td>Mobil EV Cool Drive 308 (5,03), Lopal E27 (5,51)</td></tr>
+<tr><td><strong>C</strong></td><td>2-tur: eng yangi yuritmalar, juda past qovushqoqlik</td><td class="n">≈ 4,3</td><td class="n">139–145</td><td class="n">≈ 3 800–4 400</td><td><strong>Majburiy</strong></td><td>Castrol ON EV W5 = BYD BOT383 (4,3)</td></tr>
+<tr><td><strong>D</strong></td><td>3- va 4-turlar: muftalar, sinxronizatorlar, gibridlar</td><td class="n">hujjat boʻyicha</td><td class="n">—</td><td class="n">—</td><td><strong>Majburiy</strong> + friksion xossalar</td><td>BYD EHS: EHSF-2LV</td></tr>
+<tr><td><strong>E</strong></td><td>Har qanday, agar zavod suyuqlikni nomlagan boʻlsa</td><td colspan="4">Xususiyatlar boʻyicha tanlashga yoʻl qoʻyilmaydi: faqat nomlangan suyuqlik yoki rasmiy analog</td><td>Tesla KAF1, Nissan Matic S, Kia ATF SP4M-1</td></tr>
+</table></div>
+<div class="note warn"><span class="tag">B va C ni adashtirmang</span><p>Ikkala profil ham hoʻl motor uchun, lekin qovushqoqlik sezilarli farq qiladi: 5,0–5,9 va 4,3. C ga moʻljallangan yuritmaga B moyini yozma tasdiqsiz quyilmaydi.</p></div>
+
+<h3><span class="sec">7.4</span>Texnik kartada qaysi xossalarni tekshirish</h3>
+<div class="tbl"><table>
+<tr><th>Xossa</th><th>Usul</th><th>Kim uchun muhim</th><th>Qizil bayroq</th></tr>
+<tr><td>40 va 100 °C dagi qovushqoqlik</td><td class="n">ASTM D445</td><td>Hammasi</td><td>Qiymatlar yoʻq; 40 °C da 100 °C dagidan kam (kartadagi xato)</td></tr>
+<tr><td>Qovushqoqlik indeksi, sovuq −40 °C</td><td class="n">D2270, D2983</td><td>Hammasi</td><td>Sovuq boʻyicha maʼlumot yoʻq</td></tr>
+<tr><td>Koʻpik va havo ajralishi</td><td class="n">D892, D3427</td><td>Hammasi</td><td>Koʻpik boʻyicha maʼlumot yoʻq</td></tr>
+<tr><td>Tishli gʻildiraklar himoyasi</td><td class="n">FZG</td><td>Hammasi</td><td>Faqat «zadirga qarshi» soʻzi, bosqichsiz</td></tr>
+<tr><td>Siljishga barqarorlik</td><td class="n">CEC L-45 (KRL)</td><td>Hammasi, ayniqsa C</td><td>Maʼlumot yoʻq</td></tr>
+<tr><td>Mis</td><td class="n">D130, mis sim sinovi, bugʻ fazasi</td><td>B, C, D</td><td>Faqat 100 °C dagi D130, moy esa hoʻl motorlar uchun deb eʼlon qilingan</td></tr>
+<tr><td>Elektr</td><td class="n">D1816, IEC 60156, IEC 60247</td><td>B, C, D</td><td>Na raqam, na usul yoʻq</td></tr>
+<tr><td>Emal va laklar bilan moslik</td><td>namunalarni saqlash</td><td>B, C, D</td><td>Bayonot yoʻq</td></tr>
+<tr><td>Friksion xossalar</td><td>stend sinovlari</td><td>D</td><td>Ruxsatnomasiz universal ATF</td></tr>
+</table></div>
+
+<h3><span class="sec">7.5</span>Algoritm va stop-qoidalar</h3>
+<ol class="list">
+<li>VIN boʻyicha mashinaning barcha agregatlarini va har birining turini aniqlang.</li>
+<li>Zavod hujjatini toping: suyuqlik nomi, hajmi, intervali.</li>
+<li>Agar suyuqlik nomlangan boʻlsa — bu E profili: aynan uni yoki rasmiy analogini qidiring.</li>
+<li>Nomlanmagan boʻlsa — A–D profilini tanlang va taklif qilinayotgan moyning texnik kartasini 7.4-jadval boʻyicha solishtiring.</li>
+<li>Maʼlumot yetmasa — toʻxtang va yetkazib beruvchidan qoʻllanilishi haqida xat soʻrang.</li>
+</ol>
+<div class="note warn"><span class="tag">Stop-qoidalar</span><ul class="list">
+<li>Model uchun tasdiq yoʻq — «mos keladi» demang, «aniqlayapman» deng.</li>
+<li>Motor turi nomaʼlum — xavfni hoʻl motor kabi baholang, lekin baribir hujjat bilan tasdiqlang.</li>
+<li>Mis va elektr maʼlumotlarisiz faqat «API GL-4/GL-5» — hoʻl motorlar uchun emas.</li>
+<li>Zavod taqiqlasa, turli avlod suyuqliklarini aralashtirmang (Tesla).</li>
+</ul></div>
+
+<h3><span class="sec">7.6</span>Uchta tahlil</h3>
+<div class="tbl"><table>
+<tr><th>Mashina</th><th>Mulohaza</th><th>Natija</th></tr>
+<tr><td><strong>BYD Seal AWD</strong></td><td>Qoʻllanma: old va orqa — BOT-383 / W5, 1,6 va 1,55 l. W5 — hoʻl motorlar uchun moy, KV100 4,3</td><td>C profili, original Castrol W5. Analog — faqat yozma tasdiq bilan</td></tr>
+<tr><td><strong>BYD Atto 3 (avvalgi)</strong></td><td>Qoʻllanma yoʻq. Castrol va Lopal quruqqa, FUCHS hoʻlga kiritadi</td><td>Toʻxtash: VIN va diler orqali aniqlash</td></tr>
+<tr><td><strong>Kia EV6</strong></td><td>Qoʻllanma ATF SP4M-1 va brendlar roʻyxatini nomlaydi</td><td>E profili: faqat roʻyxatdagi SP4M-1</td></tr>
+</table></div>
+<p>Barcha topilgan modellar va reduktorlar boʻyicha jadval — <a href="#permodel">«Modellar boʻyicha moy tanlash»</a> maʼlumotnomasida.</p>
+`,quiz:[
+{q:"BYD qoʻllanmasidagi qaysi belgi hoʻl motor haqida dalolat beradi?",o:["Mashinada bitta motor","Reduktor moyi bilan birga filtr almashtiriladi, moy W5 deb belgilangan","Qoʻllanmada antifriz koʻrsatilgan"],a:1,w:"Moy konturidagi filtr va W5 kodi (hoʻl motorlar uchun Castrol) — moy motorni sovutishi belgilari. Antifriz deyarli barcha mashinalarda bor."},
+{q:"C profili — bu…",o:["Quruq motor, qovushqoqlik 6 mm²/s","Hoʻl motor, 100 °C da taxminan 4,3 mm²/s juda past qovushqoqlik","Muftali gibrid"],a:1,w:"C profili — hoʻl motorli eng yangi yuritmalar, masalan W5 moyli BYD Seal."},
+{q:"Tesla KAF1 suyuqligini nomlaydi. Moyni qanday tanlash kerak?",o:["Xususiyatlar boʻyicha, istalgan oʻxshashini","Faqat KAF1 yoki rasmiy analog (E profili)","Istalgan ATF"],a:1,w:"Agar zavod suyuqlikni nomlagan boʻlsa, «xususiyatlar boʻyicha» tanlashga yoʻl qoʻyilmaydi."},
+{q:"C profiliga (4,3) moʻljallangan yuritmaga B profilidagi moyni (KV100 5,5) quyish mumkinmi?",o:["Ha, ikkalasi ham hoʻl motorlar uchun","Yoʻq, yozma tasdiqsiz mumkin emas","Ha, kamroq quyilsa"],a:1,w:"Qovushqoqlikdagi farq katta, yuritma aniq sinfga moʻljallangan."},
+{q:"BYD Seal AWD qoʻllanmasida old va orqa reduktor haqida nima deyilgan?",o:["Turli moylar","Bitta moy BOT-383 / W5, hajmlari 1,6 va 1,55 l","Moy almashtirilmaydi"],a:1,w:"Topilgan barcha ikki motorli mashinalarda moy bitta, hajmlar turlicha."}
+]});
+
+/* ============ 8-DARS ============ */
+L.push({id:"l8",title:"Gibridlar: DHT qutilari, BYD DM-i, Toyota va boshqalar",min:16,body:`
+<p class="lead">Gibridlar hozir Oʻzbekistondagi eng ommaviy «elektrlashtirilgan» segment va bu yerda bir nechta suyuqlik bor. MITAL uchun bu yana motor moyi bozori hamdir.</p>
+
+<h3><span class="sec">8.1</span>Gibrid turlari</h3>
+<div class="tbl"><table>
+<tr><th>Tur</th><th>Qanday ishlaydi</th><th>Misollar</th><th>Transmissiya suyuqligi</th></tr>
+<tr><td><strong>Quvvat taqsimlagichli HEV</strong></td><td>Planetar mexanizm IYoD quvvatini gʻildiraklar va generator oʻrtasida taqsimlaydi. Ichida ikkita motor-generator, bosqichli uzatmalar yoʻq</td><td>Toyota, Lexus (THS)</td><td>Spetsifikatsiyalangan ATF (Toyota da — ATF WS)</td></tr>
+<tr><td><strong>DHT</strong> (maxsus gibrid transmissiya)</td><td>Motor, generator va mufta (yoki bir nechta uzatma) bitta korpusda. Shaharda elektrda yuradi, trassada IYoD gʻildiraklarni toʻgʻridan-toʻgʻri aylantirishi mumkin</td><td>BYD DM-i / DM-p, Geely, Chery, GWM</td><td>Ishlab chiqaruvchi spetsifikatsiyasidagi, muftalar uchun friksion xossali suyuqlik</td></tr>
+<tr><td><strong>P2 / gibrid AKPP yoki DCT</strong></td><td>Elektr motor oddiy qutiga oʻrnatilgan</td><td>Koʻp yevropa PHEV lari</td><td>Ruxsatnoma boʻyicha ATF yoki DCTF</td></tr>
+<tr><td><strong>EREV</strong> (yurish zaxirasini oshiruvchi)</td><td>Gʻildiraklarni faqat elektr motor aylantiradi, IYoD generator boʻlib ishlaydi</td><td>Li Auto, Leapmotor C11 REEV, Voyah</td><td>EV yuritmasidagi kabi, plyus motor moyli IYoD</td></tr>
+</table></div>
+
+<h3><span class="sec">8.2</span>DHT suyuqligidan nima talab qilinadi</h3>
+<p>1–5-darslardagi hammasi plyus:</p>
+<ul class="list">
+<li><strong>Friksion xossalar.</strong> Mufta silliq, siltanmasdan ulanishi kerak (antishudder), ishqalanish koeffitsiyenti esa butun xizmat muddati davomida barqaror qolishi kerak.</li>
+<li><strong>Ikki elektr mashinani sovutish</strong> (motor va generator), odatda «hoʻl».</li>
+<li>Agregat IYoD yonida tursa, <strong>IYoD dan qizish</strong>.</li>
+<li>Koʻp bosqichli DHT larda sinxronizatorlar va tishli gʻildiraklarni himoya qilish.</li>
+</ul>
+<div class="note warn"><span class="tag">Koʻp uchraydigan xato</span><p>DHT ga «universal ATF» quyish. Muftalar uchun suyuqliklarning oʻz friksion xususiyatlari bor. Xato siltanish, ulanishda tebranish va friksionlarning tez yeyilishiga olib keladi.</p></div>
+
+<h3><span class="sec">8.3</span>Gibriddagi dvigatel — alohida ogʻir hayot</h3>
+<p>Gibrid IYoD oddiy mashinadagidan boshqacha ishlaydi:</p>
+<ul class="list">
+<li>Tez-tez ishga tushish va toʻxtash. Dvigatel uzoq vaqt qisqa tsikllarda ishlab, <strong>qizimasligi</strong> mumkin.</li>
+<li>Bundan <strong>kondensat</strong> va <strong>moydagi yoqilgʻi</strong>: emulsiya (qopqoqdagi «mayonez»), suyulish, korroziya.</li>
+<li>Atkinson va Miller tsikllari, yuqori siqish darajasi, LSPI ga (past tezlikdagi erta alangalanish) moyil turbomotorlar.</li>
+<li>Ishlab chiqaruvchi talabi boʻyicha juda past qovushqoqlik: 0W-20, 0W-16, baʼzan undan ham past.</li>
+</ul>
+<p>Talablar: dolzarb API va ILSAC toifalari yoki ishlab chiqaruvchi spetsifikatsiyasi, LSPI dan himoya, yaxshi korroziyaga qarshi xossalar, suv va yoqilgʻiga chidamlilik.</p>
+
+<h3><span class="sec">8.4</span>Gibridda nechta suyuqlik</h3>
+<div class="tbl"><table>
+<tr><th>Tizim</th><th>Suyuqlik</th></tr>
+<tr><td>Dvigatel</td><td>Motor moyi (past qovushqoqlik, ruxsatnoma boʻyicha)</td></tr>
+<tr><td>Transmissiya / DHT</td><td>ATF, DHT suyuqligi yoki spetsifikatsiya boʻyicha e-fluid</td></tr>
+<tr><td>IYoD va elektronikani sovutish</td><td>Antifriz; koʻpincha ikkita kontur</td></tr>
+<tr><td>Batareya</td><td>Tizimga qarab antifriz yoki konditsioner xladagenti</td></tr>
+<tr><td>Tormozlar</td><td>Tormoz suyuqligi</td></tr>
+</table></div>
+<div class="note biz"><span class="tag">Savdo uchun</span><p>Gibridlar — MITAL uchun eng tez kirish yoʻli. <strong>Ularga motor moyi har doim kerak</strong>, koʻpincha oddiy mashinalardan ham tez-tez: ogʻir sharoitda interval qisqartiriladi. Ustaga kondensat va qisqa tsikllar haqida tushuntira oladigan agent kanistr emas, ekspertiza sotadi.</p></div>
+
+<h3><span class="sec">8.5</span>Qoʻllanmadan misol: BYD Seal U DM-i</h3>
+<div class="tbl"><table>
+<tr><th>Uzel</th><th>Suyuqlik</th><th>Hajm</th><th>Almashtirish</th></tr>
+<tr><td>Dvigatel</td><td>Motor moyi 0W-20, ACEA C5 sinfi va yuqori</td><td class="n">3,3 l (2WD) / 3,9 l (4WD), filtr bilan</td><td>reglament boʻyicha</td></tr>
+<tr><td>EHS gibrid transmissiyasi</td><td>EHSF-2LV (firma moyi)</td><td class="n">3,0 l (2WD) / 3,7 l (4WD)</td><td>moy va filtr har 4 yil / 60 000 km da</td></tr>
+<tr><td>Orqa elektr yuritma (4WD)</td><td>BOT384</td><td class="n">0,8 l</td><td>har 4 yil / 60 000 km da</td></tr>
+</table></div>
+<p>Hatto BYD gibridida ham motor moyi — ommaviy pozitsiya (0W-20, ACEA C5), transmissiya suyuqliklari esa firma suyuqliklari. Bu MITAL uchun tez kirish yoʻli qayerda ekanini yaxshi koʻrsatadi.</p>
+`,quiz:[
+{q:"DHT nima?",o:["Dizel gibrid turbinasi","Maxsus gibrid transmissiya: motorlar, generator va muftalar bitta korpusda","Batareya turi"],a:1,w:"Dedicated Hybrid Transmission. Misol — BYD DM-i."},
+{q:"Toyota THS transmissiyasi qanday tuzilgan?",o:["Klassik 6 bosqichli AKPP","Ikkita motor-generatorli planetar quvvat taqsimlagich","Tasmali variator"],a:1,w:"Bosqichli uzatmalar yoʻq. Quvvat taqsimotini planetar mexanizm boshqaradi."},
+{q:"Nega gibrid dvigateliga oddiynikidan ogʻirroq?",o:["U kuchliroq","Tez-tez ishga tushish va qizimaslik: moyga kondensat va yoqilgʻi tushadi","U moysiz ishlaydi"],a:1,w:"Qisqa tsikllar moyda suv va yoqilgʻi beradi, bu esa emulsiya, suyulish va korroziya demakdir."},
+{q:"EREV (masalan, Li Auto) — bu qachonki…",o:["Gʻildiraklarni elektr motor aylantiradi, IYoD esa generator boʻlib ishlaydi","IYoD gʻildiraklarni aylantiradi, motor yordam beradi","IYoD siz mashina"],a:0,w:"Ketma-ket gibrid. Yuritma EV dagidek, lekin dvigatel bor va unga motor moyi kerak."},
+{q:"Bir bosqichli reduktorga nisbatan DHT suyuqligi talablariga nima qoʻshiladi?",o:["Hech narsa","Muftalar uchun friksion xossalar","Yuqori qovushqoqlik"],a:1,w:"Muftalar barqaror ishqalanish koeffitsiyenti va siltanishdan himoya (antishudder) talab qiladi."}
+]});
+
+/* ============ 9-DARS ============ */
+L.push({id:"l9",title:"Xitoy bozori: standart, ishlab chiqaruvchilar va moy kodlari",min:15,body:`
+<p class="lead">Xitoy eng koʻp elektromobil ishlab chiqaradi. U yerda qanday qoidalar amal qilishini, moylarni kim qilishini va qoʻllanmalardagi moy belgilarini qanday oʻqishni koʻrib chiqamiz.</p>
+
+<h3><span class="sec">9.1</span>NB/SH/T 6042-2021 standarti</h3>
+<ul class="list">
+<li>Nomi: «Toza elektr avtomobillar reduktorlari uchun moylar» (纯电动汽车减速箱用油). Xitoy Milliy energetika boshqarmasi tomonidan 16.11.2021 da chiqarilgan, 16.05.2022 dan amal qiladi.</li>
+<li>Xitoy nashrlariga koʻra — bunday moylar uchun dunyodagi birinchi ochiq standart. Ishlab chiqishga Sinopec (Great Wall brendi) boshchilik qilgan.</li>
+<li>Talablar <strong>ikki jadvalga</strong> boʻlingan: motori <strong>suv</strong> bilan va <strong>moy</strong> bilan sovutiladigan mashinalar uchun. Bu A profili va B/C profillari bilan bir xil mantiq.</li>
+<li>Raqamli chegaralar ochiq manbalarda topilmadi: toʻliq matn pullik (inglizcha tarjimasi ChineseStandard.net da sotiladi).</li>
+</ul>
+
+<h3><span class="sec">9.2</span>BYD reduktor moyini qanday belgilaydi</h3>
+<div class="tbl"><table>
+<tr><th>Qoʻllanmadagi belgi</th><th>Bu nima</th><th>Qayerda uchraydi</th></tr>
+<tr><td><strong>BOT383 / W5 / EV3.0</strong></td><td>Castrol ON EV Transmission Fluid W5 — Seagull qoʻllanmasida shunday toʻgʻridan-toʻgʻri yozilgan. Hoʻl motorlar uchun moy: KV100 4,3, VI 139</td><td>Seal, Sealion 7, Atto 3 EVO, Seagull</td></tr>
+<tr><td><strong>BOT384 / EV2.0</strong></td><td>Boshqa Castrol suyuqligi. Texnik kartasi topilmadi; bilvosita maʼlumotlarga koʻra — D2 sinfidagi quruq moy (KV100 ≈ 6,3). Bu xulosa, BYD maʼlumoti emas</td><td>Dolphin, Seagull (variant sifatida), Seal U DM-i orqa yuritmasi</td></tr>
+<tr><td><strong>EHSF-2LV</strong></td><td>EHS gibrid transmissiyasi uchun firma moyi</td><td>Seal U DM-i</td></tr>
+</table></div>
+<p>Shunga oʻxshash kodlar moy ishlab chiqaruvchilarida ham uchraydi: Lopal E274 texnik kartasida «BYD uchun W5 darajasi», E27 da — «BOT 805C EV spetsifikatsiyasi» tilga olingan. Moy ishlab chiqaruvchilari ham shu zavod kodlariga tayanadi.</p>
+
+<h3><span class="sec">9.3</span>Moylarni kim qiladi</h3>
+<div class="tbl"><table>
+<tr><th>Guruh</th><th>Kompaniyalar</th></tr>
+<tr><td>Xitoy kompaniyalari</td><td>Sinopec (Great Wall), PetroChina (Kunlun), Lopal, Tongyi, Copton</td></tr>
+<tr><td>Xitoydagi xalqaro kompaniyalar</td><td>Castrol (BYD zavod quyilmasi), Mobil, FUCHS, Shell, TotalEnergies</td></tr>
+<tr><td>Qoʻshimcha ishlab chiqaruvchilari</td><td>Lubrizol, Afton, Infineum, Chevron Oronite — koʻpchilik brendlar uchun qoʻshimcha paketlarini qiladi</td></tr>
+</table></div>
+<p>Saytlari bilan batafsil — <a href="#makers">«Xitoydagi ishlab chiqaruvchilar»</a> maʼlumotnomasida; topilgan barcha moylar raqamlari bilan — <a href="#catalog">«Moylar katalogi»</a>da.</p>
+
+<h3><span class="sec">9.4</span>Bozor raqamlari nima deydi</h3>
+<div class="tbl"><table>
+<tr><th>Moylar oilasi</th><th>KV100, mm²/s</th><th>Misollar</th></tr>
+<tr><td>Hoʻl motor, juda past qovushqoqlik (yangi yuritmalar)</td><td class="n">≈ 4,3</td><td>Castrol W5 (BYD BOT383), Lopal E274, Lopal E27 PRO</td></tr>
+<tr><td>Hoʻl motor, oddiy qovushqoqlik</td><td class="n">≈ 5,0–5,9</td><td>Mobil EV Cool Drive 308, 311, MS 304, MS 902; Lopal E27</td></tr>
+<tr><td>Quruq motor</td><td class="n">≈ 4,6–6,3</td><td>Castrol D1, D2; Lopal E26</td></tr>
+</table></div>
+
+<h3><span class="sec">9.5</span>Manbalarga koʻr-koʻrona ishonib boʻlmaydi</h3>
+<ul class="list">
+<li><strong>Moy ishlab chiqaruvchisining tavsiyasi zavod bilan farq qilishi mumkin.</strong> FUCHS BYD Seal ni qovushqoqligini koʻrsatmasdan oʻzining hoʻl motorlar uchun moyiga kiritadi, BYD qoʻllanmasi esa juda past qovushqoqlikdagi W5 ni nomlaydi.</li>
+<li><strong>Texnik kartalardagi xatolar.</strong> Mobil EV Cool Drive 043 sahifasida 40 °C dagi qovushqoqlik 100 °C dagidan kam — bunday boʻlmaydi. Lopal kartalarida chaqnash harorati uchun qotish harorati usuli koʻrsatilgan.</li>
+<li><strong>Bitta model — turli maʼlumotlar.</strong> Lopal Chery eQ7 ni ham E26 (quruq), ham E27 (hoʻl) roʻyxatida koʻrsatadi.</li>
+<li><strong>OAV maqolalari.</strong> 2026-yilgi xitoy maqolasi BYD uchun 24 oy / 40 000 km, keyin 48 oy / 80 000 km interval keltiradi, Seal ning yevropa qoʻllanmasi esa — 24 oy / 30 000 km, keyin 24 oy / 48 000 km.</li>
+</ul>
+<div class="note"><span class="tag">Ishonch tartibi</span><p>Zavod qoʻllanmasi → raqamli texnik karta → moy ishlab chiqaruvchisi tavsiyasi → maqola yoki reklama.</p></div>
+`,quiz:[
+{q:"NB/SH/T 6042-2021 nima?",o:["Amerika motor moylari standarti","Motorni suv va moy bilan sovutish uchun alohida talablarga ega, elektromobil reduktorlari moylari boʻyicha xitoy tarmoq standarti","BYD ruxsatnomasi"],a:1,w:"Standartning ikki jadvali quruq va hoʻl motorga mos keladi."},
+{q:"BYD qoʻllanmalaridagi BOT383 — bu…",o:["Tormoz suyuqligi","Castrol ON EV Transmission Fluid W5","Antifriz"],a:1,w:"BYD Seagull qoʻllanmasida shunday toʻgʻridan-toʻgʻri yozilgan."},
+{q:"Moy ishlab chiqaruvchisining tavsiyasi zavod qoʻllanmasi bilan farq qiladi. Nimaga ishonish kerak?",o:["Moy ishlab chiqaruvchisiga","Zavod qoʻllanmasiga","Arzonroq moyni tanlash"],a:1,w:"Ishonch tartibi: qoʻllanma → texnik karta → tavsiya → reklama."},
+{q:"Texnik kartada 40 °C dagi qovushqoqlik 100 °C dagidan kam. Bu nimani anglatadi?",o:["Moy juda yaxshi","Maʼlumotlarda xato","Shunday boʻlishi kerak"],a:1,w:"Qizdirilganda moy doim suyuqlashadi. Bunday maʼlumotlarni qayta tekshirish kerak."},
+{q:"Hoʻl motorlar moylarida qovushqoqlikning qaysi ikki «oilasi» koʻrinadi?",o:["≈ 4,3 va ≈ 5–6 mm²/s","≈ 13 va ≈ 18 mm²/s","≈ 1 va ≈ 2 mm²/s"],a:0,w:"Juda past (W5, Lopal E274) va oddiy (Mobil 308, Lopal E27)."}
+]});
+
+/* ============ 10-DARS ============ */
+L.push({id:"l10",title:"Servis: Oʻzbekiston parki, hajmlar, intervallar, almashtirish",min:15,body:`
+<p class="lead">Nazariyadan servisga oʻtamiz: qanday mashinalar yuradi, qancha suyuqlik kerak, uni qachon almashtirish va buni qanday toʻgʻri bajarish.</p>
+
+<h3><span class="sec">10.1</span>Oʻzbekistonda nimalar yuradi</h3>
+<p>Elektromobil va gibridlar parki import imtiyozlari va mahalliy yigʻish tufayli tez oʻsmoqda. BYD mashinalarni Jizzaxda yigʻadi, masalan Chazor va Song Plus DM-i. Eng koʻp uchraydiganlari:</p>
+<ul class="list">
+<li><strong>BYD</strong>: Song Plus (EV va DM-i), Chazor, Han, Seal, Yuan;</li>
+<li><strong>xitoy VW</strong>: ID.4 va ID.6;</li>
+<li><strong>Chery / Exeed, Geely, Zeekr, Changan, Leapmotor, Voyah, Hongqi</strong>;</li>
+<li><strong>Li Auto</strong> (EREV);</li>
+<li>Tesla va yevropa EV lari — asosan diler orqali emas, yakka holda olib kelingan mashinalar.</li>
+</ul>
+<p>Koʻp mashinalar xususiy tarzda olib kelingan: diler servisi yoʻq, hujjatlar xitoy tilida, ustalar suyuqlikni taxminan tanlaydi.</p>
+
+<h3><span class="sec">10.2</span>Qancha moy kerak: qoʻllanmalar maʼlumotlari</h3>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Old reduktor</th><th>Orqa reduktor</th><th>Moy</th></tr>
+<tr><td>BYD Seagull</td><td class="n">0,55 l</td><td>—</td><td>Castrol BOT384 yoki BOT383 (W5)</td></tr>
+<tr><td>BYD Dolphin</td><td class="n">0,45 yoki 0,60 l</td><td>—</td><td>BOT384</td></tr>
+<tr><td>BYD Seal, Sealion 7</td><td class="n">1,6 l (AWD)</td><td class="n">1,55 l</td><td>BOT-383 / W5</td></tr>
+<tr><td>BYD Atto 3 EVO</td><td class="n">1,8 l (AWD)</td><td class="n">1,55 l</td><td>BOT383 / W5 + filtr</td></tr>
+<tr><td>BYD Seal U DM-i</td><td class="n">EHS: 3,0 l (2WD) / 3,7 l (4WD)</td><td class="n">0,8 l (4WD)</td><td>EHSF-2LV / BOT384</td></tr>
+<tr><td>Tesla Model 3 / Y</td><td class="n">1,3 l (AWD)</td><td class="n">2,1–2,3 l</td><td>KAF1</td></tr>
+<tr><td>Nissan Leaf</td><td class="n">1,4 l</td><td>—</td><td>Matic S</td></tr>
+<tr><td>MG4</td><td>—</td><td class="n">0,9 l</td><td>Shell E-Fluid E6 iX (qoʻllanma tavsifi boʻyicha)</td></tr>
+<tr><td>Kia EV6</td><td class="n">3,2–3,3 l (AWD)</td><td class="n">3,4–3,5 l</td><td>ATF SP4M-1</td></tr>
+<tr><td>Hyundai Ioniq 5</td><td class="n">3,2 l</td><td class="n">3,4 l</td><td>HK ATF SP4M-1</td></tr>
+</table></div>
+<p>Ikki maktab koʻrinadi: BYD da reduktor kichik (0,5–1,8 l), Hyundai va Kia da — 3,2–3,5 l ATF turidagi suyuqlik. Toʻliq yuritmali mashinada buyurtma hajmi ikkita reduktordan qoʻshiladi.</p>
+<p class="small">Har bir reduktor boʻyicha — <a href="#permodel">«Modellar boʻyicha moy tanlash»</a> maʼlumotnomasida.</p>
+
+<h3><span class="sec">10.3</span>Almashtirish intervallari: qoʻllanmalar maʼlumotlari</h3>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Birinchi almashtirish</th><th>Keyin</th><th>Nima almashtiriladi</th></tr>
+<tr><td>BYD Seal, Dolphin</td><td>24 oy / 30 000 km</td><td>har 24 oy / 48 000 km da</td><td>Moy</td></tr>
+<tr><td>BYD Atto 3 EVO</td><td>24 oy / 20 000 km</td><td>har 24 oy / 30 000 km da</td><td>Moy va filtr</td></tr>
+<tr><td>BYD Sealion 7</td><td>24 oy / 20 000 mil</td><td>har 24 oy / 30 000 mil da</td><td>Moy va filtr</td></tr>
+<tr><td>BYD Seagull</td><td colspan="2">har 12 oy / 20 000 km da tekshirish</td><td>Moy</td></tr>
+<tr><td>BYD Seal U DM-i</td><td colspan="2">har 4 yil / 60 000 km da</td><td>EHS moyi va filtr</td></tr>
+</table></div>
+<ul class="list">
+<li>BYD da birinchi almashtirish keyingilaridan oldinroq: tishli gʻildiraklarning moslashuv mahsulotlari chiqariladi.</li>
+<li><strong>Ogʻir sharoit</strong> (taksi, issiq, chang, tez-tez tezlanish, togʻ) — intervalni qisqartirish uchun asos.</li>
+<li>Avtoparklar uchun eng yaxshi vosita — <strong>ishlatilgan moy tahlili</strong>: temir, mis, suv, qovushqoqlik, kislota soni.</li>
+</ul>
+<div class="note"><span class="tag">Signal</span><p>Tahlilda <strong>mis</strong>ning oʻsishi — xavotirli belgi: chulgʻamlar, vtulkalar yoki oʻtkazgichlar korroziyasi. Nima quyilganini tekshiring.</p></div>
+
+<h3><span class="sec">10.4</span>Almashtirish tartibi (umumiy sxema)</h3>
+<ol class="list">
+<li>VIN boʻyicha spetsifikatsiya va hajmni tasdiqlash.</li>
+<li>Mashinani koʻtargichga tekis qoʻyish, tizimni yoʻriqnoma boʻyicha oʻchirish (xizmat rejimi).</li>
+<li><strong>Avval quyish tiqinini burab oching</strong>, ochilishiga ishonch hosil qiling va faqat keyin toʻkish tiqinini.</li>
+<li>Toʻkilgan moy va tiqin magnitini koʻzdan kechiring: qirindi, metall pasta, suv (loyqalik, «sut»), kuygan hid.</li>
+<li>Yangi zichlagich shaybalar, tortish momenti hujjat boʻyicha.</li>
+<li>Sathgacha quying. Koʻpincha sath — quyish teshigining pastki chetigacha, lekin baʼzi agregatlarda diagnostika skaneri orqali nasos bilan haydash va belgilangan haroratda sathni tekshirish tartibi bor.</li>
+<li>Almashtirishni servis tarixiga yozib qoʻying.</li>
+</ol>
+<div class="note warn"><span class="tag">Xavfsizlik</span><p>Toʻq sariq kabel va ulagichlar — <strong>yuqori kuchlanish</strong>. Moy almashtirish — faqat mexanik qism bilan ish. Yuqori voltli ulagichlarga tegmang, elektr taʼmiriga faqat oʻqitilgan xodimlar qoʻyiladi.</p></div>
+<div class="note biz"><span class="tag">OilBook uchun gʻoya</span><p>OilBook ga alohida interval va mijozga eslatmali «EV yuritma suyuqligi» xizmat turini qoʻshish. Servis uchun bu takroriy tashrif, MITAL uchun — muntazam talab.</p></div>
+`,quiz:[
+{q:"Qaysi tiqin birinchi burab ochiladi?",o:["Toʻkish tiqini","Quyish tiqini","Farqi yoʻq"],a:1,w:"Agar quyish tiqini toʻkilgandan keyin ochilmasa, mashina moysiz qoladi."},
+{q:"Mashinada ikkita motor (toʻliq yuritma). Bu buyurtma uchun nimani anglatadi?",o:["Hech narsa","Ikki agregat, ikki hissa hajm kerak, baʼzan turli suyuqliklar","Moy faqat orqasiga kerak"],a:1,w:"Komplektatsiyani aniqlash va buyurtmani oshirish uchun yaxshi sabab."},
+{q:"Ishlatilgan moy tahlilida misning oʻsishi nimaga ishora qilishi mumkin?",o:["Yaxshi holatga","Chulgʻamlar, vtulkalar yoki oʻtkazgichlar korroziyasiga","Antifriz tushganiga"],a:1,w:"EV yuritmasidagi mis — xavotirli signal. Qanday suyuqlik quyilganini tekshiring."},
+{q:"Elektromobil taksi, +45 °C issiq — bu qanday sharoit?",o:["Normal","Ogʻir: almashtirish intervali qisqartiriladi","Yengil"],a:1,w:"Katta probeg, issiq, chang va tezlanishlar — klassik ogʻir sharoit."},
+{q:"Toʻq sariq kabellar nimani anglatadi?",o:["12 V zanjir","Yuqori kuchlanish, tegmang","ABS datchiklari"],a:1,w:"Toʻq sariq — yuqori voltli zanjirlarning standart belgisi."}
+]});
+
+/* ============ 11-DARS ============ */
+L.push({id:"l11",title:"B2B savdo, eʼtirozlar va MITAL nimani taklif qila oladi",min:15,body:`
+<p class="lead">Agent toʻgʻri savollar bersa, eʼtirozlarga javob bersa va ortiqcha vaʼda bermasa, bilim savdoga aylanadi.</p>
+
+<h3><span class="sec">11.1</span>Kimga sotish kerak</h3>
+<div class="tbl"><table>
+<tr><th>Segment</th><th>Mijoz uchun nima muhim</th></tr>
+<tr><td>Ixtisoslashgan EV servislari</td><td>Aniq tanlash, mavjudlik, texnik yordam</td></tr>
+<tr><td>EV va gibridlarni qabul qila boshlagan oddiy STO lar</td><td>Ustalarni oʻqitish, tanlash jadvali, kichik qadoqlar</td></tr>
+<tr><td>Taksi parklari va agregator haydovchilari</td><td>Bekor turish, resurs, kilometr narxi, intervallar</td></tr>
+<tr><td>Korporativ avtoparklar</td><td>Hujjatlar, hisobot, xizmat reglamenti</td></tr>
+<tr><td>Avtoehtiyot qismlar doʻkonlari</td><td>Aylanma, xaridor uchun tushunarli tanlash</td></tr>
+<tr><td>Xitoy markalari sotuvchilari huzuridagi servislar</td><td>Hajm, barqaror yetkazib berish, spetsifikatsiyalarga moslik</td></tr>
+</table></div>
+
+<h3><span class="sec">11.2</span>Uchrashuvdagi savollar</h3>
+<ol class="list">
+<li>Sizga qanday elektromobil va gibridlar keladi? Qaysi markalar eng koʻp?</li>
+<li>Oyiga nechta shunday mashina?</li>
+<li>Hozir reduktor yoki DHT ga nima quyasiz? Qayerdan olasiz?</li>
+<li>Nima quyishni qanday aniqlaysiz?</li>
+<li>Shikoyatlar boʻlganmi: shovqin, siltanish, qizib ketish, qaytarishlar?</li>
+<li>Sizda skaner, koʻtargich, oʻqitilgan usta bormi?</li>
+</ol>
+<p>Javoblar ehtiyojni koʻrsatadi. Agar 4-savolga «koʻz bilan» yoki «hamma qatori» deb javob berishsa, bu xavflar haqida suhbatga toʻgʻridan-toʻgʻri kirish.</p>
+
+<h3><span class="sec">11.3</span>Eʼtirozlar va javoblar</h3>
+<div class="tbl"><table>
+<tr><th>Eʼtiroz</th><th>Javob</th></tr>
+<tr><td>«Elektromobilda moy almashtirilmaydi»</td><td>Koʻp ishlab chiqaruvchilar almashtirishni belgilaydi, baʼzi modellarda obkatkadan keyin ham. Moy haroratdan eskiradi va yeyilish mahsulotlarini yigʻadi. Keling, modelingiz qoʻllanmasini ochamiz.</td></tr>
+<tr><td>«Istalgan ATF quyamiz — hammasi joyida»</td><td>Baʼzi yuritmalar haqiqatan ATF turida ishlaydi, lekin aniq spetsifikatsiya boʻyicha. «Hoʻl» motorlarda mis va elektr muhim, oddiy ATF da esa ular tekshirilmaydi. Muammolar darhol koʻrinmaydi.</td></tr>
+<tr><td>«Qimmat»</td><td>Hisoblaylik: 2 litr suyuqlik va minglab dollarlik yuritma taʼmiri. Bitta almashtirishdagi moy narxi farqi bitta evakuator chaqiruvidan kam.</td></tr>
+<tr><td>«Biz original olamiz»</td><td>Original suyuqlikni topish koʻpincha qiyin, qalbakilari ham boʻladi. Tasdiqlangan muvofiqlik va hujjatlarga ega mahsulotni taklif qilaman.</td></tr>
+<tr><td>«Talab yoʻq»</td><td>Hududingizda nechta EV va gibrid borligini, ulardan nechtasi taksi ekanini hisoblaylik. Ularga birinchi boʻlib toʻgʻri xizmat koʻrsata boshlagan kishi bu mijozlarni oladi.</td></tr>
+</table></div>
+<div class="note warn"><span class="tag">Halollik qoidasi</span><p>Agar aniq model uchun tasdiqlangan muvofiqlikka ega suyuqligimiz boʻlmasa, <strong>shunday deymiz</strong>. «Taxminan» sotmaymiz. Yuritmaning bitta buzilishi servisning butun mahsulot qatoriga ishonchini yoʻq qiladi.</p></div>
+
+<h3><span class="sec">11.4</span>Dialog namunasi</h3>
+<div class="note">
+<p><strong>Agent:</strong> Assalomu alaykum! Sizga elektromobil va gibridlar koʻp keladimi? Ularning reduktoriga qanday moy quyyapsiz?</p>
+<p><strong>Usta:</strong> Oddiy transmissiya moyini quyamiz.</p>
+<p><strong>Agent:</strong> Koʻp yangi elektromobillarda shu moy elektr motorni ham sovutadi va mis chulgʻamlarga tegadi. Oddiy GL-5 moyidagi oltingugurtli qoʻshimchalar misni yemiradi. Shuning uchun ishlab chiqaruvchining talabiga mos maxsus moy kerak. Keling, sizga koʻp keladigan modellarni koʻrib chiqamiz, men toʻgʻri moyni tanlab beraman.</p>
+</div>
+
+<h3><span class="sec">11.5</span>MITAL nimani taklif qila oladi</h3>
+<p>Avval narxlar roʻyxati va yetkazib beruvchidan aniqlang: Mitanol va Liman OIL da EV yuritmalari va DHT uchun suyuqliklar bormi va qanday muvofiqlik darajasi bilan (ruxsatnoma, «mos keladi» yoki «tavsiya etiladi»).</p>
+<div class="tbl"><table>
+<tr><th>Hozir</th><th>EV qatorini chiqarish rejasi</th></tr>
+<tr><td>
+<ul class="list">
+<li>Ishlab chiqaruvchi ruxsatnomalari boʻyicha gibridlar uchun motor moylari</li>
+<li>Spetsifikatsiyasi mos keladigan gibridlar va yuritmalar uchun ATF</li>
+<li>Gibridlar uchun ECO FILTER filtrlari</li>
+<li>Maslahat va tanlash — raqobatchilardan farq sifatida</li>
+</ul></td>
+<td>
+<ol class="list">
+<li>Talabni baholash: hududdagi 20–30 servis va taksi parkini soʻrovdan oʻtkazish</li>
+<li>Keng qamrovli 1–2 suyuqlikni tanlash va qoʻllanilish roʻyxatlarini tekshirish</li>
+<li>Ommabop modellar boʻyicha tanlash jadvalini tuzish</li>
+<li>Agentlarni oʻqitish (shu kurs)</li>
+<li>Pilot: 3–5 servis va bitta taksi parki</li>
+<li>Fikr-mulohaza yigʻish va kengaytirish</li>
+</ol></td></tr>
+</table></div>
+<div class="note biz"><span class="tag">Asosiy imkoniyat</span><p>Eng ommaviy yangi BYD lar (Seal, Sealion 7, Atto 3 EVO, Seagull) W5 sinfidagi bitta moydan (KV100 ≈ 4,3) foydalanadi — har bir reduktorga 0,55–1,8 l. BYD uchun yozma tasdiqli shu sinfdagi moy hududdagi BYD larning katta qismini qamrab oladi. Ikkinchi ommaviy pozitsiya — DM-i gibridlari uchun 0W-20 (ACEA C5) motor moyi.</p></div>
+`,quiz:[
+{q:"STO bilan uchrashuvni nimadan boshlagan maʼqul?",o:["Darhol narxni aytish","Mashinalar oqimi va hozir nima quyilayotgani haqida savollar berish","Kompaniya tarixini aytib berish"],a:1,w:"Savollar ehtiyoj va xavflarni koʻrsatadi, keyin suhbat ular atrofida quriladi."},
+{q:"«EV da moy almashtirilmaydi» degan gapga eng yaxshi javob:",o:["«Ha, haqsiz»","Qoʻllanma talablarini koʻrsatish va eskirish hamda yeyilish mahsulotlari haqida tushuntirish","«Har 5 000 km da almashtiring»"],a:1,w:"Model hujjatlariga tayanamiz. Bu har qanday fikrdan kuchliroq."},
+{q:"Mijoz modeli uchun tasdiqlangan muvofiqlikka ega suyuqligimiz yoʻq. Nima qilish kerak?",o:["«Oʻxshashini» taklif qilish","Halol aytish va taxminan sotmaslik","75W-90 taklif qilish"],a:1,w:"Servisning ishonchi bitta savdodan qimmatroq."},
+{q:"Gibrid egalariga MITAL ning qaysi mahsulotini eng tez sotish mumkin?",o:["Ishlab chiqaruvchi ruxsatnomasidagi motor moyi","Yuk mashinalari koʻprigi moyi","Gidravlik moy"],a:0,w:"Har bir gibridda dvigatel bor va unga moy muntazam kerak."},
+{q:"«Qimmat» degan gapga qanday javob berish kerak?",o:["Darhol chegirma berish","Moy narxini yuritma taʼmiri narxi bilan solishtirish","Ketish"],a:1,w:"Bir necha litr va minglab dollarlik taʼmir — farq aniq."}
+]});
+
+/* ============ 12-DARS: YAKUNIY TEST ============ */
+L.push({id:"l12",title:"Yakuniy test",min:20,final:true,body:`
+<p class="lead">Butun kurs boʻyicha 20 ta savol. «Kurs tugatildi» belgisini olish uchun 16 ta toʻgʻri javob kerak. Testni istalgancha qayta topshirish mumkin.</p>
+`,quiz:[
+{q:"Nega «hoʻl» motorda faol oltingugurti koʻp moyni ishlatib boʻlmaydi?",o:["U quyuqlashadi","Oltingugurt mis chulgʻamlarni yemiradi, mis sulfidi esa tok oʻtkazadi","U koʻpiklanadi"],a:1,w:"3-dars: mis sulfidi — ham korroziya, ham qisqa tutashuv xavfi."},
+{q:"Bir bosqichli reduktorda moy pardasi qayerda eng yupqa?",o:["Kirish valida","Chiqish bosqichi va differensialda","Motor podshipniklarida"],a:1,w:"2-dars: past tezlik va katta moment."},
+{q:"Bozordagi hoʻl motor moylarining 100 °C dagi odatiy qovushqoqligi:",o:["≈ 4,3–5,9 mm²/s","≈ 15 mm²/s","≈ 25 mm²/s"],a:0,w:"5- va 9-darslar: ATF darajasida yoki undan past."},
+{q:"Moyning elektr xossalarini nima keskin yomonlashtiradi?",o:["Suv","Sintetik asos","Past harorat"],a:0,w:"3-dars: hatto foizning bir qismi suv teshilish kuchlanishini pasaytiradi."},
+{q:"Plastinkadagi mis korroziyasini qaysi sinov koʻrsatadi?",o:["ASTM D892","ASTM D130","CEC L-45"],a:1,w:"3-dars. D892 — koʻpik, CEC L-45 (KRL) — siljish."},
+{q:"Nega chulgʻamlarni moy bilan sovutish mumkin, antifriz bilan esa yoʻq?",o:["Moy — dielektrik","Moy sovuqroq","Antifriz qimmatroq"],a:0,w:"4-dars."},
+{q:"Hujjatlardagi «approved» nimani anglatadi?",o:["Moy ishlab chiqaruvchisining bayonoti","Rasmiy ruxsatnoma: avtomobil ishlab chiqaruvchisi suyuqlikni roʻyxatga kiritgan","Sotuvchining tavsiyasi"],a:1,w:"6-dars: muvofiqlikning eng kuchli darajasi."},
+{q:"Sovutish forsunkalaridagi lakning eng xavfli oqibati:",o:["Moy rangining oʻzgarishi","Chulgʻamlarning mahalliy qizib ketishi","Yurish zaxirasining oshishi"],a:1,w:"4-dars."},
+{q:"Podshipnikdagi fluting nima?",o:["Elektr razryadlaridan qovurgʻalanish","Qumdan yeyilish","Moy yetishmasligidan qizib ketish"],a:0,w:"3-dars: dumalash yoʻlakchalaridagi «kir yuvish taxtasi»."},
+{q:"Toyota THS — bu…",o:["Klassik variator","Ikkita motor-generatorli planetar quvvat taqsimlagich","DSG"],a:1,w:"8-dars."},
+{q:"Nega gibrid IYoD si motor moyi uchun ogʻirroq?",o:["Tez-tez ishga tushish va qizimaslik: moyda kondensat va yoqilgʻi","U doim maksimumda ishlaydi","U yuklamasiz ishlaydi"],a:0,w:"8-dars."},
+{q:"Yuritmadan moyni toʻkishdan oldin…",o:["Avval toʻkish tiqinini ochish kerak","Avval quyish tiqini ochilishiga ishonch hosil qilish kerak","Yuqori voltli ulagichni ajratish kerak"],a:1,w:"10-dars. Yuqori voltli ulagichlarga tegilmaydi."},
+{q:"Model uchun suyuqlik haqida maʼlumot yoʻq. Toʻgʻri harakat:",o:["ATF quyish","Texnik yordamdan soʻrash va tajriba qilmaslik","75W-90 quyish"],a:1,w:"6- va 7-darslar."},
+{q:"Muftali gibrid transmissiya suyuqligi uchun nima xos?",o:["Yuqori qovushqoqlik","Muftalar uchun friksion xossalar","Qoʻshimchalar yoʻqligi"],a:1,w:"7- va 8-darslar: D profili."},
+{q:"Nega «API GL-5» belgisi hoʻl motor bilan moslikni kafolatlamaydi?",o:["GL-5 — oddiy transmissiyalar uchun toifa, u misni va elektrni tekshirmaydi","GL-5 eskirgan","GL-5 faqat yuk mashinalari uchun"],a:0,w:"6-dars."},
+{q:"Qoʻllanma boʻyicha BYD Seal ning orqa reduktoriga qancha moy quyiladi?",o:["0,5 l","1,55 l","3,5 l"],a:1,w:"10-dars: orqa 1,55 l, AWD da old — 1,6 l."},
+{q:"BYD qoʻllanmalaridagi BOT383 — bu…",o:["Castrol ON EV Transmission Fluid W5","Tormoz suyuqligi","0W-20 motor moyi"],a:0,w:"9-dars: Seagull qoʻllanmasida shunday yozilgan."},
+{q:"BYD Seal U DM-i ning EHS gibrid transmissiyasi uchun qaysi moy koʻrsatilgan?",o:["BOT383","EHSF-2LV","ATF SP4M-1"],a:1,w:"8-dars: firma moyi, xususiyatlar boʻyicha tanlashga yoʻl qoʻyilmaydi."},
+{q:"A profili nima uchun moʻljallangan?",o:["Quruq motor: moy faqat reduktorda","Eng past qovushqoqlikdagi hoʻl motor","Muftali gibridlar"],a:0,w:"7-dars."},
+{q:"NB/SH/T 6042-2021 nima?",o:["Elektromobil reduktorlari moylari boʻyicha xitoy standarti","Tesla ruxsatnomasi","Mis sinovi usuli"],a:0,w:"9-dars: ikki jadval — motorni suv va moy bilan sovutish."}
+]});
+
+/* ============ LUGʻAT ============ */
+var GLOSS = [
+["Редуктор","reduktor","Motordan gʻildiraklarga pasaytiruvchi uzatma, odatda bir bosqichli"],
+["Электропривод (EDU, e-axle)","elektr yuritma","Motor, invertor va reduktor bitta agregatda"],
+["Инвертор","invertor","Batareyaning oʻzgarmas tokini motor uchun oʻzgaruvchan tokka aylantiradi"],
+["Рекуперация","rekuperatsiya","Energiyani batareyaga qaytarib, motor bilan tormozlash"],
+["Вязкость","qovushqoqlik","Moyning oqishga qarshiligi; kinematik qovushqoqlik mm²/s da oʻlchanadi"],
+["Шестерня","tishli gʻildirak (shesternya)","Reduktorning tishli gʻildiragi"],
+["Подшипник","podshipnik","Aylanuvchi valning tayanchi"],
+["Обмотка","chulgʻam","Stator mis simi, undan tok oʻtadi"],
+["Медь","mis","Chulgʻamlar metali; faol oltingugurtga sezgir"],
+["Присадка","qoʻshimcha (prisadka)","Moyga xossa beradigan kimyoviy komponent"],
+["Базовое масло","bazaviy moy","Suyuqlik asosi: API I–V guruhlari"],
+["Пробивное напряжение","teshilish kuchlanishi","Moy uchqun bilan teshiladigan kuchlanish, kV"],
+["Охлаждение","sovutish","Motordan issiqlikni olib ketish; «hoʻl» motorlarda moy bilan"],
+["Пена","koʻpik","Yuqori aylanishlarda moydagi havo"],
+["Задир","zadir","Ortiqcha yuklamada tish yuzalarining payvandlanib yirtilishi"],
+["Питтинг","pitting","Tish yuzasidagi charchash chuqurchalari"],
+["Допуск производителя","ishlab chiqaruvchi ruxsatnomasi","Avtomobil ishlab chiqaruvchisining suyuqlikni rasmiy maʼqullashi"],
+["Гибрид / DHT","gibrid / DHT","IYoD va elektr motorli mashina; DHT — uning maxsus transmissiyasi"],
+["Мокрый мотор","moy bilan sovutiladigan («hoʻl») motor","Chulgʻamlarini reduktor moyi sovutadigan motor"],
+["Сухой мотор","antifriz bilan sovutiladigan («quruq») motor","Sovutish koʻylagi bor motor; moy faqat reduktorda"],
+["Профиль масла A–E","moy profili A–E","Ushbu kursda moy tanlash uchun xususiyatlar guruhi"],
+["W5 / BOT383","W5 / BOT383","BYD hoʻl motorlari uchun Castrol moyi, 100 °C da qovushqoqlik ≈ 4,3"],
+["EHS","EHS","BYD DM-i gibrid transmissiyasi; moyi EHSF-2LV"],
+["Техкарта (TDS)","texnik karta (TDS)","Moyning xususiyatlari koʻrsatilgan ishlab chiqaruvchi hujjati"],
+["Тяжёлые условия","ogʻir sharoit","Taksi, issiq, chang, togʻ: almashtirish intervallari qisqartiriladi"]
+];
+
+/* ============ DVIJOK ============ */
+var KEY="ev-oil-course-uz-v1";
+var S={done:{},name:""};
+try{var raw=localStorage.getItem(KEY); if(raw){var p=JSON.parse(raw); if(p&&typeof p==="object"){S.done=p.done||{};S.name=p.name||"";}}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({done:S.done,name:S.name}))}catch(e){}}
+
+var nav=document.getElementById("nav"), nav2=document.getElementById("nav2"), main=document.getElementById("main");
+var side=document.getElementById("side"), menuBtn=document.getElementById("menuBtn");
+menuBtn.addEventListener("click",function(){var o=side.classList.toggle("open");menuBtn.setAttribute("aria-expanded",o?"true":"false")});
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+var MODS=[{t:"1-modul · Asoslar",ids:["l1","l2","l3","l4","l5"]},{t:"2-modul · Moy tanlash",ids:["l6","l7","l8"]},{t:"3-modul · Bozor, servis, savdo",ids:["l9","l10","l11"]},{t:"Yakun",ids:["l12"]}];
+function modOf(id){for(var i=0;i<MODS.length;i++){if(MODS[i].ids.indexOf(id)>=0) return MODS[i].t;} return "";}
+function lessonLink(id,cur){
+  var i=L.findIndex(function(l){return l.id===id}); if(i<0) return "";
+  var l=L[i];
+  return '<li><a href="#'+l.id+'" class="'+(cur===l.id?"on":"")+'"><span class="num">'+String(i+1).padStart(2,"0")+'</span><span>'+esc(l.title)+'</span><span class="dot'+(S.done[l.id]!=null?" done":"")+'"></span></a></li>';
+}
+function renderNav(cur){
+  nav.innerHTML=MODS.map(function(m){return '<li class="modh">'+esc(m.t)+'</li>'+m.ids.map(function(id){return lessonLink(id,cur)}).join("")}).join("");
+  var R=[["home","—","Kurs haqida"],["permodel","⚑","<strong>Modellar boʻyicha moy tanlash</strong>"],["catalog","☰","Moylar katalogi"],["makers","⌂","Xitoydagi ishlab chiqaruvchilar"],["china","中","Xitoy: standart va manbalar"],["glossary","Aa","Lugʻat RU — UZ"]];
+  nav2.innerHTML=R.map(function(r){return '<li><a href="#'+r[0]+'" class="'+(cur===r[0]?"on":"")+'"><span class="num">'+r[1]+'</span><span>'+r[2]+'</span><span></span></a></li>'}).join("");
+  var n=Object.keys(S.done).filter(function(k){return L.some(function(l){return l.id===k})}).length;
+  document.getElementById("pcount").textContent=n+" / "+L.length;
+  document.getElementById("pbar").style.width=(n/L.length*100)+"%";
+  menuBtn.textContent="Darslar · "+n+"/"+L.length;
+}
+
+function home(){
+  var total=L.reduce(function(a,l){return a+l.min},0);
+  var nq=L.reduce(function(a,l){return a+l.quiz.length},0);
+  var fin=L[L.length-1];
+  var next=L.find(function(l){return S.done[l.id]==null})||L[0];
+  return '<div class="page hero"><p class="eyebrow">Bonus dars · OilBook taʼlimi</p>'+
+  '<h1>Elektromobil va gibrid reduktorlari uchun moylar</h1>'+
+  '<p class="lead">Elektr yuritma tuzilishidan tortib aniq mashina uchun moy tanlash va STO dagi usta bilan suhbatgacha. Kurs avtomobil ishlab chiqaruvchilarining qoʻllanmalari, moylarning texnik kartalari va Xitoyning NB/SH/T 6042-2021 standartiga tayanadi.</p>'+
+  '<div class="facts"><div class="fact"><b>'+(L.length-1)+' + 1</b><span>dars va yakuniy test</span></div><div class="fact"><b>≈ '+String(Math.round(total/60*10)/10).replace(".",",")+' soat</b><span>testlar bilan oʻqish</span></div><div class="fact"><b>'+nq+'</b><span>javob tahlili bilan savollar</span></div></div>'+
+  '<div class="row"><a class="btn" href="#'+next.id+'">'+(S.done[L[0].id]!=null?"Davom etish":"1-darsni boshlash")+'</a><a class="btn ghost" href="#permodel">Modellar boʻyicha moy tanlash</a></div>'+
+  '<h3>Kurs qanday tuzilgan</h3><div class="tbl"><table><tr><th>Qism</th><th>Nima beradi</th></tr>'+
+  '<tr><td><strong>1-modul · Asoslar</strong><br><small>1–5-darslar</small></td><td>Nega elektr yuritma moyi oʻziga xos: yuritma tuzilishi, tishli gʻildiraklar va FIK, elektr va mis, motorni sovutish, moy kimyosi</td></tr>'+
+  '<tr><td><strong>2-modul · Moy tanlash</strong><br><small>6–8-darslar</small></td><td>Spetsifikatsiyalar va texnik kartalar, oltita yuritma turi va beshta moy profili A–E, gibridlar</td></tr>'+
+  '<tr><td><strong>3-modul · Bozor, servis, savdo</strong><br><small>9–11-darslar</small></td><td>Xitoy standarti va BYD moy kodlari, qoʻllanmalardagi hajm va intervallar, savdo va eʼtirozlar</td></tr>'+
+  '<tr><td><strong>Yakuniy test</strong></td><td>Butun kurs boʻyicha '+fin.quiz.length+' ta savol</td></tr>'+
+  '<tr><td><strong>Maʼlumotnoma</strong></td><td>Modellar boʻyicha moy tanlash, moylar katalogi, Xitoydagi ishlab chiqaruvchilar, lugʻat — kursdan keyingi ish uchun</td></tr></table></div>'+
+  '<h3>Dastur</h3>'+MODS.map(function(m){return '<p class="eyebrow" style="margin:20px 0 0">'+esc(m.t)+'</p><div class="toc">'+m.ids.map(function(id){var i=L.findIndex(function(l){return l.id===id}); var l=L[i]; return '<a href="#'+l.id+'"><span class="num">'+String(i+1).padStart(2,"0")+'</span><span>'+esc(l.title)+'<small>'+l.min+' daqiqa'+(S.done[l.id]!=null?" · oʻtildi":"")+'</small></span></a>'}).join("")+'</div>'}).join("")+
+  '<h3>Qanday oʻqish kerak</h3><ul class="list"><li>Darslarni tartib bilan oʻqing: har biri oldingisiga tayanadi.</li><li>Dars oxirida har bir javob izohi bilan test bor. Testdan keyin dars oʻtilgan deb belgilanadi.</li><li>Kursdan keyin maʼlumotnoma bilan ishlang: unda har bir model va har bir reduktor boʻyicha jadval bor.</li><li>Natijalar faqat shu brauzerda saqlanadi.</li></ul>'+
+  '<div class="note warn"><span class="tag">Muhim</span><p>Kurs 2026-yil oktyabr holatidagi bilimlarni beradi. Aniq mashina uchun suyuqlik, hajm va intervalni doim qoʻllanma va moy yetkazib beruvchisi maʼlumotlari boʻyicha tekshiring.</p></div></div>';
+}
+
+function glossary(){
+  return '<div class="page"><p class="eyebrow">Maʼlumotnoma</p><h2>Atamalar lugʻati RU — UZ</h2><p class="lead">Ustalar bilan rus va oʻzbek tillarida gaplashish uchun kursning asosiy soʻzlari.</p>'+
+  '<div class="tbl"><table><tr><th>Русский</th><th>Oʻzbekcha</th><th>Maʼnosi</th></tr>'+
+  GLOSS.map(function(g){return '<tr><td><strong>'+esc(g[0])+'</strong></td><td>'+esc(g[1])+'</td><td>'+esc(g[2])+'</td></tr>'}).join("")+
+  '</table></div><p class="small">Baʼzi texnik atamalar oʻzbek tilida koʻpincha rus shaklida ishlatiladi (zadir, pitting). Hududingiz ustalari qanday gapirishga odatlanganini aniqlang.</p></div>';
+}
+
+function permodel(){
+  var O='<span class="lvl a">Zavod: moy va hajm</span>', OI='<span class="lvl a">Zavod: moy</span> <span class="lvl b">xossalar — xulosa</span>', M='<span class="lvl b">Moy ishlab chiqaruvchisi</span>', C='<span class="lvl c">Manbalar farq qiladi</span>', X='<span class="lvl c">Maʼlumot yoʻq</span>';
+  var W5='<strong>W5 sinfi (juda past qovushqoqlik, hoʻl motor):</strong> KV100 ≈ 4,3 · KV40 ≈ 19 · VI ≈ 139–145 · −40 °C da ≈ 4 400 mPa·s dan oshmasin · siljishga chidamlilik · mis va elektr — maʼlumot majburiy.<br><small>Original: Castrol ON EV W5 (BYD BOT383). Raqamlari yaqin: Lopal E274, E27 PRO — faqat yetkazib beruvchi tasdigʻi bilan</small>';
+  var PA='<strong>A profili (quruq motor):</strong> KV100 ≈ 4,6–6,3 · VI ≥ 150 · mis 1a–1b boʻlgani maʼqul.<br><small>Raqamlari yaqin: Castrol ON Dry D2 (6,3), Lopal E26 (5,27), Castrol D1 (4,6)</small>';
+  var PB='<strong>B profili (hoʻl motor, oddiy qovushqoqlik):</strong> KV100 ≈ 5,0–5,9 · VI ≈ 150–160 · −40 °C ≈ 5 000–5 400 · 150 °C da mis 1a–1B va elektr — majburiy.<br><small>Raqamlari yaqin: Mobil EV Cool Drive 308 / 311, Lopal E27, FUCHS EDF 4101</small>';
+  var BOT384='<strong>Original BOT384 (EV2.0).</strong> BOT384 texnik kartasi topilmadi. Bilvosita maʼlumotlarga koʻra bu D2 sinfidagi quruq Castrol moyi: KV100 ≈ 6,3 · KV40 ≈ 32 · VI ≈ 154 (xulosa, BYD maʼlumoti emas)';
+  function q(t,model,axle,type,what,vol,lvl){return '<tr class="crow" data-t="'+t+'"><td><strong>'+model+'</strong></td><td>'+axle+'</td><td>'+type+'</td><td>'+what+'</td><td class="n">'+vol+'</td><td>'+lvl+'</td></tr>';}
+  var rows=
+  q('C A','BYD Seagull','Old (yagona)','Bir bosqichli. Zavod ikki moyga ruxsat beradi','<strong>Eng yaxshisi — Castrol W5 (BOT383)</strong>: u toʻgʻridan-toʻgʻri nomlangan va xossalari maʼlum.<br>'+W5+'<br><small>Qoʻllanmadagi ikkinchi variant: Castrol BOT384</small>','0,55 ± 0,05 l',O)+
+  q('A','BYD Dolphin','Old (yagona)','Bir bosqichli; Castrol maʼlumotiga koʻra — quruq motor',BOT384+'<br>Original boʻlmasa — '+PA,'0,60 ± 0,05 l (A versiya)<br>0,45 ± 0,05 l (B versiya)',OI)+
+  q('C','BYD Seal RWD','Orqa','Hoʻl motor, W5 sinfi','<strong>BOT-383 / W5</strong>.<br>'+W5,'1,55 ± 0,05 l',O)+
+  q('C','BYD Seal AWD','Old','Hoʻl motor, W5 sinfi','<strong>BOT-383 / W5</strong> — orqadagi bilan bir xil.<br>'+W5,'1,6 ± 0,05 l',O)+
+  q('C','BYD Seal AWD','Orqa','Hoʻl motor, W5 sinfi','<strong>BOT-383 / W5</strong>.<br>'+W5,'1,55 ± 0,05 l',O)+
+  q('C','BYD Sealion 7 RWD','Orqa','Hoʻl motor; filtr ham almashtiriladi','<strong>BOT-383</strong>.<br>'+W5,'1,55 ± 0,05 l + filtr',O)+
+  q('C','BYD Sealion 7 AWD','Old','Hoʻl motor; filtr ham almashtiriladi','<strong>BOT-383</strong>.<br>'+W5,'1,6 ± 0,05 l + filtr',O)+
+  q('C','BYD Sealion 7 AWD','Orqa','Hoʻl motor; filtr ham almashtiriladi','<strong>BOT-383</strong>.<br>'+W5,'1,55 ± 0,05 l + filtr',O)+
+  q('C','BYD Atto 3 EVO RWD (2026)','Orqa','Hoʻl motor; filtr ham almashtiriladi','<strong>EV3.0; BOT383; W5</strong>.<br>'+W5,'1,55 ± 0,05 l + filtr',O)+
+  q('C','BYD Atto 3 EVO AWD (2026)','Old','Hoʻl motor; filtr ham almashtiriladi','<strong>EV3.0; BOT383; W5</strong>.<br>'+W5,'1,8 ± 0,05 l + filtr',O)+
+  q('C','BYD Atto 3 EVO AWD (2026)','Orqa','Hoʻl motor; filtr ham almashtiriladi','<strong>EV3.0; BOT383; W5</strong>.<br>'+W5,'1,55 ± 0,05 l + filtr',O)+
+  q('A B','BYD Atto 3 (avvalgi, EVO gacha)','Old (yagona)','Manbalar farq qiladi: Castrol va Lopal — quruq, FUCHS — hoʻl','Motor turini VIN boʻyicha aniqlang.<br>Quruq boʻlsa — '+PA+'<br>Hoʻl boʻlsa — '+PB,'topilmadi',C)+
+  q('A','BYD Han AWD','Old va orqa','Castrol maʼlumotiga koʻra — quruq motorlar (bitta manba)',PA,'topilmadi',M)+
+  q('A','BYD Qin EV, e3, e9, Yuan Pro','Yagona','Quruq motor (Lopal boʻyicha)',PA,'topilmadi',M)+
+  q('B C','BYD Sea Lion EV, Sealion 8, Tang','Bitta yoki ikkita','Hoʻl motor (Lopal va FUCHS boʻyicha)','Ehtimol Seal va Sealion 7 dagidek W5 sinfi, lekin zavod buni tasdiqlamagan.<br>'+W5+'<br><em>yoki</em><br>'+PB,'topilmadi',M)+
+  q('D','BYD Seal U DM-i 2WD','Old: EHS gibrid transmissiyasi','Gibrid, filtr bilan','<strong>Faqat original EHSF-2LV</strong>. Raqamli maʼlumot yoʻq, xossalar boʻyicha tanlashga yoʻl qoʻyilmaydi. Moy va filtr har 4 yil / 60 000 km da almashtiriladi','3,0 l',O)+
+  q('D','BYD Seal U DM-i 4WD','Old: EHS gibrid transmissiyasi','Gibrid, filtr bilan','<strong>Faqat original EHSF-2LV</strong>','3,7 l',O)+
+  q('A','BYD Seal U DM-i 4WD','Orqa elektr yuritma','Bir bosqichli',BOT384,'0,8 l',OI)+
+  q('D','BYD Song Plus DM-i, Chazor va boshqa DM-i','Old: EHS','Gibrid','Qoʻllanma topilmadi. Seal U DM-i ga oʻxshab — ehtimol EHSF-2LV, lekin buni VIN boʻyicha tasdiqlash kerak','topilmadi',M)+
+  q('E','Tesla Model 3 / Y RWD','Orqa','Integratsiyalashgan yuritma','<strong>Faqat KAF1 / KAF1 (V1.2)</strong>. Eski SK 212-B, ATF-9, EDF2 bilan aralashtirilmaydi','2,1 l (3DU) / 2,3 l (4DU)',O)+
+  q('E','Tesla Model 3 / Y AWD','Old','Integratsiyalashgan yuritma','<strong>Faqat KAF1</strong>','1,3 l',O)+
+  q('E','Tesla Model 3 / Y AWD','Orqa','Integratsiyalashgan yuritma','<strong>Faqat KAF1</strong>','2,1 l (3DU) / 2,3 l (4DU)',O)+
+  q('E','Nissan Leaf','Old (yagona)','Bir bosqichli, ATF turidagi suyuqlik','<strong>Faqat NISSAN Matic S ATF</strong>','≈ 1,4 l',O)+
+  q('E','Kia EV6 2WD','Orqa','Bir bosqichli, ATF','<strong>ATF SP4M-1</strong>: SK, MICHANG, S-OIL yoki Kia Genuine','3,4–3,5 l',O)+
+  q('E','Kia EV6 AWD','Old','Bir bosqichli, ATF','<strong>ATF SP4M-1</strong>','3,2–3,3 l',O)+
+  q('E','Kia EV6 AWD','Orqa','Bir bosqichli, ATF','<strong>ATF SP4M-1</strong>','3,4–3,5 l',O)+
+  q('E','Hyundai Ioniq 5 (NE1 qoʻllanmasi)','Old (AWD)','Bir bosqichli, ATF','<strong>HK ATF SP4M-1</strong>','3,2 l',O)+
+  q('E','Hyundai Ioniq 5 (NE1 qoʻllanmasi)','Orqa','Bir bosqichli, ATF','<strong>HK ATF SP4M-1</strong>','3,4 l',O)+
+  q('E','MG4 Electric','Orqa (yagona)','Bir bosqichli','<strong>Shell E-Fluid E6 iX (SL2808)</strong> — MG UK qoʻllanmasi tavsifiga koʻra','0,9 l',M)+
+  q('C','Zeekr 001 / 007 AWD','Old va orqa','Hoʻl, juda past qovushqoqlik (Lopal boʻyicha)',W5,'topilmadi',M)+
+  q('C B','Li Auto (L seriyasi, i8)','Versiyaga qarab','Hoʻl (Lopal va FUCHS boʻyicha)',W5+'<br><em>yoki</em><br>'+PB,'topilmadi',M)+
+  q('B','NIO, GAC AION, Leapmotor C01 / C11, XPeng, Voyah Free, AITO M5 / M7, Changan Lumin','Bitta yoki ikkita','Hoʻl motor (Lopal va FUCHS boʻyicha)',PB,'topilmadi',M)+
+  q('A B','Chery eQ7','Yagona','Lopal ham E26, ham E27 ni koʻrsatadi; FUCHS — hoʻl','Motor turini VIN boʻyicha aniqlang.<br>'+PA+'<br><em>yoki</em><br>'+PB,'topilmadi',C)+
+  q('A','Chery eQ1, iCAR 03, Arrizo E, QQ; GWM ORA; Wuling Mini EV, Binguo, Air EV; Changan Estar, Oshan EV, EADO EV','Yagona','Quruq motor (Lopal boʻyicha)',PA,'topilmadi',M)+
+  q('E','VW ID.4 / ID.6','Orqa; AWD da old ham','Maʼlumot yoʻq','Faqat VW qoʻllanmasi boʻyicha','topilmadi',X);
+  return '<div class="page wide"><p class="eyebrow">Maʼlumotnoma · barcha topilgan maʼlumotlar yakuni</p><h2>Har bir reduktorga qaysi moy va qancha quyiladi</h2>'+
+  '<p class="lead">Har bir reduktor uchun alohida qator: old va orqa. Reduktor turi, moy qanday xossalarga ega boʻlishi kerak va necha litr.</p>'+
+  '<div class="note warn"><span class="tag">Qanday oʻqish kerak</span><ul class="list">'+
+  '<li><span class="lvl a">Zavod: moy va hajm</span> — moy va miqdori avtomobil ishlab chiqaruvchisi qoʻllanmasidan olingan. Buni qoʻllash mumkin.</li>'+
+  '<li><span class="lvl b">Moy ishlab chiqaruvchisi</span> — yuritma turi faqat moy sotuvchisining soʻzidan maʼlum; hajm topilmagan. Almashtirishdan oldin: VIN, qoʻllanma, yetkazib beruvchi xati.</li>'+
+  '<li>Xossalar — texnik karta boʻyicha tanlash uchun moʻljal. Agar zavod aniq moyni nomlagan boʻlsa, avvalo aynan uni qidiring.</li>'+
+  '<li>Quyish hajmi — qoʻllanma boʻyicha. Hajm topilmagan boʻlsa, quyish teshigining pastki chetigacha yoki ishlab chiqaruvchi tartibi boʻyicha quyiladi.</li>'+
+  '</ul></div>'+
+  '<div class="flt" id="flt" data-label="Koʻrsatilgan reduktorlar: ">'+
+   '<button class="on" data-k="all">Hammasi</button>'+
+   '<button data-k="A">A · quruq motor</button>'+
+   '<button data-k="B">B · hoʻl, oddiy qovushqoqlik</button>'+
+   '<button data-k="C">C · W5 sinfi, juda past qovushqoqlik</button>'+
+   '<button data-k="D">D · EHS gibrid</button>'+
+   '<button data-k="E">E · faqat original</button>'+
+  '</div>'+
+  '<p class="small" id="fcount">Koʻrsatilgan reduktorlar: 35</p>'+
+  '<div class="tbl models cat"><table><tr><th>Model</th><th>Reduktor</th><th>Reduktor turi</th><th>Qaysi moyni quyish (xossalar)</th><th>Hajm</th><th>Maʼlumot</th></tr>'+rows+'</table></div>'+
+  '<h3>Profillar batafsil</h3>'+
+  '<div class="tbl models"><table><tr><th>Profil</th><th>Yuritma</th><th>KV100</th><th>KV40</th><th>VI</th><th>−40 °C, mPa·s</th><th>Mis</th><th>Elektr</th><th>Shunday raqamli moylar</th></tr>'+
+  '<tr><td class="n">A</td><td>Quruq motor</td><td class="n">4,6–6,3</td><td class="n">18–32</td><td class="n">≥ 150</td><td class="n">qanchalik past, shuncha yaxshi</td><td>1a–1b maʼqul</td><td>majburiy emas</td><td>Castrol ON Dry D2, Lopal E26, Castrol D1</td></tr>'+
+  '<tr><td class="n">B</td><td>Hoʻl, oddiy qovushqoqlik</td><td class="n">5,0–5,9</td><td class="n">22–28</td><td class="n">150–160</td><td class="n">5 000–5 400</td><td>150 °C da 1a–1B, majburiy</td><td>maʼlumot majburiy</td><td>Mobil 308, 311; Lopal E27; FUCHS EDF 4101</td></tr>'+
+  '<tr><td class="n">C</td><td>Hoʻl, juda past qovushqoqlik</td><td class="n">≈ 4,3</td><td class="n">18–19</td><td class="n">139–145</td><td class="n">3 800–4 400</td><td>majburiy</td><td>maʼlumot majburiy</td><td>Castrol W5 (BYD BOT383); Lopal E274, E27 PRO</td></tr>'+
+  '<tr><td class="n">D</td><td>Gibridlar, muftalar</td><td colspan="5">zavod hujjati boʻyicha + friksion xossalar</td><td>majburiy</td><td>BYD EHSF-2LV; Mobil MS 304 / 902 — faqat tasdiq bilan</td></tr>'+
+  '<tr><td class="n">E</td><td>Zavod suyuqlikni nomlagan</td><td colspan="6">Faqat nomlangan suyuqlik yoki rasmiy analog</td><td>—</td><td>Tesla KAF1, Nissan Matic S, Kia va Hyundai ATF SP4M-1</td></tr>'+
+  '</table></div>'+
+  '<p class="small">Profilni qanday tanlash va texnik kartani qanday tekshirish — 7-dars. Raqamli barcha moylar — «Moylar katalogi»da.</p>'+
+  '<div class="note"><span class="tag">Savdo uchun asosiy xulosa</span><p>Eng ommaviy yangi BYD lar (Seal, Sealion 7, Atto 3 EVO, Seagull) uchun <strong>bitta moy sinfi — W5</strong> kerak: KV100 taxminan 4,3, hoʻl motor uchun. Hajmlar kichik: har bir reduktorga 0,55–1,8 l. Agar MITAL yoki hamkorda BYD uchun tasdiqlangan shu sinfdagi moy boʻlsa, u hududdagi BYD larning katta qismini qamrab oladi.</p></div></div>';
+}
+
+function makers(){
+  var A='<a target="_blank" rel="noopener" href="';
+  var Y='<span class="lvl a">Sayt ochildi</span>', Q='<span class="lvl c">Tasdiqlanmagan</span>';
+  function m(n,name,cn,country,oils,proof,site,chk){return '<tr><td class="n">'+n+'</td><td><strong>'+name+'</strong><br><small>'+cn+'</small></td><td>'+country+'</td><td>'+oils+'</td><td>'+proof+'</td><td>'+site+'</td><td>'+chk+'</td></tr>';}
+  return '<div class="page wide"><p class="eyebrow">Maʼlumotnoma · 2026-yil oktyabr</p><h2>Xitoyda elektromobil reduktorlari uchun moy ishlab chiqaruvchi 10 kompaniya</h2>'+
+  '<p class="lead">Elektromobil reduktorlari uchun moylari va xitoy avtomobil ishlab chiqaruvchilari bilan aloqasi topilgan kompaniyalar, rasmiy saytlari bilan.</p>'+
+  '<div class="note warn"><span class="tag">Bu savdo reytingi emas</span><p>Xitoyda elektr reduktor moylari bozoridagi ulushlar haqida ochiq maʼlumot yoʻq. Quyidagi tartib tasdiq kuchiga koʻra: avval moyi avtomobil ishlab chiqaruvchisi hujjatlarida nomlanganlar, keyin texnik kartasi borlar, keyin matbuotdagi bayonotlar.</p></div>'+
+  '<div class="tbl models"><table><tr><th>№</th><th>Ishlab chiqaruvchi</th><th>Mamlakat</th><th>EV reduktorlari uchun moylar</th><th>Nima bilan tasdiqlangan</th><th>Rasmiy sayt</th><th>Sayt</th></tr>'+
+  m(1,'Castrol (bp)','嘉实多','Buyuk Britaniya, Xitoyda ishlab chiqarish va savdo','ON EV Transmission Fluid W5 (= BYD BOT383), BOT384, ON Dry D1/D2, Wet W2/W3','BYD qoʻllanmalarida nomlangan (Seal, Sealion 7, Atto 3 EVO, Seagull, Dolphin). 2022-yilgi BYD–Castrol kelishuvi',A+'https://www.castrol.com.cn/zh_cn/china/home.html">castrol.com.cn</a>',Y)+
+  m(2,'Sinopec Lubricant, Great Wall brendi','中国石化长城润滑油','Xitoy','ERO plus (motorni moy bilan sovutish), EROS40 (juda past qovushqoqlik, 2022), DHT uchun moylar','NB/SH/T 6042-2021 standartini ishlab chiqishga boshchilik qilgan. Toyota, BYD, Changan, CATL, Xiaomi ga yetkazib berishni daʼvo qiladi (press-relizlar boʻyicha)','Sayt tasdiqlanmagan; ona kompaniya '+A+'https://www.sinopecgroup.com">sinopecgroup.com</a>',Q)+
+  m(3,'PetroChina Lubricant, Kunlun brendi','中国石油昆仑润滑','Xitoy','Bir bosqichli reduktorlar uchun moy (modellarning 60% dan koʻpiga mos deb daʼvo qilingan), tijorat elektr koʻpriklari uchun moy, DHT uchun moy','Geely Farizon E51 elektr koʻpriklari (Xinhua); 2026-yilda Chery dan DHT moyiga buyurtma (matbuot)',A+'http://kunlunlube.cnpc.com.cn/">kunlunlube.cnpc.com.cn</a> (maʼlumotnoma boʻyicha, tekshiruvda ochilmadi)',Q)+
+  m(4,'ExxonMobil (Mobil)','美孚','AQSh, Xitoyda savdo','EV Cool Drive Elite 311, 308, MS 304, Elite MS 902, 043; EV Drive 201','Raqamli toʻliq xitoycha texnik kartalar. Mashinalar nomlanmagan; EV Drive 201 da Volvo ruxsatnomasi',A+'https://www.mobil.com/zh-cn/passenger-vehicle-lube">mobil.com/zh-cn</a>',Y)+
+  m(5,'Lopal','龙蟠科技','Xitoy','E26 (quruq motor), E27 (hoʻl), E27 PRO va E274 (juda past qovushqoqlik), G400 PRO','Qovushqoqlik bilan toʻrtta texnik karta; BYD, Zeekr, NIO, AION, Chery, GWM va boshqa modellar roʻyxati (Lopal maʼlumotiga koʻra)',A+'https://www.lopal.cn/domain/product/spu/87">lopal.cn</a>',Y)+
+  m(6,'Tongyi','统一润滑油','Xitoy','ETF-U (hoʻl va quruq reduktorlar), ETF-M, ETF-H; gibridlar uchun DHTF','Reklama maqolasi Tesla, BYD, AION, Zeekr, Li Auto, XPeng ni nomlaydi. Raqamli texnik kartalar topilmadi',A+'https://www.tongyioil.com">tongyioil.com</a>',Y)+
+  m(7,'FUCHS','福斯','Germaniya, Xitoyda zavod va savdo','BluEV EDF 4101 (hoʻl motorlar), boshqa BluEV','BYD, Chery, Li Auto, XPeng uchun FUCHS tavsiyalari. Ochiq raqamli maʼlumot yoʻq',A+'https://www.fuchs.com/cn/">fuchs.com/cn</a>',Y)+
+  m(8,'Shell','壳牌','Buyuk Britaniya / Niderlandiya, Xitoyda savdo','E-Fluids: GTL asosidagi e-transmission suyuqliklari','MG4 (SAIC): MG UK qoʻllanmasi tavsifiga koʻra Shell E-Fluid E6 iX',A+'https://www.shell.com.cn">shell.com.cn</a>',Y)+
+  m(9,'TotalEnergies','道达尔能源','Fransiya, Xitoyda savdo','Quartz EV-Drive R 3.1 (SAE 75, GL-4), Quartz EV Fluids seriyasi','Ishlab chiqaruvchi katalogi; xitoy mashinalari nomlanmagan',A+'https://lubricants.catalog.totalenergies.com/corporate/en_UK/wor_quartz-ev-drive-r-3-1">TotalEnergies katalogi</a>',Y)+
+  m(10,'Copton','康普顿','Xitoy','2025-yilgi moliyaviy hisobotga koʻra — toza elektr va gibrid mashinalar transmissiyalari uchun moylar; aniq mahsulotlar topilmadi','Moliyaviy portaldagi yillik hisobot qayta bayoni',A+'https://www.copton.com.cn">copton.com.cn</a>',Y)+
+  '</table></div>'+
+  '<div class="note"><span class="tag">Yana kimni bilish kerak</span><ul class="list">'+
+  '<li><strong>Idemitsu</strong> (Yaponiya) — elektr koʻpriklar uchun E AXLE FLUID Type-A, G, C qatori, Osiyoda sotiladi.</li>'+
+  '<li>Qoʻshimcha ishlab chiqaruvchilari <strong>Lubrizol, Afton, Infineum, Chevron Oronite</strong> — moyning oʻzini sotmaydi, lekin yuqoridagi koʻpchilik brendlar uchun qoʻshimcha paketlarini qiladi.</li>'+
+  '</ul></div>'+
+  '<div class="note warn"><span class="tag">Bu roʻyxat bilan qanday ishlash</span><p>Oʻzbekistonga yetkazib berish boʻyicha muzokaralar uchun har biridan soʻrang: mis va elektr boʻyicha raqamli texnik karta, tasdiqlangan modellar roʻyxati, avtomobil ishlab chiqaruvchisi ruxsatnomasi bormi va yetkazib berish shartlari. Bularsiz moyni servislarga aniq model uchun mos deb taklif qilib boʻlmaydi.</p></div></div>';
+}
+
+function bindCatalog(){
+  var bar=document.getElementById("flt"); if(!bar) return;
+  bar.addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    var k=b.dataset.k;
+    bar.querySelectorAll("button").forEach(function(x){x.classList.toggle("on",x===b)});
+    var shown=0;
+    document.querySelectorAll("tr.crow").forEach(function(r){
+      var ok=(k==="all")||(" "+r.dataset.t+" ").indexOf(" "+k+" ")>=0;
+      r.hidden=!ok; if(ok) shown++;
+    });
+    document.getElementById("fcount").textContent=(bar.dataset.label||"Koʻrsatilgan moylar: ")+shown;
+  });
+}
+
+function catalog(){
+  var A='<a target="_blank" rel="noopener" href="';
+  function row(t,brand,name,type,spec,cars,lvl,src){
+    return '<tr class="crow" data-t="'+t+'"><td><strong>'+brand+'</strong><br>'+name+'</td><td>'+type+'</td><td>'+spec+'</td><td>'+cars+'</td><td>'+lvl+'<span class="src">'+src+'</span></td></tr>';
+  }
+  var T='<span class="lvl a">Texnik karta</span>', P='<span class="lvl b">Matbuot yoki reklama</span>', N='<span class="lvl c">Raqam yoʻq</span>';
+  return '<div class="page wide"><p class="eyebrow">Maʼlumotnoma · xitoy va xalqaro manbalar boʻyicha qidiruv, 2026-yil oktyabr</p><h2>Xitoyda topilgan elektr reduktor moylari katalogi</h2>'+
+  '<p class="lead">Xitoy manbalarida elektromobil reduktorlari uchun qaysi moylar topildi, ular qaysi yuritma turiga moʻljallangan va xossalari qanday. Roʻyxat toʻliq emas: ochiq toʻliq reyestr yoʻq.</p>'+
+  '<div class="note warn"><span class="tag">Qanday oʻqish kerak</span><p><span class="lvl a">Texnik karta</span> raqamlar ishlab chiqaruvchi sahifasidan olingan. <span class="lvl b">Matbuot yoki reklama</span> maqola va press-relizlardan, tekshirilgan raqamlarsiz. <span class="lvl c">Raqam yoʻq</span> mahsulot bor, lekin ochiq texnik maʼlumot yoʻq. «Qaysi mashinalar uchun» ustuni ishlab chiqaruvchi yoki matbuot <strong>daʼvo qilganini</strong> koʻrsatadi, avtomobil ishlab chiqaruvchisi ruxsatnomasini emas.</p></div>'+
+
+  '<h3>1. Topilgan barcha moylar</h3>'+
+  '<div class="flt" id="flt">'+
+   '<button class="on" data-k="all">Hammasi</button>'+
+   '<button data-k="dry">Quruq motor (suv bilan sovutish)</button>'+
+   '<button data-k="wet">Hoʻl motor (moy bilan sovutish)</button>'+
+   '<button data-k="clutch">Sinxronizator va muftalar bilan</button>'+
+   '<button data-k="hybrid">DHT gibridlar</button>'+
+   '<button data-k="truck">Tijorat elektr koʻpriklari</button>'+
+   '<button data-k="unk">Turi koʻrsatilmagan</button>'+
+  '</div>'+
+  '<p class="small" id="fcount">Koʻrsatilgan moylar: 26</p>'+
+  '<div class="tbl models cat"><table><tr><th>Brend va moy</th><th>Qaysi yuritma uchun</th><th>Xossalar</th><th>Qaysi mashinalar uchun</th><th>Maʼlumot</th></tr>'+
+  row('wet','Great Wall (Sinopec)','ERO plus','<strong>Motori moy bilan sovutiladigan</strong> elektromobil reduktori','Juda past qovushqoqlik daʼvo qilingan. Raqam yoʻq','Koʻrsatilmagan. Sinopec umuman Toyota, BYD, Changan, CATL, Xiaomi ga yetkazib berishni daʼvo qiladi, lekin aniq moyga bogʻlamaydi',N,A+'https://m.tech.china.com/redian/2025/0423/042025_1663873.html">Great Wall</a> · '+A+'https://m.tech.china.com/redian/2025/1127/112025_1771927.html">Sinopec</a>')+
+  row('unk','Kunlun (CNPC)','Elektromobillar bir bosqichli reduktori uchun moy','Bir bosqichli reduktor; motor sovutish turi koʻrsatilmagan','Tishli gʻildirak va podshipniklarni uzoq himoya qilish. Raqam yoʻq','Kichik shahar elektromobillari. Keng tarqalgan modellarning 60% dan koʻpiga mos deb daʼvo qilingan',P,A+'https://m.thepaper.cn/baijiahao_30722079">The Paper</a>')+
+  row('truck','Kunlun (CNPC)','Tijorat elektr koʻpriklari uchun uzoq xizmat qiluvchi moy','Tijorat elektr transportining elektr koʻprigi','Yuqori faol oltingugurt-fosforli zadirga qarshi qoʻshimchalar. Raqam yoʻq','Geely Farizon (远程) E51, moy xarajatlari 17% ga kamaygan deb daʼvo qilingan',P,A+'https://www.news.cn/energy/20260612/7a97e1d4d6824804b23970c932c1db05/c.html">Xinhua</a>')+
+  row('dry wet','Tongyi (统一)','ETF-U','<strong>Moy bilan sovutiladigan (hoʻl)</strong> va <strong>suv bilan sovutiladigan (quruq)</strong> reduktorlar, shuningdek gibrid AKPP va differensiallar uchun daʼvo qilingan','Toʻliq sintetika, nano-qoʻshimcha (reklamaga koʻra tishli gʻildiraklar yeyilishi 40% kam). Raqam yoʻq','Tesla, BYD, GAC Aion, Zeekr, Li Auto, XPeng (reklamada daʼvo qilingan)',P,A+'https://c.m.163.com/news/a/KV7TVAOL05563JZ4.html">163.com</a>')+
+  row('unk','Tongyi (统一)','ETF-M va ETF-H','Boshqa turdagi reduktorlar uchun; aniq vazifasi manbada ochilmagan','Raqam yoʻq','Koʻrsatilmagan',N,A+'https://c.m.163.com/news/a/KV7TVAOL05563JZ4.html">163.com</a>')+
+  row('hybrid','Tongyi (统一)','DHTF','DHT gibrid transmissiyalari','Raqam yoʻq. Qidiruvdagi tavsifdan olingan, maqola sahifasida yoʻq','Gibridlar (tavsifda BYD DM-i nomlangan), tasdiqlanmagan',N,'qidiruv tavsifi')+
+  row('wet','Mobil (Xitoy)','EV Cool Drive Elite 311','Motori <strong>moy bilan sovutiladigan</strong>, reduktor bilan integratsiyalashgan elektromobil qutisi','Pastdagi jadvalga qarang: KV100 5,1, mis 1b','Ruxsatnomalar koʻrsatilmagan',T,A+'https://www.mobil.com/zh-cn/passenger-vehicle-lube/pds/cn-xx-mobil-ev-cool-drive-elite-311-ev311">sahifa</a>')+
+  row('wet','Mobil (Xitoy)','EV Cool Drive 308','Motori <strong>moy bilan sovutiladigan</strong> quti; yuqori voltli arxitekturalar','KV100 5,03, mis 1a, teshilish 77,8 kV','Ruxsatnomalar koʻrsatilmagan',T,A+'https://www.mobil.com/zh-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-cool-drive-308">sahifa</a>')+
+  row('wet clutch','Mobil (Xitoy)','EV Cool Drive MS 304','Moy bilan sovutiladigan elektromobil va gibridlar; <strong>sinxronizator va muftalar</strong> uchun yaxshi friksion xossalar','KV100 5,5, VI 161, mis 1A','Ruxsatnomalar koʻrsatilmagan',T,A+'https://mobil.com/en-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-cool-drive-ms-304">sahifa</a>')+
+  row('wet clutch hybrid','Mobil (Xitoy)','EV Cool Drive Elite MS 902','Moy bilan sovutiladigan elektromobil va gibridlar, <strong>sinxronizator va muftalar</strong>','KV100 5,9, VI 160, mis 1B, chaqnash 232 °C','Ruxsatnomalar koʻrsatilmagan',T,A+'https://www.mobil.com/en-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-cool-drive-elite-ms-902">sahifa</a>')+
+  row('wet','Mobil (Xitoy)','EV Cool Drive 043','Motori <strong>moy bilan sovutiladigan</strong>, reduktor bilan integratsiyalashgan quti','Juda past qovushqoqlik (Brukfild −40 °C = 1800 mPa·s), FZG 9. Sahifada qovushqoqlik adashtirilgan','Ruxsatnomalar koʻrsatilmagan',T,A+'https://www.mobil.com/en-cn/passenger-vehicle-lube/pds/ap-xx-mobil-ev-cool-drive-043">sahifa</a>')+
+  row('unk','Mobil (Xitoy)','EV Drive 201','Elektromobil reduktorlari, motor turi koʻrsatilmagan','KV100 5,85, mis 1B','Volvo 97342 ruxsatnomasi',T,A+'https://www.mobil.com/en-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-drive-201">sahifa</a>')+
+  row('wet','Castrol ON','EV Transmission Fluid W5 (BYD qoʻllanmalarida — BOT383)','<strong>Moyga botirilgan hoʻl motorli</strong> qutilar','KV40 19, KV100 4,3, VI 139, SAE 75W, Brukfild −40 °C 4400 mPa·s, qotish −48 °C, 20 soat KRL dan keyin KV100 yoʻqotilishi 2% dan kam. Mis himoyasi «juda yaxshi», raqamsiz','<strong>BYD qoʻllanmalari:</strong> Seal, Sealion 7, Atto 3 EVO, Seagull (variant sifatida)',T,A+'https://msdspds.castrol.com/bpglis/FusionPDS.nsf/Files/B89600A0F4CA7EC580258AED0081068E/$File/WEPP-D3UA57.pdf">Castrol texnik kartasi</a> (qidiruv tavsifi boʻyicha) · BYD qoʻllanmalari')+
+  row('dry','Castrol ON','Dry EV Transmission Fluid D2','<strong>Quruq motorli</strong> qutilar','KV40 32,2, KV100 6,3, VI 154, Brukfild −40 °C 10 000 mPa·s, qotish −57 °C','Castrol kartasida: BYD Atto 3, Han, Dolphin, E6, M3e (quruq motorlar). Ehtimol BYD BOT384 ga mos keladi',T,A+'https://msdspds.castrol.com/bpglis/FusionPDS.nsf/Files/835B8BCAA7B2800B80258C67007EBB19/$File/wepp-dfm2c7.pdf">Castrol texnik kartasi</a> (qidiruv tavsifi boʻyicha)')+
+  row('dry','Castrol ON','Dry EV Transmission Fluid (D1)','<strong>Quruq motorli</strong> qutilar, moy elektrga tegmaydi','KV100 4,6, VI 193, qovushqoqlik yoʻqotilishidan himoya, havoni tez ajratish','Mashinalar nomlanmagan',T,A+'https://www.castrol.com/en/global/corporate/products/our-brands/castrol-on/castrol-on-ev-transmission-fluids.html">Castrol</a> · texnik karta (italyancha versiya)')+
+  row('wet','Castrol ON','Wet EV Transmission Fluid (W2, W3)','<strong>Moyga botirilgan hoʻl motorli</strong> qutilar','Past qovushqoqlik, past elektr oʻtkazuvchanlik, mis himoyasi. Ochiq raqamlar yoʻq','Matbuot tavsifiga koʻra Leapmotor, MG, Polestar, Rivian, Tesla, Volvo. BYD Han EV: 2022-yilgi kelishuv boʻyicha tavsiya',P,A+'https://aftermarketinsight.spglobal.com/news/5300/castrol-launches-transmission-fluid-for-wet-e-motor-drivetrains">matbuot</a> · '+A+'https://chargedevs.com/newswire/byd-and-castrol-to-collaborate-on-fluids-and-greases-for-evs/">BYD va Castrol</a>')+
+  row('wet clutch','Castrol ON','Wet Plus EV Transmission Fluid','Hoʻl motor + <strong>almashtirish qurilmalari, sinxronizatorlar, muftalar</strong>','Ishqalanish sinxronizator va muftalarga moslangan. Raqam yoʻq','Mashinalar nomlanmagan',N,A+'https://www.castrol.com/en/global/corporate/products/our-brands/castrol-on/castrol-on-ev-transmission-fluids.html">Castrol</a>')+
+  row('wet hybrid','FUCHS','BluEV EDF 4101','Motori <strong>moy bilan sovutiladigan</strong> elektr koʻpriklar, «faqat wet qoʻllash uchun»','Kam qovushqoq; manbalarda raqam yoʻq (qovushqoqlik, mis, elektr)','BYD Atto 2, Atto 3, Seal, Sealion 8, Tang, DM-i tizimi; Chery eQ7, V23, V27, X3L; Li Auto i8; XPeng G6, X9, P7, M03 (FUCHS tavsiyasi)',N,A+'https://www.fuchs.com/de/en/products/download-center/download/file/260089-BYD-passenger-cars/">FUCHS</a>')+
+  row('unk','TotalEnergies','Quartz EV-Drive R 3.1','Elektromobil reduktorlari va kuchli yuklangan qutilar; motor turi koʻrsatilmagan','Sintetika, SAE 75, tasniflardan faqat API GL-4 koʻrsatilgan. Mis va elektr boʻyicha raqam yoʻq','Mashinalar nomlanmagan',N,A+'https://lubricants.catalog.totalenergies.com/corporate/en_UK/wor_quartz-ev-drive-r-3-1">katalog</a> · '+A+'https://sinolub.com/155625.html">Sinolub</a>')+
+  row('truck','Shell','E-Fluids (e-transmission)','Tijorat transportining elektr yuritmasi, jumladan yonilgʻi elementlari','GTL bazaviy moyi; raqobatchiga nisbatan misning 3 marta kam emirilishi va oddiy transmissiya moyidan 8 martagacha past elektr oʻtkazuvchanlik daʼvo qilingan','Mashinalar nomlanmagan; modellar yuk mashinasi va avtobus ishlab chiqaruvchilari bilan birga belgilanadi',P,A+'https://www.shell.com/business-customers/industrial-lubricants-and-specialty-fluids-for-business/news-and-media-releases/2020/shell-launches-e-fluids-for-electrified-commercial-vehicles.html">Shell</a>')+
+  row('clutch wet dry','Idemitsu','E AXLE FLUID Type-A, Type-G, Type-C','Uchta suyuqlik: A — <strong>muftalar</strong> (antishudder), G — tishli gʻildiraklarni himoya qilish uchun juda past qovushqoqlik, C — tishli gʻildiraklar himoyasi va <strong>motorni sovutish</strong>','Raqam yoʻq','Mashinalar nomlanmagan',N,A+'https://ilindia.idemitsu.com/media/single/new-development-of-dedicated-fluids-for-e-axle-a-driving-unit-for-evs-and-hybrid">Idemitsu</a>')+
+  row('dry','Lopal (龙蟠)','E26 Reducer Oil (LPL34765)','<strong>Motori suv bilan sovutiladigan</strong> (quruq) bir bosqichli elektromobil reduktori','KV40 25,02, KV100 5,274, VI 157, qotish −45 °C, chaqnash 224 °C, Brukfild −40 °C 8160 mPa·s. Mis, elektr, FZG boʻyicha maʼlumot yoʻq, ruxsatnomalar koʻrsatilmagan. Saytga koʻra avtomobil ishlab chiqaruvchisida 200 000 km yoʻl sinovidan oʻtgan','Texnik kartada: BYD (Qin EV, Atto 3, Yuan Pro, Seagull, Dolphin, e3, e9), SGMW, SAIC Maxus, Hozon (Nezha), Changan, Chery (eQ1, Wujie Pro, Arrizo E, iCAR 03, eQ7, QQ), GWM (ORA)',T,A+'https://www.lopal.cn/domain/product/spu/87">Lopal sayti</a> · foydalanuvchidan texnik karta')+
+  row('wet hybrid','Lopal (龙蟠)','E27 Reducer Oil (LPL33669)','Integratsiyalashgan elektr yuritmalar: <strong>moylash va sovutish</strong> (motorni moy bilan sovutish). Kartada BOT 805C EV spetsifikatsiyasi talabi koʻrsatilgan','KV40 26,49, KV100 5,51, VI 150, qotish −55 °C, chaqnash 216 °C, Brukfild −40 °C 5334 mPa·s, zichlik 0,834. Mis himoyasi va chulgʻam simi emali bilan moslik daʼvo qilingan. Mis, elektr va FZG boʻyicha raqam yoʻq','Voyah Free (2023 dan); BYD e2, Sea Lion EV; NIO (hammasi); Leapmotor C01, C11; AION (hammasi); Changan Lumin; Chery eQ7; Seres AITO M5, M7',T,'foydalanuvchidan texnik karta')+
+  row('wet dry','Lopal (龙蟠)','E27 PRO (LPL34529)','Bir bosqichli reduktorlar; kartaga koʻra <strong>suv yoki moy bilan</strong> sovutiladigan motorlar uchun. Juda past qovushqoqlik','KV40 18,5, KV100 4,27, VI 145, qotish −54 °C, chaqnash 206 °C, Brukfild −40 °C 3790 mPa·s. Mis qotishmalari himoyasi va izolyatsiya bilan moslik daʼvo qilingan. Mis va elektr boʻyicha raqam yoʻq','Zeekr, Li Auto, BYD ning eng yangi yuritmalari. E274 talab qilingan joyda qoʻllash mumkin',T,'foydalanuvchidan texnik karta')+
+  row('wet','Lopal (龙蟠)','E274 (LPL31955)','«Motor + reduktor» integratsiyalashgan yuritma: <strong>moylash va sovutish</strong>','KV40 18,85, KV100 4,338, VI 143, qotish −54 °C, chaqnash 198 °C, Brukfild −40 °C 3770 mPa·s. Mis himoyasi va izolyatsiya bilan moslik daʼvo qilingan. Mis va elektr boʻyicha raqam yoʻq','Zeekr 001, Zeekr 007 (2024 dan); BYD (W5 darajasi kerak boʻlgan joyda); Lynk &amp; Co, GWM, ORA, Voyah, Li Auto, Haval, Chery, Geely, Changan, Exeed',T,'foydalanuvchidan texnik karta')+
+  row('dry','Lopal (龙蟠)','G400 PRO (75W-80 / 75W-90, GL-4)','<strong>Motori suv bilan sovutiladigan</strong> bir bosqichli reduktorlar, elektromobil va gibridlar','Oddiy GL-4 transmissiya moyi, maxsus EV suyuqligi emas. Raqam yoʻq','Mashinalar nomlanmagan',N,A+'https://www.yunzhan365.com/basic/53217481.html">Lopal katalogi</a>')+
+  '</table></div>'+
+
+  '<h3>2. Raqamlar: texnik kartalarda nima bor</h3>'+
+  '<p>Qiymatlar odatiy, meʼyoriy emas. Faqat oʻzaro va yuritma talablari bilan solishtirish mumkin.</p>'+
+  '<div class="tbl models"><table><tr><th>Moy</th><th>KV40, mm²/s</th><th>KV100, mm²/s</th><th>VI</th><th>Mis (D130)</th><th>Qotish, °C</th><th>Chaqnash, °C</th><th>Brukfild −40 °C, mPa·s</th><th>FZG</th><th>Teshilish</th></tr>'+
+  '<tr><td><strong>Mobil EV Cool Drive Elite 311</strong></td><td class="n">23,58</td><td class="n">5,1</td><td class="n">—</td><td class="n">1b (150 °C, 3 soat)</td><td class="n">&lt; −57</td><td class="n">224</td><td class="n">5136</td><td class="n">9</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Mobil EV Cool Drive 308</strong></td><td class="n">22,43</td><td class="n">5,03</td><td class="n">159</td><td class="n">1a (100 °C, 3 soat); 1B (150 °C, 168 soat)</td><td class="n">−51</td><td class="n">208</td><td class="n">5072</td><td class="n">8</td><td class="n">77,8 kV</td></tr>'+
+  '<tr><td><strong>Mobil EV Cool Drive MS 304</strong></td><td class="n">25,58</td><td class="n">5,5</td><td class="n">161</td><td class="n">1A (150 °C, 3 soat)</td><td class="n">−54</td><td class="n">210</td><td class="n">5300</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Mobil EV Cool Drive Elite MS 902</strong></td><td class="n">28,3</td><td class="n">5,9</td><td class="n">160</td><td class="n">1B (150 °C, 3 soat)</td><td class="n">−57</td><td class="n">232</td><td class="n">5300</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Mobil EV Drive 201</strong></td><td class="n">29,4</td><td class="n">5,85</td><td class="n">—</td><td class="n">1B (100 °C, 3 soat)</td><td class="n">−48</td><td class="n">214</td><td class="n">12 000</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Mobil EV Cool Drive 043</strong></td><td class="n" colspan="2">sahifada adashtirilgan (3,5 va 14,47)</td><td class="n">—</td><td class="n">maʼlumot yoʻq</td><td class="n">−60</td><td class="n">212</td><td class="n">1800</td><td class="n">9</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Lopal E26</strong></td><td class="n">25,02</td><td class="n">5,274</td><td class="n">157</td><td class="n">maʼlumot yoʻq</td><td class="n">−45</td><td class="n">224</td><td class="n">8160</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Lopal E27</strong></td><td class="n">26,49</td><td class="n">5,51</td><td class="n">150</td><td class="n">maʼlumot yoʻq</td><td class="n">−55</td><td class="n">216</td><td class="n">5334</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Lopal E27 PRO</strong></td><td class="n">18,5</td><td class="n">4,27</td><td class="n">145</td><td class="n">maʼlumot yoʻq</td><td class="n">−54</td><td class="n">206</td><td class="n">3790</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Lopal E274</strong></td><td class="n">18,85</td><td class="n">4,338</td><td class="n">143</td><td class="n">maʼlumot yoʻq</td><td class="n">−54</td><td class="n">198</td><td class="n">3770</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Castrol ON W5 (BYD BOT383)</strong></td><td class="n">19</td><td class="n">4,3</td><td class="n">139</td><td class="n">«juda yaxshi», raqamsiz</td><td class="n">−48</td><td class="n">—</td><td class="n">4400</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Castrol ON Dry D2</strong></td><td class="n">32,2</td><td class="n">6,3</td><td class="n">154</td><td class="n">—</td><td class="n">−57</td><td class="n">—</td><td class="n">10 000</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '<tr><td><strong>Castrol ON Dry (D1)</strong></td><td class="n">18</td><td class="n">4,6</td><td class="n">193</td><td class="n">—</td><td class="n">−48</td><td class="n">202</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>'+
+  '</table></div>'+
+  '<div class="note"><span class="tag">Bu jadvaldan qanday foydalanish</span><ul class="list">'+
+  '<li><strong>Motori moy bilan sovutiladigan yuritmalar uchun</strong> topilgan moylar boʻyicha moʻljal: KV100 taxminan 4,3 yoki 5,0–5,9 mm²/s, 150 °C da mis 1A–1B.</li>'+
+  '<li><strong>Quruq motor uchun</strong> Castrol D1 da qovushqoqlik pastroq (KV100 = 4,6) va qovushqoqlik indeksi juda yuqori (193). Bu moʻljal, talab emas.</li>'+
+  '<li>Qovushqoqligi turli moylarni yuritma ishlab chiqaruvchisi tasdigʻisiz <strong>bir-biriga almashtirib boʻlmaydi</strong>, raqamlar yaqin boʻlsa ham.</li>'+
+  '</ul></div>'+
+
+  '<h3>3. Lopal qatori: E26, E27, E27 PRO va E274 orasidan qanday tanlash</h3>'+
+  '<p>Lopal ning toʻrtta texnik kartasi bor. Ularning hech birida old yoki orqa reduktor koʻrsatilmagan: moylar <strong>yuritma turi va qovushqoqlik</strong> boʻyicha boʻlinadi.</p>'+
+  '<div class="tbl models"><table><tr><th>Moy</th><th>Kartaga koʻra qaysi yuritma uchun</th><th>KV100, mm²/s</th><th>Brukfild −40 °C, mPa·s</th><th>Mis himoyasi daʼvo qilinganmi?</th><th>Kartalardagi model misollari</th></tr>'+
+  '<tr><td><strong>E26</strong></td><td>Integratsiyalashgan elektr yuritma tizimlari; saytda — <strong>motori suv bilan sovutiladigan</strong> reduktor</td><td class="n">5,274</td><td class="n">8160</td><td>Yoʻq. Korroziyaga qarshi xossalar va zichlagichlar bilan moslik koʻrsatilgan</td><td>BYD Atto 3, Dolphin, Seagull, Qin EV, e3, e9; Chery eQ7, iCAR 03; Changan Estar; GWM ORA</td></tr>'+
+  '<tr><td><strong>E27</strong></td><td>Integratsiyalashgan tizimlar: moylash va <strong>sovutish</strong> (motorni moy bilan sovutish)</td><td class="n">5,51</td><td class="n">5334</td><td>Ha, simning emali bilan moslik ham</td><td>NIO (hammasi), AION (hammasi), Leapmotor C01 va C11, BYD e2 va Sea Lion EV, Voyah Free, Seres AITO</td></tr>'+
+  '<tr><td><strong>E27 PRO</strong></td><td>Bir bosqichli reduktorlar, <strong>suv yoki moy bilan</strong> sovutiladigan motorlar; eng yangi avlod yuritmalari</td><td class="n">4,27</td><td class="n">3790</td><td>Ha</td><td>Zeekr, Li Auto, BYD (eng yangi yuritmalar)</td></tr>'+
+  '<tr><td><strong>E274</strong></td><td>«Motor + reduktor» integratsiyalashgan yuritma: moylash va <strong>sovutish</strong></td><td class="n">4,338</td><td class="n">3770</td><td>Ha</td><td>Zeekr 001, Zeekr 007 (2024 dan), Lynk &amp; Co, Voyah, Li Auto, Haval, Chery, Geely, Changan, Exeed; W5 darajali BYD</td></tr>'+
+  '</table></div>'+
+  '<div class="note"><span class="tag">Toʻrtta kartadan nima koʻrinadi</span><ul class="list">'+
+  '<li><strong>Ikki qovushqoqlik guruhi:</strong> KV100 taxminan 5,3–5,5 boʻlgan E26 va E27 hamda KV100 taxminan 4,3 boʻlgan juda past qovushqoq E27 PRO va E274. Birini ikkinchisiga tasdiqsiz almashtirib boʻlmaydi.</li>'+
+  '<li>E27 PRO va E274 raqamlari deyarli bir xil (KV100 4,27 va 4,338). E27 PRO kartasi uni E274 talab qilingan joyda ishlatishga toʻgʻridan-toʻgʻri ruxsat beradi. Aksi kartalarda aytilmagan.</li>'+
+  '<li>E26 tavsifida mis himoyasi yoʻq, qolgan uchtasida esa daʼvo qilingan. Bu E26 suv bilan sovutiladigan, E27, E27 PRO, E274 esa moy bilan sovutiladigan motorlar uchun ekaniga mos keladi.</li>'+
+  '<li>BYD barcha toʻrtta kartada uchraydi. Mashinaga aynan qaysi moy kerakligi model va yilga bogʻliq, VIN boʻyicha tasdiqlanadi.</li>'+
+  '<li>Chery eQ7 boʻyicha farq: Lopal uni E26 roʻyxatiga kiritadi, FUCHS esa eQ7 uchun «faqat wet» suyuqlikni tavsiya qiladi. Atto 3 boʻyicha Lopal E26 va FUCHS oʻrtasidagi farq saqlanadi.</li>'+
+  '<li>E274 kartasida BYD uchun «W5 darajasi» uchraydi — bu Castrol ON EV W5, BYD qoʻllanmalarida BOT383 kodi. E27 kartasida BOT 805C EV spetsifikatsiyasi izohsiz nomlangan.</li>'+
+  '<li>Toʻrtta kartaning hech birida mis, elektr va FZG boʻyicha raqam yoʻq, ruxsatnomalar boʻlimi esa boʻsh (E27 PRO dagi brendlar roʻyxatidan tashqari).</li>'+
+  '<li>E27 PRO va E274 kartalarida rossiyalik «Аллея Групп» (Moskva) kompaniyasi koʻrsatilgan. Ehtimol, bu mintaqadagi Lopal distribyutori: yetkazib berish shartlarini soʻrash kerak.</li>'+
+  '</ul></div>'+
+
+  '<h3>4. Nima topilmadi</h3>'+
+  '<ul class="list">'+
+  '<li>Great Wall, Kunlun va Tongyi texnik kartalari. Lopal da qovushqoqlik va sovuqdagi oquvchanlik bilan toʻrtta karta bor, lekin mis, elektr va FZG boʻyicha raqam yoʻq. Bularning hammasini ishlab chiqaruvchi yoki distribyutordan soʻrash kerak.</li>'+
+  '<li>Castrol W2/W3 raqamlari, Shell va Total ning xitoy bozori uchun maʼlumotlari.</li>'+
+  '<li>Elektr reduktor moylarining mustaqil sinovlari va topilgan moylarning hech birida solishtirma qarshilik maʼlumotlari.</li>'+
+  '<li>Avtomobil ishlab chiqaruvchisi tasdiqlagan, moyning aniq modelga bogʻlanishi: BYD qoʻllanmalaridagi Castrol kodlaridan (BOT383, BOT384), 2022-yilgi BYD–Castrol kelishuvidan va Mobil EV Drive 201 dagi Volvo ruxsatnomasidan tashqari.</li>'+
+  '</ul>'+
+  '<div class="note warn"><span class="tag">Amaliy xulosa</span><p>Bu katalog kimdan hujjat soʻrashni bilish va kartalarni solishtirish uchun kerak. Moyni faqat «elektromobillar uchun» deb quyib boʻlmaydi. Avval yuritma turini aniqlang (7-dars), keyin xossalarni solishtiring va yetkazib beruvchidan modelga qoʻllanilishi haqida xat soʻrang.</p></div></div>';
+}
+
+function china(){
+  var A='<a target="_blank" rel="noopener" href="';
+  return '<div class="page wide"><p class="eyebrow">Maʼlumotnoma · xitoy tilidagi manbalar, tarjima</p><h2>Xitoyda elektromobil reduktorlari moylari haqida nima yozishadi</h2>'+
+  '<p class="lead">Xitoy eng koʻp elektromobil ishlab chiqaradi va bunday moylar boʻyicha birinchi ochiq standart aynan u yerda paydo boʻldi. Quyida xitoy tilida topilgan va tarjima qilingan maʼlumotlar.</p>'+
+  '<div class="note warn"><span class="tag">Asosiy cheklov</span><p>Aniq modellar uchun original moylarni xitoy ochiq manbalarida topib boʻlmadi: maqolalar qoʻllanma va servis tarmogʻiga yoʻllaydi. Lekin ular <strong>BYD ning rasmiy yevropa qoʻllanmalarida</strong> topildi (Castrol BOT383 / W5, BOT384, EHSF-2LV kodlari) — 9-dars va «Modellar boʻyicha moy tanlash» maʼlumotnomasiga qarang. Xitoy standartining toʻliq matni pullik, jadvallaridagi raqamlarni olib boʻlmadi.</p></div>'+
+
+  '<h3>1. Birinchi ochiq standart: NB/SH/T 6042-2021</h3>'+
+  '<div class="tbl models"><table><tr><th>Band</th><th>Nima maʼlum</th></tr>'+
+  '<tr><td><strong>Nomi</strong></td><td>«纯电动汽车减速箱用油» — «Toza elektr avtomobillar reduktorlari uchun moylar» (neft-kimyo tarmoq standarti)</td></tr>'+
+  '<tr><td><strong>Kim chiqargan</strong></td><td>Xitoy Milliy energetika boshqarmasi (国家能源局). Xitoy nashrlariga koʻra ishlab chiqishga Sinopec Lubricants va Great Wall (长城润滑油) brendi boshchilik qilgan</td></tr>'+
+  '<tr><td><strong>Sanalar</strong></td><td>16.11.2021 da chiqarilgan, 16.05.2022 dan amal qiladi, maqomi «amaldagi»</td></tr>'+
+  '<tr><td><strong>Maqomi</strong></td><td>Xitoy nashrlari uni elektromobillar uchun moylash materiallariga oid dunyodagi birinchi ochiq standart deb ataydi</td></tr>'+
+  '<tr><td><strong>Tuzilishi</strong></td><td>Ikki talablar jadvali: <strong>1-jadval motori suv bilan sovutiladigan elektromobillar uchun</strong> (水冷电机), <strong>2-jadval moy bilan sovutiladiganlar uchun</strong> (油冷电机). Bu ochiq tavsifdagi nomuvofiqlikda qayta tekshirish bandidan kelib chiqadi</td></tr>'+
+  '<tr><td><strong>Raqamlar</strong></td><td>Qovushqoqlik, mis, FZG, qarshilik boʻyicha chegaralar ochiq manbalarda topilmadi. Inglizcha toʻliq matni '+A+'https://www.chinesestandard.net/PDF.aspx/NBSHT6042-2021">ChineseStandard.net</a> da sotiladi</td></tr>'+
+  '</table></div>'+
+  '<p>Ikki jadvalga boʻlinish kurs mantigʻiga mos keladi: «quruq» va «hoʻl» motorga turli talablar qoʻyiladi. Bu 7-dars sxemasining eng qimmatli tasdigʻi.</p>'+
+
+  '<h3>2. Xitoy bozorida sotiladigan moylar</h3>'+
+  '<div class="tbl models"><table><tr><th>Ishlab chiqaruvchi va moy</th><th>Nima daʼvo qilingan</th><th>Manba</th></tr>'+
+  '<tr><td><strong>Great Wall (Sinopec), ERO plus</strong></td><td><strong>Motori moy bilan sovutiladigan</strong> elektromobil reduktorlari uchun moy. Juda past qovushqoqlik texnologiyasi daʼvo qilingan. Ochiq materiallarda raqam yoʻq</td><td>'+A+'https://m.tech.china.com/redian/2025/0423/042025_1663873.html">2025-yilgi maqola</a></td></tr>'+
+  '<tr><td><strong>Kunlun (CNPC), bir bosqichli reduktorlar uchun moy</strong></td><td><strong>Keng tarqalgan toza elektr modellarning 60% dan koʻpiga</strong> mos deb daʼvo qilingan; kichik shahar elektromobillariga moʻljallangan</td><td>xitoy nashrlari</td></tr>'+
+  '<tr><td><strong>Mobil EV Cool Drive</strong> (Xitoy uchun seriya)</td><td>Xitoycha sahifadagi toʻliq texnik kartalar, maʼlumotlar pastdagi jadvalda</td><td>Mobil sahifalari</td></tr>'+
+  '</table></div>'+
+
+  '<h3>3. Haqiqiy raqamlar: Mobil elektr yuritma moylari, xitoycha sahifalar</h3>'+
+  '<p>Bu standart chegaralari emas, motori moy bilan sovutiladigan yuritmalar uchun tijorat moylarining odatiy qiymatlari. Ular texnik kartalarni solishtirish uchun moʻljal beradi.</p>'+
+  '<div class="tbl models"><table><tr><th>Koʻrsatkich (usul)</th><th>EV Cool Drive Elite 311</th><th>EV Cool Drive 308</th><th>EV Cool Drive MS 304</th><th>EV Cool Drive Elite MS 902</th></tr>'+
+  '<tr><td>40 °C dagi qovushqoqlik, mm²/s (D445)</td><td class="n">23,58</td><td class="n">22,43</td><td class="n">25,58</td><td class="n">28,3</td></tr>'+
+  '<tr><td>100 °C dagi qovushqoqlik, mm²/s (D445)</td><td class="n">5,1</td><td class="n">5,03</td><td class="n">5,5</td><td class="n">5,9</td></tr>'+
+  '<tr><td>Qovushqoqlik indeksi (D2270)</td><td class="n">—</td><td class="n">159</td><td class="n">161</td><td class="n">160</td></tr>'+
+  '<tr><td>Mis plastinka (D130)</td><td class="n">1b (150 °C, 3 soat)</td><td class="n">1a (100 °C, 3 soat); 1B (150 °C, 168 soat)</td><td class="n">1A (150 °C, 3 soat)</td><td class="n">1B (150 °C, 3 soat)</td></tr>'+
+  '<tr><td>Teshilish kuchlanishi (D1816)</td><td class="n">maʼlumot yoʻq</td><td class="n">77,8 kV</td><td class="n">maʼlumot yoʻq</td><td class="n">maʼlumot yoʻq</td></tr>'+
+  '<tr><td>FZG, yuklama bosqichi (CEC L-084-02)</td><td class="n">9</td><td class="n">8</td><td class="n">maʼlumot yoʻq</td><td class="n">maʼlumot yoʻq</td></tr>'+
+  '<tr><td>−40 °C da Brukfild boʻyicha qovushqoqlik, mPa·s (D2983)</td><td class="n">5136</td><td class="n">5072</td><td class="n">5300</td><td class="n">5300</td></tr>'+
+  '<tr><td>Qotish harorati, °C (D97)</td><td class="n">−57 dan past</td><td class="n">−51</td><td class="n">−54</td><td class="n">−57</td></tr>'+
+  '<tr><td>Chaqnash harorati, °C (D92)</td><td class="n">224</td><td class="n">208</td><td class="n">210</td><td class="n">232</td></tr>'+
+  '<tr><td>Solishtirma qarshilik</td><td colspan="4">Toʻrtta kartaning hammasida faqat «yuqori hajmiy qarshilik» soʻzlari, raqamlar koʻrsatilmagan</td></tr>'+
+  '<tr><td>Avtomobil ishlab chiqaruvchilari ruxsatnomalari</td><td colspan="4">Toʻrtta kartaning hech birida koʻrsatilmagan</td></tr>'+
+  '</table></div>'+
+  '<p>Havolalar: '+A+'https://www.mobil.com/zh-cn/passenger-vehicle-lube/pds/cn-xx-mobil-ev-cool-drive-elite-311-ev311">311</a> · '+A+'https://www.mobil.com/zh-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-cool-drive-308">308</a> · '+A+'https://mobil.com/en-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-cool-drive-ms-304">MS 304</a> · '+A+'https://www.mobil.com/en-cn/passenger-vehicle-lube/pds/ap-zh-mobil-ev-cool-drive-elite-ms-902">Elite MS 902</a>.</p>'+
+  '<div class="note"><span class="tag">Jadvaldan nima koʻrinadi</span>'+
+  '<ul class="list">'+
+  '<li>Xitoyda motori moy bilan sovutiladigan yuritmalar moylarining 100 °C dagi qovushqoqligi taxminan <strong>5,0–5,9 mm²/s</strong>, 40 °C da taxminan 22–28 mm²/s, qovushqoqlik indeksi taxminan 160.</li>'+
+  '<li>Hammasida mis plastinka <strong>1A–1B</strong>, bunda qattiq sharoitda (150 °C). 308 da hatto 168 soatlik sinov bor.</li>'+
+  '<li>Qotish −50 °C dan past, −40 °C dagi qovushqoqlik taxminan 5100–5300 mPa·s: Fargʻona vodiysi qishi uchun mos.</li>'+
+  '<li>Elektr xossalarini ishlab chiqaruvchilar soʻz bilan tasvirlaydi. Toʻrtta moydan faqat bittasida raqam bor (teshilish kuchlanishi 77,8 kV).</li>'+
+  '</ul></div>'+
+  '<div class="note warn"><span class="tag">Mobil sahifasidagi xato</span><p>EV Cool Drive 043 moyining sahifasida yozilgan: 40 °C dagi qovushqoqlik — 3,5 mm²/s, 100 °C da — 14,47 mm²/s. Bunday boʻlmaydi: 40 °C da moy doim quyuqroq. Qiymatlar aniq adashtirilgan. Bu misol nega maʼlumotlarni internetdagi sahifa bilan emas, rasmiy texnik karta bilan solishtirish kerakligini yaxshi koʻrsatadi.</p></div>'+
+
+  '<h3>4. Xitoy maqolalari bozor haqida nima deydi</h3>'+
+  '<ul class="list">'+
+  '<li>Elektr yuritma shunchalik tez aylanadi va moy elektrga shunchalik yaqinki, oddiy transmissiya moyi toʻgʻri kelmaydi. Izolyatsiyasi yomon moy oqib chiqsa, qisqa tutashuv va motor kuyishiga olib kelishi mumkin.</li>'+
+  '<li>Xitoy mutaxassislarining sharhi («润滑油» jurnali, 2024, CNPC Lanzhou) elektr yuritma moyiga talablarni sanab oʻtadi: elektr va issiqlik xossalari, mis korroziyasi, ishqalanish, siljish va oksidlanishga barqarorlik, koʻpik, materiallar bilan moslik. Bu bizning xossalar jadvalimizdagi bandlarning oʻzi. '+A+'https://search.napstic.cn/literature/periodical/010rhy202405001">annotatsiya</a></li>'+
+  '<li>Internetdagi xitoy maqolalari koʻpchilik toifalar uchun yagona standart yoʻqligini va har bir avtomobil ishlab chiqaruvchisi oʻz korxona standartidan (企标) foydalanishini yozadi. Bu marketing maqolalarining soʻzlari, lekin ular modellar boʻyicha koʻrayotganimizga mos keladi.</li>'+
+  '</ul>'+
+  '<div class="note warn"><span class="tag">Bu raqamlardan foydalanmang</span><p>Bitta maqolada «hajmiy qarshilik 1×10⁹ Om·sm dan katta» va «oʻtkazuvchanlik 500 pSm/m dan kam» uchraydi. Manba marketing, raqamlarni tekshirib boʻlmadi. Kursda ulardan foydalanib boʻlmaydi.</p></div>'+
+
+  '<h3>5. Almashtirish intervallari (2026-yilgi xitoy maqolasiga koʻra)</h3>'+
+  '<div class="tbl models"><table><tr><th>Marka</th><th>Nima deyilgan</th><th>Ishonchlilik</th></tr>'+
+  '<tr><td><strong>BYD (toza elektr)</strong></td><td>Reduktor moyi: birinchi almashtirish <strong>24 oy yoki 40 000 km</strong> dan keyin, keyin har <strong>48 oy yoki 80 000 km</strong> da. Elektr yuritma xizmatiga motorni tekshirish, reduktor moyini almashtirish va sovutish tizimini tekshirish kiradi. «Uch elektr uzel»ga kafolat rasmiy dilerlarda xizmatni talab qiladi</td><td><span class="lvl b">OAV dagi qayta bayon</span> <span class="lvl c">qoʻllanma boʻyicha tekshirish</span></td></tr>'+
+  '<tr><td><strong>Tesla</strong></td><td>Oʻsha maqolada uchta elektr uzelga xizmat «xizmatsiz» deyilgan, muntazam koʻrikdan oʻtkazish tavsiyasi bilan. Bu Tesla servis qoʻllanmasiga mos kelmaydi, unda toʻkish va quyish tartiblari bor</td><td><span class="lvl c">Bahsli</span></td></tr>'+
+  '</table></div>'+
+  '<p class="small">Manba: '+A+'https://www.zhihu.com/tardis/jm/art/2012461462375916549">Zhihu dagi maqola</a>. Tekshiruvda sahifa boʻsh ochildi, maʼlumotlar qidiruv tavsifidan olingan.</p>'+
+  '<div class="note warn"><span class="tag">Rasmiy qoʻllanmalar bilan solishtirish</span><p>BYD ning yevropa qoʻllanmalari boshqa intervallarni beradi: Seal va Dolphin — birinchi almashtirish 24 oy / 30 000 km dan keyin, keyin har 24 oy / 48 000 km da; Atto 3 EVO — 24 oy / 20 000 km, keyin 24 oy / 30 000 km, filtr bilan birga. Maqolaga emas, mashinangiz qoʻllanmasiga ishoning.</p></div>'+
+
+  '<h3>6. BYD va DM-i uchun motor moyi</h3>'+
+  '<p>2025-yil dekabrda BYD Mobil bilan birgalikda DM-i gibrid tizimi uchun 0W-20 motor moyini chiqardi. Yeyilishga chidamlilik tarmoq standartidan 50% yuqori deb daʼvo qilingan. Bu reduktor moyi emas, motor moyi. MITAL uchun bu signal: BYD ning firma qatori bor va u gibridlar servisida mustaqil yetkazib beruvchilar bilan raqobatlashadi. '+A+'https://carnewschina.com/2025/12/23/byd-launched-phev-engine-oil-for-its-dm-i-hybrid-system-in-partnership-with-mobil">CarNewsChina</a></p>'+
+
+  '<h3>7. Qidiruv uchun xitoycha atamalar lugʻati</h3>'+
+  '<div class="tbl models"><table><tr><th>Xitoycha</th><th>Oʻzbekcha</th></tr>'+
+  '<tr><td>减速箱油 / 减速器油</td><td>reduktor moyi</td></tr>'+
+  '<tr><td>电驱油 / 电驱动液</td><td>elektr yuritma moyi / suyuqligi</td></tr>'+
+  '<tr><td>油冷电机 / 水冷电机</td><td>moy bilan / suv bilan sovutiladigan motor</td></tr>'+
+  '<tr><td>纯电动汽车减速箱用油</td><td>toza elektr avtomobillar reduktorlari uchun moy (standart nomi)</td></tr>'+
+  '<tr><td>铜片腐蚀</td><td>mis plastinka korroziyasi (ASTM D130)</td></tr>'+
+  '<tr><td>体积电阻率</td><td>solishtirma hajmiy qarshilik</td></tr>'+
+  '<tr><td>击穿电压</td><td>teshilish kuchlanishi</td></tr>'+
+  '<tr><td>企标</td><td>korxona standarti (avtomobil ishlab chiqaruvchisining ichki standarti)</td></tr>'+
+  '<tr><td>原厂 / 加注量 / 更换周期</td><td>original / quyish hajmi / almashtirish intervali</td></tr>'+
+  '</table></div>'+
+
+  '<h3>8. Keyin nima qilish kerak</h3>'+
+  '<ol class="list">'+
+  '<li>NB/SH/T 6042-2021 standartining inglizcha tarjimasini sotib olish va xossalar jadvallarini u bilan solishtirish. Bu ikkala turdagi moylar uchun chegaralari bor yagona ommaviy hujjat.</li>'+
+  '<li>BYD va Chery ning Oʻzbekistondagi rasmiy distribyutoridan oʻzbek, rus yoki ingliz tilidagi servis hujjatlarini soʻrash: suyuqlik nomlari va hajmlar.</li>'+
+  '<li>Mitanol va Liman OIL yetkazib beruvchisidan NB/SH/T 6042 ga (1- yoki 2-jadval) mos suyuqliklar bormi va elektr maʼlumotlari bilan texnik kartani soʻrash.</li>'+
+  '</ol></div>';
+}
+
+function lesson(l,idx){
+  var h='<div class="page"><p class="eyebrow">'+(l.final?"Yakun":(modOf(l.id)+" · "+(idx+1)+"-dars, jami "+(L.length-1)))+'</p><h2>'+esc(l.title)+'</h2>'+
+    '<div class="meta"><span><b>'+l.min+'</b> daqiqa</span><span><b>'+l.quiz.length+'</b> savol</span>'+(S.done[l.id]!=null?'<span>Eng yaxshi natija: <b>'+S.done[l.id]+' / '+l.quiz.length+'</b></span>':'')+'</div>'+
+    l.body+
+    '<section class="quiz" id="quiz"><div class="quiz-head"><h2>'+(l.final?"Savollar":"Oʻzingizni tekshiring")+'</h2><span id="qscore">0 / '+l.quiz.length+'</span></div>'+
+    l.quiz.map(function(q,qi){
+      return '<div class="q" data-q="'+qi+'"><p class="q-t"><span class="num">'+(qi+1)+'.</span><span>'+esc(q.q)+'</span></p><div class="opts">'+
+      q.o.map(function(o,oi){return '<button class="opt" id="'+l.id+'-q'+qi+'-o'+oi+'" data-o="'+oi+'">'+esc(o)+'</button>'}).join("")+
+      '</div><p class="why" hidden></p></div>';
+    }).join("")+
+    '<div id="qres"></div></section>';
+  var prev=L[idx-1], next=L[idx+1];
+  h+='<nav class="pager">'+(prev?'<a href="#'+prev.id+'"><small>Orqaga</small>'+esc(prev.title)+'</a>':'<a href="#home"><small>Orqaga</small>Kurs haqida</a>')+
+     (next?'<a class="next" href="#'+next.id+'"><small>Keyingi</small>'+esc(next.title)+'</a>':'<a class="next" href="#permodel"><small>Keyingi</small>Modellar boʻyicha moy tanlash</a>')+'</nav></div>';
+  return h;
+}
+
+function bindQuiz(l){
+  var ans={}, right=0;
+  var box=document.getElementById("quiz");
+  box.addEventListener("click",function(ev){
+    var b=ev.target.closest(".opt"); if(!b||b.disabled) return;
+    var qd=b.closest(".q"), qi=+qd.dataset.q, oi=+b.dataset.o, q=l.quiz[qi];
+    if(ans[qi]!=null) return;
+    ans[qi]=oi;
+    qd.querySelectorAll(".opt").forEach(function(x,i){x.disabled=true; if(i===q.a) x.classList.add("ok"); else if(i===oi) x.classList.add("no");});
+    var w=qd.querySelector(".why"); w.textContent=q.w; w.hidden=false;
+    if(oi===q.a) right++;
+    document.getElementById("qscore").textContent=right+" / "+l.quiz.length;
+    if(Object.keys(ans).length===l.quiz.length) finish(l,right);
+  });
+}
+
+function finish(l,right){
+  var tot=l.quiz.length, res=document.getElementById("qres");
+  var best=Math.max(right,S.done[l.id]||0);
+  var need=Math.ceil(tot*0.8); var pass = l.final ? right>=need : true;
+  if(pass){ S.done[l.id]=best; save(); renderNav(l.id); }
+  var idx=L.indexOf(l), next=L[idx+1];
+  if(!l.final){
+    var ok=right/tot>=0.8;
+    res.innerHTML='<div class="result'+(ok?"":" fail")+'"><b>'+right+' / '+tot+'</b><p>'+(ok?"Aʼlo, dars oʻtildi. Keyingisiga oʻtish mumkin.":"Dars belgilandi, lekin xato boʻlgan boʻlimlarni qayta oʻqib, testni yana topshirish kerak.")+'</p>'+
+      '<div class="row"><button class="btn ghost" id="retry">Testni qayta topshirish</button>'+(next?'<a class="btn" href="#'+next.id+'">Keyingi dars</a>':'')+'</div></div>';
+  } else if(pass){
+    res.innerHTML='<div class="cert"><p class="eyebrow">OilBook taʼlimi · Bonus dars</p><h3>Kurs tugatildi</h3><p>«Elektromobil va gibrid reduktorlari uchun moylar» · natija <strong>'+right+' / '+tot+'</strong></p>'+
+      '<p><label for="certName" class="small">Belgi uchun ism</label><br><input id="certName" value="'+esc(S.name)+'" placeholder="Ism va familiya"></p>'+
+      '<p class="small" id="certLine">'+(S.name?esc(S.name)+' · ':'')+new Date().toLocaleDateString("ru-RU")+'</p>'+
+      '<div class="row" style="justify-content:center"><button class="btn ghost" id="retry">Qayta topshirish</button></div></div>';
+    var inp=document.getElementById("certName");
+    inp.addEventListener("input",function(){S.name=inp.value.trim();save();document.getElementById("certLine").textContent=(S.name?S.name+" · ":"")+new Date().toLocaleDateString("ru-RU")});
+  } else {
+    res.innerHTML='<div class="result fail"><b>'+right+' / '+tot+'</b><p>Kamida '+need+' ta toʻgʻri javob kerak. Javoblar izohida qaysi darsni takrorlash kerakligi koʻrsatilgan.</p><div class="row"><button class="btn" id="retry">Qayta topshirish</button></div></div>';
+  }
+  document.getElementById("retry").addEventListener("click",function(){route(true)});
+}
+
+function route(toQuiz){
+  var id=(location.hash||"#home").slice(1);
+  var alias={models:"permodel",popular:"permodel",summary:"permodel",types:"l7"};
+  if(alias[id]) id=alias[id];
+  var idx=L.findIndex(function(l){return l.id===id});
+  var PAGES={glossary:glossary,china:china,catalog:catalog,makers:makers,permodel:permodel};
+  if(PAGES[id]){main.innerHTML=PAGES[id](); if(id==="catalog"||id==="permodel") bindCatalog();}
+  else if(idx>=0){main.innerHTML=lesson(L[idx],idx);bindQuiz(L[idx]);}
+  else {id="home";main.innerHTML=home();}
+  renderNav(id);
+  side.classList.remove("open");menuBtn.setAttribute("aria-expanded","false");
+  if(toQuiz===true){var qz=document.getElementById("quiz"); if(qz) qz.scrollIntoView();}
+  else window.scrollTo(0,0);
+}
+window.addEventListener("hashchange",function(){route(false)});
+route(false);
+</script>
+
+</body></html>
