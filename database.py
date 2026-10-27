@@ -5348,8 +5348,16 @@ SUB_DEFAULTS = {
     "card_number": "",
     "card_holder": "",
     "support_contact": "",
+    # скидка на первый месяц для новых точек после пробного периода, %
+    "first_disc": 30,
+    # «Безлимит» — разовая оплата навсегда, цена в долларах, платят сумами
+    # по курсу (курс ЦБ подтягивается сам; usd_rate_manual > 0 — свой курс)
+    "lifetime_usd": 599,
+    "lifetime_branch_usd": 100,
+    "usd_rate_manual": 0,
 }
-_SUB_INT_KEYS = ("price_main", "price_branch", "disc_1", "disc_3", "disc_6", "disc_12")
+_SUB_INT_KEYS = ("price_main", "price_branch", "disc_1", "disc_3", "disc_6", "disc_12", "first_disc",
+                 "lifetime_usd", "lifetime_branch_usd", "usd_rate_manual")
 # Чеки на сервере НЕ хранятся: файл сразу уходит администратору в Telegram,
 # в базе остаётся только его file_id (по нему админка показывает чек).
 
@@ -5391,6 +5399,10 @@ def _migrate_subscription(conn):
     pay_cols = {row["name"] for row in conn.execute("PRAGMA table_info(sub_payments)").fetchall()}
     if "tg_file_id" not in pay_cols:
         conn.execute("ALTER TABLE sub_payments ADD COLUMN tg_file_id TEXT")
+    # автооплата через Hamyon API: номер платежа у Hamyon
+    if "ext_id" not in pay_cols:
+        conn.execute("ALTER TABLE sub_payments ADD COLUMN ext_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_payments_ext ON sub_payments(ext_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_payments_shop ON sub_payments(shop_id, status)")
     # раньше каждое включение «∞» добавляло новую запись о продаже (и выключение
     # её не убирало) — оставляем по одной действующей на бессрочную точку
@@ -5475,7 +5487,11 @@ def subscription_state(shop: dict) -> dict:
     days_left = (until - today).days if until else None
     expired = bool(not lifetime and until and today > until)
     pending = bool(shop and shop.get("role") == "branch" and shop.get("branch_pending"))
-    reason = "expired" if expired else ("branch_pending" if pending else None)
+    # Срок закончился (пробный или оплаченный) — режим «только просмотр»:
+    # смотреть можно всё, добавлять и менять — нет. Полностью закрыт вход
+    # только у нового филиала, который ещё ни разу не оплачен.
+    readonly = expired and not pending
+    reason = "branch_pending" if pending else ("expired" if expired else None)
     return {
         "head_id": head.get("id"),
         "lifetime": lifetime,
@@ -5483,7 +5499,8 @@ def subscription_state(shop: dict) -> dict:
         "paid_until": until.strftime("%Y-%m-%d") if until else None,
         "days_left": days_left,
         "expired": expired,
-        "blocked": bool(reason),
+        "readonly": readonly,
+        "blocked": pending,
         "reason": reason,
     }
 
@@ -5495,13 +5512,61 @@ def _sub_discount(settings: dict, months) -> int:
         return 0
 
 
+def first_month_offer(head: dict, settings: dict = None) -> int:
+    """Скидка (%) на первый месяц: новой точке (зарегистрировалась сама или
+    была на пробном периоде), которая ещё ни разу не платила. 0 — скидки нет."""
+    if not head or head.get("role") != "shop":
+        return 0
+    if (head.get("license_type") or "sub") == "lifetime" or head.get("custom_price"):
+        return 0
+    if not (head.get("self_registered") or head.get("trial")):
+        return 0
+    settings = settings or get_platform_settings()
+    disc = int(settings.get("first_disc") or 0)
+    if disc <= 0:
+        return 0
+    with get_conn() as conn:
+        paid = conn.execute("SELECT 1 FROM sub_payments WHERE shop_id=? AND status='confirmed' "
+                            "AND kind IN ('extend', 'both', 'lifetime') LIMIT 1", (head["id"],)).fetchone()
+    return 0 if paid else min(disc, 90)
+
+
 def head_main_price(head: dict, settings: dict) -> int:
     """Цена главной точки в месяц: индивидуальная (если админ задал) или общая."""
     cp = head.get("custom_price") if head else None
     return int(cp) if cp else settings["price_main"]
 
 
-def sub_quote(head_id: int) -> dict:
+def get_raw_setting(key: str):
+    with get_conn() as conn:
+        r = conn.execute("SELECT value FROM platform_settings WHERE key=?", (key,)).fetchone()
+        return r["value"] if r else None
+
+
+@_serialized
+def set_raw_setting(key: str, value):
+    with get_conn() as conn:
+        conn.execute("INSERT INTO platform_settings(key, value) VALUES(?, ?) "
+                     "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+        conn.commit()
+
+
+def lifetime_quote(head: dict, settings: dict, usd_rate) -> dict:
+    """Цена «Безлимита» в сумах: (цена главной + филиалы) × курс, до тысячи.
+    None — тариф не предлагается (уже бессрочный, выключен, нет курса)."""
+    if not head or (head.get("license_type") or "sub") == "lifetime":
+        return None
+    usd_main = int(settings.get("lifetime_usd") or 0)
+    if usd_main <= 0 or not usd_rate or usd_rate <= 0:
+        return None
+    branches = [b for b in get_branches(head["id"]) if b.get("is_active")]
+    usd = usd_main + int(settings.get("lifetime_branch_usd") or 0) * len(branches)
+    return {"usd": usd, "usd_main": usd_main, "branches": len(branches),
+            "usd_branch": int(settings.get("lifetime_branch_usd") or 0),
+            "rate": float(usd_rate), "amount": _round_k(usd * float(usd_rate))}
+
+
+def sub_quote(head_id: int, usd_rate=None) -> dict:
     """Всё, что нужно экрану «Подписка»: статус, цена сети в месяц, варианты
     сроков с суммами и, если есть, оплата новых филиалов."""
     head = get_shop(head_id)
@@ -5525,17 +5590,21 @@ def sub_quote(head_id: int) -> dict:
                        "until": until.strftime("%Y-%m-%d")}
 
     base = until if active_period else today
+    first_disc = first_month_offer(head, settings)
     options = []
     for m in SUB_TERMS:
         # индивидуальная цена — уже особые условия, скидки за срок к ней не применяются
         disc = 0 if custom else _sub_discount(settings, m)
+        first = bool(m == 1 and first_disc > disc)
+        if first:
+            disc = first_disc  # первый месяц новой точки — со скидкой
         full = monthly * m
         amount = _round_k(full * (100 - disc) / 100.0)
         if branch_part:
             amount += branch_part["amount"]
             full += branch_part["amount"]
         options.append({
-            "months": m, "discount": disc, "amount": amount,
+            "months": m, "discount": disc, "amount": amount, "first": first,
             "per_month": int(round(amount / m / 100.0)) * 100,
             "saving": max(0, full - amount),
             "new_until": (base + relativedelta(months=m)).strftime("%Y-%m-%d"),
@@ -5550,6 +5619,9 @@ def sub_quote(head_id: int) -> dict:
         "pending_branches": [{"id": b["id"], "name": b.get("shop_name") or b["username"]} for b in pending],
         "branch_part": branch_part,
         "options": options,
+        "first_disc": first_disc,
+        "first_amount": next((o["amount"] for o in options if o.get("first")), None),
+        "lifetime": lifetime_quote(head, settings, usd_rate),
     }
 
 
@@ -5641,6 +5713,35 @@ def _clear_branch_pending(conn, head_id: int, branch_ids):
         conn.execute("UPDATE shops SET branch_pending=0 WHERE id=? AND parent_shop_id=?", (int(bid), head_id))
 
 
+def _confirm_locked(conn, p: dict) -> dict:
+    """Применяет оплату (продление + филиалы) внутри открытой транзакции."""
+    payment_id = p["id"]
+    try:
+        branch_ids = json.loads(p.get("branch_ids") or "[]")
+    except ValueError:
+        branch_ids = []
+    new_until = None
+    created = _parse_day(p.get("created_at")) or _today()
+    if p["kind"] == "lifetime":
+        # «Безлимит» куплен: сеть больше не платит помесячно, филиалы включены;
+        # прежняя запись о разовой покупке (если была) заменяется этой
+        conn.execute("UPDATE sub_payments SET status='cancelled' WHERE shop_id=? AND kind='lifetime' "
+                     "AND status='confirmed' AND id!=?", (p["shop_id"], payment_id))
+        conn.execute("UPDATE shops SET license_type='lifetime', trial=0, sub_notice=NULL WHERE id=?", (p["shop_id"],))
+        _clear_branch_pending(conn, p["shop_id"], None)
+    if p["kind"] in ("extend", "both") and p.get("months"):
+        new_until = _extend_head(conn, p["shop_id"], p["months"], created)
+    if p["kind"] in ("branches", "both", "extend"):
+        _clear_branch_pending(conn, p["shop_id"], branch_ids)
+    if new_until is None:
+        row = conn.execute("SELECT paid_until FROM shops WHERE id=?", (p["shop_id"],)).fetchone()
+        new_until = row["paid_until"] if row else None
+    conn.execute("UPDATE sub_payments SET status='confirmed', new_until=?, "
+                 "decided_at=datetime('now','localtime') WHERE id=?", (new_until, payment_id))
+    p.update(status="confirmed", new_until=new_until)
+    return p
+
+
 @_serialized
 def confirm_sub_payment(payment_id: int):
     """Подтверждение чека. Возвращает обновлённую заявку или None, если её
@@ -5649,25 +5750,81 @@ def confirm_sub_payment(payment_id: int):
         p = conn.execute("SELECT * FROM sub_payments WHERE id=?", (payment_id,)).fetchone()
         if not p or p["status"] != "pending":
             return None
-        p = dict(p)
-        try:
-            branch_ids = json.loads(p.get("branch_ids") or "[]")
-        except ValueError:
-            branch_ids = []
-        new_until = None
-        created = _parse_day(p.get("created_at")) or _today()
-        if p["kind"] in ("extend", "both") and p.get("months"):
-            new_until = _extend_head(conn, p["shop_id"], p["months"], created)
-        if p["kind"] in ("branches", "both", "extend"):
-            _clear_branch_pending(conn, p["shop_id"], branch_ids)
-        if new_until is None:
-            row = conn.execute("SELECT paid_until FROM shops WHERE id=?", (p["shop_id"],)).fetchone()
-            new_until = row["paid_until"] if row else None
-        conn.execute("UPDATE sub_payments SET status='confirmed', new_until=?, "
-                     "decided_at=datetime('now','localtime') WHERE id=?", (new_until, payment_id))
+        p = _confirm_locked(conn, dict(p))
         conn.commit()
-        p.update(status="confirmed", new_until=new_until)
         return p
+
+
+# ---------- Автооплата (Hamyon API) ----------
+# Заявка живёт так: 'auto_new' (создана у нас) → 'auto_wait' (Hamyon ждёт
+# перевод, ext_id = его payment_id) → 'confirmed' (деньги пришли, срок
+# продлён) или 'cancelled' (5 минут прошло / человек отменил).
+
+@_serialized
+def create_auto_payment(head_id: int, kind: str, months, amount: int, discount: int,
+                        branch_ids: list, branch_count: int, new_until: str = None) -> int:
+    with get_conn() as conn:
+        # у точки одновременно ждёт только одна автооплата
+        conn.execute("UPDATE sub_payments SET status='cancelled', decided_at=datetime('now','localtime') "
+                     "WHERE shop_id=? AND method='hamyon' AND status IN ('auto_new', 'auto_wait')", (head_id,))
+        cur = conn.execute("""
+            INSERT INTO sub_payments (shop_id, kind, months, discount, amount, branch_count, branch_ids,
+                                      method, status, new_until)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'hamyon', 'auto_new', ?)
+        """, (head_id, kind, months, discount, amount, branch_count, json.dumps(branch_ids or []), new_until))
+        conn.commit()
+        return cur.lastrowid
+
+
+@_serialized
+def auto_payment_started(payment_id: int, ext_id: str, amount: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE sub_payments SET status='auto_wait', ext_id=?, amount=? WHERE id=? AND status='auto_new'",
+                     (str(ext_id), int(amount), payment_id))
+        conn.commit()
+
+
+def get_auto_payment(ext_id: str = None, order_id: int = None):
+    with get_conn() as conn:
+        r = None
+        if ext_id:
+            r = conn.execute("SELECT * FROM sub_payments WHERE method='hamyon' AND ext_id=? ORDER BY id DESC LIMIT 1",
+                             (str(ext_id),)).fetchone()
+        if not r and order_id:
+            r = conn.execute("SELECT * FROM sub_payments WHERE method='hamyon' AND id=?", (int(order_id),)).fetchone()
+        return dict(r) if r else None
+
+
+@_serialized
+def confirm_auto_payment(payment_id: int, paid_amount=None):
+    """Деньги пришли. Повторный callback (Hamyon шлёт до 5 раз) ничего не
+    меняет — возвращается None, срок второй раз не продлевается."""
+    with get_conn() as conn:
+        p = conn.execute("SELECT * FROM sub_payments WHERE id=? AND method='hamyon'", (payment_id,)).fetchone()
+        if not p or p["status"] not in ("auto_wait", "auto_new", "cancelled"):
+            return None
+        # 'cancelled' тоже засчитываем: если Hamyon всё-таки прислал «paid»
+        # с верной подписью, деньги на карту пришли
+        p = dict(p)
+        if paid_amount:
+            try:
+                p["amount"] = int(float(paid_amount))
+                conn.execute("UPDATE sub_payments SET amount=? WHERE id=?", (p["amount"], payment_id))
+            except (TypeError, ValueError):
+                pass
+        p = _confirm_locked(conn, p)
+        conn.commit()
+        return p
+
+
+@_serialized
+def cancel_auto_payment(payment_id: int, note: str = None) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE sub_payments SET status='cancelled', note=COALESCE(?, note), "
+                           "decided_at=datetime('now','localtime') WHERE id=? AND method='hamyon' "
+                           "AND status IN ('auto_new', 'auto_wait')", (note, payment_id))
+        conn.commit()
+        return cur.rowcount > 0
 
 
 @_serialized
@@ -5786,6 +5943,11 @@ def new_branch_needs_payment(head: dict) -> bool:
     return bool(head.get("paid_until"))
 
 
+# через сколько дней после конца пробного периода снова напомнить об оплате
+# (на следующий день уходит обычное сообщение «пробный период закончился»)
+TRIAL_FOLLOWUP_DAYS = (3, 7, 14, 30)
+
+
 def get_due_sub_notices() -> list:
     """Для бота: кому из владельцев пора напомнить (за 5, 3, 1 день) или
     сообщить о блокировке. Каждое событие отправляется один раз."""
@@ -5804,6 +5966,10 @@ def get_due_sub_notices() -> list:
         left = (until - today).days
         if left in (5, 3, 1):
             code = f"d{left}"
+        elif r.get("trial") and -left in TRIAL_FOLLOWUP_DAYS:
+            # пробный закончился, а оплаты нет — ещё несколько напоминаний
+            # со скидкой на первый месяц
+            code = f"t{-left}"
         elif left < 0:
             code = "blocked"
         else:

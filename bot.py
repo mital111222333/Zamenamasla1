@@ -906,7 +906,8 @@ async def registration_decide_callback(update: Update, context: ContextTypes.DEF
 
 async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
     """Напоминания владельцам: подписка заканчивается через 5, 3, 1 день;
-    сообщение о блокировке (и копия администратору платформы)."""
+    сообщение о режиме просмотра (и копия администратору платформы); после
+    пробного периода — ещё напоминания со скидкой на первый месяц."""
     if not _daytime():
         return
     link = webapp._sub_owner_link()
@@ -915,8 +916,24 @@ async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
         lang = shop.get("language") or "ru"
         date = webapp._fmt_day(shop.get("paid_until"))
         trial = bool(shop.get("trial"))
+        offer = {}
+        if trial and (item["code"] == "blocked" or item["code"].startswith("t")):
+            # после пробного периода — напоминаем о скидке на первый месяц
+            try:
+                q = await asyncio.to_thread(db.sub_quote, shop["id"])
+                if q.get("first_disc") and q.get("first_amount"):
+                    offer = {"d": q["first_disc"], "sum": webapp._fmt_sum(q["first_amount"]),
+                             "full": webapp._fmt_sum(q["monthly"])}
+            except Exception as e:
+                logger.warning(f"Скидка первого месяца для точки {shop['id']}: {e}")
         if item["code"] == "blocked":
-            text = i18n.t("trial_bot_blocked" if trial else "sub_bot_blocked", lang, date=date, link=link)
+            if trial and offer:
+                text = i18n.t("trial_bot_blocked_offer", lang, date=date, link=link, **offer)
+            else:
+                text = i18n.t("trial_bot_blocked" if trial else "sub_bot_blocked", lang, date=date, link=link)
+        elif item["code"].startswith("t"):
+            text = (i18n.t("trial_bot_t_offer", lang, link=link, **offer) if offer
+                    else i18n.t("trial_bot_t", lang, link=link))
         else:
             text = i18n.t("trial_bot_d" if trial else "sub_bot_d", lang, n=item["days_left"], date=date, link=link)
         if shop.get("notify_telegram_id"):
@@ -929,9 +946,9 @@ async def check_subscription_notices(context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=ADMIN_TELEGRAM_ID,
                     text=(f"🔒 У точки «{shop.get('shop_name') or shop['username']}» закончился пробный период "
-                          f"({date}), оплаты нет." if trial else
-                          f"🔒 Точка «{shop.get('shop_name') or shop['username']}» заблокирована за неоплату "
-                          f"(оплачено было до {date})."))
+                          f"({date}), оплаты нет — включён режим просмотра." if trial else
+                          f"🔒 Точка «{shop.get('shop_name') or shop['username']}» не продлила подписку "
+                          f"(оплачено было до {date}) — включён режим просмотра."))
             except Exception as e:
                 logger.warning(f"Не удалось сообщить администратору о блокировке: {e}")
         db.mark_sub_notice(shop["id"], item["key"])

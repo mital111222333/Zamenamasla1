@@ -112,7 +112,7 @@ def _security_headers(resp):
 
 # Камера ANPR шлёт номера со своего устройства, а не из браузера — её не проверяем
 # (там защита — секретный токен в адресе).
-_CSRF_EXEMPT_PREFIXES = ("/api/anpr/",)
+_CSRF_EXEMPT_PREFIXES = ("/api/anpr/", "/api/hamyon/")
 
 
 @app.before_request
@@ -546,8 +546,23 @@ def login_required(view):
             if request.path.startswith("/api/") and "text/html" not in (request.headers.get("Accept") or ""):
                 return jsonify({"ok": False, "error": "subscription", "subscription": True}), 402
             return redirect("/subscription")
+        # срок закончился — режим «только просмотр»: читать можно всё,
+        # а любые изменения (добавить, изменить, удалить) — после оплаты
+        if (g.sub.get("readonly") and request.method not in ("GET", "HEAD", "OPTIONS")
+                and not getattr(view, "_sub_exempt", False) and not getattr(view, "_ro_ok", False)):
+            resp = jsonify({"ok": False, "error": g.T["ro_error"], "readonly": True})
+            resp.status_code = 402
+            resp.headers["X-OilBook-Readonly"] = "1"
+            return resp
         return view(*args, **kwargs)
     return wrapped
+
+
+def readonly_ok(view):
+    """Действие, которое не меняет данные точки (язык, отметка урока) —
+    работает и в режиме «только просмотр». Ставить сразу ПОД @login_required."""
+    view._ro_ok = True
+    return view
 
 
 def sub_exempt(view):
@@ -2983,6 +2998,18 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .sub-banner { display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:12px 14px; border-radius:12px; background:#FEF0DC; color:#7A3A04; font-size:14px; font-weight:700; line-height:1.35; text-decoration:none; border:1.5px solid #F2C27D; }
   .sub-banner span { flex:1; }
   .sub-banner i { flex:none; }
+  .sub-banner.ro { background:#FCE6EA; color:#7A0C20; border-color:#F0A3B0; }
+  .ro-mode > :not(.ro-pay) { display:none !important; }
+  .ro-pay { grid-column:1 / -1; max-width:560px; margin:8px auto 24px; background:#fff; border:1px solid #E3E8F0; border-radius:18px; padding:24px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; box-shadow:0 8px 24px rgba(11,31,58,.06); }
+  .ro-pay .ro-ic { width:76px; height:76px; border-radius:50%; background:#EEF3FB; color:#1D6FE0; display:flex; align-items:center; justify-content:center; font-size:30px; }
+  .ro-pay h2 { margin:0; font-size:22px; font-weight:800; color:#0B1F3A; }
+  .ro-pay p { margin:0; font-size:15px; line-height:1.5; color:#3E4F68; }
+  .ro-offer { width:100%; background:#FFF6D6; border:1.5px solid #F5B700; color:#5C4300; border-radius:14px; padding:12px 14px; font-size:15px; font-weight:700; line-height:1.4; }
+  .ro-btn { width:100%; height:52px; border:0; border-radius:12px; background:#1D6FE0; color:#fff; font:700 16px 'Plus Jakarta Sans', system-ui, sans-serif; display:flex; align-items:center; justify-content:center; gap:10px; text-decoration:none; cursor:pointer; }
+  .ro-btn.ghost { background:#fff; color:#0B1F3A; border:1.5px solid #D5DDE8; height:48px; font-size:15px; }
+  .ro-sheet-bg { position:fixed; inset:0; z-index:9998; background:rgba(11,31,58,.45); display:flex; align-items:flex-end; justify-content:center; }
+  .ro-pay.ro-sheet { width:100%; max-width:480px; margin:0; border:0; box-shadow:none; border-radius:20px 20px 0 0; padding:22px 20px calc(20px + env(safe-area-inset-bottom, 0px)); }
+  @media (min-width:900px) { .ro-sheet-bg { align-items:center; } .ro-pay.ro-sheet { border-radius:20px; } }
   #view-staff label[for] { display:block; font-size:13px; font-weight:600; color:var(--text); margin:12px 0 4px; }
   .staff-err { display:none; color:#B3241C; font-size:13px; margin-top:4px; }
   .staff-err.on { display:block; }
@@ -3148,10 +3175,35 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch_short }}</button>
   </div>
 
-  {% if sub_banner %}{% if sub_banner.link %}<a class="sub-banner" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ sub_banner.text }}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<div class="sub-banner"><i class="fa-solid fa-circle-info"></i><span>{{ sub_banner.text }}</span></div>{% endif %}{% endif %}
+  {% if sub_banner %}{% if sub_banner.link %}<a class="sub-banner{% if sub_banner.ro %} ro{% endif %}" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ sub_banner.text }}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<div class="sub-banner{% if sub_banner.ro %} ro{% endif %}"><i class="fa-solid fa-circle-info"></i><span>{{ sub_banner.text }}</span></div>{% endif %}{% endif %}
   <div id="msg"></div>
 
-  <div id="view-add" class="add-form">
+  <div id="view-add" class="add-form{% if sub_ro %} ro-mode{% endif %}">
+    {% if sub_ro %}
+    <div class="ro-pay" id="roPay">
+      <div class="ro-ic"><i class="fa-solid fa-eye"></i></div>
+      <h2>{{ sub_ro.title }}</h2>
+      <p>{{ sub_ro.text }}</p>
+      {% if sub_ro.offer %}<div class="ro-offer">{{ sub_ro.offer }}</div>{% endif %}
+      {% if sub_ro.owner %}<a class="ro-btn" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.ro_pay_btn }}</span></a>{% endif %}
+      <button type="button" class="ro-btn ghost" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.ro_view_btn }}</span></button>
+    </div>
+    <script>
+    window.OB_RO = true;
+    window.obShowRo = function () {
+      if (document.getElementById('roSheetBg')) return;
+      const bg = document.createElement('div');
+      bg.className = 'ro-sheet-bg'; bg.id = 'roSheetBg';
+      const box = document.getElementById('roPay').cloneNode(true);
+      box.removeAttribute('id'); box.className = 'ro-pay ro-sheet';
+      const view = box.querySelector('button.ghost');
+      if (view) { view.textContent = {{ T.ro_sheet_close|tojson }}; view.onclick = function () { bg.remove(); }; }
+      bg.appendChild(box);
+      bg.addEventListener('click', function (e) { if (e.target === bg) bg.remove(); });
+      document.body.appendChild(bg);
+    };
+    </script>
+    {% endif %}
     <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<span class="af-keys">{{ T.rcpt_keys }}</span></div>
 
     <div class="af-main">
@@ -11267,6 +11319,13 @@ NET_GUARD_JS = """<style>
       setTimeout(() => { location.href = '/login'; }, 1500);
       throw netError('session', NT.session, true);
     }
+    if (res.status === 402 && res.headers.get('X-OilBook-Readonly')) {
+      // режим «только просмотр»: изменения не сохраняются — показываем,
+      // как снова включить запись (оплатить подписку)
+      if (window.obShowRo) { window.obShowRo(); return res; }
+      location.href = '/subscription';
+      throw netError('session', NT.session, true);
+    }
     if (res.status === 402) {
       // подписка закончилась, пока панель была открыта
       location.href = '/subscription';
@@ -12370,6 +12429,7 @@ def index():
         usd_rate_head=_head_usd_rate(shop),
         draft_owner=f"{g.shop_id}_{session.get('username') or ''}",
         sub_banner=_sub_banner(shop),
+        sub_ro=_sub_ro_ctx(),
         is_sub_owner=_is_sub_owner(),
         **_help_context(shop),
     )
@@ -12601,6 +12661,7 @@ def api_course():
 
 @app.route("/api/course/progress", methods=["POST"])
 @login_required
+@readonly_ok
 def api_course_progress():
     data = request.get_json(silent=True) or {}
     try:
@@ -12626,6 +12687,7 @@ def api_course_progress():
 
 @app.route("/api/set_language", methods=["POST"])
 @login_required
+@readonly_ok
 def api_set_language():
     data = request.get_json(force=True)
     lang = data.get("language")
@@ -15271,6 +15333,15 @@ if ('serviceWorker' in navigator) {
         <div class="field"><label>6 мес, %</label><input id="ss_disc_6" inputmode="numeric"></div>
         <div class="field"><label>12 мес, %</label><input id="ss_disc_12" inputmode="numeric"></div>
       </div>
+      <div class="field"><label>Скидка на первый месяц для новых точек (после пробного периода), %</label><input id="ss_first_disc" inputmode="numeric"></div>
+      <div style="font-weight:700; font-size:13px; margin:6px 0 8px;">♾ Безлимит (разовая оплата навсегда)</div>
+      <div class="row2">
+        <div class="field"><label>Главная точка, $</label><input id="ss_lifetime_usd" inputmode="numeric"></div>
+        <div class="field"><label>Каждый филиал, $</label><input id="ss_lifetime_branch_usd" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label>Свой курс доллара, сум (0 — брать курс ЦБ автоматически)</label><input id="ss_usd_rate_manual" inputmode="numeric"></div>
+      <div class="hint-text" id="ssRate" style="margin:0 0 10px;"></div>
+      <div class="hint-text" id="ssAuto" style="margin:0 0 10px;"></div>
       <button class="submit" style="width:auto; padding:10px 20px;" onclick="saveSubSettings()">Сохранить</button>
       <div class="hint-text" style="margin-top:10px;">Точки без даты оплаты («без даты») работают как раньше — поставь им дату в карточке, и подписка начнёт действовать. Блокировка — на следующий день после даты, без льготы. Данные при блокировке не удаляются.</div>
     </div>
@@ -15874,15 +15945,23 @@ async function loadSubPanel() {
     document.getElementById('subSecSub').textContent = list.length ? `чеков на проверке: ${list.length}` : 'проверка оплат, карта, цены';
     if (list.length && !sec.dataset.autoOpened) { sec.open = true; sec.dataset.autoOpened = '1'; }
     const st = sd.settings || {};
-    ['card_number', 'card_holder', 'support_contact', 'price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12']
+    ['card_number', 'card_holder', 'support_contact', 'price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12', 'first_disc', 'lifetime_usd', 'lifetime_branch_usd', 'usd_rate_manual']
       .forEach(k => { const el = document.getElementById('ss_' + k); if (el && document.activeElement !== el) el.value = st[k] == null ? '' : st[k]; });
+    const rt = document.getElementById('ssRate');
+    if (rt) rt.innerHTML = sd.usd_rate
+      ? 'Сейчас курс: <b>' + fmtSum(Math.round(sd.usd_rate)) + '</b> сум (' + (sd.usd_src === 'manual' ? 'свой курс' : 'ЦБ, обновляется сам') + ') → безлимит главной точки = <b>' + fmtSum(sd.lt_example) + '</b> сум'
+      : '⚠️ Курс ЦБ пока не получен — тариф «Безлимит» скрыт. Укажи свой курс или подожди 10 минут.';
+    const au = document.getElementById('ssAuto');
+    if (au) au.innerHTML = sd.auto
+      ? '💳 Автооплата Hamyon: <b style="color:#0E6B3E;">подключена</b>. В Hamyon укажи COMPLETE_URL: <b>' + escapeHtml(sd.complete_url || '') + '</b>'
+      : '💳 Автооплата Hamyon: <b style="color:#B3241C;">не подключена</b> — добавь в Render переменные HAMYON_SHOP_ID и HAMYON_SHOP_KEY. Пока оплата идёт по чеку.';
   } catch (e) {}
 }
 
 async function saveSubSettings() {
   const body = {};
   ['card_number', 'card_holder', 'support_contact'].forEach(k => body[k] = document.getElementById('ss_' + k).value.trim());
-  for (const k of ['price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12']) {
+  for (const k of ['price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12', 'first_disc', 'lifetime_usd', 'lifetime_branch_usd', 'usd_rate_manual']) {
     const raw = document.getElementById('ss_' + k).value.replace(/[^0-9]/g, '');
     if (raw === '') { showMsg('Заполните все цены и скидки', false); return; }
     body[k] = Number(raw);
@@ -18794,6 +18873,17 @@ def _sub_banner(shop):
     T = g.T
     owner = _is_sub_owner()
     n = st.get("days_left")
+    if st.get("readonly"):
+        if not owner:
+            return {"text": T["ro_banner_staff"], "link": False, "ro": True}
+        disc = db.first_month_offer(db.get_shop(st["head_id"]) or {}) if st.get("trial") else 0
+        if st.get("trial") and disc:
+            text = T["ro_banner_trial_owner"].format(d=disc)
+        elif st.get("trial"):
+            text = T["ro_banner_trial_plain"]
+        else:
+            text = T["ro_banner_owner"]
+        return {"text": text, "link": True, "ro": True}
     if st.get("trial") and n is not None and n >= 0:
         # пробный период — плашка видна все дни пробного периода, владельцу — со ссылкой на оплату
         if owner:
@@ -18815,6 +18905,75 @@ def _sub_banner(shop):
     return None
 
 
+# ---------- Курс доллара для тарифа «Безлимит» ----------
+# Берём официальный курс ЦБ Узбекистана (обновляем раз в 6 часов). Если сайт
+# ЦБ недоступен — последний сохранённый курс. Админ может задать свой курс
+# (usd_rate_manual) — тогда используется он.
+_CBU_URL = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/"
+_cbu_cache = {"rate": None, "at": 0.0, "tried": 0.0}
+
+
+def _cbu_usd_rate():
+    now = time.time()
+    if _cbu_cache["rate"] and now - _cbu_cache["at"] < 6 * 3600:
+        return _cbu_cache["rate"]
+    if now - _cbu_cache["tried"] > 600:
+        _cbu_cache["tried"] = now
+        try:
+            r = requests.get(_CBU_URL, timeout=6)
+            data = r.json()
+            row = data[0] if isinstance(data, list) and data else data
+            rate = float(str(row.get("Rate")).replace(",", "."))
+            if 1000 < rate < 100000:
+                _cbu_cache.update(rate=rate, at=now)
+                db.set_raw_setting("cbu_usd_rate", rate)
+                db.set_raw_setting("cbu_usd_date", row.get("Date") or "")
+                return rate
+        except Exception as e:
+            logger.warning(f"Курс ЦБ не получен: {e}")
+    if not _cbu_cache["rate"]:
+        try:
+            saved = float(db.get_raw_setting("cbu_usd_rate") or 0)
+            if saved > 0:
+                _cbu_cache.update(rate=saved, at=now - 5.5 * 3600)  # попробуем обновить через 30 мин
+        except (TypeError, ValueError):
+            pass
+    return _cbu_cache["rate"]
+
+
+def sub_usd_rate():
+    """(курс, откуда): свой курс админа или курс ЦБ."""
+    manual = int(db.get_platform_settings().get("usd_rate_manual") or 0)
+    if manual > 0:
+        return float(manual), "manual"
+    rate = _cbu_usd_rate()
+    return (rate, "cbu") if rate else (None, None)
+
+
+def _sub_quote(head_id: int) -> dict:
+    return db.sub_quote(head_id, usd_rate=sub_usd_rate()[0])
+
+
+def _sub_ro_ctx():
+    """Карточка «Режим просмотра» на месте формы «Замена» (None — всё работает)."""
+    st = getattr(g, "sub", None) or {}
+    if not st.get("readonly"):
+        return None
+    T = g.T
+    owner = _is_sub_owner()
+    ctx = {"owner": owner, "title": T["ro_title_trial"] if st.get("trial") else T["ro_title"],
+           "text": T["ro_text"] if owner else T["ro_text_staff"], "offer": ""}
+    if owner and st.get("trial"):
+        try:
+            q = db.sub_quote(st["head_id"])
+            if q.get("first_disc") and q.get("first_amount"):
+                nb = lambda n: _fmt_sum(n).replace(" ", "\u00a0")  # число не разрывается на две строки
+                ctx["offer"] = T["ro_offer"].format(d=q["first_disc"], sum=nb(q["first_amount"]), full=nb(q["monthly"]))
+        except Exception as e:
+            logger.warning(f"Не удалось посчитать скидку первого месяца: {e}")
+    return ctx
+
+
 def _sub_admin_caption(p: dict) -> str:
     head = db.get_shop(p["shop_id"]) or {}
     name = head.get("shop_name") or head.get("username") or "—"
@@ -18827,13 +18986,15 @@ def _sub_admin_caption(p: dict) -> str:
             ids = []
         names = ", ".join((db.get_shop(i) or {}).get("shop_name") or str(i) for i in ids) or "—"
         what = f"Оплата новых филиалов: {names}"
+    elif p["kind"] == "lifetime":
+        what = "♾ Безлимит — разовая оплата навсегда"
     else:
         disc = f" (−{p['discount']}%)" if p.get("discount") else ""
         what = f"Продление {p['months']} мес{disc}"
         if p["kind"] == "both":
             what += " + новые филиалы"
     lines = [
-        f"🧾 Оплата подписки №{p['id']}",
+        (f"💳 Автооплата №{p['id']}" if p.get("method") == "hamyon" else f"🧾 Оплата подписки №{p['id']}"),
         f"Точка: {name} (@{head.get('username', '')})",
         f"Сеть: {net}",
         f"Что: {what}",
@@ -18900,6 +19061,8 @@ def notify_sub_decision(p: dict):
     if p["status"] == "confirmed":
         if p["kind"] == "branches":
             text = i18n.t("sub_bot_confirmed_br", lang)
+        elif p["kind"] == "lifetime":
+            text = i18n.t("sub_bot_lifetime", lang)
         else:
             text = i18n.t("sub_bot_confirmed", lang, date=_fmt_day(p.get("new_until")))
     else:
@@ -18963,13 +19126,13 @@ def subscription_page():
     if ctx["mode"] == "staff":
         return render_template_string(SUB_PAGE, **ctx)
 
-    q = db.sub_quote(g.shop_id)
+    q = _sub_quote(g.shop_id)
     settings = q["settings"]
     n = st.get("days_left")
     if st["lifetime"]:
         chip = ("blue", "∞")
     elif st["expired"]:
-        chip = ("bad", T["sub_status_blocked"])
+        chip = ("bad", T["sub_status_readonly"])
     elif n is None:
         chip = ("warn", T["sub_not_set"])
     elif n == 0:
@@ -18986,8 +19149,12 @@ def subscription_page():
             "months": o["months"], "label": T[f"sub_m{o['months']}"], "discount": o["discount"],
             "amount_txt": _fmt_sum(o["amount"]), "until_txt": _fmt_day(o["new_until"]),
             "sub_txt": _sub_option_text(T, o, q["branch_part"]),
-            "best": o["months"] == 12,
+            "best": o["months"] == 12, "first": bool(o.get("first")),
         })
+    first_txt = ""
+    if q.get("first_disc") and q.get("first_amount"):
+        first_txt = T["sub_first_text"].format(sum=_fmt_sum(q["first_amount"]), full=_fmt_sum(q["monthly"]))
+    checked = 1 if first_txt else 12
     names = ", ".join(b["name"] for b in q["pending_branches"])
     branch_txt = None
     if q["branch_part"]:
@@ -19015,7 +19182,8 @@ def subscription_page():
         left = f"{_fmt_day(p['created_at'])} · {what}"
         st_txt = {"confirmed": T["sub_st_confirmed"], "rejected": T["sub_st_rejected"],
                   "pending": T["sub_st_pending"]}[p["status"]]
-        method = T["sub_method_cash"] if p.get("method") == "cash" else T["sub_method_card"]
+        method = (T["sub_method_cash"] if p.get("method") == "cash"
+                  else T["sub_method_auto"] if p.get("method") == "hamyon" else T["sub_method_card"])
         history.append({"left": left, "sub": f"{method} · {st_txt}",
                         "right": _fmt_sum(p["amount"]) if p.get("amount") else "",
                         "bad": p["status"] == "rejected"})
@@ -19026,7 +19194,15 @@ def subscription_page():
         pending_txt=pending_txt, history=history,
         lifetime_branches=[T["sub_lifetime_branch"].format(name=b["name"]) for b in q["pending_branches"]]
         if st["lifetime"] else [],
-        expired_txt=T["sub_expired_text"].format(date=_fmt_day(st.get("paid_until"))),
+        expired_title=T["trial_expired_title"] if st.get("trial") else T["sub_expired_title"],
+        expired_txt=(T["trial_expired_text"] if st.get("trial") else T["sub_expired_text"]).format(
+            date=_fmt_day(st.get("paid_until"))),
+        first_disc=q.get("first_disc") or 0, first_txt=first_txt, checked=checked,
+        lt=q.get("lifetime"), lt_amount_txt=_fmt_sum(q["lifetime"]["amount"]) if q.get("lifetime") else "",
+        lt_sub=(T["sub_lt_sub"].format(rate=_fmt_sum(round(q["lifetime"]["rate"])))
+                + (" · " + T["sub_lt_branches"].format(n=q["lifetime"]["branches"], usd=q["lifetime"]["usd_branch"])
+                   if q["lifetime"]["branches"] else "")) if q.get("lifetime") else "",
+        auto=hamyon_enabled(),
         card_number=settings.get("card_number") or "", card_holder=settings.get("card_holder") or "",
         support=T["sub_support"].format(contact=settings["support_contact"]) if settings.get("support_contact") else "",
     )
@@ -19040,14 +19216,18 @@ def api_subscription_pay():
     T = g.T
     if not _is_sub_owner():
         return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
-    q = db.sub_quote(g.shop_id)
+    q = _sub_quote(g.shop_id)
     if q["state"]["lifetime"]:
         return jsonify({"ok": False, "error": "lifetime"}), 400
     if not q["settings"].get("card_number"):
         return jsonify({"ok": False, "error": T["sub_no_card"]}), 400
     choice = (request.form.get("choice") or "").strip()
     pending_ids = [b["id"] for b in q["pending_branches"]]
-    if choice == "branches":
+    if choice == "lifetime":
+        if not q.get("lifetime"):
+            return jsonify({"ok": False, "error": "выберите срок"}), 400
+        kind, months, amount, discount, new_until = "lifetime", None, q["lifetime"]["amount"], 0, None
+    elif choice == "branches":
         if not q["branch_part"]:
             return jsonify({"ok": False, "error": "нет филиалов для оплаты"}), 400
         kind, months, amount, discount, new_until = "branches", None, q["branch_part"]["amount"], \
@@ -19087,6 +19267,334 @@ def api_subscription_pay():
         return jsonify({"ok": False, "error": T["sub_err"]}), 502
     db.sub_payment_sent(pid, sent[0], sent[1], mime)
     return jsonify({"ok": True, "id": pid})
+
+
+# ---------- Подписка: автооплата через Hamyon API ----------
+# Как это работает: точка выбирает срок → мы создаём платёж в Hamyon →
+# показываем номер карты и ТОЧНУЮ сумму → человек переводит любым своим
+# приложением (Payme, Click, Uzum, банк) → Hamyon видит поступление на карту
+# и присылает нам callback (status=paid) → срок продлевается сам.
+# В настройках Hamyon (бот @HamyonAPIBot → «Do'kon» → «Hamyon API»):
+#   COMPLETE_URL = https://<ваш сайт>/api/hamyon/complete
+#   PREPARE_URL  — можно оставить пустым.
+# В Render → Environment: HAMYON_SHOP_ID и HAMYON_SHOP_KEY (из @HamyonAPIBot).
+
+HAMYON_BASE = (os.environ.get("HAMYON_BASE_URL") or "https://hamyon-api.uz").rstrip("/")
+HAMYON_SHOP_ID = (os.environ.get("HAMYON_SHOP_ID") or "").strip()
+HAMYON_SHOP_KEY = (os.environ.get("HAMYON_SHOP_KEY") or "").strip()
+_AUTO_TTL = 5 * 60          # сколько Hamyon ждёт перевод
+_AUTO_GIVE_UP = 8 * 60      # после этого считаем, что перевода нет (если callback потерялся)
+_auto_polls = {}            # payment_id → когда в последний раз спрашивали Hamyon о статусе
+
+
+def hamyon_enabled() -> bool:
+    return bool(HAMYON_SHOP_ID and HAMYON_SHOP_KEY)
+
+
+def _hy_pick(d, *keys):
+    """Достаёт поле из ответа Hamyon: и сверху, и из вложенных data/result/payment."""
+    if not isinstance(d, dict):
+        return None
+    pools = [d] + [d[k] for k in ("data", "result", "payment") if isinstance(d.get(k), dict)]
+    for pool in pools:
+        for k in keys:
+            v = pool.get(k)
+            if v not in (None, ""):
+                return v
+    return None
+
+
+def _hy_json(resp):
+    try:
+        d = resp.json()
+        return d if isinstance(d, dict) else {"data": d}
+    except ValueError:
+        return None
+
+
+def _hy_request(method: str, path: str, payload: dict) -> dict:
+    """Запрос к Hamyon. Формат тела в их документации не указан, поэтому
+    сначала шлём обычную форму, а если сервер её не понял — JSON."""
+    url = HAMYON_BASE + path
+    last = {}
+    for mode in ("form", "json"):
+        try:
+            if method == "GET":
+                r = requests.get(url, params=payload, timeout=20)
+            elif mode == "form":
+                r = requests.post(url, data=payload, timeout=20)
+            else:
+                r = requests.post(url, json=payload, timeout=20)
+        except Exception as e:
+            logger.warning(f"Hamyon {path}: нет связи — {e}")
+            last = {"error": "network"}
+            continue
+        d = _hy_json(r)
+        if d is None:
+            logger.warning(f"Hamyon {path}: HTTP {r.status_code} — {r.text[:300]}")
+            last = {"error": f"HTTP {r.status_code}"}
+            if method == "GET":
+                break
+            continue
+        if method == "POST" and mode == "form" and r.status_code in (400, 415, 422) \
+                and not _hy_pick(d, "payment_id"):
+            last = d
+            continue
+        return d
+    return last
+
+
+def _hy_error(d) -> str:
+    v = _hy_pick(d, "error", "message", "detail", "msg")
+    return str(v) if v and not isinstance(v, bool) else ""
+
+
+def hamyon_create(amount: int, order_id: str):
+    """Создаёт платёж. Если такая сумма у кого-то уже ждёт оплаты (Hamyon
+    различает платежи по сумме), добавляем 1–3 сума. Возвращает
+    (payment_id, карта, точная сумма) или (None, текст ошибки, None)."""
+    err = ""
+    for extra in range(0, 4):
+        amt = int(amount) + extra
+        d = _hy_request("POST", "/payment/create", {
+            "shop_id": HAMYON_SHOP_ID, "shop_key": HAMYON_SHOP_KEY,
+            "amount": amt, "order_id": order_id})
+        pid = _hy_pick(d, "payment_id")
+        if pid is None and (_hy_pick(d, "status") in ("ok", "success", True, "pending", "prepare")):
+            pid = _hy_pick(d, "id")
+        if pid is not None:
+            card = _hy_pick(d, "card", "card_number", "cardNumber", "card_num", "pan") or ""
+            real = _hy_pick(d, "amount")
+            try:
+                real = int(float(real)) if real is not None else amt
+            except (TypeError, ValueError):
+                real = amt
+            return str(pid), str(card), real
+        err = _hy_error(d) or "error"
+        logger.warning(f"Hamyon create {order_id} на {amt}: {d}")
+        if err in ("network",) or err.startswith("HTTP 5"):
+            break
+    return None, err, None
+
+
+def hamyon_status(ext_id: str) -> str:
+    """Статус платежа у Hamyon: 'paid', 'cancel', 'pending'… или '' если не узнали."""
+    d = _hy_request("GET", "/payment/status", {
+        "payment_id": ext_id, "shop_id": HAMYON_SHOP_ID, "shop_key": HAMYON_SHOP_KEY})
+    st = _hy_pick(d, "status", "state")
+    return str(st).strip().lower() if st and not isinstance(st, bool) else ""
+
+
+def hamyon_cancel(ext_id: str):
+    try:
+        _hy_request("POST", "/payment/cancel", {
+            "payment_id": ext_id, "shop_id": HAMYON_SHOP_ID, "shop_key": HAMYON_SHOP_KEY})
+    except Exception as e:
+        logger.warning(f"Hamyon cancel {ext_id}: {e}")
+
+
+def _hy_sign_ok(ext_id, amount, sign) -> bool:
+    """sign = md5(shop_id + payment_id + amount + shop_key). Как именно Hamyon
+    пишет сумму (50000 или 50000.00), в документации не сказано — проверяем
+    все обычные варианты."""
+    import hashlib
+    if not sign or ext_id is None or amount is None:
+        return False
+    sign = str(sign).strip().lower()
+    variants = {str(amount).strip()}
+    try:
+        f = float(amount)
+        variants.update({str(int(f)), f"{f:.2f}", f"{f:.1f}", str(f)})
+    except (TypeError, ValueError):
+        pass
+    for a in variants:
+        raw = f"{HAMYON_SHOP_ID}{ext_id}{a}{HAMYON_SHOP_KEY}"
+        if secrets.compare_digest(hashlib.md5(raw.encode("utf-8")).hexdigest(), sign):
+            return True
+    return False
+
+
+def _auto_paid(p: dict):
+    """Оплата засчитана: сообщения владельцу и администратору, реферальный бонус."""
+    try:
+        notify_sub_decision(p)
+    except Exception as e:
+        logger.error(f"Не удалось уведомить точку об автооплате {p.get('id')}: {e}")
+    if ADMIN_TELEGRAM_ID:
+        try:
+            until = "навсегда (безлимит)" if p.get("kind") == "lifetime" else f"до {_fmt_day(p.get('new_until'))}"
+            _send_telegram_message(ADMIN_TELEGRAM_ID, _sub_admin_caption(p) + f"\n\n✅ Оплачено автоматически — действует {until}")
+        except Exception as e:
+            logger.warning(f"Не удалось сообщить администратору об автооплате: {e}")
+    try:
+        _ref_sync(p["shop_id"])
+    except Exception as e:
+        logger.error(f"Реферальный бонус после автооплаты {p.get('id')}: {e}")
+
+
+def _sub_pick(q: dict, choice: str):
+    """Что оплачивается: (kind, months, amount, discount, new_until) или None."""
+    if choice == "lifetime":
+        lt = q.get("lifetime")
+        return ("lifetime", None, lt["amount"], 0, None) if lt else None
+    if choice == "branches":
+        if not q["branch_part"]:
+            return None
+        bp = q["branch_part"]
+        return "branches", None, bp["amount"], bp["discount"], bp["until"]
+    opt = next((o for o in q["options"] if str(o["months"]) == choice), None)
+    if not opt:
+        return None
+    kind = "both" if q["branch_part"] else "extend"
+    return kind, opt["months"], opt["amount"], opt["discount"], opt["new_until"]
+
+
+def _order_num(order_id):
+    m = re.search(r"(\d+)", str(order_id or ""))
+    return int(m.group(1)) if m else None
+
+
+@app.route("/api/subscription/auto", methods=["POST"])
+@login_required
+@sub_exempt
+def api_subscription_auto():
+    T = g.T
+    if not _is_sub_owner():
+        return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
+    if not hamyon_enabled():
+        return jsonify({"ok": False, "error": T["sub_auto_err"]}), 400
+    q = _sub_quote(g.shop_id)
+    if q["state"]["lifetime"]:
+        return jsonify({"ok": False, "error": "lifetime"}), 400
+    data = request.get_json(silent=True) or request.form
+    picked = _sub_pick(q, str(data.get("choice") or "").strip())
+    if not picked:
+        return jsonify({"ok": False, "error": "выберите срок"}), 400
+    kind, months, amount, discount, new_until = picked
+    # прежняя неоплаченная автооплата этой точки больше не нужна
+    for old in db.list_sub_payments(head_id=g.shop_id, limit=5):
+        if old.get("method") == "hamyon" and old["status"] == "auto_wait" and old.get("ext_id"):
+            hamyon_cancel(old["ext_id"])
+    pid = db.create_auto_payment(g.shop_id, kind, months, amount, discount,
+                                 [b["id"] for b in q["pending_branches"]], q["branch_count"], new_until)
+    ext_id, card, real = hamyon_create(amount, f"OB{pid}")
+    if not ext_id:
+        db.cancel_auto_payment(pid, f"hamyon: {card}"[:200])
+        return jsonify({"ok": False, "error": T["sub_auto_err"]}), 502
+    db.auto_payment_started(pid, ext_id, real)
+    card = card or (q["settings"].get("card_number") or "")
+    return jsonify({"ok": True, "id": pid, "amount": real, "amount_txt": _fmt_sum(real),
+                    "card": card, "holder": q["settings"].get("card_holder") or "", "ttl": _AUTO_TTL})
+
+
+def _auto_age(p) -> float:
+    try:
+        return (datetime.now() - datetime.strptime(str(p.get("created_at"))[:19], "%Y-%m-%d %H:%M:%S")).total_seconds()
+    except ValueError:
+        return 0
+
+
+@app.route("/api/subscription/auto/<int:payment_id>")
+@login_required
+@sub_exempt
+def api_subscription_auto_status(payment_id):
+    if not _is_sub_owner():
+        return jsonify({"ok": False}), 403
+    p = db.get_sub_payment(payment_id)
+    if not p or p["shop_id"] != g.shop_id or p.get("method") != "hamyon":
+        return jsonify({"ok": False}), 404
+    if p["status"] == "auto_wait" and p.get("ext_id"):
+        age = _auto_age(p)
+        # на случай, если callback от Hamyon до нас не дошёл — раз в 15 секунд
+        # сами спрашиваем у них статус
+        if age > 20 and time.time() - _auto_polls.get(payment_id, 0) > 15:
+            _auto_polls[payment_id] = time.time()
+            st = hamyon_status(p["ext_id"])
+            if st in ("paid", "success", "completed"):
+                done = db.confirm_auto_payment(payment_id)
+                if done:
+                    _auto_paid(done)
+                p = db.get_sub_payment(payment_id)
+            elif st in ("cancel", "cancelled", "canceled", "timeout", "expired"):
+                db.cancel_auto_payment(payment_id, "timeout")
+                p = db.get_sub_payment(payment_id)
+        if p["status"] == "auto_wait" and age > _AUTO_GIVE_UP:
+            db.cancel_auto_payment(payment_id, "timeout")
+            p = db.get_sub_payment(payment_id)
+    status = {"confirmed": "paid", "cancelled": "cancel"}.get(p["status"], "wait")
+    return jsonify({"ok": True, "status": status, "until": _fmt_day(p.get("new_until")) if p.get("new_until") else ""})
+
+
+@app.route("/api/subscription/auto/<int:payment_id>/cancel", methods=["POST"])
+@login_required
+@sub_exempt
+def api_subscription_auto_cancel(payment_id):
+    if not _is_sub_owner():
+        return jsonify({"ok": False}), 403
+    p = db.get_sub_payment(payment_id)
+    if not p or p["shop_id"] != g.shop_id or p.get("method") != "hamyon":
+        return jsonify({"ok": False}), 404
+    if p["status"] == "auto_wait" and p.get("ext_id"):
+        hamyon_cancel(p["ext_id"])
+    db.cancel_auto_payment(payment_id, "user")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/hamyon/complete", methods=["POST", "GET"])
+@app.route("/api/hamyon/prepare", methods=["POST", "GET"])
+def api_hamyon_callback():
+    """Сюда Hamyon сообщает о платеже. Всегда отвечаем 200, иначе он будет
+    повторять. Деньги засчитываем, только если подпись верная или сам Hamyon
+    подтвердил статус по нашему ключу."""
+    data = {}
+    js = request.get_json(silent=True)
+    if isinstance(js, dict):
+        data.update(js)
+    data.update(request.form.to_dict())
+    data.update(request.args.to_dict())
+    ext_id = _hy_pick(data, "payment_id")
+    status = str(_hy_pick(data, "status") or "").strip().lower()
+    amount = _hy_pick(data, "amount")
+    sign = _hy_pick(data, "sign")
+    order = _hy_pick(data, "order_id")
+    logger.info(f"Hamyon callback {request.path}: payment_id={ext_id} order={order} status={status} amount={amount}")
+    if not hamyon_enabled():
+        return jsonify({"ok": True})
+    p = db.get_auto_payment(ext_id=ext_id, order_id=None if ext_id else _order_num(order))
+    if not p and order:
+        cand = db.get_auto_payment(order_id=_order_num(order))
+        # по номеру заказа ищем, только если у нас ещё нет номера Hamyon или он совпал
+        if cand and (not cand.get("ext_id") or str(cand["ext_id"]) == str(ext_id)):
+            p = cand
+    if not p:
+        return jsonify({"ok": True, "note": "unknown payment"})
+    if request.path.endswith("/prepare") or status in ("prepare", "pending", "wait", "waiting"):
+        return jsonify({"ok": True})
+    ext = str(ext_id or p.get("ext_id") or "")
+    verified = _hy_sign_ok(ext, amount, sign)
+    if status in ("paid", "success", "completed"):
+        if not verified and ext:
+            verified = hamyon_status(ext) in ("paid", "success", "completed")
+        if not verified:
+            logger.warning(f"Hamyon: подпись не сошлась, оплату {p['id']} не засчитываем ({data})")
+            return jsonify({"ok": False, "error": "sign"})
+        try:
+            if amount is not None and int(float(amount)) < int(p.get("amount") or 0):
+                logger.warning(f"Hamyon: сумма {amount} меньше ожидаемой {p.get('amount')} (оплата {p['id']})")
+                if ADMIN_TELEGRAM_ID:
+                    _send_telegram_message(ADMIN_TELEGRAM_ID, f"⚠️ Автооплата №{p['id']}: пришло {amount}, "
+                                           f"ожидалось {_fmt_sum(p.get('amount'))} — проверьте вручную.")
+                return jsonify({"ok": True})
+        except (TypeError, ValueError):
+            pass
+        done = db.confirm_auto_payment(p["id"], amount)
+        if done:
+            _auto_paid(done)
+        return jsonify({"ok": True})
+    if status in ("cancel", "cancelled", "canceled", "timeout", "expired"):
+        if verified or (ext and hamyon_status(ext) in ("cancel", "cancelled", "canceled", "timeout", "expired")):
+            db.cancel_auto_payment(p["id"], str(_hy_pick(data, "reason") or "cancel")[:60])
+    return jsonify({"ok": True})
 
 
 # ---------- Подписка: админка ----------
@@ -19134,7 +19642,13 @@ def api_admin_income():
 @app.route("/api/admin/sub/settings")
 @admin_required
 def api_admin_sub_settings():
-    return jsonify({"ok": True, "settings": db.get_platform_settings()})
+    origin = (PUBLIC_URL or request.host_url).rstrip("/")
+    rate, src = sub_usd_rate()
+    st = db.get_platform_settings()
+    return jsonify({"ok": True, "settings": st, "auto": hamyon_enabled(),
+                    "complete_url": origin + "/api/hamyon/complete",
+                    "usd_rate": rate, "usd_src": src,
+                    "lt_example": db._round_k(st["lifetime_usd"] * rate) if rate else None})
 
 
 @app.route("/api/admin/sub/settings", methods=["POST"])
@@ -19345,6 +19859,19 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 .err { color:var(--red); font-size:14px; font-weight:700; }
 .lo { display:block; text-align:center; padding:12px; color:var(--muted); text-decoration:none; font-size:15px; }
 .hidden { display:none !important; }
+.gift { display:flex; gap:12px; align-items:flex-start; background:#FFF6D6; border:1.5px solid #F5B700; border-radius:14px; padding:14px 16px; color:#5C4300; font-size:14px; line-height:1.45; }
+.gift i { font-size:22px; color:#C98A00; margin-top:2px; }
+.gift b { font-size:16px; color:#3D2C00; }
+.ltc { font-size:12px; font-weight:700; color:#fff; background:#0B1F3A; padding:2px 8px; border-radius:999px; }
+.opt.lt { border-color:#0B1F3A33; }
+.firstc { font-size:12px; font-weight:700; color:#5C4300; background:#FFE58A; padding:2px 8px; border-radius:999px; }
+.howto { display:flex; gap:6px; flex-wrap:wrap; }
+.howto span { font-size:12px; font-weight:700; color:#3E4F68; background:#EEF2F7; padding:4px 10px; border-radius:999px; }
+.waitbox { display:flex; align-items:center; gap:12px; background:var(--blue-bg); border:1.5px solid #BCD3F5; border-radius:14px; padding:14px 16px; font-size:15px; font-weight:700; color:#0B3A7A; }
+.spin { width:22px; height:22px; border-radius:50%; border:3px solid #BCD3F5; border-top-color:var(--blue); animation:spin 0.9s linear infinite; flex:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.timer { margin-left:auto; font-family:var(--mono); font-size:16px; }
+.linkbtn { background:none; border:0; color:var(--blue); font:700 15px 'Plus Jakarta Sans', system-ui, sans-serif; padding:12px; cursor:pointer; width:100%; }
 </style>
 </head>
 <body>
@@ -19370,11 +19897,13 @@ h1 { margin:0; font-size:26px; font-weight:800; }
       {% if st.lifetime %}<b>{{ T.sub_lifetime_title }}</b>
       {% else %}<div class="muted">{{ T.sub_paid_until }}</div><div class="big">{{ paid_until_txt }}</div>{% endif %}
     </div>
+    {% if st.readonly %}<div class="redbox">{{ T.ro_text_staff }}</div>{% endif %}
   </div>
   {% endif %}
 {% else %}
   <div class="body" id="step1">
-    {% if st.expired %}<div class="redbox"><b>{{ T.sub_expired_title }}</b><br>{{ expired_txt }}</div>{% endif %}
+    {% if st.expired %}<div class="redbox"><b>{{ expired_title }}</b><br>{{ expired_txt }}</div>{% endif %}
+    {% if first_txt %}<div class="gift"><i class="fa-solid fa-gift"></i><span><b>{{ T.sub_first_title.format(d=first_disc) }}</b><br>{{ first_txt }}</span></div>{% endif %}
     {% if pending_txt %}
     <div class="warnbox"><b><i class="fa-solid fa-hourglass-half"></i> {{ T.sub_pending_title }}</b><span>{{ pending_txt }}</span><span class="note">{{ T.sub_pending_hint }}</span></div>
     {% endif %}
@@ -19402,15 +19931,27 @@ h1 { margin:0; font-size:26px; font-weight:800; }
       <div class="h">{% if branch_txt %}{{ T.sub_or_extend }}{% else %}{{ T.sub_choose }}{% endif %}</div>
       {% for o in options %}
       <label class="opt" data-opt>
-        <input type="radio" name="term" value="{{ o.months }}" data-amount="{{ o.amount_txt }}" data-until="{{ o.until_txt }}"{% if o.best %} checked{% endif %}>
+        <input type="radio" name="term" value="{{ o.months }}" data-amount="{{ o.amount_txt }}" data-until="{{ o.until_txt }}"{% if o.months == checked %} checked{% endif %}>
         <span class="radio"></span>
         <span class="mid">
-          <span class="nm">{{ o.label }}{% if o.discount %}<span class="disc">−{{ o.discount }}%</span>{% endif %}{% if o.best %}<span class="best">{{ T.sub_best }}</span>{% endif %}</span>
+          <span class="nm">{{ o.label }}{% if o.discount %}<span class="disc">−{{ o.discount }}%</span>{% endif %}{% if o.first %}<span class="firstc">🎁 {{ T.sub_first_chip }}</span>{% elif o.best %}<span class="best">{{ T.sub_best }}</span>{% endif %}</span>
           <span class="sub">{{ o.sub_txt }}</span>
         </span>
         <span class="amt">{{ o.amount_txt }}</span>
       </label>
       {% endfor %}
+      {% if lt %}
+      <div class="h" style="margin-top:6px;">{{ T.sub_lt_or }}</div>
+      <label class="opt lt" data-opt>
+        <input type="radio" name="term" value="lifetime" data-amount="{{ lt_amount_txt }}" data-until="∞ {{ T.sub_lt_forever }}">
+        <span class="radio"></span>
+        <span class="mid">
+          <span class="nm">{{ T.sub_lt_title }}<span class="ltc">♾ {{ lt.usd }} $</span></span>
+          <span class="sub">{{ lt_sub }}</span>
+        </span>
+        <span class="amt">{{ lt_amount_txt }}</span>
+      </label>
+      {% endif %}
       <div class="note">{% if branch_txt %}{{ T.sub_incl_branches_note }} {% endif %}{{ T.sub_note }}</div>
     {% endif %}
 
@@ -19429,8 +19970,43 @@ h1 { margin:0; font-size:26px; font-weight:800; }
   {% if not st.lifetime %}
   <div class="foot" id="foot1">
     <div class="row muted"><span>{{ T.sub_new_date }}</span><span id="newDate" style="font-family:var(--mono); color:var(--text); font-weight:600;"></span></div>
-    <button class="btn" id="payBtn" type="button" onclick="showStep(2)"></button>
+    <button class="btn" id="payBtn" type="button" onclick="{% if auto %}startAuto(){% else %}showStep(2){% endif %}"></button>
+    {% if auto %}<div class="note" style="text-align:center;">{{ T.sub_auto_how }}</div>{% endif %}
   </div>
+
+  {% if auto %}
+  <div class="body hidden" id="stepA">
+    <div class="opt sel" style="cursor:default;">
+      <span class="mid"><span class="nm" id="aWhat"></span><span class="sub" id="aUntil"></span></span>
+    </div>
+    <div class="h">{{ T.sub_auto_title }}</div>
+    <div class="paycard">
+      <span class="lbl">{{ T.sub_auto_amount }}</span>
+      <div class="row"><span class="num" id="aAmount" style="font-size:26px;"></span>
+        <button class="cp" type="button" aria-label="{{ T.sub_copy }}" onclick="copyText(document.getElementById('aAmount').textContent, this)"><i class="fa-regular fa-copy"></i></button></div>
+      <span class="lbl" style="margin-top:6px;">{{ T.sub_auto_card }}</span>
+      <div class="row"><span class="num" id="aCard"></span>
+        <button class="cp" type="button" aria-label="{{ T.sub_copy }}" onclick="copyText(document.getElementById('aCard').textContent, this)"><i class="fa-regular fa-copy"></i></button></div>
+      <span class="lbl" id="aHolder" style="font-size:13px;"></span>
+    </div>
+    <div class="howto"><span>Payme</span><span>Click</span><span>Uzum</span><span>{{ T.sub_auto_bank }}</span></div>
+    <div class="note" style="font-size:14px; color:#3E4F68;">{{ T.sub_auto_hint }}</div>
+    <div class="waitbox" id="aWait"><span class="spin"></span><span>{{ T.sub_auto_wait }}</span><span class="timer" id="aTimer">5:00</span></div>
+    <div class="redbox hidden" id="aTimeout">{{ T.sub_auto_timeout }}</div>
+    <div class="err hidden" id="aErr"></div>
+    {% if card_number %}<button class="linkbtn" type="button" onclick="manualPay()">{{ T.sub_auto_manual }}</button>{% endif %}
+  </div>
+  <div class="foot hidden" id="footA">
+    <button class="btn hidden" id="aRetry" type="button" onclick="startAuto()"><i class="fa-solid fa-rotate-right"></i><span>{{ T.sub_auto_retry }}</span></button>
+    <button class="btn ghost" id="aCancel" type="button" onclick="cancelAuto()">{{ T.sub_auto_cancel }}</button>
+  </div>
+  <div class="center hidden" id="stepOK">
+    <div class="ico green"><i class="fa-solid fa-check"></i></div>
+    <h1>{{ T.sub_auto_ok_title }}</h1>
+    <p class="p" id="okText"></p>
+  </div>
+  <div class="foot hidden" id="footOK"><a class="btn" href="/">{{ T.sub_auto_open }}</a></div>
+  {% endif %}
 
   <div class="body hidden" id="step2">
     <div class="opt sel" style="cursor:default;">
@@ -19499,6 +20075,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
   window.showStep = function (n) {
     const r = current();
     if (n === 2 && !r) return;
+    ['stepA', 'footA', 'stepOK', 'footOK'].forEach(id => { if ($(id)) $(id).classList.add('hidden'); });
     $('step1').classList.toggle('hidden', n !== 1);
     $('foot1').classList.toggle('hidden', n !== 1);
     $('step2').classList.toggle('hidden', n !== 2);
@@ -19517,6 +20094,97 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     }
     window.scrollTo(0, 0);
   };
+
+  // ---------- автооплата ----------
+  const A = { starting: {{ T.sub_auto_starting|tojson }}, err: {{ T.sub_auto_err|tojson }},
+    ok: {{ T.sub_auto_ok_text|tojson }} };
+  let autoId = null, autoTimer = null, autoPoll = null, autoEnd = 0, autoBusy = false;
+  function only(ids) {
+    ['step1', 'foot1', 'step2', 'foot2', 'step3', 'foot3', 'stepA', 'footA', 'stepOK', 'footOK'].forEach(id => {
+      if ($(id)) $(id).classList.toggle('hidden', ids.indexOf(id) === -1);
+    });
+    const homeBack = document.querySelector('a.back');
+    if (homeBack) homeBack.classList.toggle('hidden', ids[0] !== 'step1');
+    $('backStep').classList.add('hidden');
+    window.scrollTo(0, 0);
+  }
+  function stopAuto() { clearInterval(autoTimer); clearTimeout(autoPoll); autoTimer = autoPoll = null; }
+  function tick() {
+    const left = Math.max(0, Math.round((autoEnd - Date.now()) / 1000));
+    $('aTimer').textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+  }
+  function showTimeout() {
+    $('aWait').classList.add('hidden'); $('aTimeout').classList.remove('hidden');
+    $('aRetry').classList.remove('hidden'); $('aCancel').textContent = {{ T.sub_back|tojson }};
+  }
+  async function poll() {
+    if (!autoId) return;
+    try {
+      const res = await fetch('/api/subscription/auto/' + autoId, { cache: 'no-store' });
+      const d = await res.json();
+      if (d.ok && d.status === 'paid') {
+        stopAuto(); autoId = null;
+        $('okText').textContent = A.ok.replace('{date}', d.until || '');
+        only(['stepOK', 'footOK']);
+        return;
+      }
+      if (d.ok && d.status === 'cancel') { stopAuto(); showTimeout(); return; }
+    } catch (e) {}
+    if (Date.now() > autoEnd + 3 * 60 * 1000) { stopAuto(); showTimeout(); return; }
+    autoPoll = setTimeout(poll, 4000);
+  }
+  window.startAuto = async function () {
+    const r = current();
+    if (!r || autoBusy) return;
+    autoBusy = true; stopAuto();
+    const btn = $('payBtn'); const old = btn.textContent;
+    btn.disabled = true; btn.textContent = A.starting;
+    if ($('aRetry')) { $('aRetry').disabled = true; }
+    try {
+      const res = await fetch('/api/subscription/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ choice: r.value }) });
+      let d = {};
+      try { d = await res.json(); } catch (e) {}
+      if (res.status === 401) { location.href = '/login'; return; }
+      if (!res.ok || !d.ok) {
+        if ($('step2') && $('receipt')) { manualPay(); $('payErr').textContent = d.error || A.err; $('payErr').classList.remove('hidden'); }
+        else { alert(d.error || A.err); }
+        return;
+      }
+      autoId = d.id;
+      const lbl = r.closest('label').querySelector('.nm');
+      $('aWhat').textContent = (r.value === 'branches' ? L.branches : lbl.childNodes[0].textContent.trim()) + ' · ' + r.dataset.amount;
+      $('aUntil').textContent = L.until + ': ' + r.dataset.until;
+      $('aAmount').textContent = d.amount_txt;
+      $('aCard').textContent = String(d.card || '').replace(/[^0-9]/g, '').replace(/(.{4})/g, '$1 ').trim();
+      $('aHolder').textContent = d.holder || '';
+      $('aWait').classList.remove('hidden'); $('aTimeout').classList.add('hidden');
+      $('aRetry').classList.add('hidden'); $('aCancel').textContent = {{ T.sub_auto_cancel|tojson }};
+      autoEnd = Date.now() + (d.ttl || 300) * 1000;
+      tick(); autoTimer = setInterval(tick, 1000);
+      only(['stepA', 'footA']);
+      autoPoll = setTimeout(poll, 4000);
+    } catch (e) {
+      alert(A.err);
+    } finally {
+      autoBusy = false; btn.disabled = false; btn.textContent = old;
+      if ($('aRetry')) { $('aRetry').disabled = false; }
+    }
+  };
+  window.cancelAuto = function () {
+    const id = autoId; stopAuto(); autoId = null;
+    if (id) fetch('/api/subscription/auto/' + id + '/cancel', { method: 'POST' }).catch(() => {});
+    showStep(1);
+  };
+  window.manualPay = function () {
+    const id = autoId; stopAuto(); autoId = null;
+    if (id) fetch('/api/subscription/auto/' + id + '/cancel', { method: 'POST' }).catch(() => {});
+    showStep(2);
+  };
+  document.addEventListener('visibilitychange', () => {
+    // вернулись из приложения банка — сразу проверяем, дошли ли деньги
+    if (!document.hidden && autoId) { clearTimeout(autoPoll); poll(); }
+  });
 
   window.copyText = function (text, btn) {
     const plain = String(text).replace(/[^0-9]/g, '');
