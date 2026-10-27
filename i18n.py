@@ -3414,6 +3414,7 @@ RU.update({
     "sub_lt_forever": "навсегда",
     "sub_lt_sub": "Разовая оплата, без ежемесячных платежей · по курсу ЦБ {rate} сум за $",
     "sub_lt_branches": "вкл. филиалы: {n} × {usd} $",
+    "sub_lt_warn": "У вас оплачено до {date} — при переходе на безлимит оплаченные дни не переносятся",
     "sub_bot_lifetime": "✅ Оплата получена! У вас тариф «Безлимит» — OilBook работает навсегда, без ежемесячных платежей.",
 })
 UZ.update({
@@ -3422,5 +3423,6 @@ UZ.update({
     "sub_lt_forever": "abadiy",
     "sub_lt_sub": "Bir martalik to'lov, oylik to'lovlarsiz · MB kursi bo'yicha 1 $ = {rate} so'm",
     "sub_lt_branches": "filiallar bilan: {n} × {usd} $",
+    "sub_lt_warn": "Sizda {date} gacha to'langan — cheksiz tarifga o'tganda to'langan kunlar o'tkazilmaydi",
     "sub_bot_lifetime": "✅ To'lov qabul qilindi! Sizda «Cheksiz» tarif — OilBook abadiy ishlaydi, oylik to'lovlarsiz.",
 })

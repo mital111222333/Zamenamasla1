@@ -19198,6 +19198,9 @@ def subscription_page():
         expired_txt=(T["trial_expired_text"] if st.get("trial") else T["sub_expired_text"]).format(
             date=_fmt_day(st.get("paid_until"))),
         first_disc=q.get("first_disc") or 0, first_txt=first_txt, checked=checked,
+        lt_warn=(T["sub_lt_warn"].format(date=_fmt_day(st["paid_until"]))
+                 if q.get("lifetime") and not st.get("trial") and st.get("days_left") is not None
+                 and st["days_left"] >= 1 else ""),
         lt=q.get("lifetime"), lt_amount_txt=_fmt_sum(q["lifetime"]["amount"]) if q.get("lifetime") else "",
         lt_sub=(T["sub_lt_sub"].format(rate=_fmt_sum(round(q["lifetime"]["rate"])))
                 + (" · " + T["sub_lt_branches"].format(n=q["lifetime"]["branches"], usd=q["lifetime"]["usd_branch"])
@@ -19864,6 +19867,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 .gift b { font-size:16px; color:#3D2C00; }
 .ltc { font-size:12px; font-weight:700; color:#fff; background:#0B1F3A; padding:2px 8px; border-radius:999px; }
 .opt.lt { border-color:#0B1F3A33; }
+.ltw { font-size:13px; font-weight:600; color:var(--warn); margin-top:2px; line-height:1.35; }
 .firstc { font-size:12px; font-weight:700; color:#5C4300; background:#FFE58A; padding:2px 8px; border-radius:999px; }
 .howto { display:flex; gap:6px; flex-wrap:wrap; }
 .howto span { font-size:12px; font-weight:700; color:#3E4F68; background:#EEF2F7; padding:4px 10px; border-radius:999px; }
@@ -19948,6 +19952,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
         <span class="mid">
           <span class="nm">{{ T.sub_lt_title }}<span class="ltc">♾ {{ lt.usd }} $</span></span>
           <span class="sub">{{ lt_sub }}</span>
+          {% if lt_warn %}<span class="ltw">⚠️ {{ lt_warn }}</span>{% endif %}
         </span>
         <span class="amt">{{ lt_amount_txt }}</span>
       </label>
