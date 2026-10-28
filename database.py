@@ -28,6 +28,7 @@ except AttributeError:  # Windows — tzset нет; для локального 
     pass
 
 import json
+import re
 import math
 import sqlite3
 import threading
@@ -5355,9 +5356,41 @@ SUB_DEFAULTS = {
     "lifetime_usd": 599,
     "lifetime_branch_usd": 100,
     "usd_rate_manual": 0,
+    # пробный период новой точки после одобрения заявки, дней
+    "trial_days": 3,
+    # льготные дни после окончания оплаты: точка ещё работает как обычно
+    "grace_days": 0,
+    # за сколько дней до конца оплаты напоминать владельцу (через запятую)
+    "remind_days": "5,3,1",
+    # бонус пригласившему: % от первой оплаты приглашённой точки
+    "ref_pct": 50,
 }
 _SUB_INT_KEYS = ("price_main", "price_branch", "disc_1", "disc_3", "disc_6", "disc_12", "first_disc",
-                 "lifetime_usd", "lifetime_branch_usd", "usd_rate_manual")
+                 "lifetime_usd", "lifetime_branch_usd", "usd_rate_manual", "trial_days", "grace_days", "ref_pct")
+# границы, чтобы опечатка в админке не сломала подписки
+_SUB_LIMITS = {"trial_days": (1, 90), "grace_days": (0, 30), "ref_pct": (0, 100),
+               "disc_1": (0, 90), "disc_3": (0, 90), "disc_6": (0, 90), "disc_12": (0, 90), "first_disc": (0, 90)}
+
+
+def _parse_remind_days(raw) -> list:
+    out = []
+    for part in re.split(r"[^0-9]+", str(raw or "")):
+        if part and 1 <= int(part) <= 60 and int(part) not in out:
+            out.append(int(part))
+    return sorted(out, reverse=True)[:6]
+
+
+def grace_days(settings: dict = None) -> int:
+    settings = settings or get_platform_settings()
+    return int(settings.get("grace_days") or 0)
+
+
+def trial_days() -> int:
+    return max(1, int(get_platform_settings().get("trial_days") or 3))
+
+
+def ref_pct() -> int:
+    return int(get_platform_settings().get("ref_pct") or 0)
 # Чеки на сервере НЕ хранятся: файл сразу уходит администратору в Telegram,
 # в базе остаётся только его file_id (по нему админка показывает чек).
 
@@ -5445,7 +5478,13 @@ def set_platform_settings(values: dict):
             if k not in SUB_DEFAULTS:
                 continue
             if k in _SUB_INT_KEYS:
-                v = str(max(0, int(float(v))))
+                v = max(0, int(float(v)))
+                if k in _SUB_LIMITS:
+                    lo, hi = _SUB_LIMITS[k]
+                    v = min(hi, max(lo, v))
+                v = str(v)
+            elif k == "remind_days":
+                v = ",".join(str(x) for x in _parse_remind_days(v))
             else:
                 v = str(v or "").strip()
             conn.execute("INSERT INTO platform_settings(key, value) VALUES(?, ?) "
@@ -5485,7 +5524,8 @@ def subscription_state(shop: dict) -> dict:
     until = _parse_day(head.get("paid_until"))
     today = _today()
     days_left = (until - today).days if until else None
-    expired = bool(not lifetime and until and today > until)
+    grace = grace_days()
+    expired = bool(not lifetime and until and (today - until).days > grace)
     pending = bool(shop and shop.get("role") == "branch" and shop.get("branch_pending"))
     # Срок закончился (пробный или оплаченный) — режим «только просмотр»:
     # смотреть можно всё, добавлять и менять — нет. Полностью закрыт вход
@@ -5499,6 +5539,7 @@ def subscription_state(shop: dict) -> dict:
         "paid_until": until.strftime("%Y-%m-%d") if until else None,
         "days_left": days_left,
         "expired": expired,
+        "in_grace": bool(not lifetime and until and not expired and today > until),
         "readonly": readonly,
         "blocked": pending,
         "reason": reason,
@@ -5952,6 +5993,9 @@ def get_due_sub_notices() -> list:
     """Для бота: кому из владельцев пора напомнить (за 5, 3, 1 день) или
     сообщить о блокировке. Каждое событие отправляется один раз."""
     today = _today()
+    settings = get_platform_settings()
+    grace = grace_days(settings)
+    remind = _parse_remind_days(settings.get("remind_days")) or [5, 3, 1]
     out = []
     with get_conn() as conn:
         rows = conn.execute("""
@@ -5964,20 +6008,20 @@ def get_due_sub_notices() -> list:
         if not until:
             continue
         left = (until - today).days
-        if left in (5, 3, 1):
+        if left in remind:
             code = f"d{left}"
         elif r.get("trial") and -left in TRIAL_FOLLOWUP_DAYS:
             # пробный закончился, а оплаты нет — ещё несколько напоминаний
             # со скидкой на первый месяц
             code = f"t{-left}"
-        elif left < 0:
+        elif left < -grace:
             code = "blocked"
         else:
             continue
         key = f"{r['paid_until']}:{code}"
         if r.get("sub_notice") == key:
             continue
-        if code == "blocked" and left < -3:
+        if code == "blocked" and left < -grace - 3:
             continue  # о старых блокировках не пишем повторно (например, после восстановления базы)
         out.append({"shop": r, "code": code, "days_left": left, "key": key})
     return out
@@ -6027,7 +6071,7 @@ def get_income_stats() -> dict:
             counts["unset"] += 1
             continue
         left = (until - today).days
-        if left < 0:
+        if left < -grace_days(settings):
             counts["blocked"] += 1
             blocked.append({"id": h["id"], "name": name, "paid_until": until.strftime("%Y-%m-%d"),
                             "days": -left, "monthly": monthly})
@@ -6113,6 +6157,418 @@ def get_income_stats() -> dict:
         "price_main": settings["price_main"],
         "price_branch": settings["price_branch"],
     }
+
+
+# ---------- Админка: «Доходы» (обзор, точки, оплаты) ----------
+# Всё считается на сервере: даже при тысяче точек в браузер уходит только
+# одна страница списка и готовые цифры.
+
+INC_STATUSES = ("trial", "paying", "soon", "grace", "blocked", "lifetime", "unset", "off")
+_KIND_MONEY = ("extend", "both", "branches", "lifetime")
+
+
+def _inc_range(date_from=None, date_to=None):
+    """Период «с — по» (включительно). По умолчанию — текущий месяц."""
+    today = _today()
+    f = _parse_day(date_from) or today.replace(day=1)
+    t = _parse_day(date_to) or today
+    if t < f:
+        f, t = t, f
+    if (t - f).days > 3700:
+        f = t - timedelta(days=3700)
+    return f, t
+
+
+def _inc_heads(conn, settings):
+    """Все главные точки с ценой в месяц, статусом и итогами по оплатам."""
+    today = _today()
+    grace = grace_days(settings)
+    heads = [dict(r) for r in conn.execute(
+        "SELECT id, username, shop_name, phone, address, client_group, is_active, created_at, paid_until, "
+        "license_type, custom_price, trial, self_registered, last_period_months, notify_telegram_id "
+        "FROM shops WHERE role='shop'").fetchall()]
+    br_all, br_act, br_pend = {}, {}, {}
+    for b in conn.execute("SELECT parent_shop_id, is_active, branch_pending FROM shops WHERE role='branch'").fetchall():
+        pid = b["parent_shop_id"]
+        br_all[pid] = br_all.get(pid, 0) + 1
+        if b["is_active"]:
+            br_act[pid] = br_act.get(pid, 0) + 1
+        if b["branch_pending"]:
+            br_pend[pid] = br_pend.get(pid, 0) + 1
+    paid = {r["shop_id"]: dict(r) for r in conn.execute(f"""
+        SELECT shop_id, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+               MAX(substr(COALESCE(decided_at, created_at), 1, 10)) AS last_day,
+               MIN(substr(COALESCE(decided_at, created_at), 1, 10)) AS first_day
+        FROM sub_payments WHERE status='confirmed' AND kind IN ({",".join("?" * len(_KIND_MONEY))})
+        GROUP BY shop_id""", _KIND_MONEY).fetchall()}
+    pend = {r["shop_id"]: dict(r) for r in conn.execute(
+        "SELECT shop_id, id, amount, tg_file_id FROM sub_payments WHERE status='pending' ORDER BY id").fetchall()}
+    for h in heads:
+        hid = h["id"]
+        h["name"] = h.get("shop_name") or h["username"]
+        h["branches"] = br_act.get(hid, 0)
+        h["branches_pending"] = br_pend.get(hid, 0)
+        h["monthly"] = head_main_price(h, settings) + settings["price_branch"] * br_act.get(hid, 0)
+        p = paid.get(hid) or {}
+        h["paid_total"] = int(p.get("total") or 0)
+        h["paid_count"] = int(p.get("n") or 0)
+        h["last_paid"] = p.get("last_day")
+        h["first_paid"] = p.get("first_day")
+        pp = pend.get(hid)
+        h["pending"] = {"id": pp["id"], "amount": pp.get("amount"), "has_receipt": bool(pp.get("tg_file_id"))} if pp else None
+        until = _parse_day(h.get("paid_until"))
+        h["days_left"] = (until - today).days if until else None
+        lifetime = (h.get("license_type") or "sub") == "lifetime"
+        if not h.get("is_active"):
+            st = "off"
+        elif lifetime:
+            st = "lifetime"
+        elif not until:
+            st = "unset"
+        elif h["days_left"] < -grace:
+            st = "blocked"
+        elif h["days_left"] < 0:
+            st = "grace"
+        elif h.get("trial"):
+            st = "trial"
+        elif h["days_left"] <= 7:
+            st = "soon"
+        else:
+            st = "paying"
+        h["status"] = st
+        # платит ли эта точка сейчас (для дохода в месяц)
+        h["earning"] = st in ("paying", "soon", "grace")
+        h["has_tg"] = bool(h.get("notify_telegram_id"))
+        h.pop("notify_telegram_id", None)
+    return heads
+
+
+def _inc_pays(conn, f=None, t=None):
+    q = ("SELECT p.id, p.shop_id, p.kind, p.months, p.discount, p.amount, p.branch_count, p.method, p.status, "
+         "p.new_until, p.note, p.created_at, p.decided_at, p.tg_file_id, s.shop_name, s.username, s.client_group "
+         "FROM sub_payments p LEFT JOIN shops s ON s.id = p.shop_id WHERE p.status='confirmed'")
+    args = []
+    if f:
+        q += " AND substr(COALESCE(p.decided_at, p.created_at), 1, 10) >= ?"
+        args.append(f.strftime("%Y-%m-%d"))
+    if t:
+        q += " AND substr(COALESCE(p.decided_at, p.created_at), 1, 10) <= ?"
+        args.append(t.strftime("%Y-%m-%d"))
+    return [dict(r) for r in conn.execute(q, args).fetchall()]
+
+
+def _pay_day(p):
+    return (p.get("decided_at") or p.get("created_at") or "")[:10]
+
+
+def get_income_overview(date_from=None, date_to=None) -> dict:
+    """Обзор доходов за период + сравнение с прошлым таким же периодом."""
+    settings = get_platform_settings()
+    today = _today()
+    f, t = _inc_range(date_from, date_to)
+    span = (t - f).days + 1
+    pf, pt = f - timedelta(days=span), f - timedelta(days=1)
+    with get_conn() as conn:
+        heads = _inc_heads(conn, settings)
+        cur = _inc_pays(conn, f, t)
+        prev = _inc_pays(conn, pf, pt)
+        year_from = (today.replace(day=1) - relativedelta(months=11))
+        year = _inc_pays(conn, year_from, today)
+        pend = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS s FROM sub_payments "
+                            "WHERE status='pending'").fetchone()
+        try:
+            ref = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(reward_amount), 0) AS s FROM referral_rewards "
+                               "WHERE status='pending'").fetchone()
+            ref = {"count": ref["n"], "sum": ref["s"]}
+        except sqlite3.Error:
+            ref = {"count": 0, "sum": 0}
+
+    def money(rows):
+        rows = [r for r in rows if r["kind"] in _KIND_MONEY]
+        return sum(int(r.get("amount") or 0) for r in rows), len(rows)
+
+    rec, n = money(cur)
+    prec, pn = money(prev)
+    by_method = {"cash": 0, "card": 0, "hamyon": 0}
+    by_kind = {"extend": 0, "both": 0, "branches": 0, "lifetime": 0}
+    terms = {m: 0 for m in SUB_TERMS}
+    days = {}
+    for p in cur:
+        if p["kind"] not in _KIND_MONEY:
+            continue
+        a = int(p.get("amount") or 0)
+        m = p.get("method") or "card"
+        by_method[m if m in by_method else "card"] += a
+        by_kind[p["kind"]] = by_kind.get(p["kind"], 0) + a
+        if p["kind"] in ("extend", "both") and p.get("months") and int(p["months"]) in terms:
+            terms[int(p["months"])] += 1
+        d = _pay_day(p)
+        days[d] = days.get(d, 0) + a
+
+    # серия по дням периода (для графика) — если период не больше 92 дней
+    daily = []
+    if span <= 92:
+        for i in range(span):
+            d = (f + timedelta(days=i)).strftime("%Y-%m-%d")
+            daily.append([d, days.get(d, 0)])
+
+    # 12 месяцев: получено и «в пересчёте на месяц»
+    months = [(today.replace(day=1) - relativedelta(months=i)).strftime("%Y-%m") for i in range(11, -1, -1)]
+    received = {m: 0 for m in months}
+    spread = {m: 0.0 for m in months}
+    for p in year:
+        if p["kind"] not in _KIND_MONEY:
+            continue
+        a = int(p.get("amount") or 0)
+        day = _pay_day(p)
+        ym = day[:7]
+        if ym in received:
+            received[ym] += a
+        if p["kind"] in ("extend", "both") and p.get("months") and a:
+            start = _parse_day(day)
+            k_m = int(p["months"])
+            for k in range(k_m):
+                key = (start.replace(day=1) + relativedelta(months=k)).strftime("%Y-%m")
+                if key in spread:
+                    spread[key] += a / k_m
+        elif ym in spread:
+            spread[ym] += a
+
+    counts = {s: 0 for s in INC_STATUSES}
+    mrr = paying = 0
+    groups = {}
+    new_paying, churned, lost = [], [], 0
+    trial_total = trial_paid = 0
+    forecast = []
+    fc_months = [(today.replace(day=1) + relativedelta(months=i)) for i in range(3)]
+    fc = {m.strftime("%Y-%m"): {"sum": 0, "count": 0} for m in fc_months}
+    grace = grace_days(settings)
+    for h in heads:
+        counts[h["status"]] += 1
+        g = h.get("client_group") or ""
+        gr = groups.setdefault(g, {"name": g, "shops": 0, "paying": 0, "mrr": 0, "received": 0, "branches": 0})
+        gr["shops"] += 1
+        gr["branches"] += h["branches"]
+        if h["earning"]:
+            mrr += h["monthly"]
+            paying += 1
+            gr["paying"] += 1
+            gr["mrr"] += h["monthly"]
+        if h.get("first_paid") and f.strftime("%Y-%m-%d") <= h["first_paid"] <= t.strftime("%Y-%m-%d"):
+            new_paying.append(h["id"])
+        until = _parse_day(h.get("paid_until"))
+        if (h["status"] == "blocked" and until and f <= until + timedelta(days=grace) + timedelta(days=1) <= t + timedelta(days=1)):
+            churned.append({"id": h["id"], "name": h["name"], "paid_until": h["paid_until"], "monthly": h["monthly"],
+                            "trial": bool(h.get("trial"))})
+            if not h.get("trial"):
+                lost += h["monthly"]
+        created = (h.get("created_at") or "")[:10]
+        if h.get("self_registered") and created and f.strftime("%Y-%m-%d") <= created <= t.strftime("%Y-%m-%d"):
+            trial_total += 1
+            if h.get("paid_count"):
+                trial_paid += 1
+        if h["earning"] and until:
+            key = until.strftime("%Y-%m")
+            if key in fc:
+                per = int(h.get("last_period_months") or 1)
+                disc = 0 if h.get("custom_price") else _sub_discount(settings, per)
+                fc[key]["sum"] += _round_k(h["monthly"] * per * (100 - disc) / 100.0)
+                fc[key]["count"] += 1
+    for p in cur:
+        g = p.get("client_group") or ""
+        if g in groups and p["kind"] in _KIND_MONEY:
+            groups[g]["received"] += int(p.get("amount") or 0)
+    grp = sorted(groups.values(), key=lambda x: (-x["mrr"], -x["received"], x["name"]))
+    churn_base = paying + len([c for c in churned if not c["trial"]])
+    for m in fc_months:
+        k = m.strftime("%Y-%m")
+        forecast.append({"month": k, "sum": fc[k]["sum"], "count": fc[k]["count"]})
+    return {
+        "from": f.strftime("%Y-%m-%d"), "to": t.strftime("%Y-%m-%d"), "days": span,
+        "prev_from": pf.strftime("%Y-%m-%d"), "prev_to": pt.strftime("%Y-%m-%d"),
+        "received": rec, "payments": n, "avg": int(rec / n) if n else 0,
+        "prev_received": prec, "prev_payments": pn,
+        "by_method": by_method, "by_kind": by_kind, "terms": terms, "daily": daily,
+        "months": months, "months_received": [received[m] for m in months],
+        "months_spread": [int(round(spread[m])) for m in months],
+        "mrr": mrr, "arr": mrr * 12, "paying": paying, "arpu": int(mrr / paying) if paying else 0,
+        "counts": counts, "total_shops": len(heads),
+        "new_paying": len(new_paying),
+        "churned": churned[:50], "churned_count": len(churned), "lost_mrr": lost,
+        "churn_pct": round(len([c for c in churned if not c["trial"]]) * 100.0 / churn_base, 1) if churn_base else 0,
+        "trial_total": trial_total, "trial_paid": trial_paid,
+        "trial_conv": round(trial_paid * 100.0 / trial_total) if trial_total else None,
+        "forecast": forecast,
+        "groups": grp[:30], "groups_count": len(grp),
+        "pending": {"count": pend["n"], "sum": pend["s"]},
+        "ref_owed": ref,
+        "grace_days": grace,
+    }
+
+
+def list_income_shops(q: str = "", status: str = "all", group: str = None, sort: str = "until",
+                      page: int = 1, per: int = 50) -> dict:
+    """Список главных точек для «Доходы → Точки»: поиск, фильтр, сортировка, страницы."""
+    settings = get_platform_settings()
+    with get_conn() as conn:
+        heads = _inc_heads(conn, settings)
+    counts = {s: 0 for s in INC_STATUSES}
+    counts["all"] = len(heads)
+    counts["check"] = 0
+    for h in heads:
+        counts[h["status"]] += 1
+        if h["pending"] or h["branches_pending"]:
+            counts["check"] += 1
+    ql = (q or "").strip().lower()
+    digits = re.sub(r"\D", "", ql)
+    rows = []
+    for h in heads:
+        if status and status != "all":
+            if status == "check":
+                if not (h["pending"] or h["branches_pending"]):
+                    continue
+            elif status == "attention":
+                if h["status"] not in ("soon", "grace", "blocked", "trial"):
+                    continue
+            elif h["status"] != status:
+                continue
+        if group is not None and group != "*" and (h.get("client_group") or "") != group:
+            continue
+        if ql:
+            hay = " ".join(str(h.get(k) or "") for k in ("name", "username", "address", "client_group")).lower()
+            ph = re.sub(r"\D", "", str(h.get("phone") or ""))
+            if ql not in hay and not (digits and len(digits) >= 3 and digits in ph):
+                continue
+        rows.append(h)
+    big = 10 ** 9
+    keys = {
+        "until": lambda h: (h["days_left"] if h["days_left"] is not None else big, h["name"].lower()),
+        "name": lambda h: h["name"].lower(),
+        "monthly": lambda h: (-h["monthly"], h["name"].lower()),
+        "paid": lambda h: (-h["paid_total"], h["name"].lower()),
+        "new": lambda h: tuple(-ord(c) for c in (h.get("created_at") or "")),
+        "last": lambda h: tuple(-ord(c) for c in (h.get("last_paid") or "")),
+    }
+    rows.sort(key=keys.get(sort, keys["until"]))
+    per = max(10, min(200, int(per or 50)))
+    pages = max(1, (len(rows) + per - 1) // per)
+    page = max(1, min(pages, int(page or 1)))
+    chunk = rows[(page - 1) * per: page * per]
+    return {
+        "rows": chunk, "total": len(rows), "page": page, "pages": pages, "per": per,
+        "counts": counts,
+        "sum_monthly": sum(h["monthly"] for h in rows if h["earning"]),
+        "groups": sorted({h.get("client_group") or "" for h in heads}),
+        "ids": [h["id"] for h in rows],
+    }
+
+
+def list_income_payments(date_from=None, date_to=None, method: str = "", kind: str = "", status: str = "confirmed",
+                         q: str = "", page: int = 1, per: int = 100) -> dict:
+    f, t = _inc_range(date_from, date_to)
+    q_sql = ("SELECT p.id, p.shop_id, p.kind, p.months, p.discount, p.amount, p.branch_count, p.method, p.status, "
+             "p.new_until, p.note, p.created_at, p.decided_at, p.tg_file_id, s.shop_name, s.username "
+             "FROM sub_payments p LEFT JOIN shops s ON s.id = p.shop_id "
+             "WHERE substr(COALESCE(p.decided_at, p.created_at), 1, 10) BETWEEN ? AND ?")
+    args = [f.strftime("%Y-%m-%d"), t.strftime("%Y-%m-%d")]
+    if status == "all":
+        q_sql += " AND p.status IN ('confirmed', 'pending', 'rejected', 'cancelled')"
+    elif status in ("confirmed", "pending", "rejected", "cancelled"):
+        q_sql += " AND p.status=?"
+        args.append(status)
+    if method in ("cash", "card", "hamyon"):
+        q_sql += " AND COALESCE(p.method, 'card')=?"
+        args.append(method)
+    if kind in _KIND_MONEY:
+        q_sql += " AND p.kind=?"
+        args.append(kind)
+    if q and q.strip():
+        q_sql += " AND (lower(COALESCE(s.shop_name, '')) LIKE ? OR lower(COALESCE(s.username, '')) LIKE ?)"
+        like = "%" + q.strip().lower() + "%"
+        args += [like, like]
+    q_sql += " ORDER BY COALESCE(p.decided_at, p.created_at) DESC, p.id DESC"
+    with get_conn() as conn:
+        rows = [dict(r) for r in conn.execute(q_sql, args).fetchall()]
+    total_sum = sum(int(r.get("amount") or 0) for r in rows if r["status"] == "confirmed")
+    per = max(20, min(500, int(per or 100)))
+    pages = max(1, (len(rows) + per - 1) // per)
+    page = max(1, min(pages, int(page or 1)))
+    chunk = rows[(page - 1) * per: page * per]
+    for r in chunk:
+        r["day"] = _pay_day(r)
+        r["name"] = r.get("shop_name") or r.get("username") or "—"
+        r["has_receipt"] = bool(r.pop("tg_file_id", None))
+    return {"rows": chunk, "total": len(rows), "sum": total_sum, "page": page, "pages": pages,
+            "from": f.strftime("%Y-%m-%d"), "to": t.strftime("%Y-%m-%d")}
+
+
+def get_income_shop(head_id: int) -> dict:
+    """Карточка точки во вкладке «Доходы»: данные, филиалы, все оплаты."""
+    settings = get_platform_settings()
+    with get_conn() as conn:
+        heads = [h for h in _inc_heads(conn, settings) if h["id"] == head_id]
+        if not heads:
+            return None
+        pays = [dict(r) for r in conn.execute(
+            "SELECT id, kind, months, discount, amount, branch_count, method, status, new_until, note, "
+            "created_at, decided_at, tg_file_id FROM sub_payments WHERE shop_id=? "
+            "AND status IN ('confirmed', 'pending', 'rejected', 'cancelled') "
+            "ORDER BY COALESCE(decided_at, created_at) DESC, id DESC LIMIT 100",
+            (head_id,)).fetchall()]
+        branches = [dict(r) for r in conn.execute(
+            "SELECT id, shop_name, username, is_active, branch_pending FROM shops WHERE parent_shop_id=? "
+            "AND role='branch' ORDER BY shop_name COLLATE NOCASE", (head_id,)).fetchall()]
+    for p in pays:
+        p["day"] = _pay_day(p)
+        p["has_receipt"] = bool(p.pop("tg_file_id", None))
+    return {"shop": heads[0], "payments": pays, "branches": branches}
+
+
+@_serialized
+def admin_add_days(head_id: int, days: int) -> str:
+    """Подарить дни (или убрать, если days < 0) без записи об оплате.
+    Если оплата уже закончилась — дни считаются от сегодня."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT paid_until FROM shops WHERE id=? AND role='shop'", (head_id,)).fetchone()
+        if not row:
+            return None
+        today = _today()
+        until = _parse_day(row["paid_until"])
+        base = until if (until and (until >= today or days < 0)) else today
+        new_until = (base + timedelta(days=int(days))).strftime("%Y-%m-%d")
+        conn.execute("UPDATE shops SET paid_until=?, sub_notice=NULL WHERE id=?", (new_until, head_id))
+        conn.commit()
+        return new_until
+
+
+@_serialized
+def admin_record_payment(head_id: int, months: int, amount, note: str = None, method: str = "cash",
+                         day: str = None) -> str:
+    """Записать оплату вручную: продлить на months и сохранить сумму.
+    day — дата оплаты для статистики (по умолчанию сегодня)."""
+    d = _parse_day(day) or _today()
+    with get_conn() as conn:
+        new_until = _extend_head(conn, head_id, months, _today())
+        _clear_branch_pending(conn, head_id, None)
+        conn.execute("""
+            INSERT INTO sub_payments (shop_id, kind, months, amount, method, status, new_until, note, created_at, decided_at)
+            VALUES (?, 'extend', ?, ?, ?, 'confirmed', ?, ?, ?, ?)
+        """, (head_id, int(months), int(amount) if amount else None, method if method in ("cash", "card") else "cash",
+              new_until, (note or "").strip()[:200] or None,
+              d.strftime("%Y-%m-%d") + " 12:00:00", d.strftime("%Y-%m-%d") + " 12:00:00"))
+        conn.commit()
+        return new_until
+
+
+def income_telegram_targets(ids: list) -> list:
+    if not ids:
+        return []
+    ids = [int(x) for x in ids][:2000]
+    with get_conn() as conn:
+        rows = conn.execute(f"SELECT id, shop_name, username, notify_telegram_id, language FROM shops "
+                            f"WHERE role='shop' AND id IN ({','.join('?' * len(ids))})", ids).fetchall()
+    return [dict(r) for r in rows]
+
 
 
 # ---------- Админка: карта точек с аналитикой ----------
@@ -7168,7 +7624,7 @@ def approve_registration(req_id: int) -> dict:
                                  (req["username"],)).fetchone())
         if taken:
             return {"ok": False, "error": "username_taken", "req": req}
-        until = (_today() + timedelta(days=REG_TRIAL_DAYS - 1)).strftime("%Y-%m-%d")
+        until = (_today() + timedelta(days=trial_days() - 1)).strftime("%Y-%m-%d")
         address = ", ".join(x for x in (req.get("city"), req.get("address")) if x) or None
         cur = conn.execute("""
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
@@ -7360,7 +7816,7 @@ def referral_sync(referred_id: int) -> dict:
                 conn.commit()
             return out
         base = int(pay["amount"])
-        reward = int(round(base * REF_SHARE_PCT / 100.0))
+        reward = int(round(base * ref_pct() / 100.0))
         if rw:
             if (rw["status"] != "pending" or rw["payment_id"] != pay["id"] or rw["base_amount"] != base
                     or rw["referrer_id"] != ref_id):
@@ -7452,7 +7908,7 @@ def admin_referrals() -> dict:
         "shops": heads,
         "pending_sum": sum(r["reward_amount"] for r in pend),
         "paid_sum": sum(r["reward_amount"] for r in rewards if r["status"] == "paid"),
-        "pct": REF_SHARE_PCT,
+        "pct": ref_pct(),
     }
 
 

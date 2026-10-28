@@ -15241,6 +15241,124 @@ if ('serviceWorker' in navigator) {
   .inc-row .r-v { font-family:var(--font-mono, monospace); font-weight:700; white-space:nowrap; }
   .inc-jact { display:flex; gap:6px; margin-top:6px; }
   .inc-jact button { border:1px solid #CBD5E1; background:#fff; border-radius:7px; padding:4px 8px; font-size:11.5px; font-weight:700; color:#334155; cursor:pointer; }
+  .ix-dates[hidden], .ix-bulk[hidden], .ix-sug[hidden], .ix-tabs .cnt[hidden], #ixShops[hidden], #ixPays[hidden], #ixSet[hidden], #ixOv[hidden] { display:none !important; }
+  .ix-tabs { display:flex; gap:4px; background:#fff; border:1px solid var(--border); padding:4px; border-radius:12px; margin-bottom:12px; position:sticky; top:0; z-index:20; }
+  .ix-tabs button { flex:1; height:38px; border:0; border-radius:9px; background:transparent; font-weight:700; font-size:13.5px; color:#475569; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
+  .ix-tabs button.on { background:#0B1F3A; color:#fff; }
+  .ix-tabs .cnt { background:#E63946; color:#fff; border-radius:999px; font-size:11px; padding:1px 6px; }
+  @media (max-width:440px) { .ix-tabs button { font-size:12.5px; } .ix-tabs button i { display:none; } }
+  .ix-per { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+  .ix-per .inc-seg { flex-wrap:wrap; }
+  .ix-dates { display:flex; gap:6px; align-items:center; font-size:13px; color:#475569; }
+  .ix-dates input { width:150px; padding:7px 8px; font-size:13px; }
+  .ix-btn { border:1px solid #CBD5E1; background:#fff; border-radius:9px; padding:7px 12px; font-size:13px; font-weight:700; color:#0B1F3A; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  .ix-btn.pri { background:#0B1F3A; border-color:#0B1F3A; color:#fff; }
+  .ix-btn.ok { background:#059669; border-color:#059669; color:#fff; }
+  .ix-btn.no { color:#B3241C; border-color:#F3C4C7; }
+  .ix-btn:disabled { opacity:.5; cursor:default; }
+  .ix-chg { font-size:12px; font-weight:700; }
+  .ix-chg.up { color:#059669; } .ix-chg.dn { color:#B3241C; }
+  .ix-2 { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+  @media (min-width:760px) { .ix-2 { grid-template-columns:repeat(2, minmax(0,1fr)); } .ix-2 > .inc-card { margin-bottom:0; } }
+  .ix-2 { margin-bottom:12px; }
+  .ix-stat-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-top:1px solid #EEF2F7; font-size:13.5px; cursor:pointer; }
+  .ix-stat-row:first-of-type { border-top:0; }
+  .ix-stat-row b { font-family:var(--font-mono); }
+  .ix-stat-row .dot { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:8px; vertical-align:-1px; }
+  .ix-meter { display:flex; height:10px; border-radius:999px; overflow:hidden; background:#EEF2F7; margin:8px 0 10px; }
+  .ix-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+  .ix-tbl th { background:transparent; color:var(--hint); font-size:11px; text-transform:none; letter-spacing:0; padding:6px 4px; border-bottom:1px solid var(--border); font-weight:700; }
+  .ix-tbl td { padding:8px 4px; border-bottom:1px solid #EEF2F7; }
+  .ix-tbl td.n, .ix-tbl th.n { text-align:right; font-family:var(--font-mono); white-space:nowrap; }
+  .ix-tbl tr.clk { cursor:pointer; } .ix-tbl tr.clk:hover td { background:#F8FAFC; }
+  .ix-tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .ix-tools .ix-search { flex:1 1 220px; position:relative; }
+  .ix-tools .ix-search input { padding-left:34px; }
+  .ix-tools .ix-search i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--hint); }
+  .ix-tools select { padding:9px 10px; border-radius:10px; border:1.5px solid var(--border); background:#fff; font-family:inherit; font-size:14px; color:var(--text); max-width:100%; }
+  .ix-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px; scrollbar-width:none; }
+  .ix-chips::-webkit-scrollbar { display:none; }
+  .ix-chips button { flex:none; border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 11px; font-size:12.5px; font-weight:700; color:#334155; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .ix-chips button.on { background:#0B1F3A; border-color:#0B1F3A; color:#fff; }
+  .ix-chips button span { opacity:.7; margin-left:3px; }
+  .ix-sum { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; color:#475569; margin:0 2px 8px; flex-wrap:wrap; }
+  .ix-sum label { text-transform:none; letter-spacing:0; font-size:13px; color:#334155; display:flex; align-items:center; gap:6px; margin:0; cursor:pointer; }
+  .ix-sum input[type=checkbox], .ix-row input[type=checkbox] { width:18px; height:18px; margin:0; accent-color:#0B1F3A; flex:none; }
+  .ix-list { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .ix-row { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 12px; border-top:1px solid #EEF2F7; cursor:pointer; }
+  .ix-row:first-child { border-top:0; }
+  .ix-row:hover { background:#F8FAFC; }
+  .ix-row.sel { background:#EFF6FF; }
+  .ix-row .nm { font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ix-row .sb { font-size:12px; color:#64748B; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ix-row .rt { text-align:right; }
+  .ix-row .rt b { display:block; font-family:var(--font-mono); font-size:13px; white-space:nowrap; }
+  .ix-row .cols { display:none; }
+  @media (min-width:760px) {
+    .ix-row { grid-template-columns:24px minmax(0,1.6fr) 120px 100px 110px 110px; }
+    .ix-row .rt { display:none; }
+    .ix-row .cols { display:contents; }
+    .ix-row .cols > div { font-size:13px; text-align:right; font-family:var(--font-mono); white-space:nowrap; }
+    .ix-row .cols > div.st { text-align:left; font-family:inherit; }
+    .ix-head { display:grid !important; }
+  }
+  .ix-head { display:none; grid-template-columns:24px minmax(0,1.6fr) 120px 100px 110px 110px; gap:10px; padding:8px 12px; font-size:11px; font-weight:700; color:var(--hint); background:#F8FAFC; border-bottom:1px solid var(--border); }
+  .ix-head > div:nth-child(n+4) { text-align:right; }
+  .ix-head .srt { cursor:pointer; } .ix-head .srt.on { color:#0B1F3A; }
+  .ix-pill { display:inline-block; border-radius:999px; padding:2px 8px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .ix-pill.trial { background:#EDE9FE; color:#5B21B6; }
+  .ix-pill.paying { background:#DCFCE7; color:#166534; }
+  .ix-pill.soon { background:#FEF3C7; color:#92400E; }
+  .ix-pill.grace { background:#FFEDD5; color:#9A3412; }
+  .ix-pill.blocked { background:#FEE2E2; color:#991B1B; }
+  .ix-pill.lifetime { background:#DBEAFE; color:#1E40AF; }
+  .ix-pill.unset, .ix-pill.off { background:#F1F5F9; color:#475569; }
+  .ix-pill.chk { background:#FEF3C7; color:#92400E; margin-left:4px; }
+  .ix-pager { display:flex; justify-content:center; align-items:center; gap:10px; margin:12px 0; font-size:13px; color:#475569; }
+  .ix-bulk { position:sticky; bottom:10px; z-index:30; background:#0B1F3A; color:#fff; border-radius:14px; padding:10px 12px; margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; box-shadow:0 10px 30px rgba(11,31,58,.35); }
+  .ix-bulk .t { font-weight:700; font-size:13.5px; margin-right:auto; }
+  .ix-bulk button { border:0; background:rgba(255,255,255,.14); color:#fff; border-radius:9px; padding:8px 10px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .ix-bulk button.x { background:transparent; font-size:16px; padding:4px 8px; }
+  .ix-day { display:flex; justify-content:space-between; font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:.4px; padding:12px 4px 6px; }
+  .ix-pay { background:#fff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:6px; display:flex; justify-content:space-between; gap:10px; }
+  .ix-pay.st-cancelled, .ix-pay.st-rejected { opacity:.55; }
+  .ix-pay.st-pending { border-color:#FCD34D; background:#FFFBEB; }
+  .ix-pay .nm { font-weight:700; font-size:14px; cursor:pointer; }
+  .ix-pay .sb { font-size:12px; color:#64748B; margin-top:2px; }
+  .ix-pay .am { font-family:var(--font-mono); font-weight:700; white-space:nowrap; text-align:right; }
+  .ix-pay .act { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .ix-pay .act button, .ix-pay .act a { border:1px solid #CBD5E1; background:#fff; border-radius:7px; padding:4px 9px; font-size:12px; font-weight:700; color:#334155; cursor:pointer; text-decoration:none; font-family:inherit; }
+  .ix-pay .act .ok { background:#059669; color:#fff; border-color:#059669; }
+  .ix-pay .act .no { color:#B3241C; border-color:#F3C4C7; }
+  .ix-ov { position:fixed; inset:0; z-index:5000; background:rgba(15,23,42,.55); display:none; }
+  .ix-ov.open { display:block; }
+  .ix-box { position:absolute; left:0; right:0; bottom:0; top:max(24px, env(safe-area-inset-top, 0px)); background:var(--bg); border-radius:20px 20px 0 0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 14px 30px; }
+  .ix-box.sm { top:auto; max-height:92vh; }
+  @media (min-width:900px) { .ix-box { left:50%; transform:translateX(-50%); width:720px; top:30px; bottom:30px; border-radius:20px; } .ix-box.sm { top:auto; bottom:auto; top:50%; transform:translate(-50%, -50%); width:520px; } }
+  .ix-bh { position:sticky; top:0; background:var(--bg); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:16px 0 10px; z-index:2; }
+  .ix-bh .t { font-weight:800; font-size:18px; color:var(--darkblue); }
+  .ix-bh .s { font-size:12.5px; color:#64748B; margin-top:3px; }
+  .ix-bh .x { border:0; background:#E2E8F0; width:34px; height:34px; border-radius:50%; font-size:15px; cursor:pointer; flex:none; }
+  .ix-acts { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+  @media (min-width:600px) { .ix-acts { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .ix-acts button { border:1px solid #CBD5E1; background:#fff; border-radius:12px; padding:10px 6px; font-size:13px; font-weight:700; color:#0B1F3A; cursor:pointer; font-family:inherit; line-height:1.25; }
+  .ix-acts button small { display:block; font-weight:600; color:#64748B; font-size:11.5px; margin-top:2px; }
+  .ix-acts button.main { background:#0B1F3A; color:#fff; border-color:#0B1F3A; } .ix-acts button.main small { color:#B9C6DA; }
+  .ix-form .field label { text-transform:none; letter-spacing:0; font-size:12.5px; color:#475569; font-weight:600; }
+  .ix-sug { background:#fff; border:1px solid var(--border); border-radius:10px; margin-top:4px; max-height:220px; overflow-y:auto; }
+  .ix-sug div { padding:9px 12px; font-size:14px; cursor:pointer; border-top:1px solid #EEF2F7; }
+  .ix-sug div:first-child { border-top:0; } .ix-sug div:hover { background:#F1F5F9; }
+  .ix-seg2 { display:flex; gap:6px; flex-wrap:wrap; }
+  .ix-seg2 button { border:1.5px solid var(--border); background:#fff; border-radius:10px; padding:8px 12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; color:#334155; }
+  .ix-seg2 button.on { border-color:#0B1F3A; background:#0B1F3A; color:#fff; }
+  .ix-set h4 { margin:18px 0 8px; font-size:14px; color:var(--darkblue); }
+  .ix-set h4:first-child { margin-top:0; }
+  .ix-set .field label { text-transform:none; letter-spacing:0; font-size:12.5px; color:#475569; font-weight:600; }
+  .ix-empty { text-align:center; color:var(--hint); padding:30px 10px; font-size:14px; }
+  .ix-fc { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+  .ix-fc div { background:#F8FAFC; border-radius:10px; padding:10px; }
+  .ix-fc b { display:block; font-family:var(--font-mono); font-size:15px; margin:3px 0; }
+  .ix-fc span { font-size:12px; color:#64748B; }
   .inc-alert { display:flex; align-items:center; gap:10px; background:#FEF3C7; border:1.5px solid #FCD34D; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:13.5px; font-weight:600; cursor:pointer; }
 </style>
 </head>
@@ -15342,46 +15460,6 @@ if ('serviceWorker' in navigator) {
     </div>
   </details>
 
-  <details class="adm-sec" id="secSub">
-    <summary>
-      <span class="ic" style="background:#FEF3C7; color:#B45309;"><i class="fa-solid fa-credit-card"></i></span>
-      <span>Подписка: чеки и реквизиты<span class="sub" id="subSecSub">проверка оплат, карта, цены</span></span>
-      <i class="fa-solid fa-chevron-down chev"></i>
-    </summary>
-    <div class="sec-body">
-      <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Чеки на проверке</div>
-      <div id="subPayments"><div class="hint-text">Загружаю…</div></div>
-      <div style="font-weight:700; font-size:13px; margin:14px 0 8px;">Реквизиты для оплаты</div>
-      <div class="row2">
-        <div class="field"><label>Номер карты</label><input id="ss_card_number" inputmode="numeric" placeholder="5614 0000 0000 0000"></div>
-        <div class="field"><label>Имя на карте</label><input id="ss_card_holder" placeholder="Имя Фамилия"></div>
-      </div>
-      <div class="field"><label>Контакт поддержки (Telegram или телефон, необяз.)</label><input id="ss_support_contact" placeholder="@username или +998..."></div>
-      <div style="font-weight:700; font-size:13px; margin:6px 0 8px;">Цены в месяц (сум) и скидки за срок (%)</div>
-      <div class="row2">
-        <div class="field"><label>Главная точка</label><input id="ss_price_main" inputmode="numeric"></div>
-        <div class="field"><label>Каждый филиал</label><input id="ss_price_branch" inputmode="numeric"></div>
-      </div>
-      <div class="row2">
-        <div class="field"><label>1 мес, %</label><input id="ss_disc_1" inputmode="numeric"></div>
-        <div class="field"><label>3 мес, %</label><input id="ss_disc_3" inputmode="numeric"></div>
-        <div class="field"><label>6 мес, %</label><input id="ss_disc_6" inputmode="numeric"></div>
-        <div class="field"><label>12 мес, %</label><input id="ss_disc_12" inputmode="numeric"></div>
-      </div>
-      <div class="field"><label>Скидка на первый месяц для новых точек (после пробного периода), %</label><input id="ss_first_disc" inputmode="numeric"></div>
-      <div style="font-weight:700; font-size:13px; margin:6px 0 8px;">♾ Безлимит (разовая оплата навсегда)</div>
-      <div class="row2">
-        <div class="field"><label>Главная точка, $</label><input id="ss_lifetime_usd" inputmode="numeric"></div>
-        <div class="field"><label>Каждый филиал, $</label><input id="ss_lifetime_branch_usd" inputmode="numeric"></div>
-      </div>
-      <div class="field"><label>Свой курс доллара, сум (0 — брать курс ЦБ автоматически)</label><input id="ss_usd_rate_manual" inputmode="numeric"></div>
-      <div class="hint-text" id="ssRate" style="margin:0 0 10px;"></div>
-      <div class="hint-text" id="ssAuto" style="margin:0 0 10px;"></div>
-      <button class="submit" style="width:auto; padding:10px 20px;" onclick="saveSubSettings()">Сохранить</button>
-      <div class="hint-text" style="margin-top:10px;">Точки без даты оплаты («без даты») работают как раньше — поставь им дату в карточке, и подписка начнёт действовать. Блокировка — на следующий день после даты, без льготы. Данные при блокировке не удаляются.</div>
-    </div>
-  </details>
-
   <details class="adm-sec" id="secRef">
     <summary>
       <span class="ic" style="background:#FEF9C3; color:#A16207;"><i class="fa-solid fa-gift"></i></span>
@@ -15466,7 +15544,118 @@ if ('serviceWorker' in navigator) {
   </div>
   <div id="shops-body"></div>
   </div>
-  <div id="admIncome" style="display:none;"><div class="hint-text">Загружаю…</div></div>
+  <div id="admIncome" style="display:none;">
+    <div class="ix-tabs" id="ixTabs">
+      <button class="on" data-x="ov" onclick="ixTab('ov')"><i class="fa-solid fa-chart-line"></i> Обзор</button>
+      <button data-x="shops" onclick="ixTab('shops')"><i class="fa-solid fa-store"></i> Точки</button>
+      <button data-x="pays" onclick="ixTab('pays')"><i class="fa-solid fa-receipt"></i> Оплаты <span class="cnt" id="ixChkCnt" hidden></span></button>
+      <button data-x="set" onclick="ixTab('set')"><i class="fa-solid fa-sliders"></i> Настройки</button>
+    </div>
+    <div class="ix-per" id="ixPer">
+      <span class="inc-seg" id="ixPerSeg">
+        <button data-p="month" class="on" onclick="ixSetPeriod('month')">Этот месяц</button>
+        <button data-p="prev" onclick="ixSetPeriod('prev')">Прошлый</button>
+        <button data-p="3m" onclick="ixSetPeriod('3m')">3 мес</button>
+        <button data-p="year" onclick="ixSetPeriod('year')">Год</button>
+        <button data-p="custom" onclick="ixSetPeriod('custom')">Свой</button>
+      </span>
+      <span class="ix-dates" id="ixDates" hidden>
+        <input type="date" id="ixFrom" onchange="ixCustomDates()"> — <input type="date" id="ixTo" onchange="ixCustomDates()">
+      </span>
+      <button class="ix-btn" onclick="ixExport()" style="margin-left:auto;"><i class="fa-solid fa-file-excel" style="color:#15803D;"></i> Excel</button>
+    </div>
+    <div id="ixOv"><div class="hint-text">Загружаю…</div></div>
+    <div id="ixShops" hidden>
+      <div class="ix-tools">
+        <div class="ix-search"><i class="fa-solid fa-magnifying-glass"></i><input id="ixQ" placeholder="Название, логин, телефон, адрес" oninput="ixSearchSoon()"></div>
+        <select id="ixGroup" onchange="IX.s.group = this.value; IX.s.page = 1; ixLoadShops();"><option value="*">Все сети</option></select>
+        <select id="ixSort" onchange="IX.s.sort = this.value; IX.s.page = 1; ixLoadShops();">
+          <option value="until">Сначала кому продлевать</option>
+          <option value="monthly">Дороже в месяц</option>
+          <option value="paid">Больше всего заплатили</option>
+          <option value="last">Недавно платили</option>
+          <option value="new">Новые точки</option>
+          <option value="name">По названию</option>
+        </select>
+      </div>
+      <div class="ix-chips" id="ixChips"></div>
+      <div class="ix-sum" id="ixShopSum"></div>
+      <div class="ix-list" id="ixShopList"></div>
+      <div class="ix-pager" id="ixShopPager"></div>
+      <div class="ix-bulk" id="ixBulk" hidden>
+        <span class="t" id="ixBulkT"></span>
+        <button onclick="ixBulkExtend()">Продлить</button>
+        <button onclick="ixBulkDays()">+ Дни</button>
+        <button onclick="ixBulkPrice()">Цена</button>
+        <button onclick="ixBulkMsg()">Сообщение</button>
+        <button class="x" onclick="ixClearSel()" aria-label="Снять выбор">✕</button>
+      </div>
+    </div>
+    <div id="ixPays" hidden>
+      <div class="ix-tools">
+        <div class="ix-search"><i class="fa-solid fa-magnifying-glass"></i><input id="ixPQ" placeholder="Точка" oninput="ixPaySearchSoon()"></div>
+        <select id="ixPMethod" onchange="IX.p.method = this.value; IX.p.page = 1; ixLoadPays();">
+          <option value="">Любой способ</option><option value="card">Перевод (чек)</option><option value="hamyon">Автооплата</option><option value="cash">Наличные</option>
+        </select>
+        <select id="ixPKind" onchange="IX.p.kind = this.value; IX.p.page = 1; ixLoadPays();">
+          <option value="">Всё</option><option value="extend">Продление</option><option value="both">Продление + филиалы</option><option value="branches">Филиалы</option><option value="lifetime">Бессрочная</option>
+        </select>
+        <button class="ix-btn pri" onclick="ixRecordOpen()"><i class="fa-solid fa-plus"></i> Записать оплату</button>
+      </div>
+      <div class="ix-chips" id="ixPStatus">
+        <button data-s="confirmed" class="on" onclick="ixPayStatus('confirmed')">Оплачено</button>
+        <button data-s="pending" onclick="ixPayStatus('pending')">На проверке</button>
+        <button data-s="cancelled" onclick="ixPayStatus('cancelled')">Отменённые</button>
+        <button data-s="all" onclick="ixPayStatus('all')">Все</button>
+      </div>
+      <div class="ix-sum" id="ixPaySum"></div>
+      <div id="ixPayList"></div>
+      <div class="ix-pager" id="ixPayPager"></div>
+    </div>
+    <div id="ixSet" hidden>
+      <div class="inc-card ix-set">
+        <h4>Цены в месяц, сум</h4>
+        <div class="row2">
+          <div class="field"><label>Главная точка</label><input id="ss_price_main" inputmode="numeric"></div>
+          <div class="field"><label>Каждый филиал</label><input id="ss_price_branch" inputmode="numeric"></div>
+        </div>
+        <h4>Скидки за срок, %</h4>
+        <div class="row2">
+          <div class="field"><label>1 мес</label><input id="ss_disc_1" inputmode="numeric"></div>
+          <div class="field"><label>3 мес</label><input id="ss_disc_3" inputmode="numeric"></div>
+          <div class="field"><label>6 мес</label><input id="ss_disc_6" inputmode="numeric"></div>
+          <div class="field"><label>12 мес</label><input id="ss_disc_12" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>Скидка на первый месяц для новых точек (после пробного периода), %</label><input id="ss_first_disc" inputmode="numeric"></div>
+        <h4>Сроки и напоминания</h4>
+        <div class="row2">
+          <div class="field"><label>Пробный период, дней</label><input id="ss_trial_days" inputmode="numeric"></div>
+          <div class="field"><label>Льготные дни после окончания</label><input id="ss_grace_days" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>Напоминать владельцу за … дней до конца (через запятую)</label><input id="ss_remind_days" placeholder="5,3,1"></div>
+        <div class="hint-text" style="margin:-4px 0 6px;">Льготные дни: оплата закончилась, но точка ещё работает как обычно. 0 — режим просмотра со следующего дня.</div>
+        <h4>♾ Безлимит (разовая оплата навсегда)</h4>
+        <div class="row2">
+          <div class="field"><label>Главная точка, $</label><input id="ss_lifetime_usd" inputmode="numeric"></div>
+          <div class="field"><label>Каждый филиал, $</label><input id="ss_lifetime_branch_usd" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>Свой курс доллара, сум (0 — курс ЦБ автоматически)</label><input id="ss_usd_rate_manual" inputmode="numeric"></div>
+        <div class="hint-text" id="ssRate" style="margin:0 0 6px;"></div>
+        <h4>Реферальная программа</h4>
+        <div class="field"><label>Бонус пригласившему, % от первой оплаты</label><input id="ss_ref_pct" inputmode="numeric"></div>
+        <h4>Реквизиты для оплаты</h4>
+        <div class="row2">
+          <div class="field"><label>Номер карты</label><input id="ss_card_number" inputmode="numeric" placeholder="5614 0000 0000 0000"></div>
+          <div class="field"><label>Имя на карте</label><input id="ss_card_holder" placeholder="Имя Фамилия"></div>
+        </div>
+        <div class="field"><label>Контакт поддержки (Telegram или телефон, необяз.)</label><input id="ss_support_contact" placeholder="@username или +998..."></div>
+        <div class="hint-text" id="ssAuto" style="margin:0 0 10px;"></div>
+        <button class="ix-btn pri" style="padding:12px 22px; font-size:14px;" onclick="saveSubSettings()"><i class="fa-solid fa-check"></i> Сохранить настройки</button>
+        <div class="hint-text" style="margin-top:12px;">Точки «без даты» работают как раньше — поставь им дату в карточке точки, и подписка начнёт действовать. Данные при блокировке не удаляются.</div>
+      </div>
+    </div>
+  </div>
+  <div class="ix-ov" id="ixOvl" onclick="if (event.target === this) ixClose()"><div class="ix-box" id="ixBox"></div></div>
   <div id="admMap" style="display:none;">
     <div class="map-kpis" id="mapKpis"></div>
     <div class="map-bar">
@@ -15870,117 +16059,605 @@ function fmtShort(n) {
   if (n >= 1000) return Math.round(n / 1000) + ' тыс';
   return String(n);
 }
-let INC = null, incMode = 'received';
+// ---------- Доходы: Обзор / Точки / Оплаты / Настройки ----------
+const IX_ST = {
+  trial: ['Пробный', '#7C3AED'], paying: ['Платит', '#16A34A'], soon: ['Скоро продление', '#F59E0B'],
+  grace: ['Льготные дни', '#EA580C'], blocked: ['Заблокирована', '#DC2626'], lifetime: ['∞ Бессрочная', '#0F52BA'],
+  unset: ['Без даты', '#94A3B8'], off: ['Выключена', '#CBD5E1']
+};
+const IX_KIND = { extend: 'продление', both: 'продление + филиалы', branches: 'филиалы', lifetime: '∞ бессрочная' };
+const IX_METHOD = { cash: 'наличные', card: 'перевод (чек)', hamyon: 'автооплата' };
+const IX = {
+  tab: 'ov', period: 'month', from: '', to: '', ov: null, ovChart: 'auto',
+  s: { q: '', status: 'all', group: '*', sort: 'until', page: 1, data: null, sel: new Set() },
+  p: { q: '', status: 'confirmed', method: '', kind: '', page: 1, data: null },
+  shop: null, loaded: {}
+};
+let INC = null;
+function loadIncome() { ixTab(IX.tab, true); }
 
-async function loadIncome() {
-  const box = document.getElementById('admIncome');
+function ixIso(d) { const z = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); }
+function ixRange() {
+  const now = new Date();
+  if (IX.period === 'custom' && IX.from && IX.to) return [IX.from, IX.to];
+  if (IX.period === 'prev') { const a = new Date(now.getFullYear(), now.getMonth() - 1, 1); const b = new Date(now.getFullYear(), now.getMonth(), 0); return [ixIso(a), ixIso(b)]; }
+  if (IX.period === '3m') return [ixIso(new Date(now.getFullYear(), now.getMonth() - 2, 1)), ixIso(now)];
+  if (IX.period === 'year') return [ixIso(new Date(now.getFullYear(), now.getMonth() - 11, 1)), ixIso(now)];
+  return [ixIso(new Date(now.getFullYear(), now.getMonth(), 1)), ixIso(now)];
+}
+function ixQS(obj) { return Object.entries(obj).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'); }
+async function ixGet(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  const d = await res.json();
+  if (!d.ok) throw new Error(d.error || 'Ошибка');
+  return d.data;
+}
+async function ixPost(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  let d = {};
+  try { d = await res.json(); } catch (e) { d = { ok: false, error: 'нет ответа от сервера' }; }
+  return d;
+}
+function ixPct(a, b) {
+  if (!b) return a ? '<span class="ix-chg up">новое</span>' : '';
+  const p = Math.round((a - b) / b * 100);
+  return `<span class="ix-chg ${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
+}
+function ixPill(st) { const s = IX_ST[st] || [st, '#94A3B8']; return `<span class="ix-pill ${st}">${s[0]}</span>`; }
+function ixDaysTxt(h) {
+  if (h.status === 'lifetime') return 'навсегда';
+  if (h.days_left === null || h.days_left === undefined) return 'без даты';
+  if (h.days_left < 0) return Math.abs(h.days_left) + ' дн. назад';
+  if (h.days_left === 0) return 'сегодня последний день';
+  return 'через ' + h.days_left + ' дн.';
+}
+
+function ixTab(t, force) {
+  IX.tab = t;
+  document.querySelectorAll('#ixTabs button').forEach(b => b.classList.toggle('on', b.dataset.x === t));
+  document.getElementById('ixOv').hidden = t !== 'ov';
+  document.getElementById('ixShops').hidden = t !== 'shops';
+  document.getElementById('ixPays').hidden = t !== 'pays';
+  document.getElementById('ixSet').hidden = t !== 'set';
+  document.getElementById('ixPer').style.display = (t === 'ov' || t === 'pays') ? '' : 'none';
+  if (t === 'ov') ixLoadOv();
+  if (t === 'shops') ixLoadShops();
+  if (t === 'pays') ixLoadPays();
+  if (t === 'set') loadSubPanel();
+  try { history.replaceState(null, '', '#income' + (t === 'ov' ? '' : '-' + t)); } catch (e) {}
+}
+
+function ixSetPeriod(p) {
+  IX.period = p;
+  document.querySelectorAll('#ixPerSeg button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  const dates = document.getElementById('ixDates');
+  dates.hidden = p !== 'custom';
+  if (p === 'custom') {
+    const [f, t] = IX.from && IX.to ? [IX.from, IX.to] : ixRange();
+    document.getElementById('ixFrom').value = f; document.getElementById('ixTo').value = t;
+    IX.from = f; IX.to = t;
+  }
+  IX.p.page = 1;
+  if (IX.tab === 'ov') ixLoadOv(); else if (IX.tab === 'pays') ixLoadPays();
+}
+function ixCustomDates() {
+  const f = document.getElementById('ixFrom').value, t = document.getElementById('ixTo').value;
+  if (!f || !t) return;
+  IX.from = f; IX.to = t; IX.p.page = 1;
+  if (IX.tab === 'ov') ixLoadOv(); else ixLoadPays();
+}
+function ixExport() {
+  const [f, t] = ixRange();
+  window.open('/api/admin/income/export?' + ixQS({ from: f, to: t }), '_blank');
+}
+
+// ----- Обзор -----
+let ixOvSeq = 0;
+async function ixLoadOv() {
+  const box = document.getElementById('ixOv');
+  const [f, t] = ixRange();
+  const seq = ++ixOvSeq;
+  if (!IX.ov) box.innerHTML = '<div class="hint-text">Загружаю…</div>';
   try {
-    const res = await fetch('/api/admin/income');
-    const data = await res.json();
-    if (!data.ok) { box.innerHTML = `<div class="msg err">${escapeHtml(data.error || 'Ошибка')}</div>`; return; }
-    INC = data.stats;
-    renderIncome();
+    const d = await ixGet('/api/admin/income/overview?' + ixQS({ from: f, to: t }));
+    if (seq !== ixOvSeq) return;
+    IX.ov = d; INC = d;
+    ixRenderOv();
   } catch (e) {
-    box.innerHTML = '<div class="msg err">Не удалось загрузить — проверьте интернет</div>';
+    if (seq === ixOvSeq) box.innerHTML = `<div class="msg err">${escapeHtml(e.message || 'Не удалось загрузить — проверьте интернет')}</div>`;
   }
 }
-
-function setIncMode(m) { incMode = m; renderIncome(); }
-
-function openPendingChecks() {
-  admTab('main');
-  const sec = document.getElementById('secSub');
-  sec.open = true;
-  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function ixSetChart(m) { IX.ovChart = m; ixRenderOv(); }
+function ixGoShops(status, group) {
+  IX.s.status = status || 'all'; IX.s.page = 1; IX.s.sel.clear();
+  if (group !== undefined) { IX.s.group = group; }
+  ixTab('shops');
 }
-
-function renderIncome() {
-  const d = INC;
+function ixRenderOv() {
+  const d = IX.ov;
   if (!d) return;
   const c = d.counts;
-  const curM = Number(d.months[d.months.length - 1].slice(5)) - 1;
-  const diff = d.this_month - d.prev_month;
+  const per = `${fmtDay(d.from)} — ${fmtDay(d.to)}`;
+  const alerts = [];
+  if (d.pending.count) alerts.push(`<div class="inc-alert" onclick="ixPayStatus('pending'); ixTab('pays');">🧾 <span style="flex:1;">Чеков на проверке: ${d.pending.count} на ${fmtSum(d.pending.sum)} сум</span><i class="fa-solid fa-chevron-right"></i></div>`);
+  if (c.blocked) alerts.push(`<div class="inc-alert" style="background:#FEF2F2; border-color:#FCA5A5;" onclick="ixGoShops('blocked')">🔒 <span style="flex:1;">Заблокированы, не продлили: ${c.blocked}</span><i class="fa-solid fa-chevron-right"></i></div>`);
+  if (d.ref_owed && d.ref_owed.count) alerts.push(`<div class="inc-alert" style="background:#F0F9FF; border-color:#7DD3FC;" onclick="admTab('main'); const s = document.getElementById('secRef'); if (s) { s.open = true; s.scrollIntoView({behavior: 'smooth'}); }">🎁 <span style="flex:1;">Реферальные бонусы к выплате: ${d.ref_owed.count} на ${fmtSum(d.ref_owed.sum)} сум</span><i class="fa-solid fa-chevron-right"></i></div>`);
   const kpis = `
     <div class="inc-grid">
-      <div class="inc-kpi main"><div class="k-l">Подписки в месяц</div><div class="k-v">${fmtSum(d.mrr)}</div><div class="k-s">${c.paying} точек платят · ${fmtShort(d.arr)} в год</div></div>
-      <div class="inc-kpi"><div class="k-l">Получено в ${MONTHS_FULL[curM]}</div><div class="k-v">${fmtSum(d.this_month)}</div><div class="k-s">прошлый месяц ${fmtShort(d.prev_month)}${d.prev_month || d.this_month ? (diff >= 0 ? ' · ▲ ' : ' · ▼ ') + fmtShort(Math.abs(diff)) : ''}</div></div>
-      <div class="inc-kpi"><div class="k-l">За 12 месяцев</div><div class="k-v">${fmtSum(d.year_total)}</div><div class="k-s">деньгами, все оплаты</div></div>
-      <div class="inc-kpi"><div class="k-l">Ожидается за 30 дней</div><div class="k-v">${fmtSum(d.expected_30)}</div><div class="k-s">${d.expected.length} точек продлевают</div></div>
+      <div class="inc-kpi main"><div class="k-l">Доход в месяц (подписки)</div><div class="k-v">${fmtSum(d.mrr)}</div><div class="k-s">${d.paying} точек платят · ${fmtShort(d.arr)} в год</div></div>
+      <div class="inc-kpi"><div class="k-l">Получено за период</div><div class="k-v">${fmtSum(d.received)}</div><div class="k-s">${d.payments} оплат · ${ixPct(d.received, d.prev_received)} к прошлому</div></div>
+      <div class="inc-kpi"><div class="k-l">Средний чек</div><div class="k-v">${fmtSum(d.avg)}</div><div class="k-s">доход с точки ${fmtShort(d.arpu)}/мес</div></div>
+      <div class="inc-kpi"><div class="k-l">Новые платящие</div><div class="k-v">${d.new_paying}</div><div class="k-s">первая оплата за период</div></div>
+      <div class="inc-kpi"><div class="k-l">Отток</div><div class="k-v" style="color:${d.churn_pct > 5 ? '#B3241C' : 'var(--darkblue)'};">${d.churn_pct}%</div><div class="k-s">${d.churned_count} не продлили · −${fmtShort(d.lost_mrr)}/мес</div></div>
+      <div class="inc-kpi"><div class="k-l">Пробный → оплата</div><div class="k-v">${d.trial_conv === null ? '—' : d.trial_conv + '%'}</div><div class="k-s">${d.trial_total ? d.trial_paid + ' из ' + d.trial_total + ' новых' : 'новых регистраций нет'}</div></div>
+      <div class="inc-kpi"><div class="k-l">Ожидается продлений</div><div class="k-v">${fmtSum(d.forecast[0] ? d.forecast[0].sum : 0)}</div><div class="k-s">в этом месяце · ${d.forecast[0] ? d.forecast[0].count : 0} точек</div></div>
+      <div class="inc-kpi"><div class="k-l">Всего точек</div><div class="k-v">${d.total_shops}</div><div class="k-s">${c.trial} пробных · ${c.lifetime} бессрочных</div></div>
     </div>`;
-  const pend = d.pending.count ? `<div class="inc-alert" onclick="openPendingChecks()">🧾 <span style="flex:1;">Чеков на проверке: ${d.pending.count} на ${fmtSum(d.pending.sum)} сум</span><i class="fa-solid fa-chevron-right"></i></div>` : '';
-  const series = incMode === 'received' ? d.received : d.spread;
+  // график
+  let mode = IX.ovChart;
+  if (mode === 'auto') mode = d.daily.length && d.daily.length <= 92 ? 'days' : 'months';
+  let series, labels, cur = -1, hint;
+  if (mode === 'days' && d.daily.length) {
+    series = d.daily.map(x => x[1]); labels = d.daily.map(x => x[0].slice(8)); hint = 'Деньги по дням выбранного периода.';
+    cur = d.daily.findIndex(x => x[0] === ixIso(new Date()));
+  } else {
+    const src = mode === 'spread' ? d.months_spread : d.months_received;
+    series = src; labels = d.months.map(m => MONTHS_RU[Number(m.slice(5)) - 1]); cur = series.length - 1;
+    hint = mode === 'spread' ? 'Оплата за N месяцев разложена поровну на эти месяцы — реальный доход в месяц.' : 'Деньги в месяц, когда оплата подтверждена.';
+  }
   const max = Math.max(1, ...series);
-  const bars = series.map((v, i) => {
-    const m = Number(d.months[i].slice(5)) - 1;
-    return `<div class="inc-bar ${i === series.length - 1 ? 'cur' : ''} ${v === max ? 'mx' : ''}" title="${MONTHS_RU[m]} ${d.months[i].slice(0, 4)}: ${fmtSum(v)} сум">
-      <span class="v">${v ? fmtShort(v) : ''}</span><div class="b" style="height:${Math.round(v / max * 100)}%;"></div><span class="m">${MONTHS_RU[m]}</span></div>`;
-  }).join('');
+  const bars = series.map((v, i) => `<div class="inc-bar ${i === cur ? 'cur' : ''} ${v === max && v ? 'mx' : ''}" title="${labels[i]}: ${fmtSum(v)} сум"><span class="v">${v ? fmtShort(v) : ''}</span><div class="b" style="height:${Math.round(v / max * 100)}%;"></div><span class="m">${series.length > 16 && i % (series.length > 45 ? 7 : 3) ? '' : labels[i]}</span></div>`).join('');
   const chart = `
     <div class="inc-card">
-      <h3>Оплаты по месяцам
-        <span class="inc-seg"><button class="${incMode === 'received' ? 'on' : ''}" onclick="setIncMode('received')">Получено</button><button class="${incMode === 'spread' ? 'on' : ''}" onclick="setIncMode('spread')">В пересчёте на месяц</button></span>
+      <h3>Поступления
+        <span class="inc-seg">${d.daily.length ? `<button class="${mode === 'days' ? 'on' : ''}" onclick="ixSetChart('days')">По дням</button>` : ''}<button class="${mode === 'months' ? 'on' : ''}" onclick="ixSetChart('months')">12 месяцев</button><button class="${mode === 'spread' ? 'on' : ''}" onclick="ixSetChart('spread')">В пересчёте</button></span>
       </h3>
-      <div class="inc-bars">${bars}</div>
-      <div class="hint-text" style="margin-top:8px;">${incMode === 'received' ? 'Деньги в месяц, когда оплата подтверждена. Оплата за год даёт один высокий столбик.' : 'Оплата за N месяцев разложена поровну на эти месяцы — так видно реальный доход в месяц.'}</div>
+      <div class="inc-bars" style="${series.length > 40 ? 'gap:1px;' : ''}">${bars}</div>
+      <div class="hint-text" style="margin-top:8px;">${hint} Период: ${per}.</div>
     </div>`;
-  const parts = [
-    ['Платят', c.paying, '#16A34A'], ['∞ Бессрочные', c.lifetime, '#0F52BA'], ['Без даты', c.unset, '#94A3B8'],
-    ['Заблокированы', c.blocked, '#DC2626'], ['Выключены', c.off, '#CBD5E1']];
-  const totalPts = Math.max(1, parts.reduce((a, p) => a + p[1], 0));
-  const pts = `
+  // статусы
+  const order = ['paying', 'soon', 'trial', 'grace', 'blocked', 'lifetime', 'unset', 'off'];
+  const tot = Math.max(1, d.total_shops);
+  const stat = `
     <div class="inc-card">
-      <h3>Точки <span class="hint-text" style="font-weight:600;">всего ${c.total}${c.soon ? ' · скоро истекает: ' + c.soon : ''}</span></h3>
-      <div class="inc-stack">${parts.filter(p => p[1]).map(p => `<div style="width:${p[1] / totalPts * 100}%; background:${p[2]};"></div>`).join('')}</div>
-      <div class="inc-leg">${parts.map(p => `<span><i style="background:${p[2]};"></i>${p[0]}: <b>${p[1]}</b></span>`).join('')}</div>
-      <div class="hint-text" style="margin-top:10px;">Цена: главная ${fmtSum(d.price_main)} + филиал ${fmtSum(d.price_branch)} сум/мес</div>
-      ${d.lifetime_sales || d.branch_cash ? `<div class="inc-row" style="margin-top:6px;"><div><b>Разовые продажи</b><div class="r-s">∞ точек: ${d.lifetime_sales}${d.branch_cash ? ' · филиалов вручную: ' + d.branch_cash : ''}</div></div><span class="r-v">${fmtSum(d.lifetime_sum + d.branch_cash_sum)}</span></div>` : ''}
+      <h3>Точки по статусу <span class="hint-text" style="font-weight:600;">нажми, чтобы открыть список</span></h3>
+      <div class="ix-meter">${order.filter(k => c[k]).map(k => `<div style="width:${c[k] / tot * 100}%; background:${IX_ST[k][1]};"></div>`).join('')}</div>
+      ${order.map(k => `<div class="ix-stat-row" onclick="ixGoShops('${k}')"><span><i class="dot" style="background:${IX_ST[k][1]};"></i>${IX_ST[k][0]}</span><span><b>${c[k]}</b> <i class="fa-solid fa-chevron-right" style="color:#CBD5E1; font-size:11px;"></i></span></div>`).join('')}
+    </div>`;
+  const fc = `
+    <div class="inc-card">
+      <h3>Прогноз продлений</h3>
+      <div class="ix-fc">${d.forecast.map(x => `<div><span>${MONTHS_RU[Number(x.month.slice(5)) - 1]} ${x.month.slice(0, 4)}</span><b>${fmtShort(x.sum)}</b><span>${x.count} точек</span></div>`).join('')}</div>
+      <div class="hint-text" style="margin-top:8px;">Если все, у кого заканчивается оплата, продлят на тот же срок.</div>
+    </div>`;
+  const methTot = Math.max(1, d.by_method.card + d.by_method.hamyon + d.by_method.cash);
+  const mcol = { card: '#0F52BA', hamyon: '#00A8E8', cash: '#16A34A' };
+  const meth = `
+    <div class="inc-card">
+      <h3>Как платят <span class="hint-text" style="font-weight:600;">за период</span></h3>
+      <div class="ix-meter">${['card', 'hamyon', 'cash'].filter(k => d.by_method[k]).map(k => `<div style="width:${d.by_method[k] / methTot * 100}%; background:${mcol[k]};"></div>`).join('')}</div>
+      ${['card', 'hamyon', 'cash'].map(k => `<div class="ix-stat-row" style="cursor:default;"><span><i class="dot" style="background:${mcol[k]};"></i>${IX_METHOD[k]}</span><b>${fmtSum(d.by_method[k])}</b></div>`).join('')}
+      <div style="height:8px;"></div>
+      ${Object.keys(IX_KIND).map(k => `<div class="ix-stat-row" style="cursor:default;"><span>${IX_KIND[k]}</span><b>${fmtSum(d.by_kind[k] || 0)}</b></div>`).join('')}
     </div>`;
   const tTotal = Math.max(1, Object.values(d.terms).reduce((a, b) => a + b, 0));
   const terms = `
     <div class="inc-card">
-      <h3>Какой срок выбирают</h3>
-      ${[1, 3, 6, 12].map(m => `<div class="inc-term"><span class="t-n">${m} мес</span><span class="t-bar"><div style="width:${d.terms[m] / tTotal * 100}%;"></div></span><span class="t-c">${d.terms[m]} · ${Math.round(d.terms[m] / tTotal * 100)}%</span></div>`).join('')}
+      <h3>Какой срок выбирают <span class="hint-text" style="font-weight:600;">за период</span></h3>
+      ${[1, 3, 6, 12].map(m => `<div class="inc-term"><span class="t-n">${m} мес</span><span class="t-bar"><div style="width:${(d.terms[m] || 0) / tTotal * 100}%;"></div></span><span class="t-c">${d.terms[m] || 0} · ${Math.round((d.terms[m] || 0) / tTotal * 100)}%</span></div>`).join('')}
     </div>`;
-  const exp = `
+  const grp = d.groups.length > 1 || (d.groups[0] && d.groups[0].name) ? `
     <div class="inc-card">
-      <h3>Продлевают в ближайшие 30 дней</h3>
-      ${d.expected.length ? d.expected.map(x => `<div class="inc-row"><div><b>${escapeHtml(x.name)}</b><div class="r-s">до ${fmtDay(x.paid_until)} · ${x.days === 0 ? 'сегодня последний день' : 'через ' + x.days + ' дн.'}</div></div><span class="r-v">${fmtSum(x.monthly)}/мес</span></div>`).join('') : '<div class="hint-text">Никто — всё оплачено надолго вперёд.</div>'}
-    </div>`;
-  const blk = d.blocked.length ? `
-    <div class="inc-card">
-      <h3>Не продлили <span class="hint-text" style="font-weight:600;">теряем ${fmtSum(d.blocked.reduce((a, x) => a + x.monthly, 0))} сум/мес</span></h3>
-      ${d.blocked.map(x => `<div class="inc-row"><div><b>${escapeHtml(x.name)}</b><div class="r-s">заблокирована ${x.days} дн. · было оплачено до ${fmtDay(x.paid_until)}</div></div><span class="r-v" style="color:#B3241C;">${fmtSum(x.monthly)}/мес</span></div>`).join('')}
+      <h3>Сети <span class="hint-text" style="font-weight:600;">${d.groups_count} · по доходу в месяц</span></h3>
+      <div style="overflow-x:auto;"><table class="ix-tbl">
+        <tr><th>Сеть</th><th class="n">Точек</th><th class="n">Платят</th><th class="n">В месяц</th><th class="n">За период</th></tr>
+        ${d.groups.map(g => `<tr class="clk" onclick='ixGoShops("all", ${JSON.stringify(g.name).replace(/'/g, "&#39;")})'><td>${g.name ? escapeHtml(g.name) : '<span style="color:var(--hint);">без сети</span>'}</td><td class="n">${g.shops}${g.branches ? ' +' + g.branches : ''}</td><td class="n">${g.paying}</td><td class="n">${fmtSum(g.mrr)}</td><td class="n">${fmtSum(g.received)}</td></tr>`).join('')}
+      </table></div>
+      <div class="hint-text" style="margin-top:6px;">«+N» — филиалы. Нажми на сеть — откроется список её точек.</div>
     </div>` : '';
-  const kindTxt = j => j.kind === 'lifetime' ? '∞ бессрочная' : j.kind === 'branches' ? 'новые филиалы' : `${j.months} мес${j.kind === 'both' ? ' + филиалы' : ''}`;
-  const jr = `
+  const churn = d.churned.length ? `
     <div class="inc-card">
-      <h3>Последние оплаты</h3>
-      ${d.journal.length ? d.journal.map(j => `<div class="inc-row"><div><b>${escapeHtml(j.name)}</b><div class="r-s">${fmtDay(j.date)} · ${kindTxt(j)} · ${j.method === 'cash' ? 'наличные' : 'перевод'}</div>
-        <div class="inc-jact">${j.method === 'cash' ? `<button onclick="editPayAmount(${j.id}, ${j.amount || 0})">✏️ сумма</button>` : ''}<button onclick="cancelPayment(${j.id})">🗑 убрать</button></div></div>
-        <span class="r-v">${j.amount ? fmtSum(j.amount) : `<span style="color:#B45309; font-family:inherit; font-size:12px;">сумма не указана</span>`}</span></div>`).join('') : '<div class="hint-text">Оплат пока нет.</div>'}
+      <h3>Не продлили за период <span class="hint-text" style="font-weight:600;">−${fmtSum(d.lost_mrr)} сум/мес</span></h3>
+      ${d.churned.slice(0, 10).map(x => `<div class="inc-row" style="cursor:pointer;" onclick="ixOpenShop(${x.id})"><div><b>${escapeHtml(x.name)}</b><div class="r-s">${x.trial ? 'пробный закончился' : 'было оплачено до'} ${fmtDay(x.paid_until)}</div></div><span class="r-v" style="color:#B3241C;">${fmtSum(x.monthly)}/мес</span></div>`).join('')}
+      ${d.churned_count > 10 ? `<button class="ix-btn" style="margin-top:8px;" onclick="ixGoShops('blocked')">Все заблокированные →</button>` : ''}
+    </div>` : '';
+  document.getElementById('ixOv').innerHTML = alerts.join('') + kpis + chart +
+    `<div class="ix-2">${stat}${fc}</div><div class="ix-2">${meth}${terms}</div>` + grp + churn;
+}
+
+// ----- Точки -----
+let ixShopSeq = 0, ixSearchT = null;
+function ixSearchSoon() {
+  clearTimeout(ixSearchT);
+  ixSearchT = setTimeout(() => { IX.s.q = document.getElementById('ixQ').value.trim(); IX.s.page = 1; ixLoadShops(); }, 300);
+}
+function ixSetStatus(st) { IX.s.status = st; IX.s.page = 1; ixLoadShops(); }
+function ixPage(n) { IX.s.page = n; ixLoadShops(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+async function ixLoadShops() {
+  const seq = ++ixShopSeq;
+  const list = document.getElementById('ixShopList');
+  if (!IX.s.data) list.innerHTML = '<div class="ix-empty">Загружаю…</div>';
+  const qs = ixQS({ q: IX.s.q, status: IX.s.status, group: IX.s.group === '*' ? '' : IX.s.group, sort: IX.s.sort, page: IX.s.page, per: 50 });
+  try {
+    const d = await ixGet('/api/admin/income/shops?' + qs + (IX.s.group === '' ? '&group=' : ''));
+    if (seq !== ixShopSeq) return;
+    IX.s.data = d;
+    ixRenderShops();
+  } catch (e) {
+    if (seq === ixShopSeq) list.innerHTML = `<div class="ix-empty">${escapeHtml(e.message || 'Ошибка загрузки')}</div>`;
+  }
+}
+function ixRenderShops() {
+  const d = IX.s.data;
+  if (!d) return;
+  document.getElementById('ixQ').value !== IX.s.q && document.activeElement !== document.getElementById('ixQ') && (document.getElementById('ixQ').value = IX.s.q);
+  const gs = document.getElementById('ixGroup');
+  const cur = IX.s.group;
+  gs.innerHTML = '<option value="*">Все сети</option>' + d.groups.map(g => `<option value="${escapeHtml(g)}">${g ? escapeHtml(g) : 'Без сети'}</option>`).join('');
+  gs.value = cur;
+  document.getElementById('ixSort').value = IX.s.sort;
+  const c = d.counts;
+  const chips = [['all', 'Все', c.all], ['attention', 'Требуют внимания', c.soon + c.grace + c.blocked + c.trial], ['check', '🧾 Чек или филиал ждёт', c.check],
+    ['paying', 'Платят', c.paying], ['soon', 'Скоро продление', c.soon], ['trial', 'Пробные', c.trial], ['grace', 'Льготные', c.grace],
+    ['blocked', 'Заблокированы', c.blocked], ['lifetime', '∞', c.lifetime], ['unset', 'Без даты', c.unset], ['off', 'Выкл.', c.off]];
+  document.getElementById('ixChips').innerHTML = chips.filter(x => x[0] === 'all' || x[0] === IX.s.status || x[2])
+    .map(x => `<button class="${IX.s.status === x[0] ? 'on' : ''}" onclick="ixSetStatus('${x[0]}')">${x[1]}<span>${x[2]}</span></button>`).join('');
+  const allSel = d.ids.length && d.ids.every(id => IX.s.sel.has(id));
+  document.getElementById('ixShopSum').innerHTML = `
+    <label><input type="checkbox" ${allSel ? 'checked' : ''} onchange="ixSelAll(this.checked)"> Выбрать все ${d.total}</label>
+    <span>Найдено <b>${d.total}</b> · платят на <b>${fmtSum(d.sum_monthly)}</b> сум/мес</span>`;
+  const head = `<div class="ix-head"><div></div><div class="srt ${IX.s.sort === 'name' ? 'on' : ''}" onclick="ixSort('name')">Точка</div><div>Статус</div><div class="srt ${IX.s.sort === 'until' ? 'on' : ''}" onclick="ixSort('until')">До</div><div class="srt ${IX.s.sort === 'monthly' ? 'on' : ''}" onclick="ixSort('monthly')">В месяц</div><div class="srt ${IX.s.sort === 'paid' ? 'on' : ''}" onclick="ixSort('paid')">Всего</div></div>`;
+  const rows = d.rows.map(h => {
+    const sel = IX.s.sel.has(h.id);
+    const sub = [h.client_group, h.phone, h.branches ? h.branches + ' фил.' : '', h.custom_price ? 'своя цена' : ''].filter(Boolean).map(escapeHtml).join(' · ');
+    const chk = h.pending ? '<span class="ix-pill chk">🧾 чек</span>' : (h.branches_pending ? '<span class="ix-pill chk">филиал ждёт</span>' : '');
+    return `<div class="ix-row ${sel ? 'sel' : ''}" onclick="ixOpenShop(${h.id})">
+      <input type="checkbox" ${sel ? 'checked' : ''} onclick="event.stopPropagation(); ixSel(${h.id}, this.checked)">
+      <div style="min-width:0;"><div class="nm">${escapeHtml(h.name)}${chk}</div><div class="sb">${sub || escapeHtml(h.username)}</div></div>
+      <div class="rt">${ixPill(h.status)}<b>${h.status === 'lifetime' ? '∞' : fmtSum(h.monthly)}</b><span class="sb">${ixDaysTxt(h)}</span></div>
+      <div class="cols"><div class="st">${ixPill(h.status)}</div><div>${h.paid_until ? fmtDay(h.paid_until) : '—'}</div><div>${h.status === 'lifetime' ? '∞' : fmtSum(h.monthly)}</div><div>${fmtSum(h.paid_total)}</div></div>
     </div>`;
-  document.getElementById('admIncome').innerHTML = kpis + pend + chart + pts + terms + exp + blk + jr;
+  }).join('');
+  document.getElementById('ixShopList').innerHTML = d.rows.length ? head + rows : '<div class="ix-empty">Ничего не найдено</div>';
+  document.getElementById('ixShopPager').innerHTML = d.pages > 1 ? `
+    <button class="ix-btn" ${d.page <= 1 ? 'disabled' : ''} onclick="ixPage(${d.page - 1})">‹ Назад</button>
+    <span>${d.page} из ${d.pages}</span>
+    <button class="ix-btn" ${d.page >= d.pages ? 'disabled' : ''} onclick="ixPage(${d.page + 1})">Дальше ›</button>` : '';
+  ixBulkBar();
+}
+function ixSort(k) { IX.s.sort = k; IX.s.page = 1; ixLoadShops(); }
+function ixSel(id, on) { if (on) IX.s.sel.add(id); else IX.s.sel.delete(id); ixRenderShops(); }
+function ixSelAll(on) { (IX.s.data ? IX.s.data.ids : []).forEach(id => on ? IX.s.sel.add(id) : IX.s.sel.delete(id)); ixRenderShops(); }
+function ixClearSel() { IX.s.sel.clear(); ixRenderShops(); }
+function ixBulkBar() {
+  const n = IX.s.sel.size;
+  document.getElementById('ixBulk').hidden = !n;
+  document.getElementById('ixBulkT').textContent = 'Выбрано: ' + n;
+}
+async function ixBulk(body, okText) {
+  const d = await ixPost('/api/admin/income/bulk', Object.assign({ ids: [...IX.s.sel] }, body));
+  if (!d.ok) { showMsg('Ошибка: ' + escapeHtml(d.error || ''), false); return; }
+  showMsg(`✅ ${okText}: ${d.done}${d.skipped ? ' · пропущено ' + d.skipped : ''}`, true);
+  IX.s.sel.clear(); IX.ov = null; ixLoadShops(); loadShops();
+}
+function ixBulkExtend() {
+  ixModal('Продлить выбранные', `Выбрано точек: ${IX.s.sel.size}. Каждой запишется оплата наличными по её цене. Бессрочные и выключенные пропустятся.`,
+    `<div class="ix-acts">${[1, 3, 6, 12].map(m => `<button onclick="ixClose(); ixBulk({action: 'extend', months: ${m}}, 'Продлено')">+${m} мес</button>`).join('')}</div>`);
+}
+function ixBulkDays() {
+  ixModal('Подарить дни', `Выбрано точек: ${IX.s.sel.size}. Дни добавятся без записи об оплате (например, компенсация за сбой). Отрицательное число — убрать дни.`,
+    `<div class="ix-form"><div class="field"><label>Сколько дней</label><input id="ixBD" inputmode="numeric" value="7"></div>
+     <button class="ix-btn pri" onclick="const v = parseInt(document.getElementById('ixBD').value, 10); if (!v) return; ixClose(); ixBulk({action: 'days', days: v}, 'Готово')">Добавить</button></div>`);
+}
+function ixBulkPrice() {
+  ixModal('Своя цена', `Выбрано точек: ${IX.s.sel.size}. Цена главной точки в месяц; скидки за срок к ней не применяются. Пусто — вернуть обычную цену.`,
+    `<div class="ix-form"><div class="field"><label>Цена, сум в месяц</label><input id="ixBP" inputmode="numeric" placeholder="обычная цена"></div>
+     <button class="ix-btn pri" onclick="const v = document.getElementById('ixBP').value.replace(/[^0-9]/g, ''); ixClose(); ixBulk({action: 'price', price: v}, v ? 'Цена задана' : 'Обычная цена')">Сохранить</button></div>`);
+}
+function ixBulkMsg() {
+  ixModal('Сообщение в Telegram', `Выбрано точек: ${IX.s.sel.size}. Придёт владельцам, у кого подключён Telegram.`,
+    `<div class="ix-form"><div class="field"><label>Текст</label><textarea id="ixBM" rows="5" style="width:100%; padding:10px; border-radius:10px; border:1.5px solid var(--border); font-family:inherit; font-size:15px;"></textarea></div>
+     <button class="ix-btn pri" onclick="ixBulkMsgSend()"><i class="fa-brands fa-telegram"></i> Отправить</button></div>`);
+}
+async function ixBulkMsgSend() {
+  const text = document.getElementById('ixBM').value.trim();
+  if (text.length < 2) { showMsg('Напишите текст сообщения', false); return; }
+  ixClose();
+  const d = await ixPost('/api/admin/income/bulk', { ids: [...IX.s.sel], action: 'message', text });
+  if (!d.ok) { showMsg('Ошибка: ' + escapeHtml(d.error || ''), false); return; }
+  showMsg(`📨 Отправляется ${d.done} точкам${d.skipped ? ' · без Telegram: ' + d.skipped : ''}. Итог придёт тебе в Telegram.`, true);
+  IX.s.sel.clear(); ixRenderShops();
+}
+
+// ----- Модальное окно -----
+function ixModal(title, sub, body, small) {
+  const box = document.getElementById('ixBox');
+  box.className = 'ix-box' + (small === false ? '' : ' sm');
+  box.innerHTML = `<div class="ix-bh"><div><div class="t">${title}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div><button class="x" onclick="ixClose()" aria-label="Закрыть">✕</button></div>${body}`;
+  document.getElementById('ixOvl').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function ixClose() {
+  document.getElementById('ixOvl').classList.remove('open');
+  document.body.style.overflow = '';
+  IX.shop = null;
+}
+
+// ----- Карточка точки -----
+async function ixOpenShop(id) {
+  ixModal('Загружаю…', '', '<div class="hint-text">…</div>', false);
+  try {
+    const d = await ixGet('/api/admin/income/shop/' + id);
+    IX.shop = d;
+    ixRenderShop();
+  } catch (e) { ixModal('Ошибка', escapeHtml(e.message || ''), '', true); }
+}
+function ixRenderShop() {
+  const d = IX.shop;
+  if (!d) return;
+  const h = d.shop;
+  const nm = escapeHtml(JSON.stringify(h.name));
+  const life = h.status === 'lifetime';
+  const info = `
+    <div class="inc-grid">
+      <div class="inc-kpi"><div class="k-l">Статус</div><div style="margin-top:6px;">${ixPill(h.status)}</div><div class="k-s" style="margin-top:4px;">${ixDaysTxt(h)}</div></div>
+      <div class="inc-kpi"><div class="k-l">Оплачено до</div><div class="k-v">${life ? '∞' : (h.paid_until ? fmtDay(h.paid_until) : '—')}</div><div class="k-s">${h.last_period_months ? 'последний срок ' + h.last_period_months + ' мес' : '&nbsp;'}</div></div>
+      <div class="inc-kpi"><div class="k-l">В месяц</div><div class="k-v">${fmtSum(h.monthly)}</div><div class="k-s">${h.custom_price ? 'своя цена ' + fmtSum(h.custom_price) : 'обычная цена'}${h.branches ? ' · ' + h.branches + ' фил.' : ''}</div></div>
+      <div class="inc-kpi"><div class="k-l">Всего заплатила</div><div class="k-v">${fmtSum(h.paid_total)}</div><div class="k-s">${h.paid_count} оплат${h.last_paid ? ' · последняя ' + fmtDay(h.last_paid) : ''}</div></div>
+    </div>`;
+  const pend = d.payments.find(p => p.status === 'pending');
+  const chk = pend ? `<div class="inc-alert" style="cursor:default; flex-wrap:wrap;">🧾 <span style="flex:1;">Чек на проверке: <b>${fmtSum(pend.amount)} сум</b> · ${pend.kind === 'lifetime' ? '∞' : (pend.months ? pend.months + ' мес' : IX_KIND[pend.kind] || '')}</span>
+      ${pend.has_receipt ? `<a class="ix-btn" href="/api/admin/sub/receipt/${pend.id}" target="_blank" rel="noopener">Открыть чек</a>` : ''}
+      <button class="ix-btn ok" onclick="ixDecide(${pend.id}, 1)">✅ Подтвердить</button><button class="ix-btn no" onclick="ixDecide(${pend.id}, 0)">Отклонить</button></div>` : '';
+  const opt = m => (d.options.find(o => o.months === m) || {});
+  const acts = life ? `
+    <div class="ix-acts">
+      <button onclick="ixShopLifetime(0)">Вернуть подписку<small>снять ∞</small></button>
+    </div>` : `
+    <div class="ix-acts">
+      ${[1, 3, 6, 12].map(m => `<button class="${m === (h.last_period_months || 1) ? 'main' : ''}" onclick="ixShopExtend(${m})">+${m} мес<small>${fmtSum(opt(m).amount)}${opt(m).discount ? ' · −' + opt(m).discount + '%' : ''}</small></button>`).join('')}
+      <button onclick="ixRecordOpen(${h.id}, ${nm})">Своя сумма<small>записать оплату</small></button>
+      <button onclick="ixShopDays()">+ Дни<small>подарить</small></button>
+      <button onclick="ixShopDate()">📅 Дата<small>оплачено до</small></button>
+      <button onclick="ixShopPrice()">💲 Цена<small>${h.custom_price ? 'своя' : 'обычная'}</small></button>
+      <button onclick="ixShopLifetime(1)">∞ Навсегда<small>разовая покупка</small></button>
+    </div>`;
+  const br = d.branches.length ? `
+    <div class="inc-card" style="margin-top:12px;"><h3>Филиалы</h3>
+      ${d.branches.map(b => `<div class="inc-row"><div><b>${escapeHtml(b.shop_name || b.username)}</b><div class="r-s">${b.is_active ? (b.branch_pending ? '⏳ ждёт оплаты' : 'работает') : 'выключен'}</div></div>
+        ${b.branch_pending ? `<button class="ix-btn ok" onclick="ixBranchPaid(${b.id}, ${escapeHtml(JSON.stringify(b.shop_name || b.username))})">Оплачен</button>` : ''}</div>`).join('')}
+    </div>` : '';
+  const stName = { confirmed: '', pending: ' · на проверке', rejected: ' · отклонён', cancelled: ' · отменён' };
+  const pays = `
+    <div class="inc-card" style="margin-top:12px;"><h3>История оплат</h3>
+      ${d.payments.length ? d.payments.map(p => `<div class="inc-row" style="${p.status === 'cancelled' || p.status === 'rejected' ? 'opacity:.5;' : ''}"><div><b>${fmtDay(p.day)}</b> · ${p.kind === 'extend' || p.kind === 'both' ? (p.months || '?') + ' мес' + (p.kind === 'both' ? ' + филиалы' : '') : IX_KIND[p.kind] || p.kind}
+        <div class="r-s">${IX_METHOD[p.method || 'card'] || ''}${p.discount ? ' · скидка ' + p.discount + '%' : ''}${p.new_until ? ' · до ' + fmtDay(p.new_until) : ''}${stName[p.status] || ''}${p.note ? ' · ' + escapeHtml(p.note) : ''}</div>
+        ${p.status === 'confirmed' ? `<div class="inc-jact">${p.method === 'cash' ? `<button onclick="ixEditAmount(${p.id}, ${p.amount || 0})">✏️ сумма</button>` : ''}<button onclick="ixCancelPay(${p.id})">🗑 убрать</button></div>` : ''}</div>
+        <span class="r-v">${p.amount ? fmtSum(p.amount) : '<span style="color:#B45309; font-family:inherit; font-size:12px;">без суммы</span>'}</span></div>`).join('') : '<div class="hint-text">Оплат пока не было.</div>'}
+    </div>`;
+  const sub = [escapeHtml(h.username), h.phone ? escapeHtml(h.phone) : '', h.client_group ? 'сеть ' + escapeHtml(h.client_group) : '', h.has_tg ? 'Telegram ✓' : 'без Telegram'].filter(Boolean).join(' · ');
+  ixModal(escapeHtml(h.name), sub, info + chk + acts + br + pays, false);
+}
+async function ixAfterChange(msg) {
+  showMsg(msg, true);
+  IX.ov = null;
+  if (IX.shop) await ixOpenShop(IX.shop.shop.id);
+  if (IX.tab === 'shops') ixLoadShops();
+  if (IX.tab === 'pays') ixLoadPays();
+  if (IX.tab === 'ov') ixLoadOv();
+  loadShops();
+}
+async function ixShopExtend(m) {
+  const h = IX.shop.shop;
+  if (!confirm(`Продлить «${h.name}» на ${m} мес.? Запишется оплата наличными.`)) return;
+  const d = await subAction(h.id, { action: 'extend', months: m });
+  if (d.ok) ixAfterChange(`✅ Продлено до ${fmtDay(d.paid_until)}`); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+function ixShopDays() {
+  const h = IX.shop.shop;
+  const v = prompt(`«${h.name}» — сколько дней подарить? (без записи об оплате; минус — убрать дни)`, '7');
+  if (v === null) return;
+  const n = parseInt(v, 10);
+  if (!n) return;
+  ixPost('/api/admin/income/days', { shop_id: h.id, days: n }).then(d => d.ok ? ixAfterChange(`✅ Теперь до ${fmtDay(d.paid_until)}`) : showMsg('Ошибка: ' + escapeHtml(d.error || ''), false));
+}
+async function ixShopDate() {
+  const h = IX.shop.shop;
+  const v = prompt('Оплачено до (ДД.ММ.ГГГГ). Пусто — убрать дату (точка работает без подписки):', h.paid_until ? fmtDay(h.paid_until) : '');
+  if (v === null) return;
+  const d = await subAction(h.id, { action: 'set_until', date: v.trim() });
+  if (d.ok) ixAfterChange(d.paid_until ? `✅ Дата: ${fmtDay(d.paid_until)}` : '✅ Дата убрана'); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+async function ixShopPrice() {
+  const h = IX.shop.shop;
+  const v = askSum(`Своя цена главной точки «${h.name}», сум в месяц. Скидки за срок к ней не применяются. Пусто — обычная цена.`, h.custom_price || '');
+  if (v === null) return;
+  const d = await subAction(h.id, { action: 'price', price: v });
+  if (d.ok) ixAfterChange(v ? `✅ Цена ${fmtSum(v)} сум/мес` : '✅ Обычная цена'); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+async function ixShopLifetime(on) {
+  const h = IX.shop.shop;
+  let amount = '';
+  if (on) {
+    amount = askSum(`«${h.name}» — разовая покупка (∞, без ежемесячной оплаты). Сумма в сумах для статистики:`, '');
+    if (amount === null) return;
+  } else if (!confirm(`Вернуть «${h.name}» на ежемесячную подписку? Запись о разовой покупке уберётся из статистики.`)) return;
+  const d = await subAction(h.id, { action: 'lifetime', on: !!on, amount });
+  if (d.ok) ixAfterChange('✅ Готово'); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+async function ixBranchPaid(branchId, name) {
+  const amount = askSum(`Филиал «${name}» оплачен — он сразу заработает. Сумма в сумах (для статистики):`, '');
+  if (amount === null) return;
+  const d = await ixPost(`/api/admin/branches/${branchId}/sub_paid`, { amount });
+  if (d.ok) ixAfterChange('✅ Филиал включён'); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+async function ixDecide(id, ok) {
+  if (!ok && !confirm('Отклонить этот чек? Точке придёт сообщение, что чек не принят.')) return;
+  const d = await ixPost(`/api/admin/sub/payments/${id}/${ok ? 'confirm' : 'reject'}`);
+  if (d.ok) { ixAfterChange(ok ? `✅ Подтверждено — до ${fmtDay(d.new_until)}` : 'Чек отклонён'); loadSubPanel(); }
+  else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+async function ixEditAmount(id, cur) {
+  const v = askSum('Сумма оплаты в сумах:', cur || '');
+  if (v === null) return;
+  const d = await ixPost(`/api/admin/sub/payments/${id}/amount`, { amount: v });
+  if (d.ok) ixAfterChange('✅ Сумма сохранена'); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+async function ixCancelPay(id) {
+  if (!confirm('Убрать эту оплату из статистики? Дата «оплачено до» не изменится — при необходимости поправь её кнопкой «📅 Дата».')) return;
+  const d = await ixPost(`/api/admin/sub/payments/${id}/cancel`);
+  if (d.ok) ixAfterChange('✅ Убрано'); else showMsg('Ошибка: ' + escapeHtml(d.error || ''), false);
+}
+
+// ----- Оплаты -----
+let ixPaySeq = 0, ixPayT = null;
+function ixPaySearchSoon() {
+  clearTimeout(ixPayT);
+  ixPayT = setTimeout(() => { IX.p.q = document.getElementById('ixPQ').value.trim(); IX.p.page = 1; ixLoadPays(); }, 300);
+}
+function ixPayStatus(s) {
+  IX.p.status = s; IX.p.page = 1;
+  document.querySelectorAll('#ixPStatus button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+  if (IX.tab === 'pays') ixLoadPays();
+}
+function ixPayPage(n) { IX.p.page = n; ixLoadPays(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+async function ixLoadPays() {
+  const seq = ++ixPaySeq;
+  const box = document.getElementById('ixPayList');
+  if (!IX.p.data) box.innerHTML = '<div class="ix-empty">Загружаю…</div>';
+  let [f, t] = ixRange();
+  // «На проверке» — все непроверенные чеки, за любой срок
+  if (IX.p.status === 'pending') { f = '2020-01-01'; t = ixIso(new Date()); }
+  try {
+    const d = await ixGet('/api/admin/income/payments?' + ixQS({ from: f, to: t, status: IX.p.status, method: IX.p.method, kind: IX.p.kind, q: IX.p.q, page: IX.p.page, per: 100 }));
+    if (seq !== ixPaySeq) return;
+    IX.p.data = d;
+    ixRenderPays();
+  } catch (e) {
+    if (seq === ixPaySeq) box.innerHTML = `<div class="ix-empty">${escapeHtml(e.message || 'Ошибка загрузки')}</div>`;
+  }
+}
+function ixRenderPays() {
+  const d = IX.p.data;
+  if (!d) return;
+  document.getElementById('ixPaySum').innerHTML = IX.p.status === 'pending'
+    ? `<span>Чеков на проверке: <b>${d.total}</b></span>`
+    : `<span>${fmtDay(d.from)} — ${fmtDay(d.to)}</span><span>${d.total} записей${IX.p.status === 'confirmed' || IX.p.status === 'all' ? ' · пришло <b>' + fmtSum(d.sum) + '</b> сум' : ''}</span>`;
+  const byDay = {};
+  const order = [];
+  d.rows.forEach(r => { if (!byDay[r.day]) { byDay[r.day] = []; order.push(r.day); } byDay[r.day].push(r); });
+  const stTxt = { pending: '🧾 на проверке', rejected: 'отклонён', cancelled: 'отменён' };
+  const html = order.map(day => {
+    const sum = byDay[day].filter(r => r.status === 'confirmed').reduce((a, r) => a + (r.amount || 0), 0);
+    return `<div class="ix-day"><span>${fmtDay(day)}</span><span>${sum ? '+' + fmtSum(sum) : ''}</span></div>` + byDay[day].map(r => `
+      <div class="ix-pay st-${r.status}">
+        <div style="min-width:0;">
+          <div class="nm" onclick="ixOpenShop(${r.shop_id})">${escapeHtml(r.name)}</div>
+          <div class="sb">${r.kind === 'extend' || r.kind === 'both' ? (r.months || '?') + ' мес' + (r.kind === 'both' ? ' + филиалы' : '') : IX_KIND[r.kind] || r.kind} · ${IX_METHOD[r.method || 'card'] || ''}${r.discount ? ' · −' + r.discount + '%' : ''}${r.new_until ? ' · до ' + fmtDay(r.new_until) : ''}${stTxt[r.status] ? ' · ' + stTxt[r.status] : ''}${r.note ? ' · ' + escapeHtml(r.note) : ''}</div>
+          <div class="act">
+            ${r.has_receipt ? `<a href="/api/admin/sub/receipt/${r.id}" target="_blank" rel="noopener">чек</a>` : ''}
+            ${r.status === 'pending' ? `<button class="ok" onclick="ixDecide(${r.id}, 1)">✅ Подтвердить</button><button class="no" onclick="ixDecide(${r.id}, 0)">Отклонить</button>` : ''}
+            ${r.status === 'confirmed' && r.method === 'cash' ? `<button onclick="ixEditAmount(${r.id}, ${r.amount || 0})">✏️ сумма</button>` : ''}
+            ${r.status === 'confirmed' ? `<button onclick="ixCancelPay(${r.id})">🗑 убрать</button>` : ''}
+          </div>
+        </div>
+        <div class="am">${r.amount ? (r.status === 'confirmed' ? '+' : '') + fmtSum(r.amount) : '<span style="color:#B45309; font-size:12px;">без суммы</span>'}</div>
+      </div>`).join('');
+  }).join('');
+  document.getElementById('ixPayList').innerHTML = html || `<div class="ix-empty">${IX.p.status === 'pending' ? 'Новых чеков нет' : 'За этот период оплат нет'}</div>`;
+  document.getElementById('ixPayPager').innerHTML = d.pages > 1 ? `
+    <button class="ix-btn" ${d.page <= 1 ? 'disabled' : ''} onclick="ixPayPage(${d.page - 1})">‹ Новее</button>
+    <span>${d.page} из ${d.pages}</span>
+    <button class="ix-btn" ${d.page >= d.pages ? 'disabled' : ''} onclick="ixPayPage(${d.page + 1})">Старее ›</button>` : '';
+}
+
+// ----- Записать оплату вручную -----
+const IXR = { shop: null, months: 1, opts: [], method: 'cash' };
+function ixRecordOpen(shopId, name) {
+  IXR.shop = shopId ? { id: shopId, name } : null; IXR.months = 1; IXR.opts = []; IXR.method = 'cash';
+  ixModal('Записать оплату', 'Точка продлится на выбранный срок, сумма попадёт в доходы.', `
+    <div class="ix-form">
+      <div class="field"><label>Точка</label>
+        <input id="ixRShop" placeholder="Начни вводить название" autocomplete="off" oninput="ixRSuggest()" value="${shopId ? escapeHtml(name) : ''}">
+        <div class="ix-sug" id="ixRSug" hidden></div></div>
+      <div class="field"><label>Срок</label><div class="ix-seg2" id="ixRMonths">${[1, 3, 6, 12].map(m => `<button data-m="${m}" class="${m === 1 ? 'on' : ''}" onclick="ixRMonths(${m})">${m} мес</button>`).join('')}<input id="ixRMx" inputmode="numeric" placeholder="другой" style="width:90px;" oninput="ixRMonths(parseInt(this.value, 10) || 0, true)"></div></div>
+      <div class="row2">
+        <div class="field"><label>Сумма, сум</label><input id="ixRAmt" inputmode="numeric" placeholder="по цене точки"></div>
+        <div class="field"><label>Дата оплаты</label><input id="ixRDate" type="date" value="${ixIso(new Date())}"></div>
+      </div>
+      <div class="field"><label>Как заплатили</label><div class="ix-seg2" id="ixRMethod"><button data-k="cash" class="on" onclick="ixRMethod('cash')">Наличные</button><button data-k="card" onclick="ixRMethod('card')">Перевод</button></div></div>
+      <div class="field"><label>Заметка (необяз.)</label><input id="ixRNote" maxlength="200"></div>
+      <button class="ix-btn pri" style="padding:12px 20px; font-size:14px;" onclick="ixRSave()"><i class="fa-solid fa-check"></i> Записать</button>
+    </div>`, true);
+  if (shopId) ixRLoadOpts();
+}
+let ixRSugT = null;
+function ixRSuggest() {
+  IXR.shop = null;
+  clearTimeout(ixRSugT);
+  ixRSugT = setTimeout(async () => {
+    const q = document.getElementById('ixRShop').value.trim();
+    const box = document.getElementById('ixRSug');
+    if (q.length < 2) { box.hidden = true; return; }
+    try {
+      const d = await ixGet('/api/admin/income/shops?' + ixQS({ q, per: 10, sort: 'name' }));
+      box.innerHTML = d.rows.length ? d.rows.map(h => `<div onclick='ixRPick(${h.id}, ${JSON.stringify(h.name).replace(/'/g, "&#39;")})'>${escapeHtml(h.name)} <span style="color:var(--hint); font-size:12px;">${escapeHtml(h.username)} · ${IX_ST[h.status] ? IX_ST[h.status][0] : ''}</span></div>`).join('') : '<div style="color:var(--hint);">не найдено</div>';
+      box.hidden = false;
+    } catch (e) {}
+  }, 250);
+}
+function ixRPick(id, name) {
+  IXR.shop = { id, name };
+  document.getElementById('ixRShop').value = name;
+  document.getElementById('ixRSug').hidden = true;
+  ixRLoadOpts();
+}
+async function ixRLoadOpts() {
+  try {
+    const d = await ixGet('/api/admin/income/shop/' + IXR.shop.id);
+    IXR.opts = d.options || [];
+    IXR.monthly = d.shop.monthly;
+    ixRMonths(IXR.months);
+  } catch (e) {}
+}
+function ixRMonths(m, fromInput) {
+  IXR.months = m;
+  document.querySelectorAll('#ixRMonths button').forEach(b => b.classList.toggle('on', Number(b.dataset.m) === m));
+  if (!fromInput) { const mx = document.getElementById('ixRMx'); if (mx) mx.value = ''; }
+  const o = IXR.opts.find(x => x.months === m);
+  const amt = document.getElementById('ixRAmt');
+  if (amt) amt.placeholder = o ? fmtSum(o.amount) + ' (по цене)' : (IXR.monthly && m ? fmtSum(Math.round(IXR.monthly * m / 1000) * 1000) + ' (по цене)' : 'по цене точки');
+}
+function ixRMethod(k) {
+  IXR.method = k;
+  document.querySelectorAll('#ixRMethod button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+}
+async function ixRSave() {
+  if (!IXR.shop) { showMsg('Выбери точку из списка', false); return; }
+  if (!IXR.months || IXR.months < 1 || IXR.months > 36) { showMsg('Срок — от 1 до 36 месяцев', false); return; }
+  const body = { shop_id: IXR.shop.id, months: IXR.months, amount: document.getElementById('ixRAmt').value.replace(/[^0-9]/g, ''),
+    date: document.getElementById('ixRDate').value, method: IXR.method, note: document.getElementById('ixRNote').value };
+  const d = await ixPost('/api/admin/income/record', body);
+  if (!d.ok) { showMsg('Ошибка: ' + escapeHtml(d.error || ''), false); return; }
+  ixClose();
+  ixAfterChange(`✅ Записано ${fmtSum(d.amount)} сум · «${escapeHtml(IXR.shop.name)}» до ${fmtDay(d.paid_until)}`);
 }
 
 async function loadSubPanel() {
   try {
     const [pr, sr] = await Promise.all([fetch('/api/admin/sub/payments?status=pending'), fetch('/api/admin/sub/settings')]);
     const pd = await pr.json(), sd = await sr.json();
-    const box = document.getElementById('subPayments');
-    const list = (pd.payments || []);
-    box.innerHTML = list.length ? list.map(p => `
-      <div class="pay-item"><div class="pay-cap">${escapeHtml(p.caption)}</div><div class="hint-text" style="margin-top:4px;">отправлен ${escapeHtml(p.created_at || '')}</div>
-        <div class="pay-act">
-          ${p.has_receipt ? `<a href="/api/admin/sub/receipt/${p.id}" target="_blank" rel="noopener">открыть чек</a>` : ''}
-          <button class="ok" onclick="decideSub(${p.id}, 1)">✅ Подтвердить</button>
-          <button class="no" onclick="decideSub(${p.id}, 0)">❌ Отклонить</button>
-        </div>
-      </div>`).join('') : '<div class="hint-text">Новых чеков нет.</div>';
-    const sec = document.getElementById('secSub');
-    document.getElementById('subSecSub').textContent = list.length ? `чеков на проверке: ${list.length}` : 'проверка оплат, карта, цены';
-    if (list.length && !sec.dataset.autoOpened) { sec.open = true; sec.dataset.autoOpened = '1'; }
+    const n = (pd.payments || []).length;
+    const cnt = document.getElementById('ixChkCnt');
+    if (cnt) { cnt.hidden = !n; cnt.textContent = n; }
+    const tb = document.querySelector('#admTabs button[data-t="income"]');
+    if (tb) {
+      let b = tb.querySelector('.cnt');
+      if (n && !b) { b = document.createElement('span'); b.className = 'cnt'; b.style.cssText = 'background:#E63946; color:#fff; border-radius:999px; font-size:11px; padding:1px 6px; margin-left:4px;'; tb.appendChild(b); }
+      if (b) { b.textContent = n; b.hidden = !n; }
+    }
     const st = sd.settings || {};
-    ['card_number', 'card_holder', 'support_contact', 'price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12', 'first_disc', 'lifetime_usd', 'lifetime_branch_usd', 'usd_rate_manual']
+    ['card_number', 'card_holder', 'support_contact', 'remind_days', 'price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12', 'first_disc', 'lifetime_usd', 'lifetime_branch_usd', 'usd_rate_manual', 'trial_days', 'grace_days', 'ref_pct']
       .forEach(k => { const el = document.getElementById('ss_' + k); if (el && document.activeElement !== el) el.value = st[k] == null ? '' : st[k]; });
     const rt = document.getElementById('ssRate');
     if (rt) rt.innerHTML = sd.usd_rate
@@ -15995,8 +16672,8 @@ async function loadSubPanel() {
 
 async function saveSubSettings() {
   const body = {};
-  ['card_number', 'card_holder', 'support_contact'].forEach(k => body[k] = document.getElementById('ss_' + k).value.trim());
-  for (const k of ['price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12', 'first_disc', 'lifetime_usd', 'lifetime_branch_usd', 'usd_rate_manual']) {
+  ['card_number', 'card_holder', 'support_contact', 'remind_days'].forEach(k => body[k] = document.getElementById('ss_' + k).value.trim());
+  for (const k of ['price_main', 'price_branch', 'disc_1', 'disc_3', 'disc_6', 'disc_12', 'first_disc', 'lifetime_usd', 'lifetime_branch_usd', 'usd_rate_manual', 'trial_days', 'grace_days', 'ref_pct']) {
     const raw = document.getElementById('ss_' + k).value.replace(/[^0-9]/g, '');
     if (raw === '') { showMsg('Заполните все цены и скидки', false); return; }
     body[k] = Number(raw);
@@ -16005,7 +16682,7 @@ async function saveSubSettings() {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
   });
   const data = await res.json();
-  if (data.ok) { showMsg('✅ Сохранено', true); loadSubPanel(); loadShops(); } else showMsg('Ошибка: ' + data.error, false);
+  if (data.ok) { showMsg('✅ Настройки сохранены', true); loadSubPanel(); loadShops(); IX.ov = null; } else showMsg('Ошибка: ' + data.error, false);
 }
 
 async function loadShops() {
@@ -16653,7 +17330,9 @@ guardOnce(['refMarkPaid', 'saveReferrer', 'createShop', 'createBranch', 'createE
   'deleteEmployee', 'resetPassword', 'resetEmployeePassword', 'saveIdentity', 'saveNotifyTelegram',
   'triggerBackupNow', 'triggerRestore', 'toggleShop', 'toggleSms', 'toggleWarehouse', 'toggleBranchField',
   'subExtend', 'subSetDate', 'subLifetime', 'decideSub', 'markBranchPaid', 'saveSubSettings',
-  'subPrice', 'editPayAmount', 'cancelPayment', 'decideReg']);
+  'subPrice', 'editPayAmount', 'cancelPayment', 'decideReg',
+  'ixBulk', 'ixBulkMsgSend', 'ixShopExtend', 'ixShopDate', 'ixShopPrice', 'ixShopLifetime', 'ixBranchPaid', 'ixDecide',
+  'ixEditAmount', 'ixCancelPay', 'ixRSave']);
 loadShops();
 loadSubPanel();
 loadRegs();
@@ -17639,7 +18318,7 @@ function snapSuppliersHtml(S) {
   });
   return h;
 }
-if (location.hash === '#income') admTab('income');
+if (location.hash.indexOf('#income') === 0) { const m = location.hash.split('-')[1]; if (m && ['shops', 'pays', 'set'].indexOf(m) >= 0) IX.tab = m; admTab('income'); }
 if (location.hash === '#analytics') admTab('analytics');
 if (location.hash === '#map') admTab('map');
 </script>
@@ -19677,6 +20356,250 @@ def api_admin_income():
     return jsonify({"ok": True, "stats": db.get_income_stats()})
 
 
+# ---------- «Доходы»: обзор, точки, оплаты, массовые действия ----------
+
+def _inc_int(name, default):
+    try:
+        return int(request.args.get(name) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+@app.route("/api/admin/income/overview")
+@admin_required
+def api_admin_income_overview():
+    return jsonify({"ok": True, "data": db.get_income_overview(request.args.get("from"), request.args.get("to"))})
+
+
+@app.route("/api/admin/income/shops")
+@admin_required
+def api_admin_income_shops():
+    grp = request.args.get("group")
+    data = db.list_income_shops(q=request.args.get("q", ""), status=request.args.get("status", "all"),
+                                group=grp if grp is not None else None, sort=request.args.get("sort", "until"),
+                                page=_inc_int("page", 1), per=_inc_int("per", 50))
+    return jsonify({"ok": True, "data": data})
+
+
+@app.route("/api/admin/income/payments")
+@admin_required
+def api_admin_income_payments():
+    data = db.list_income_payments(request.args.get("from"), request.args.get("to"),
+                                   method=request.args.get("method", ""), kind=request.args.get("kind", ""),
+                                   status=request.args.get("status", "confirmed"), q=request.args.get("q", ""),
+                                   page=_inc_int("page", 1), per=_inc_int("per", 100))
+    return jsonify({"ok": True, "data": data})
+
+
+@app.route("/api/admin/income/shop/<int:shop_id>")
+@admin_required
+def api_admin_income_shop(shop_id):
+    d = db.get_income_shop(shop_id)
+    if not d:
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    q = db.sub_quote(shop_id)
+    d["options"] = [{"months": o["months"], "amount": o["amount"], "discount": o["discount"]} for o in q["options"]]
+    return jsonify({"ok": True, "data": d})
+
+
+@app.route("/api/admin/income/record", methods=["POST"])
+@admin_required
+def api_admin_income_record():
+    """Записать оплату вручную: точка, срок, сумма (можно своя), дата, способ."""
+    data = request.get_json(force=True) or {}
+    try:
+        shop_id = int(data.get("shop_id"))
+        months = int(data.get("months"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "выберите точку и срок"}), 400
+    shop = db.get_shop(shop_id)
+    if not shop or shop.get("role") != "shop":
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    if (shop.get("license_type") or "sub") == "lifetime":
+        return jsonify({"ok": False, "error": "у точки бессрочная лицензия — продлевать не нужно"}), 400
+    if months < 1 or months > 36:
+        return jsonify({"ok": False, "error": "срок — от 1 до 36 месяцев"}), 400
+    amount = _parse_admin_sum(data.get("amount"))
+    if amount is False:
+        return jsonify({"ok": False, "error": "сумма — только цифры"}), 400
+    if amount is None:
+        q = db.sub_quote(shop_id)
+        amount = next((o["amount"] for o in q["options"] if o["months"] == months), None) \
+            or db._round_k(q["monthly"] * months)
+    day = None
+    raw = (data.get("date") or "").strip()
+    if raw:
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+            try:
+                day = datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+                break
+            except ValueError:
+                pass
+        if not day:
+            return jsonify({"ok": False, "error": "дата в формате ДД.ММ.ГГГГ"}), 400
+    new_until = db.admin_record_payment(shop_id, months, amount, data.get("note"),
+                                        data.get("method") or "cash", day)
+    _ref_sync(shop_id)
+    return jsonify({"ok": True, "paid_until": new_until, "amount": amount})
+
+
+@app.route("/api/admin/income/days", methods=["POST"])
+@admin_required
+def api_admin_income_days():
+    data = request.get_json(force=True) or {}
+    try:
+        shop_id = int(data.get("shop_id"))
+        days = int(data.get("days"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "укажите число дней"}), 400
+    if not days or abs(days) > 366:
+        return jsonify({"ok": False, "error": "от 1 до 366 дней"}), 400
+    new_until = db.admin_add_days(shop_id, days)
+    if not new_until:
+        return jsonify({"ok": False, "error": "точка не найдена"}), 404
+    return jsonify({"ok": True, "paid_until": new_until})
+
+
+def _inc_send_messages(targets: list, text: str):
+    sent = 0
+    for t in targets:
+        if not t.get("notify_telegram_id"):
+            continue
+        if _tg_api("sendMessage", {"chat_id": t["notify_telegram_id"], "text": text}):
+            sent += 1
+        time.sleep(0.06)  # Telegram: не больше ~30 сообщений в секунду
+    if ADMIN_TELEGRAM_ID:
+        _tg_api("sendMessage", {"chat_id": ADMIN_TELEGRAM_ID,
+                                "text": f"📨 Рассылка из «Доходов»: доставлено {sent} из {len(targets)} точек."})
+
+
+@app.route("/api/admin/income/bulk", methods=["POST"])
+@admin_required
+def api_admin_income_bulk():
+    """Действие сразу для многих точек: продлить, подарить дни, цена, сообщение."""
+    data = request.get_json(force=True) or {}
+    try:
+        ids = [int(x) for x in (data.get("ids") or [])]
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "неверный список"}), 400
+    ids = list(dict.fromkeys(ids))[:2000]
+    if not ids:
+        return jsonify({"ok": False, "error": "не выбрано ни одной точки"}), 400
+    action = data.get("action")
+    shops = {s["id"]: s for s in (db.get_shop(i) for i in ids) if s and s.get("role") == "shop"}
+    done, skipped = 0, 0
+    if action == "extend":
+        try:
+            months = int(data.get("months"))
+        except (TypeError, ValueError):
+            months = 0
+        if months not in db.SUB_TERMS:
+            return jsonify({"ok": False, "error": "неверный срок"}), 400
+        for sid, s in shops.items():
+            if (s.get("license_type") or "sub") == "lifetime" or not s.get("is_active"):
+                skipped += 1
+                continue
+            q = db.sub_quote(sid)
+            amount = next((o["amount"] for o in q["options"] if o["months"] == months), None)
+            db.admin_extend_subscription(sid, months, amount)
+            _ref_sync(sid)
+            done += 1
+    elif action == "days":
+        try:
+            days = int(data.get("days"))
+        except (TypeError, ValueError):
+            days = 0
+        if not days or abs(days) > 366:
+            return jsonify({"ok": False, "error": "от 1 до 366 дней"}), 400
+        for sid, s in shops.items():
+            if (s.get("license_type") or "sub") == "lifetime":
+                skipped += 1
+                continue
+            db.admin_add_days(sid, days)
+            done += 1
+    elif action == "price":
+        price = _parse_admin_sum(data.get("price"))
+        if price is False:
+            return jsonify({"ok": False, "error": "цена — только цифры"}), 400
+        for sid in shops:
+            db.admin_set_custom_price(sid, price)
+            done += 1
+    elif action == "message":
+        text = (data.get("text") or "").strip()
+        if len(text) < 2:
+            return jsonify({"ok": False, "error": "напишите текст сообщения"}), 400
+        targets = db.income_telegram_targets(list(shops))
+        with_tg = [t for t in targets if t.get("notify_telegram_id")]
+        threading.Thread(target=_inc_send_messages, args=(with_tg, text[:3500]), daemon=True).start()
+        return jsonify({"ok": True, "done": len(with_tg), "skipped": len(targets) - len(with_tg), "queued": True})
+    else:
+        return jsonify({"ok": False, "error": "неизвестное действие"}), 400
+    return jsonify({"ok": True, "done": done, "skipped": skipped + (len(ids) - len(shops))})
+
+
+@app.route("/api/admin/income/export")
+@admin_required
+def api_admin_income_export():
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    pays = db.list_income_payments(request.args.get("from"), request.args.get("to"), status="all", per=500)
+    rows = []
+    page = 1
+    while True:
+        rows += pays["rows"]
+        if page >= pays["pages"]:
+            break
+        page += 1
+        pays = db.list_income_payments(request.args.get("from"), request.args.get("to"), status="all", page=page, per=500)
+    shops = db.list_income_shops(per=200)
+    all_shops = []
+    for p in range(1, shops["pages"] + 1):
+        all_shops += db.list_income_shops(page=p, per=200, sort="name")["rows"]
+    wb = Workbook()
+    head_font = Font(name="Arial", bold=True, color="FFFFFF")
+    head_fill = PatternFill(start_color="0B1F3A", end_color="0B1F3A", fill_type="solid")
+
+    def sheet(ws, headers, data, widths, money_cols):
+        for i, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=i, value=h)
+            c.font, c.fill = head_font, head_fill
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws.freeze_panes = "A2"
+        for r_i, vals in enumerate(data, 2):
+            for c_i, v in enumerate(vals, 1):
+                c = ws.cell(row=r_i, column=c_i, value=v)
+                if c_i in money_cols and isinstance(v, (int, float)):
+                    c.number_format = "#,##0"
+        for i, w in enumerate(widths, 1):
+            ws.column_dimensions[chr(64 + i)].width = w
+
+    kinds = {"extend": "продление", "both": "продление + филиалы", "branches": "филиалы", "lifetime": "бессрочная"}
+    methods = {"cash": "наличные", "card": "перевод (чек)", "hamyon": "автооплата"}
+    stats = {"confirmed": "оплачено", "pending": "на проверке", "rejected": "отклонён", "cancelled": "отменён"}
+    ws = wb.active
+    ws.title = "Оплаты"
+    sheet(ws, ["Дата", "Точка", "Что оплачено", "Месяцев", "Сумма, сум", "Способ", "Статус", "Оплачено до", "Заметка"],
+          [[r["day"], r["name"], kinds.get(r["kind"], r["kind"]), r.get("months"), r.get("amount"),
+            methods.get(r.get("method") or "card", r.get("method")), stats.get(r["status"], r["status"]),
+            r.get("new_until") or "", r.get("note") or ""] for r in rows],
+          [12, 28, 20, 9, 14, 16, 13, 13, 30], {5})
+    st_names = {"trial": "пробный", "paying": "платит", "soon": "скоро продление", "grace": "льготные дни",
+                "blocked": "заблокирована", "lifetime": "бессрочная", "unset": "без даты", "off": "выключена"}
+    ws2 = wb.create_sheet("Точки")
+    sheet(ws2, ["Точка", "Логин", "Телефон", "Сеть", "Статус", "Оплачено до", "Филиалов", "В месяц, сум",
+                "Своя цена", "Всего заплатила, сум", "Последняя оплата"],
+          [[h["name"], h["username"], h.get("phone") or "", h.get("client_group") or "", st_names.get(h["status"], h["status"]),
+            h.get("paid_until") or "", h["branches"], h["monthly"], h.get("custom_price") or "", h["paid_total"],
+            h.get("last_paid") or ""] for h in all_shops],
+          [28, 16, 16, 16, 16, 13, 9, 13, 11, 16, 14], {8, 9, 10})
+    buf = io.BytesIO()
+    wb.save(buf)
+    fname = f"oilbook_dohody_{pays['from']}_{pays['to']}.xlsx"
+    return Response(buf.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename=\"{fname}\""})
+
+
 @app.route("/api/admin/sub/settings")
 @admin_required
 def api_admin_sub_settings():
@@ -20612,7 +21535,7 @@ def reg_notify_admin(req: dict, auto: bool = False):
     payload = {"chat_id": ADMIN_TELEGRAM_ID, "text": _reg_admin_text(req), "disable_web_page_preview": "true"}
     if not auto:
         payload["reply_markup"] = json.dumps({"inline_keyboard": [[
-            {"text": f"✅ Одобрить ({db.REG_TRIAL_DAYS} дн. бесплатно)", "callback_data": f"reg:ok:{req['id']}"},
+            {"text": f"✅ Одобрить ({db.trial_days()} дн. бесплатно)", "callback_data": f"reg:ok:{req['id']}"},
             {"text": "❌ Отклонить", "callback_data": f"reg:no:{req['id']}"},
         ]]})
     res = _tg_api("sendMessage", payload)
@@ -20742,7 +21665,7 @@ def _ref_sync(referred_id):
             f"Кому: {ref.get('shop_name') or '—'} (@{ref.get('username') or '?'})",
             f"Карта: {card}",
             f"За точку: {new.get('shop_name') or '—'} (@{new.get('username') or '?'})",
-            f"Оплата: {_fmt_sum(rw['base_amount'])} сум → бонус {db.REF_SHARE_PCT}%: {_fmt_sum(rw['reward_amount'])} сум",
+            f"Оплата: {_fmt_sum(rw['base_amount'])} сум → бонус {db.ref_pct()}%: {_fmt_sum(rw['reward_amount'])} сум",
             "После перевода нажмите «Выплачено» в админке → Реферальная программа.",
         ]))
 
@@ -20787,7 +21710,7 @@ def referral_page():
         items.append({"name": it["name"], "date": _fmt_day(it["date"]), "chip": chip, "sub": sub})
     share_text = T["ref_share_text"].format(link=link)
     return render_template_string(
-        REFERRAL_PAGE, T=T, lang=g.lang, link=link, code=code, pct=db.REF_SHARE_PCT,
+        REFERRAL_PAGE, T=T, lang=g.lang, link=link, code=code, pct=db.ref_pct(),
         share_text=share_text,
         tg_share="https://t.me/share/url?url=" + quote(link, safe="") + "&text=" + quote(
             T["ref_share_text_tg"], safe=""),
