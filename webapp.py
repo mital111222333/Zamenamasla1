@@ -11540,6 +11540,9 @@ PLATE_SCAN_HTML = r"""<style>
   #psHint { position:absolute; left:16px; right:16px; text-align:center; color:#fff; font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.6); }
   #psStatus { position:absolute; left:16px; right:16px; text-align:center; }
   #psStatus span { display:inline-block; background:rgba(34,211,238,.18); color:#a5f3fc; border:1px solid rgba(34,211,238,.4); font-size:13px; padding:7px 14px; border-radius:20px; font-weight:600; max-width:100%; }
+  #psTap { position:absolute; left:50%; bottom:calc(120px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); white-space:nowrap; z-index:5; border:0; border-radius:16px; background:#22D3EE; color:#062B33; font:inherit; font-size:16px; font-weight:800; padding:16px 22px; display:flex; align-items:center; gap:10px; cursor:pointer; max-width:calc(100% - 40px); }
+  #psTap[hidden] { display:none; }
+  #psOverlay.result #psTap { display:none; }
   #psStatus.err span { background:rgba(239,68,68,.2); color:#fecaca; border-color:rgba(239,68,68,.5); }
   .ps-bottom { position:absolute; left:0; right:0; bottom:calc(22px + env(safe-area-inset-bottom, 0px)); text-align:center; }
   .ps-manual { background:none; border:none; color:#fff; font-size:14px; text-decoration:underline; opacity:.85; cursor:pointer; padding:8px; font-family:inherit; }
@@ -11585,6 +11588,7 @@ PLATE_SCAN_HTML = r"""<style>
   </div>
   <div id="psHint">{{ T.ps_hint }}</div>
   <div id="psStatus"><span></span></div>
+  <button type="button" id="psTap" hidden onclick="psTapStart()"><i class="fa-solid fa-camera"></i> {{ T.ps_tap_start }}</button>
   <div class="ps-bottom">
     <button type="button" class="ps-manual" onclick="psManual()">{{ T.ps_manual }}</button>
     <div class="ps-priv"><i class="fa-solid fa-lock"></i> {{ T.ps_privacy }}</div>
@@ -11672,10 +11676,37 @@ async function openPlateScanner() {
   const modelP = psLoadModel();
   try {
     await psStartCamera();
+    // iPhone иногда отдаёт «пустую» камеру: картинки нет, хотя доступ дан
+    // (первый запуск после разрешения, режим энергосбережения, камера
+    // занята). Проверяем, что кадры правда идут, и чиним сами.
+    if (!(await psVideoAlive(2500))) {
+      if (gen !== PS.gen) return;
+      const v = document.getElementById('psVideo');
+      if (v.paused) {
+        // видео не запустилось само — нужно нажатие пальцем
+        document.getElementById('psTap').hidden = false;
+        psSetStatus(T.ps_tap_hint);
+        const ok = await new Promise(r => { PS.tapResolve = r; });
+        if (gen !== PS.gen) return;
+        if (!ok) { psSetStatus(T.ps_black, true); return; }
+      }
+      if (!(await psVideoAlive(1500))) {
+        if (gen !== PS.gen) return;
+        // перезапуск камеры — помогает при первом запуске на iPhone
+        psStopCamera();
+        await psStartCamera();
+        if (!(await psVideoAlive(3000))) {
+          if (gen !== PS.gen) return;
+          psSetStatus(T.ps_black, true);
+          return;
+        }
+      }
+    }
   } catch (e) {
     if (gen !== PS.gen) return;
     const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-    psSetStatus(denied ? T.ps_denied : T.ps_no_camera, true);
+    const busy = e && (e.name === 'NotReadableError' || e.name === 'AbortError' || e.name === 'TrackStartError');
+    psSetStatus(denied ? T.ps_denied : (busy ? T.ps_black : T.ps_no_camera), true);
     return;
   }
   try {
@@ -11709,6 +11740,7 @@ async function psStartCamera() {
   const v = document.getElementById('psVideo');
   v.srcObject = stream;
   try { await v.play(); } catch (e) {}
+  if (PS.track) PS.track.onended = () => { if (PS.stream === stream) psSetStatus(T.ps_black, true); };
   // фонарик — только если телефон умеет
   PS.torch = false;
   const tb = document.getElementById('psTorch');
@@ -11716,6 +11748,28 @@ async function psStartCamera() {
   let caps = {};
   try { caps = PS.track && PS.track.getCapabilities ? PS.track.getCapabilities() : {}; } catch (e) {}
   tb.hidden = !caps.torch;
+}
+
+// идут ли кадры с камеры: видео играет, размер известен и время двигается
+async function psVideoAlive(ms) {
+  const v = document.getElementById('psVideo');
+  const t0 = Date.now();
+  let lastT = v.currentTime;
+  while (Date.now() - t0 < ms) {
+    await new Promise(r => setTimeout(r, 200));
+    if (!document.getElementById('psOverlay').classList.contains('open')) return false;
+    if (!v.paused && v.videoWidth > 0 && v.readyState >= 2 && v.currentTime !== lastT) return true;
+    lastT = v.currentTime;
+  }
+  return false;
+}
+
+async function psTapStart() {
+  const v = document.getElementById('psVideo');
+  document.getElementById('psTap').hidden = true;
+  let ok = true;
+  try { await v.play(); } catch (e) { ok = false; }
+  if (PS.tapResolve) { const r = PS.tapResolve; PS.tapResolve = null; r(ok); }
 }
 
 function psBuildPlateSet() {
@@ -11741,6 +11795,9 @@ async function psToggleTorch() {
 
 function closePlateScanner() {
   PS.gen++;
+  const tap = document.getElementById('psTap');
+  if (tap) tap.hidden = true;
+  if (PS.tapResolve) { const r = PS.tapResolve; PS.tapResolve = null; r(false); }
   psStopCamera();
   const ov = document.getElementById('psOverlay');
   ov.classList.remove('open', 'result');

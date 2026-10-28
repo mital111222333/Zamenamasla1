@@ -2043,6 +2043,9 @@ RU.update({
     "ps_denied": "Нет доступа к камере. Разрешите камеру для этого сайта в настройках браузера.",
     "ps_load_fail": "Не удалось загрузить распознавание. Проверьте интернет и попробуйте ещё раз.",
     "ps_torch": "Фонарик",
+    "ps_tap_start": "Включить камеру",
+    "ps_tap_hint": "Нажмите кнопку — телефон не дал включить камеру автоматически",
+    "ps_black": "Камера не показывает картинку. Закройте другие приложения с камерой (звонок, Instagram, Telegram) и откройте сканер ещё раз.",
 })
 UZ.update({
     "ps_btn_title": "Raqamni skanerlash",
@@ -2070,6 +2073,9 @@ UZ.update({
     "ps_denied": "Kameraga ruxsat yo'q. Brauzer sozlamalarida ushbu sayt uchun kamerani yoqing.",
     "ps_load_fail": "Aniqlashni yuklab bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.",
     "ps_torch": "Chiroq",
+    "ps_tap_start": "Kamerani yoqish",
+    "ps_tap_hint": "Tugmani bosing — telefon kamerani avtomatik yoqmadi",
+    "ps_black": "Kamera tasvir ko‘rsatmayapti. Kamerani ishlatayotgan boshqa ilovalarni yoping (qo‘ng‘iroq, Instagram, Telegram) va skanerni qayta oching.",
 })
 
 
