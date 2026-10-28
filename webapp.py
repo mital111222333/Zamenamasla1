@@ -2408,6 +2408,17 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .sv-send:has(> :nth-child(3)) { grid-template-columns:repeat(3, minmax(0,1fr)); }
   .sv-send a, .sv-send button { height:50px; border:0; border-radius:14px; color:#fff; font:inherit; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; cursor:pointer; }
   .sv-tg { background:#229ED9; } .sv-wa { background:#1FA855; } .sv-qr { background:#475569; }
+  .sv-ok[hidden] { display:none; }
+  .sv-badge { margin:0 auto; background:#E3F4EC; color:#0F6B4C; font-size:13px; font-weight:800; padding:6px 12px; border-radius:999px; display:inline-flex; align-items:center; gap:6px; }
+  .sv-badge[hidden] { display:none; }
+  .sv-qrbox { background:#fff; border-radius:20px; padding:16px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .sv-qrbox[hidden] { display:none; }
+  .sv-qrbox img { width:min(68vw, 260px); height:min(68vw, 260px); display:block; image-rendering:pixelated; }
+  .sv-qrhint { font-size:13px; color:var(--hint); text-align:center; }
+  .sv-more { height:44px; border:1px dashed #CBD5E1; border-radius:14px; background:transparent; font:inherit; font-size:14px; font-weight:700; color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .sv-more[hidden] { display:none; }
+  .sv-more.open i { transform:rotate(180deg); }
+  .sv-card.sv-hide { display:none; }
   .sv-note { font-size:13px; color:#047857; text-align:center; }
   .sv-next { background:var(--btn); height:58px; font-size:17px; margin-top:6px; }
   .sv-row { display:flex; gap:8px; }
@@ -3394,12 +3405,18 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   </div>
   <div class="sv-wrap" id="savedScreen" hidden role="dialog" aria-modal="true" aria-labelledby="svTitle">
     <div class="sv-in">
-      <div class="sv-ok"><i class="fa-solid fa-check"></i></div>
+      <div class="sv-ok" id="svOk"><i class="fa-solid fa-check"></i></div>
+      <div class="sv-badge" id="svBadge" hidden><i class="fa-solid fa-check"></i> {{ T.sv_title }}</div>
       <div class="sv-title" id="svTitle">{{ T.sv_title }}</div>
       <div class="sv-sub" id="svSub"></div>
-      <div class="sv-card" id="svCard"></div>
+      <div class="sv-qrbox" id="svQrBox" hidden>
+        <img id="svQrImg" alt="QR">
+        <div class="sv-qrhint">{{ T.sv_qr_hint }}</div>
+      </div>
       <div id="svSend"></div>
-      <button type="button" class="sv-next" onclick="closeSaved(true)">+ {{ T.sv_next_car }}</button>
+      <button type="button" class="sv-next" id="svNext" onclick="closeSaved(true)">+ {{ T.sv_next_car }}</button>
+      <button type="button" class="sv-more" id="svMore" hidden onclick="toggleSavedDetails()"><span>{{ T.sv_details }}</span> <i class="fa-solid fa-chevron-down"></i></button>
+      <div class="sv-card" id="svCard"></div>
       <div class="sv-row">
         <button type="button" onclick="closeSaved(false)">{{ T.close }}</button>
         <button type="button" class="sv-undo" id="svUndo" onclick="undoSaved()"></button>
@@ -8954,9 +8971,12 @@ function showSaved(data, payload, items) {
     }
     send.innerHTML = `<div class="ps-grp" style="margin-top:4px;">${T.sv_send}</div><div class="sv-send">
       <a class="sv-tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(T.share_text_tg)}"><i class="fa-brands fa-telegram"></i> Telegram</a>
-      ${wa}<button type="button" class="sv-qr" onclick="openModal(${escapeHtml(JSON.stringify(String(payload.plate || '')))}, ${escapeHtml(JSON.stringify(link))}, '')"><i class="fa-solid fa-qrcode"></i> QR</button></div>`;
+      ${wa}</div>`;
+    document.getElementById('svQrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=520x520&margin=0&data=' + encodeURIComponent(link);
+    setSavedQrMode(true);
   } else {
     send.innerHTML = `<div class="sv-note"><i class="fa-brands fa-telegram"></i> ${T.sv_sent_tg}</div>`;
+    setSavedQrMode(false);
   }
   SAVED.id = data.oc_id || null;
   clearInterval(SAVED.timer);
@@ -8977,6 +8997,20 @@ function showSaved(data, payload, items) {
   scr.hidden = false;
   document.body.style.overflow = 'hidden';
   return true;
+}
+function setSavedQrMode(on) {
+  document.getElementById('svOk').hidden = on;
+  document.getElementById('svBadge').hidden = !on;
+  document.getElementById('svTitle').textContent = on ? T.sv_qr_title : T.sv_title;
+  document.getElementById('svQrBox').hidden = !on;
+  document.getElementById('svNext').textContent = on ? T.sv_ready_next : '+ ' + T.sv_next_car;
+  const more = document.getElementById('svMore');
+  more.hidden = !on; more.classList.remove('open');
+  document.getElementById('svCard').classList.toggle('sv-hide', on);
+}
+function toggleSavedDetails() {
+  const open = document.getElementById('svMore').classList.toggle('open');
+  document.getElementById('svCard').classList.toggle('sv-hide', !open);
 }
 function closeSaved(next) {
   clearInterval(SAVED.timer);

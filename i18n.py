@@ -3140,6 +3140,10 @@ RU.update({
     "sv_undone": "Замена отменена — товар вернулся на склад",
     "sv_undo_fail": "Не удалось отменить. Удалите запись в «Базе».",
     "sv_next_car": "Следующая машина",
+    "sv_qr_title": "Покажите клиенту",
+    "sv_qr_hint": "Клиент сканирует камерой — откроется сервисный паспорт и бот",
+    "sv_ready_next": "Готово → следующая машина",
+    "sv_details": "Подробнее",
 })
 UZ.update({
     "kc_visits_short": "tashrif",
@@ -3179,6 +3183,10 @@ UZ.update({
     "sv_undone": "Almashtirish bekor qilindi — mahsulot omborga qaytdi",
     "sv_undo_fail": "Bekor qilib bo'lmadi. Yozuvni «Baza»dan o'chiring.",
     "sv_next_car": "Keyingi mashina",
+    "sv_qr_title": "Mijozga ko‘rsating",
+    "sv_qr_hint": "Mijoz kamera bilan skanerlaydi — servis pasport va bot ochiladi",
+    "sv_ready_next": "Tayyor → keyingi mashina",
+    "sv_details": "Tafsilotlar",
 })
 
 
