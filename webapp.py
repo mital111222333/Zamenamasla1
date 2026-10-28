@@ -2405,6 +2405,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .sv-card div span { color:var(--hint); }
   .sv-card div b { text-align:right; }
   .sv-send { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+  .sv-send:has(> :nth-child(3)) { grid-template-columns:repeat(3, minmax(0,1fr)); }
   .sv-send a, .sv-send button { height:50px; border:0; border-radius:14px; color:#fff; font:inherit; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; cursor:pointer; }
   .sv-tg { background:#229ED9; } .sv-wa { background:#1FA855; } .sv-qr { background:#475569; }
   .sv-note { font-size:13px; color:#047857; text-align:center; }
@@ -8953,7 +8954,7 @@ function showSaved(data, payload, items) {
     }
     send.innerHTML = `<div class="ps-grp" style="margin-top:4px;">${T.sv_send}</div><div class="sv-send">
       <a class="sv-tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(T.share_text_tg)}"><i class="fa-brands fa-telegram"></i> Telegram</a>
-      ${wa || `<button type="button" class="sv-qr" onclick="openModal(${escapeHtml(JSON.stringify(String(payload.plate || '')))}, ${escapeHtml(JSON.stringify(link))}, '')"><i class="fa-solid fa-qrcode"></i> QR</button>`}</div>`;
+      ${wa}<button type="button" class="sv-qr" onclick="openModal(${escapeHtml(JSON.stringify(String(payload.plate || '')))}, ${escapeHtml(JSON.stringify(link))}, '')"><i class="fa-solid fa-qrcode"></i> QR</button></div>`;
   } else {
     send.innerHTML = `<div class="sv-note"><i class="fa-brands fa-telegram"></i> ${T.sv_sent_tg}</div>`;
   }
