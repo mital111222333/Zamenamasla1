@@ -11721,9 +11721,7 @@ PLATE_SCAN_HTML = r"""<style>
   #psFrame.ps-hit b { border-color:#34d399; }
   /* автопоиск: рамка-подсказка в центре бледная, а найденный номер
      обводится отдельной рамкой, которая сама переезжает на него */
-  #psOverlay.auto #psFrame { box-shadow:none; opacity:.55; }
-  #psOverlay.auto #psFrame .ps-line { display:none; }
-  #psOverlay.auto.found #psFrame { opacity:0; transition:opacity .2s; }
+  #psOverlay.auto #psFrame { visibility:hidden; }
   #psBox { position:absolute; left:0; top:0; width:0; height:0; border:3px solid #34d399; border-radius:8px; display:none; pointer-events:none;
            box-shadow:0 0 0 200vmax rgba(0,0,0,.35); transition:left .12s linear, top .12s linear, width .12s linear, height .12s linear; }
   #psOverlay.auto.found #psBox { display:block; }
@@ -11810,7 +11808,7 @@ const PS_MIN_CONF = 0.55;     // кадр учитывается, если мо�
 const PS_NEED_HITS = 2;       // сколько раз подряд должен прочитаться один и тот же номер
 const PS_INSTANT_CONF = 0.97; // при такой уверенности хватает одного кадра
 const PS_BASE_CONF = 0.5;     // для номера, который уже есть в базе, достаточно такой
-const PS_DET = 384;           // размер кадра для «искателя»
+const PS_DET = 256;           // размер кадра для «искателя» (облегчённая модель — быстрее на телефоне)
 const PS_DET_MIN = 0.4;       // с какой уверенности «искатель» считает, что это номер
 
 function psLoadScript(src) {
@@ -11839,21 +11837,127 @@ function psLoadModel() {
 }
 
 // «искатель» номера: маленькая YOLO-модель смотрит на весь кадр и говорит,
-// где номер. Если не загрузилась (старый телефон, нет памяти) — сканер
-// просто работает по-старому, по рамке в центре.
-function psLoadDetector() {
-  if (PS.det) return Promise.resolve(PS.det);
-  if (PS.detFailed) return Promise.resolve(null);
-  if (!PS.detLoading) {
-    PS.detLoading = (async () => {
-      await psLoadModel();  // движок ort уже подключён
-      const d = await ort.InferenceSession.create('/ocr/v1/plate_det.onnx', { executionProviders: ['wasm'] });
-      try { await d.run({ [d.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * PS_DET * PS_DET), [1, 3, PS_DET, PS_DET]) }); } catch (e) {}
-      PS.det = d;
-      return d;
-    })().catch(() => { PS.detFailed = true; PS.detLoading = null; return null; });
+// где номер. Работает в ОТДЕЛЬНОМ потоке (Web Worker), поэтому не тормозит
+// обычное чтение: оно идёт каждый кадр, как раньше, а «искатель» в это время
+// сам по себе ищет номер и подсказывает, где он. Если поток не запустился
+// (старый телефон) — сканер просто работает по рамке в центре.
+const PS_DET_WORKER = `
+let sess = null, S = 256;
+self.onmessage = async (e) => {
+  const m = e.data;
+  if (m.type === 'init') {
+    try {
+      S = m.size;
+      importScripts(m.base + 'ort.wasm.min.js');
+      ort.env.wasm.wasmPaths = m.base;
+      ort.env.wasm.numThreads = 1;
+      sess = await ort.InferenceSession.create(m.base + 'plate_det.onnx', { executionProviders: ['wasm'] });
+      try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * S * S), [1, 3, S, S]) }); } catch (x) {}
+      self.postMessage({ type: 'ready' });
+    } catch (err) {
+      self.postMessage({ type: 'fail', err: String(err) });
+    }
+    return;
   }
-  return PS.detLoading;
+  if (m.type === 'frame' && sess) {
+    const t0 = Date.now();
+    const px = new Uint8ClampedArray(m.buf), n = S * S, f = new Float32Array(3 * n);
+    for (let i = 0, j = 0; j < n; i += 4, j++) { f[j] = px[i] / 255; f[n + j] = px[i + 1] / 255; f[2 * n + j] = px[i + 2] / 255; }
+    let boxes = [];
+    try {
+      const out = await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', f, [1, 3, S, S]) });
+      const d = out[sess.outputNames[0]].data;
+      for (let k = 0; k + 6 < d.length; k += 7) boxes.push([d[k + 1], d[k + 2], d[k + 3], d[k + 4], d[k + 6]]);
+    } catch (x) { boxes = []; }
+    self.postMessage({ type: 'boxes', id: m.id, boxes, ms: Date.now() - t0 });
+  }
+};`;
+
+function psInitDetector() {
+  if (PS.detWorker || PS.detFailed) return;
+  try {
+    const url = URL.createObjectURL(new Blob([PS_DET_WORKER], { type: 'text/javascript' }));
+    const w = new Worker(url);
+    PS.detWorker = w;
+    w.onmessage = e => psOnDetMessage(e.data);
+    w.onerror = () => psDetFail();
+    w.postMessage({ type: 'init', base: location.origin + '/ocr/v1/', size: PS_DET });
+  } catch (e) {
+    psDetFail();
+  }
+}
+function psDetFail() {
+  PS.detFailed = true; PS.det = false; PS.detBusy = false;
+  try { if (PS.detWorker) PS.detWorker.terminate(); } catch (e) {}
+  PS.detWorker = null;
+  // без «искателя» — обычная рамка в центре, как раньше
+  const ov = document.getElementById('psOverlay');
+  if (ov) ov.classList.remove('auto', 'found');
+  const h = document.getElementById('psHint');
+  if (h && ov && ov.classList.contains('open') && !ov.classList.contains('result')) h.textContent = T.ps_hint;
+}
+function psOnDetMessage(m) {
+  if (m.type === 'ready') { PS.det = true; psDetPump(); return; }
+  if (m.type === 'fail') { psDetFail(); return; }
+  if (m.type !== 'boxes') return;
+  PS.detBusy = false;
+  const map = PS.detMap;
+  if (map && m.id === map.id && PS.running) psOnBoxes(m.boxes, map);
+  // следующий кадр «искателю» — когда освободится, без очереди
+  if (PS.running) setTimeout(psDetPump, 0);
+}
+
+// кадр камеры → «искателю»: весь кадр вписан в квадрат с серыми полями
+function psDetPump() {
+  if (!PS.det || PS.detBusy || !PS.running || !PS.detWorker) return;
+  const v = document.getElementById('psVideo');
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) { setTimeout(psDetPump, 100); return; }
+  const S = PS_DET, r = Math.min(S / vw, S / vh);
+  const nw = Math.round(vw * r), nh = Math.round(vh * r);
+  const dx = Math.round((S - nw) / 2), dy = Math.round((S - nh) / 2);
+  const c = document.getElementById('psDetCanvas');
+  if (c.width !== S) { c.width = S; c.height = S; }
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = 'rgb(114,114,114)';
+  ctx.fillRect(0, 0, S, S);
+  ctx.drawImage(v, 0, 0, vw, vh, dx, dy, nw, nh);
+  const buf = ctx.getImageData(0, 0, S, S).data.buffer;
+  PS.detSeq = (PS.detSeq || 0) + 1;
+  PS.detMap = { id: PS.detSeq, r, dx, dy, vw, vh };
+  PS.detBusy = true;
+  PS.detWorker.postMessage({ type: 'frame', id: PS.detSeq, buf }, [buf]);
+}
+
+// ответ «искателя»: выбираем номер (самый уверенный, при равенстве — ближе
+// к центру и крупнее) и ставим на него рамку
+function psOnBoxes(boxes, map) {
+  let best = null, bestRank = 0;
+  for (const bx of boxes) {
+    const sc = bx[4];
+    if (sc < PS_DET_MIN) continue;
+    const x1 = (bx[0] - map.dx) / map.r, y1 = (bx[1] - map.dy) / map.r;
+    const x2 = (bx[2] - map.dx) / map.r, y2 = (bx[3] - map.dy) / map.r;
+    const cx = (x1 + x2) / 2 / map.vw - 0.5, cy = (y1 + y2) / 2 / map.vh - 0.5;
+    const area = Math.max(0, x2 - x1) * Math.max(0, y2 - y1) / (map.vw * map.vh);
+    const rank = sc + Math.min(area * 4, 0.15) - Math.min(Math.hypot(cx, cy) * 0.3, 0.2);
+    if (rank > bestRank && x2 - x1 >= 12 && y2 - y1 >= 5) { bestRank = rank; best = { x1, y1, x2, y2, score: sc }; }
+  }
+  if (!best) {
+    // номер пропал на кадр-другой (блик, тряска) — держим рамку, потом прячем
+    PS.lost = (PS.lost || 0) + 1;
+    if (PS.lost > 2) { PS.box = null; PS.boxSmall = false; psShowBox(null); }
+    return;
+  }
+  if (PS.box) {  // сглаживаем, чтобы рамка не дёргалась
+    const k = 0.6;
+    best = { x1: PS.box.x1 + (best.x1 - PS.box.x1) * k, y1: PS.box.y1 + (best.y1 - PS.box.y1) * k,
+             x2: PS.box.x2 + (best.x2 - PS.box.x2) * k, y2: PS.box.y2 + (best.y2 - PS.box.y2) * k, score: best.score };
+  }
+  PS.box = best; PS.lost = 0; PS.boxAt = Date.now();
+  // мелкий номер (далеко) читается с ошибками — просим подойти ближе
+  PS.boxSmall = (best.x2 - best.x1) < map.vw * 0.12;
+  psShowBox(best);
 }
 
 function psSetStatus(text, isErr) {
@@ -11880,12 +11984,13 @@ async function openPlateScanner() {
   PS.gen++;
   PS.result = null; PS.editing = false; PS.hits = {};
   ov.classList.remove('result', 'found');
-  ov.classList.toggle('auto', !!PS.det);
-  PS.box = null; PS.lost = 0;
+  // рамки в центре нет: номер ищется по всему кадру (если «искатель» доступен)
+  ov.classList.toggle('auto', !PS.detFailed && typeof Worker !== 'undefined');
+  PS.box = null; PS.lost = 0; PS.boxSmall = false; PS.detBusy = false;
   ov.classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('psFrame').classList.remove('ps-hit');
-  document.getElementById('psHint').textContent = T.ps_hint;
+  document.getElementById('psHint').textContent = ov.classList.contains('auto') ? T.ps_hint_auto : T.ps_hint;
   psLayout();
   ensureCarsCacheLoaded().then(psBuildPlateSet);
   psBuildPlateSet();
@@ -11896,7 +12001,7 @@ async function openPlateScanner() {
   psSetStatus(PS.session ? T.ps_scanning : T.ps_loading);
   const gen = PS.gen;
   const modelP = psLoadModel();
-  const detP = psLoadDetector();
+  psInitDetector();
   try {
     await psStartCamera();
     // iPhone иногда отдаёт «пустую» камеру: картинки нет, хотя доступ дан
@@ -11939,14 +12044,12 @@ async function openPlateScanner() {
     psSetStatus(T.ps_load_fail, true);
     return;
   }
-  await detP;
   if (gen !== PS.gen || !ov.classList.contains('open')) return;
-  ov.classList.toggle('auto', !!PS.det);
-  document.getElementById('psHint').textContent = PS.det ? T.ps_hint_auto : T.ps_hint;
   psSetStatus(T.ps_scanning);
   PS.running = true;
   PS.startedAt = Date.now();
   psTick(gen);
+  psDetPump();
 }
 
 async function psStartCamera() {
@@ -11957,7 +12060,7 @@ async function psStartCamera() {
     // и обычного качества (номер всё равно ужимается до 128×64)
     // «искателю» нужен чёткий кадр: просим HD (если камера не умеет — даст что может)
     video: PS.det || !PS.detFailed
-      ? { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      ? { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
       : { facingMode: { ideal: 'environment' } }
   });
   if (!document.getElementById('psOverlay').classList.contains('open')) {
@@ -12066,50 +12169,6 @@ function psCropTensor(inset) {
 
 function psDecode(probs) { return plateDecode(probs); }
 
-// кадр камеры → вход «искателя»: весь кадр вписан в квадрат 384×384 с серыми полями
-function psDetTensor() {
-  const v = document.getElementById('psVideo');
-  const vw = v.videoWidth, vh = v.videoHeight;
-  if (!vw || !vh) return null;
-  const S = PS_DET, r = Math.min(S / vw, S / vh);
-  const nw = Math.round(vw * r), nh = Math.round(vh * r);
-  const dx = Math.round((S - nw) / 2), dy = Math.round((S - nh) / 2);
-  const c = document.getElementById('psDetCanvas');
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.fillStyle = 'rgb(114,114,114)';
-  ctx.fillRect(0, 0, S, S);
-  ctx.drawImage(v, 0, 0, vw, vh, dx, dy, nw, nh);
-  const px = ctx.getImageData(0, 0, S, S).data;
-  const n = S * S, f = new Float32Array(3 * n);
-  for (let i = 0, j = 0; j < n; i += 4, j++) {
-    f[j] = px[i] / 255; f[n + j] = px[i + 1] / 255; f[2 * n + j] = px[i + 2] / 255;
-  }
-  return { t: new ort.Tensor('float32', f, [1, 3, S, S]), r, dx, dy, vw, vh };
-}
-
-// где номер в кадре (в пикселях видео) — или null. Из нескольких номеров
-// берём самый уверенный, а при равенстве — ближе к центру и крупнее.
-async function psDetect() {
-  const d = PS.det;
-  const inp = psDetTensor();
-  if (!d || !inp) return null;
-  const out = await d.run({ [d.inputNames[0]]: inp.t });
-  const data = out[d.outputNames[0]].data;
-  let best = null, bestScore = 0;
-  for (let k = 0; k + 6 < data.length; k += 7) {
-    const sc = data[k + 6];
-    if (sc < PS_DET_MIN) continue;
-    const x1 = (data[k + 1] - inp.dx) / inp.r, y1 = (data[k + 2] - inp.dy) / inp.r;
-    const x2 = (data[k + 3] - inp.dx) / inp.r, y2 = (data[k + 4] - inp.dy) / inp.r;
-    const cx = (x1 + x2) / 2 / inp.vw - 0.5, cy = (y1 + y2) / 2 / inp.vh - 0.5;
-    const area = Math.max(0, x2 - x1) * Math.max(0, y2 - y1) / (inp.vw * inp.vh);
-    const rank = sc + Math.min(area * 4, 0.15) - Math.min(Math.hypot(cx, cy) * 0.3, 0.2);
-    if (rank > bestScore) { bestScore = rank; best = { x1, y1, x2, y2, score: sc }; }
-  }
-  if (!best || best.x2 - best.x1 < 12 || best.y2 - best.y1 < 5) return null;
-  return best;
-}
-
 // найденный номер (в пикселях видео) → тензор для модели чтения, с запасом
 // вокруг (pad — доля ширины/высоты), прямо из полного кадра камеры
 function psBoxTensor(b, pad) {
@@ -12152,37 +12211,21 @@ function psShowBox(b, label) {
 async function psRecognize() {
   const sess = PS.session;
   PS.tickN = (PS.tickN || 0) + 1;
-  let t = null;
-  if (PS.det) {
-    let b = null;
-    try { b = await psDetect(); } catch (e) { b = null; }
-    if (b) {
-      // сглаживаем: рамка не дёргается от кадра к кадру
-      if (PS.box) {
-        const k = 0.55;
-        b = { x1: PS.box.x1 + (b.x1 - PS.box.x1) * k, y1: PS.box.y1 + (b.y1 - PS.box.y1) * k,
-              x2: PS.box.x2 + (b.x2 - PS.box.x2) * k, y2: PS.box.y2 + (b.y2 - PS.box.y2) * k, score: b.score };
-      }
-      PS.box = b; PS.lost = 0;
-      // мелкий номер (далеко) читается с ошибками — просим подойти ближе
-      PS.boxSmall = (b.x2 - b.x1) < 120;
-      psShowBox(b);
-      t = psBoxTensor(b, PS.tickN % 2 ? [0.08, 0.2] : [0.03, 0.1]);
-    } else {
-      // номер пропал на 1–2 кадра (блик, тряска) — держим рамку, потом прячем
-      PS.lost = (PS.lost || 0) + 1;
-      if (PS.lost > 3) { PS.box = null; PS.boxSmall = false; psShowBox(null); }
-      // запасной путь: номер вплотную или «искатель» не узнал его — читаем центр
-      if (PS.tickN % 3 === 0) t = psCropTensor([0, 0]);
-    }
-  } else {
-    // по очереди: вся рамка / чуть плотнее (номер не всегда ровно на всю рамку)
-    t = psCropTensor(PS.tickN % 2 ? [0, 0] : [0.06, 0.14]);
+  // чтение идёт каждый кадр, как раньше. Если «искатель» недавно нашёл номер —
+  // читаем его место (два варианта запаса вокруг), а каждый третий кадр —
+  // центр экрана: номер, наведённый в центр, читается без ожидания «искателя»
+  const boxFresh = PS.box && Date.now() - (PS.boxAt || 0) < 900;
+  let t = null, fromBox = false;
+  if (boxFresh && PS.tickN % 3 !== 0) {
+    t = psBoxTensor(PS.box, PS.tickN % 3 === 1 ? [0.08, 0.2] : [0.03, 0.1]);
+    fromBox = true;
   }
+  if (!t) t = psCropTensor(PS.tickN % 2 ? [0, 0] : [0.06, 0.14]);
   if (!t) return null;
   const out = await sess.run({ [sess.inputNames[0]]: t });
   const r = psDecode(out[sess.outputNames[0]].data);
-  if (r && PS.box && r.fmt && r.conf >= 0.9) psShowBox(PS.box, psPretty(r.plate));
+  if (r) r.fromBox = fromBox;
+  if (r && fromBox && r.fmt && r.conf >= 0.9) psShowBox(PS.box, psPretty(r.plate));
   return r;
 }
 
@@ -12197,7 +12240,7 @@ async function psTick(gen) {
     // номер уже есть в базе этой точки — хватает одного уверенного кадра
     const inBase = r.conf >= PS_BASE_CONF && PS.plateSet && PS.plateSet.has(r.plate);
     // далёкий мелкий номер: только если уверенно и три раза подряд одинаково
-    const smallOk = !PS.boxSmall || (r.fmt && r.conf >= 0.8 && PS.hits[r.plate] >= 3);
+    const smallOk = !(r.fromBox && PS.boxSmall) || (r.fmt && r.conf >= 0.8 && PS.hits[r.plate] >= 3);
     if (PS.boxSmall) document.getElementById('psHint').textContent = T.ps_closer;
     if (smallOk && (inBase || r.conf >= PS_INSTANT_CONF || PS.hits[r.plate] >= PS_NEED_HITS)) {
       if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
