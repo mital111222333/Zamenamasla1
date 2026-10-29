@@ -1932,11 +1932,13 @@ if ('serviceWorker' in navigator) {
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <style>
   :root {
-    --bg: var(--tg-theme-bg-color, #F1F5F9);
-    --text: var(--tg-theme-text-color, #1E293B);
-    --hint: var(--tg-theme-hint-color, #94A3B8);
-    --btn: var(--tg-theme-button-color, #E63946);
-    --btn-text: var(--tg-theme-button-text-color, #FFFFFF);
+    /* цвета свои, не из темы Telegram: в тёмной теме Telegram текст
+       становился белым на белых карточках и пропадал */
+    --bg: #F1F5F9;
+    --text: #1E293B;
+    --hint: #94A3B8;
+    --btn: #E63946;
+    --btn-text: #FFFFFF;
     --blue: #0F52BA;
     --darkblue: #0A2540;
     --cyan: #00A8E8;
@@ -19387,7 +19389,10 @@ TG_PANEL_JS = """<script>
     try { if (w.isVersionAtLeast('7.7')) w.disableVerticalSwipes(); } catch (e) {}
     try {
       var m = document.querySelector('meta[name=theme-color]');
-      if (w.isVersionAtLeast('6.1')) w.setHeaderColor(m ? m.content : '#0A2540');
+      if (w.isVersionAtLeast('6.1')) {
+        w.setHeaderColor(m ? m.content : '#0A2540');
+        w.setBackgroundColor(getComputedStyle(document.body).backgroundColor || '#F1F5F9');
+      }
     } catch (e) {}
   }
   if (window.Telegram && window.Telegram.WebApp) { setup(); return; }
@@ -19397,7 +19402,8 @@ TG_PANEL_JS = """<script>
   document.head.appendChild(s);
 })();
 </script>
-<style>html.in-tg .more-install, html.in-tg .tg-only-out { display:none !important; }</style>
+<style>html.in-tg .more-install, html.in-tg .tg-only-out { display:none !important; }
+html.in-tg { color-scheme: light only; }</style>
 """
 assert "\\" not in TG_PANEL_JS
 assert PAGE.count("<!--__TG_PANEL_JS__-->") == 1
