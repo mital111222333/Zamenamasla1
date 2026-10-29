@@ -20858,6 +20858,9 @@ def subscription_page():
             "full_txt": _fmt_sum(full + extra) if hero and o["discount"] and full + extra > o["amount"] else "",
             "per_month_txt": _fmt_sum(int(round((o["amount"] - extra) / o["months"] / 100.0)) * 100) if o["months"] else "",
             "monthly_txt": _fmt_sum(q["monthly"]) if q.get("monthly") else "",
+            "saving_txt": _fmt_sum(o["saving"]) if hero and o.get("saving") else "",
+            "months_free": (str(round(o["saving"] / q["monthly"], 1)).replace(".", ",")
+                            if hero and o.get("saving") and q.get("monthly") else ""),
             "save_txt": (T["sub_hero_save"].format(sum=_fmt_sum(o["saving"]),
                                                    n=str(round(o["saving"] / q["monthly"], 1)).replace(".", ","))
                          if hero and o.get("saving") and q.get("monthly") else ""),
@@ -20911,6 +20914,7 @@ def subscription_page():
         expired_txt=(T["trial_expired_text"] if st.get("trial") else T["sub_expired_text"]).format(
             date=_fmt_day(st.get("paid_until"))),
         first_disc=q.get("first_disc") or 0, first_txt=first_txt, checked=checked, gift=gift,
+        year_disc=next((o["discount"] for o in q["options"] if o["months"] == db.COURSE_GIFT_MONTHS), 0),
         lt_warn=(T["sub_lt_warn"].format(date=_fmt_day(st["paid_until"]))
                  if q.get("lifetime") and not st.get("trial") and st.get("days_left") is not None
                  and st["days_left"] >= 1 else ""),
@@ -21840,6 +21844,18 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 .hero-ben.gf > i { color:#C27803; }
 .hero-ben small { display:block; font-size:12.5px; font-weight:500; color:var(--muted); margin-top:2px; }
 .hero-ben em { font-style:normal; font-size:11px; font-weight:800; color:#5C4300; background:#FFE58A; padding:1px 7px; border-radius:999px; margin-left:4px; white-space:nowrap; }
+.hero-two { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; margin:10px 0 2px; }
+.hb { border-radius:12px; padding:10px 11px; display:flex; flex-direction:column; min-width:0; }
+.hb-save { background:var(--green-bg); color:var(--green); }
+.hb-gift { background:#FFF4C2; color:#5C4300; }
+.hb-h { font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; opacity:.85; }
+.hb-v { font-size:16.5px; font-weight:800; line-height:1.2; margin-top:4px; }
+.hb small { font-size:12px; font-weight:600; line-height:1.35; margin-top:5px; opacity:.9; }
+.hero-inside { display:flex; flex-direction:column; gap:5px; border-top:1px solid var(--line); margin-top:10px; padding:9px 0 6px; }
+.hero-inside span { display:flex; gap:9px; font-size:13.5px; font-weight:600; color:#33415C; line-height:1.35; }
+.hero-inside i { color:#C27803; width:16px; text-align:center; margin-top:2px; flex:none; }
+.nudge { border:1.5px dashed #E8B64A; background:#FFFBEB; color:#7A4E00; border-radius:12px; padding:9px 12px; font-size:13px; font-weight:600; margin-top:-2px; }
+.nudge[hidden] { display:none; }
 .lt-gifts { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
 .lt-gifts span { font-size:11.5px; font-weight:700; color:#5C4300; background:#FFF4C2; padding:2px 8px; border-radius:999px; }
 .ltw { font-size:13px; font-weight:600; color:var(--warn); margin-top:2px; line-height:1.35; }
@@ -21882,7 +21898,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 {% else %}
   <div class="body" id="step1">
     {% if st.expired %}<div class="redbox"><b>{{ expired_title }}</b><br>{{ expired_txt }}</div>{% endif %}
-    {% if first_txt %}<div class="gift"><i class="fa-solid fa-gift"></i><span><b>{{ T.sub_first_title.format(d=first_disc) }}</b><br>{{ first_txt }}</span></div>{% endif %}
+    {% if first_txt %}<div class="gift"><i class="fa-solid fa-gift"></i><span>{% if gift %}<b>{{ T.sub_first_title_gift.format(d=first_disc, y=year_disc) }}</b><br>{{ T.sub_first_text_gift }}{% else %}<b>{{ T.sub_first_title.format(d=first_disc) }}</b><br>{{ first_txt }}{% endif %}</span></div>{% endif %}
     {% if pending_txt %}
     <div class="warnbox"><b><i class="fa-solid fa-hourglass-half"></i> {{ T.sub_pending_title }}</b><span>{{ pending_txt }}</span><span class="note">{{ T.sub_pending_hint }}</span></div>
     {% endif %}
@@ -21919,11 +21935,22 @@ h1 { margin:0; font-size:26px; font-weight:800; }
             <span class="nm">{{ o.label }}</span>
             <span class="hero-price">{% if o.full_txt %}<s>{{ o.full_txt }}</s>{% endif %}<b>{{ o.amount_txt }}</b></span>
           </span>
-          {% if o.save_txt %}<span class="hero-save"><i class="fa-solid fa-piggy-bank"></i> {{ o.save_txt }}</span>{% endif %}
-          <span class="hero-ben"><i class="fa-solid fa-calendar-check"></i><span>{% if o.monthly_txt and o.discount %}{{ T.sub_hero_month.format(sum=o.per_month_txt, full=o.monthly_txt) }}{% else %}{{ o.sub_txt }}{% endif %}<small>{{ T.sub_hero_fixed }}</small></span></span>
           {% if gift %}
-          <span class="hero-ben gf"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.sub_gift_course }} <em>{{ T.sub_gift_tag }}</em><small>{{ T.sub_gift_course_sub }}</small></span></span>
-          <span class="hero-ben gf"><i class="fa-solid fa-bolt"></i><span>{{ T.sub_gift_ev }} <em>{{ T.sub_gift_tag }}</em><small>{{ T.sub_gift_ev_sub }}</small></span></span>
+          <span class="hero-two">
+            <span class="hb hb-save"><span class="hb-h">{{ T.sub_gain1 }}</span><span class="hb-v">{% if o.saving_txt %}−{{ o.saving_txt }} {{ T.sub_sum }}{% else %}−{{ o.discount }}%{% endif %}</span>
+              <small>{% if o.months_free %}{{ T.sub_gain1_free.format(n=o.months_free) }}<br>{% endif %}{% if o.monthly_txt and o.discount %}{{ T.sub_hero_month.format(sum=o.per_month_txt, full=o.monthly_txt) }}{% endif %}</small></span>
+            <span class="hb hb-gift"><span class="hb-h">{{ T.sub_gain2 }}</span><span class="hb-v">{{ T.sub_gain2_v }}</span>
+              <small>{{ T.sub_gain2_sub }}</small></span>
+          </span>
+          <span class="hero-inside">
+            <span><i class="fa-solid fa-check"></i>{{ T.sub_in_1 }}</span>
+            <span><i class="fa-solid fa-check"></i>{{ T.sub_in_2 }}</span>
+            <span><i class="fa-solid fa-check"></i>{{ T.sub_in_3 }}</span>
+            <span><i class="fa-solid fa-bolt"></i>{{ T.sub_in_4 }}</span>
+          </span>
+          {% else %}
+          {% if o.save_txt %}<span class="hero-save"><i class="fa-solid fa-circle-check"></i> {{ o.save_txt }}</span>{% endif %}
+          <span class="hero-ben"><i class="fa-solid fa-calendar-check"></i><span>{% if o.monthly_txt and o.discount %}{{ T.sub_hero_month.format(sum=o.per_month_txt, full=o.monthly_txt) }}{% else %}{{ o.sub_txt }}{% endif %}<small>{{ T.sub_hero_fixed }}</small></span></span>
           {% endif %}
         </span>
       </label>
@@ -21939,6 +21966,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
       </label>
       {% endif %}
       {% endfor %}
+      {% if gift %}<div class="nudge" id="subNudge" hidden><i class="fa-solid fa-circle-info"></i> {{ T.sub_nudge.format(y=year_disc) }}</div>{% endif %}
       {% if lt %}
       <div class="h" style="margin-top:6px;">{{ T.sub_lt_or }}</div>
       <label class="opt lt" data-opt>
@@ -22067,8 +22095,17 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     document.querySelectorAll('[data-opt]').forEach(l => l.classList.toggle('sel', !!r && l.contains(r)));
     if (!r) { $('payBtn').disabled = true; $('payBtn').textContent = PAY_TPL.replace('{sum}', '—'); return; }
     $('payBtn').disabled = false;
-    $('payBtn').textContent = PAY_TPL.replace('{sum}', r.dataset.amount);
+    const giftOn = {{ 'true' if gift else 'false' }};
+    const giftTerm = r.value === '12' || r.value === 'lifetime';
+    $('payBtn').textContent = PAY_TPL.replace('{sum}', r.dataset.amount) + (giftOn && giftTerm ? ' · ' + {{ T.sub_pay_gift|tojson }} : '');
     $('newDate').textContent = r.dataset.until;
+    // выбрали короткий срок — мягкая подсказка прямо под ним: год выгоднее и с подарком
+    const nd = $('subNudge');
+    if (nd) {
+      const short = ['1', '3', '6'].indexOf(r.value) >= 0;
+      nd.hidden = !short;
+      if (short) { const lbl = r.closest('label'); if (lbl) lbl.insertAdjacentElement('afterend', nd); }
+    }
   }
   document.querySelectorAll('input[name=term]').forEach(i => i.addEventListener('change', refresh));
   refresh();
