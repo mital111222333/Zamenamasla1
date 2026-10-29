@@ -2023,9 +2023,11 @@ def get_cross_network_history(plate: str, exclude_shop_id: int):
     out = []
     for r in rows:
         d = dict(r)
-        # заметки — внутреннее дело точки (там бывают телефоны, имена, долги),
-        # другим точкам их не отдаём; на экране они и раньше не показывались
-        d.pop("notes", None)
+        # заметки мастера (состояние двигателя, коробки и т.п.) видны и
+        # другим точкам — чтобы следующий мастер знал, на что смотреть.
+        # Под полем «Заметки» точку предупреждают, что их видят все мастера
+        n = " ".join(str(d.get("notes") or "").split())[:500]
+        d["notes"] = n or None
         # в items_json чужой точки лежат её цены продажи и закупки — наружу
         # отдаём только ЧТО делали (позиция, марка, количество), без денег
         if d.get("items_json"):
@@ -2059,7 +2061,8 @@ def get_car_by_passport_token(token: str):
         if not row:
             return None, []
         history = conn.execute(
-            "SELECT change_date, mileage, service_type, cost, items_json, notes FROM oil_changes "
+            "SELECT change_date, mileage, service_type, cost, items_json, notes, "
+            "COALESCE(discount_amount, 0) AS discount_amount FROM oil_changes "
             "WHERE car_id=? ORDER BY change_date DESC, id DESC",
             (row["car_id"],)
         ).fetchall()
@@ -2095,7 +2098,6 @@ def get_all_cars_overview(shop_id: int):
 
 # ---------- Замены масла / обслуживание ----------
 
-@_serialized
 def normalize_discount(subtotal, discount, discount_pct=None):
     """Скидка не может быть меньше 0 и больше суммы позиций. Процент
     сохраняем только если он разумный (0 < % ≤ 100)."""
@@ -2118,6 +2120,7 @@ def normalize_discount(subtotal, discount, discount_pct=None):
     return d, pct
 
 
+@_serialized
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
                     next_mileage=None, items=None, cash_amount=None, card_amount=None,
@@ -2544,6 +2547,55 @@ def get_top_products_by_qty_range(shop_id: int, date_from: str, date_to: str, li
             totals[name] = totals.get(name, 0) + qty
     ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:limit]
     return [{"name": name, "qty": round(qty, 2)} for name, qty in ranked]
+
+
+def get_frequent_items(shop_id: int, days: int = 90, limit: int = 6) -> dict:
+    """«Часто берут» для формы замены: по каждой категории позиции (key из
+    items_json — fluid_0, filter_0, other, other_stock…) самые частые товары
+    этой точки за последние `days` дней. Для каждого — сколько раз брали,
+    обычное количество (литры) и последняя цена продажи. Цен закупки нет."""
+    date_from = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.items_json IS NOT NULL
+            ORDER BY oc.change_date, oc.id
+        """, (shop_id, date_from)).fetchall()
+    agg = {}
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"]) or []
+        except (TypeError, ValueError):
+            continue
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            key = str(it.get("key") or "")
+            if not key:
+                continue
+            pid = it.get("product_id")
+            label = (it.get("brand") or it.get("name") or "").strip()
+            if key == "other":
+                label = (it.get("name") or "").strip()
+            if not pid and not label:
+                continue
+            ident = f"p{pid}" if pid else "t" + " ".join(label.upper().split())
+            d = agg.setdefault(key, {}).setdefault(ident, {"product_id": pid, "label": label, "count": 0, "qtys": {}, "price": 0})
+            d["count"] += 1
+            q = it.get("qty")
+            if q:
+                d["qtys"][q] = d["qtys"].get(q, 0) + 1
+            if it.get("unit_price"):
+                d["price"] = it.get("unit_price")  # строки по дате — останется последняя цена
+            if label:
+                d["label"] = label
+    out = {}
+    for key, m in agg.items():
+        lst = sorted(m.values(), key=lambda x: x["count"], reverse=True)[:limit]
+        out[key] = [{"product_id": x["product_id"], "label": x["label"], "count": x["count"],
+                     "qty": max(x["qtys"].items(), key=lambda kv: kv[1])[0] if x["qtys"] else None,
+                     "price": x["price"] or None} for x in lst]
+    return out
 
 
 def get_top_products_by_qty(shop_id: int, days: int = 30, limit: int = 5):

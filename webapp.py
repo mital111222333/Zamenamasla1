@@ -1131,6 +1131,7 @@ PASSPORT_PAGE = """
           {% for it in h.items_list %}
           <div><span>{{ it.name }}{% if it.brand %} ({{ it.brand }}){% endif %}{% if it.qty and it.qty != 1 %} — {{ it.qty }} л{% endif %}</span><span>{{ "{:,}".format(it.total|int).replace(',', ' ') }}</span></div>
           {% endfor %}
+          {% if h.discount_amount %}<div style="color:#B3241C;"><span>Скидка</span><span>−{{ "{:,}".format(h.discount_amount|int).replace(',', ' ') }}</span></div>{% endif %}
         </div>
         {% endif %}
       </div>
@@ -1223,6 +1224,8 @@ def _generate_passport_pdf(car, history, output_path):
                         f"• {it.get('name', '')}" + (f" ({it['brand']})" if it.get("brand") else "")
                         for it in items
                     )
+                    if h.get("discount_amount"):
+                        desc += "<br/>• Скидка −" + f"{int(h['discount_amount']):,}".replace(",", " ") + " сум"
                 except (TypeError, ValueError):
                     pass
             mileage = f"{h['mileage']:,}".replace(",", " ") + " км" if h.get("mileage") else "—"
@@ -1300,7 +1303,9 @@ _OCR_FILES = {
     "ort-wasm-simd-threaded.mjs": "text/javascript",
     "ort-wasm-simd-threaded.wasm": "application/wasm",
     "plate_ocr_uz.onnx": "application/octet-stream",  # дообучена на номерах UZ / RU / KZ / KG / TJ
-    "plate_det.onnx": "application/octet-stream",  # «искатель»: находит номер в любом месте кадра
+    # «искатель»: находит номер в любом месте кадра. Имя с размером входа —
+    # файлы кэшируются «навсегда», новая версия модели = новое имя файла
+    "plate_det_s256.onnx": "application/octet-stream",
 }
 _ocr_gz_cache = {}
 _ocr_gz_lock = threading.Lock()
@@ -2323,6 +2328,12 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .kc-more-btn.open i { transform:rotate(180deg); }
   .kc-last-line { margin-top:8px; font-size:12.5px; color:#334155; background:#F4F7FA; border-radius:10px; padding:7px 10px; line-height:1.4; }
   .kc-last-line b { font-family:var(--font-mono); }
+  .kc-notes-box { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+  .kc-note { margin-top:8px; font-size:12.5px; line-height:1.45; color:#78350F; background:#FFFBEB; border:1px solid #FCD34D; border-radius:10px; padding:7px 10px; white-space:pre-wrap; word-break:break-word; }
+  .kc-notes-box .kc-note { margin-top:0; }
+  .kc-note i { color:#D97706; margin-right:2px; }
+  .known-client .kc-last-visit + .kc-last-visit { margin-top:8px; }
+  .notes-shared-hint { font-size:11.5px; color:var(--hint); margin-top:4px; }
   .kc-quick { display:flex; gap:6px; margin-top:8px; overflow-x:auto; scrollbar-width:none; }
   .kc-quick::-webkit-scrollbar { display:none; }
   .kc-quick:empty { display:none; }
@@ -2344,6 +2355,55 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .pick-wrap select { flex:1; width:100%; }
   .pick-ov { display:none; position:absolute; inset:0; border:0; background:transparent; cursor:pointer; }
   /* фильтры и работы — плитки-галочки */
+  /* ---- «Товары и работа»: плитки категорий + чек ---- */
+  .af-legacy { display:none !important; }
+  .cat-tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+  @media (min-width:700px) { .cat-tiles { grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); } }
+  .cat-tile { display:flex; align-items:center; gap:9px; min-height:54px; text-align:left; border:1.5px solid var(--border); background:#fff; border-radius:14px; padding:7px 9px; font:inherit; color:var(--text); cursor:pointer; min-width:0; }
+  .cat-tile:active { transform:scale(.98); }
+  .cat-tile .ci { width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex:none; font-size:16px; background:#EFF6FF; color:var(--blue); }
+  .cat-tile .ci.g { background:#ECFDF5; color:#047857; } .cat-tile .ci.v { background:#F5F3FF; color:#6D28D9; } .cat-tile .ci.y { background:#FFFBEB; color:#B45309; }
+  .cat-tile div { min-width:0; display:flex; flex-direction:column; }
+  .cat-tile b { font-size:13.5px; font-weight:700; line-height:1.2; }
+  .cat-tile small { font-size:11.5px; color:var(--hint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .cat-tile.on { border-color:var(--blue); background:#F5F9FF; }
+  .cat-tile.on small { color:var(--blue); font-weight:600; }
+  .it-rcpt { margin-top:14px; background:#FAFBFC; border:1px solid #E2E8F0; border-radius:16px; padding:12px 14px; position:relative; }
+  .it-rcpt::before, .it-rcpt::after { content:''; position:absolute; left:14px; right:14px; height:0; border-top:2px dashed #E2E8F0; }
+  .it-rcpt::before { top:-1px; border:0; }
+  .it-rcpt::after { display:none; }
+  .ir-h { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--hint); padding-bottom:8px; border-bottom:1.5px dashed #CBD5E1; }
+  .ir-h b { font-family:var(--font-mono); font-size:13px; letter-spacing:.08em; color:#334155; }
+  .ir-line { display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px dotted #CBD5E1; }
+  .ir-line:last-of-type { border-bottom:0; }
+  .ir-main { flex:1; min-width:0; cursor:pointer; }
+  .ir-main b { display:block; font-size:14px; font-weight:700; overflow-wrap:anywhere; }
+  .ir-main span { display:block; font-size:12px; color:var(--hint); margin-top:1px; }
+  .ir-step { display:flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:13px; font-weight:600; }
+  .ir-step button { width:28px; height:28px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; color:var(--blue); padding:0; }
+  .ir-sum { font-family:var(--font-mono); font-size:14px; font-weight:600; white-space:nowrap; min-width:70px; text-align:right; }
+  .ir-x { border:0; background:none; color:#94A3B8; font-size:15px; cursor:pointer; padding:4px; }
+  .ir-disc .ir-sum { color:#B3241C; }
+  .ir-tot { display:flex; justify-content:space-between; align-items:baseline; padding-top:10px; margin-top:2px; border-top:1.5px dashed #CBD5E1; font-weight:800; }
+  .ir-tot b { font-family:var(--font-mono); font-size:18px; }
+  .ir-empty { font-size:13px; color:var(--hint); padding:12px 0 4px; line-height:1.45; }
+  @media (min-width:1200px) { .it-rcpt { display:none; } }
+  .cs-tabs { display:flex; gap:6px; overflow-x:auto; margin:0 0 10px; padding-bottom:2px; }
+  .cs-tabs:empty { display:none; }
+  .cs-tabs button { flex:none; border:1.5px solid var(--border); background:#fff; border-radius:999px; padding:8px 13px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+  .cs-tabs button.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .cs-tabs button.has::after { content:'✓'; margin-left:5px; }
+  .cs-freq { display:flex; flex-wrap:wrap; gap:6px; }
+  .cs-freq button { border:1.5px solid #BFDBFE; background:#F5F9FF; color:#0B1B3F; border-radius:999px; padding:8px 12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; max-width:100%; text-align:left; }
+  .cs-freq button em { font-style:normal; font-family:var(--font-mono); font-weight:600; font-size:12px; color:#1D4ED8; margin-left:6px; }
+  .cs-freq button.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .cs-freq button.on em { color:#fff; }
+  .cs-man { display:grid; grid-template-columns:minmax(0,1fr) 120px; gap:8px; }
+  .cs-man input { margin:0; }
+  .cs-qty { display:flex; align-items:center; gap:8px; margin:6px 0 10px; }
+  .cs-qty button { width:44px; height:44px; border:1px solid var(--border); border-radius:10px; background:#fff; font:inherit; font-size:20px; font-weight:700; cursor:pointer; color:var(--blue); }
+  .cs-qty b { font-family:var(--font-mono); font-size:18px; min-width:70px; text-align:center; }
+  .cs-del { width:100%; margin-top:8px; height:44px; border:1.5px solid #FECACA; background:#FEF2F2; color:#B3241C; border-radius:12px; font:inherit; font-weight:700; cursor:pointer; }
   .flt-tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; margin:4px 0 8px; }
   @media (min-width:600px) { .flt-tiles { grid-template-columns:repeat(4, minmax(0,1fr)); } }
   .flt-tile { text-align:left; border:1.5px solid var(--border); background:#fff; border-radius:12px; padding:9px 11px; min-height:50px; font:inherit; color:var(--text); cursor:pointer; display:flex; flex-direction:column; justify-content:center; gap:2px; }
@@ -3309,6 +3369,9 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
 
     <div class="af-sec">
       <div class="af-h"><i class="fa-solid fa-oil-can"></i>{{ T.af_items }}</div>
+      <div class="cat-tiles" id="catTiles"></div>
+      <div class="it-rcpt" id="itRcpt"></div>
+      <div class="af-legacy" aria-hidden="true">
       {% if warehouse_enabled %}
       <div class="field pick-search">
         <input id="pickSearch" type="search" placeholder="🔍 {{ T.pick_search_ph }}" aria-label="{{ T.pick_search_label }}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="renderPickResults('main')" onkeydown="onPickKey(event, 'main')">
@@ -3335,6 +3398,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div id="otherStockRows"></div>
       <button type="button" class="af-ghost" onclick="addOtherStockRow('other')">{{ T.wh_add_row }}</button>
       {% endif %}
+      </div>
     </div>
     </div>
 
@@ -3405,6 +3469,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       </div>
       <div class="af-sub" style="margin-top:14px;">{{ T.field_notes }}</div>
       <textarea id="notes" rows="2" placeholder="{{ T.notes_ph }}"></textarea>
+      <div class="notes-shared-hint"><i class="fa-solid fa-eye"></i> {{ T.notes_shared_hint }}</div>
     </div>
 
     <div class="af-bar">
@@ -3416,6 +3481,15 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
 
   <!-- шторки формы замены (телефон) и экран «Сохранено» -->
   <div class="ob-sheet-bg" id="obSheetBg" onclick="closeObSheets()"></div>
+  <div class="ob-sheet" id="catSheet" role="dialog" aria-modal="true" aria-labelledby="cs_title">
+    <div class="ob-sheet-h"><b id="cs_title"></b><button type="button" class="ob-sheet-x" onclick="closeObSheets()" aria-label="{{ T.close }}">✕</button></div>
+    <div class="ob-sheet-body">
+      <div class="cs-tabs" id="cs_tabs"></div>
+      <input id="cs_search" class="ps-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="renderCatSheet()">
+      <div id="cs_body"></div>
+    </div>
+    <div class="ob-sheet-foot" id="cs_foot"></div>
+  </div>
   <div class="ob-sheet" id="pickSheet" role="dialog" aria-modal="true" aria-labelledby="pickSheetTitle">
     <div class="ob-sheet-h"><b id="pickSheetTitle"></b><button type="button" class="ob-sheet-x" onclick="closeObSheets()" aria-label="{{ T.close }}">✕</button></div>
     <div class="ob-sheet-body">
@@ -8505,7 +8579,7 @@ function collectOtherStockItems(prefix) {
       const opt = selectEl.options[selectEl.selectedIndex];
       items.push({
         key: 'other_stock', name: opt.dataset.name || '', brand: null, product_id: parseInt(selectEl.value),
-        unit_price: price, qty, total: Math.round(price * qty),
+        unit_price: price, qty, total: Math.round(price * qty), _row: id,
       });
     }
   });
@@ -8705,7 +8779,8 @@ function renderItemLists() {
   `).join('');
   document.getElementById('filtersList').innerHTML = FILTER_KEYS.map((key, i) => {
     const prods = productsForCategory(key);
-    const brandField = prods.length ? brandFieldHtml(key, `filter_brand_${i}`, `onFilterProductPicked(${i})`) : '';
+    // поле марки есть всегда: без склада марку вписывают вручную в окне категории
+    const brandField = brandFieldHtml(key, `filter_brand_${i}`, `onFilterProductPicked(${i})`);
     return `
     <div class="item-row" id="row_${key}">
       <span class="item-name" style="flex:${prods.length ? '1.3' : '2.3'};">${T[key]}</span>
@@ -8748,6 +8823,7 @@ function syncItemRows() {
   // фильтры — плитками (renderFilterTiles), здесь только остальные жидкости
   if (box) box.innerHTML = hidden.filter(k => FILTER_KEYS.indexOf(k) < 0).map(k => `<button type="button" onclick="openItemRow('${k}')"><i class="fa-solid fa-plus"></i>${T[k]}</button>`).join('');
   renderFilterTiles();
+  if (typeof renderCatTiles === 'function') renderCatTiles();
 }
 
 // ---- Фильтры плитками: нажал — фильтр в чеке, ещё раз — убран ----
@@ -8796,6 +8872,7 @@ function stepLiters(i, d) {
 
 // «Работа / услуга» отдельной кнопкой: подставляет название и ставит курсор в цену
 function addLabor() {
+  if (document.getElementById('catSheet')) { closeObSheets(); openCatSheet('wk'); return; }
   const n = document.getElementById('other_name'), pr = document.getElementById('other_price');
   if (!n || !pr) return;
   if (!n.value.trim()) n.value = T.labor_name;
@@ -8823,6 +8900,363 @@ function closeItemRow(key) {
   rowFieldIds(key).forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   ROW_OPEN.delete(key);
   updateTotal();
+}
+
+// ===== «Товары и работа»: плитки категорий → окно категории → чек =====
+// Данные позиций по-прежнему лежат в скрытых полях формы (fluid_*, filter_*,
+// other_*, строки «прочих товаров») — collectItems() и сохранение не
+// меняются. Плитки и окно только удобно заполняют эти поля.
+let FREQ = {};
+async function loadFrequentItems() {
+  try { const r = await fetch('/api/frequent_items'); if (r.ok) FREQ = await r.json() || {}; } catch (e) {}
+}
+const CATS = [
+  { id: 'oil', keys: ['fluid_0'], ic: 'fa-oil-can', cls: '' },
+  { id: 'f0', keys: ['filter_0'], ic: 'fa-filter', cls: '' },
+  { id: 'f1', keys: ['filter_1'], ic: 'fa-wind', cls: 'g' },
+  { id: 'f2', keys: ['filter_2'], ic: 'fa-fan', cls: 'g' },
+  { id: 'f3', keys: ['filter_3'], ic: 'fa-gas-pump', cls: 'g' },
+  { id: 'fl', keys: ['fluid_1', 'fluid_2', 'fluid_3', 'fluid_4'], ic: 'fa-flask', cls: 'v' },
+  { id: 'os', keys: ['other_stock'], ic: 'fa-box-open', cls: 'v' },
+  { id: 'wk', keys: ['other'], ic: 'fa-screwdriver-wrench', cls: 'y' },
+];
+const CS = { cat: '', key: '', pid: '', qty: 0, manual: null };
+function catTitle(c) {
+  if (c.id === 'fl') return T.cat_fluids;
+  if (c.id === 'os') return T.cat_goods;
+  if (c.id === 'wk') return T.cat_work;
+  return T[c.keys[0]] || '';
+}
+function catVisible(c) {
+  return c.id !== 'os' || (WAREHOUSE_ENABLED && productsForCategory('other').length > 0);
+}
+function catOfKey(key) { return CATS.find(c => c.keys.indexOf(key) >= 0); }
+function isFluidKey(k) { return FLUID_KEYS.indexOf(k) >= 0; }
+const csMoney = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+const csQty = v => String(Math.round((Number(v) || 0) * 100) / 100).replace('.', ',');
+
+function renderCatTiles() {
+  const box = document.getElementById('catTiles');
+  if (!box) return;
+  const items = collectItems();
+  box.innerHTML = CATS.filter(catVisible).map(c => {
+    const mine = items.filter(it => c.keys.indexOf(it.key) >= 0);
+    let sub;
+    if (mine.length) {
+      sub = mine.map(it => (it.key === 'other' ? String(it.name || '').replace(T.other_prefix + ': ', '') : (it.brand || it.name))
+        + (isFluidKey(it.key) && it.qty ? ' · ' + csQty(it.qty) + ' ' + T.unit_l : '')).join(', ');
+    } else if (c.id === 'wk') {
+      sub = T.cat_work_sub;
+    } else {
+      const n = c.keys.reduce((a, k) => a + productsForCategory(k === 'other_stock' ? 'other' : k).length, 0);
+      sub = n ? n + ' ' + T.cat_in_stock : (c.id === 'fl' ? T.cat_fluids_sub : T.cat_manual);
+    }
+    return `<button type="button" class="cat-tile${mine.length ? ' on' : ''}" onclick="openCatSheet('${c.id}')"><span class="ci ${c.cls}"><i class="fa-solid ${c.ic}"></i></span><div><b>${escapeHtml(catTitle(c))}</b><small>${escapeHtml(sub)}</small></div></button>`;
+  }).join('');
+}
+
+function renderItRcpt(items, subtotal) {
+  const box = document.getElementById('itRcpt');
+  if (!box) return;
+  items = items || collectItems();
+  subtotal = subtotal == null ? itemsSubtotal(items) : subtotal;
+  const plate = (document.getElementById('plate').value || '').trim().toUpperCase();
+  const head = `<div class="ir-h"><span>${T.rcpt_title}</span><b>${escapeHtml(plate)}</b></div>`;
+  if (!items.length) { box.innerHTML = head + `<div class="ir-empty">${T.cat_rcpt_empty}</div>`; return; }
+  const lines = items.map((it, i) => {
+    const c = catOfKey(it.key);
+    const title = it.key === 'other' ? String(it.name || '').replace(T.other_prefix + ': ', '') : (it.brand || it.name);
+    const catName = it.key === 'other_stock' ? T.cat_goods : (it.key === 'other' ? T.cat_work : (T[it.key] || ''));
+    const fluid = isFluidKey(it.key);
+    const qtyTxt = (it.qty && it.qty !== 1) || fluid ? csQty(it.qty) + (fluid ? ' ' + T.unit_l : '') + ' × ' + csMoney(it.unit_price) : '';
+    const step = fluid || it.key === 'other_stock'
+      ? `<span class="ir-step"><button type="button" onclick="irStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="irStep(${i}, 1)" aria-label="+">+</button></span>` : '';
+    return `<div class="ir-line"><div class="ir-main" onclick="openCatSheet('${c ? c.id : ''}', '${it.key}')"><b>${escapeHtml(title || '')}</b><span>${escapeHtml(catName)}${qtyTxt ? ' · ' + qtyTxt : ''}</span></div>${step}<span class="ir-sum">${csMoney(it.total)}</span><button type="button" class="ir-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button></div>`;
+  }).join('');
+  const d = discountFor(subtotal);
+  const disc = d ? `<div class="ir-line ir-disc"><div class="ir-main"><b>${T.disc_title}</b></div><span class="ir-sum">−${csMoney(d)}</span></div>` : '';
+  box.innerHTML = head + lines + disc + `<div class="ir-tot"><span>${T.field_total}</span><b>${csMoney(subtotal - d)} ${T.currency}</b></div>`;
+}
+
+// литры масла: по 0,5 л; прочие товары: по 1 шт (или 0,5 л)
+function irStep(i, dir) {
+  const it = collectItems()[i];
+  if (!it) return;
+  if (isFluidKey(it.key)) { stepLiters(FLUID_KEYS.indexOf(it.key), dir * 0.5); return; }
+  if (it.key === 'other_stock' && it._row) {
+    const el = document.getElementById(`other_stock_qty_${it._row}`);
+    if (!el) return;
+    const p = productsCache.find(x => x.id === it.product_id);
+    const step = p && p.unit !== 'pc' ? 0.5 : 1;
+    const v = Math.round(((parseFloat(el.value) || 0) + dir * step) * 10) / 10;
+    if (v <= 0) { removeOtherStockRow('other', it._row); return; }
+    el.value = v;
+    updateTotal();
+  }
+}
+
+function openCatSheet(catId, key) {
+  const c = CATS.find(x => x.id === catId);
+  if (!c) return;
+  CS.cat = c.id;
+  if (!key || c.keys.indexOf(key) < 0) {
+    // жидкости: открываем первую выбранную, иначе АКПП
+    key = c.keys.find(k => isFluidKey(k) && rowHasValue(k)) || c.keys[0];
+  }
+  CS.key = key;
+  csResetPick();
+  const s = document.getElementById('cs_search');
+  s.value = '';
+  s.placeholder = '🔍 ' + T.cat_search_ph + ' ' + String(catTitle(c)).toLowerCase() + '…';
+  document.getElementById('cs_title').textContent = catTitle(c);
+  renderCatSheet();
+  openObSheet('catSheet');
+}
+function csResetPick() {
+  const key = CS.key;
+  CS.pid = ''; CS.qty = 0; CS.manual = null;
+  if (FLUID_KEYS.indexOf(key) >= 0 || FILTER_KEYS.indexOf(key) >= 0) {
+    const sel = document.getElementById(brandFieldIdFor(key));
+    if (sel && sel.tagName === 'SELECT') CS.pid = sel.value || '';
+    if (isFluidKey(key)) {
+      CS.qty = parseFloat((document.getElementById(`fluid_liters_${FLUID_KEYS.indexOf(key)}`) || {}).value) || 0;
+      if (!CS.qty) {
+        const prev = (LAST_VISIT_ITEMS || []).find(it => it.key === key && it.qty);
+        const fr = (FREQ[key] || []).find(f => f.qty);
+        CS.qty = Number(prev ? prev.qty : (fr ? fr.qty : (key === 'fluid_0' ? 4 : 1))) || 0;
+      }
+    }
+  }
+  if (key === 'other_stock') CS.qty = 1;
+}
+function csSetKey(k) { CS.key = k; csResetPick(); renderCatSheet(); }
+
+function csHasProducts(key) {
+  const sel = document.getElementById(brandFieldIdFor(key));
+  return !!(sel && sel.tagName === 'SELECT');
+}
+function csFreqFor(key) {
+  return (FREQ[key] || []).slice(0, 6);
+}
+
+function renderCatSheet() {
+  const c = CATS.find(x => x.id === CS.cat);
+  if (!c) return;
+  const key = CS.key;
+  const tabs = document.getElementById('cs_tabs');
+  tabs.innerHTML = c.keys.length > 1 ? c.keys.map(k => `<button type="button" class="${k === key ? 'on' : ''}${rowHasValue(k) ? ' has' : ''}" onclick="csSetKey('${k}')">${escapeHtml(T[k])}</button>`).join('') : '';
+  const searchEl = document.getElementById('cs_search');
+  const body = document.getElementById('cs_body');
+  const foot = document.getElementById('cs_foot');
+  if (key === 'other') { searchEl.style.display = 'none'; renderCsWork(body, foot); return; }
+  if (key === 'other_stock') { searchEl.style.display = ''; renderCsGoods(body, foot); return; }
+  if (!csHasProducts(key)) { searchEl.style.display = 'none'; renderCsManual(body, foot); return; }
+  searchEl.style.display = '';
+  const words = (searchEl.value || '').trim().split(' ').map(pickNorm).filter(Boolean);
+  const all = productsForCategory(key);
+  const prods = all.filter(p => !words.length || words.every(w => pickNorm(p.name).includes(w)));
+  const availOf = p => (sellQty(p) || 0) + (STORE_ENABLED ? (mainQtyOf(p) || 0) : 0);
+  const unitOf = p => p.unit === 'pc' ? T.unit_pc : T.unit_l;
+  const fluid = isFluidKey(key);
+  const row = p => {
+    const q = availOf(p);
+    const cls = !(q > 0) ? 'none' : (q <= (fluid ? 8 : 3) ? 'low' : '');
+    const stock = !(q > 0) ? T.psh_out : `${T.psh_instock} ${whQty(q)} ${unitOf(p)}${cls === 'low' ? ' · ' + T.psh_low : ''}`;
+    return `<button type="button" class="ps-item${String(p.id) === String(CS.pid) ? ' on' : ''}${!(q > 0) ? ' out' : ''}" onclick="csPick(${p.id})">
+      <div><b>${escapeHtml(p.name)}</b><small class="${cls}">${stock}</small></div><em>${p.sell_price ? csMoney(p.sell_price) + (fluid ? '/' + T.unit_l : '') : '—'}</em></button>`;
+  };
+  let html = '';
+  if (!words.length) {
+    const byId = id => all.find(p => String(p.id) === String(id));
+    const freq = csFreqFor(key).filter(f => f.product_id && byId(f.product_id));
+    if (freq.length) {
+      html += `<div class="ps-grp" style="margin-top:0;">${T.cat_freq}</div><div class="cs-freq">` + freq.map(f => {
+        const p = byId(f.product_id);
+        return `<button type="button" class="${String(p.id) === String(CS.pid) ? 'on' : ''}" onclick="csPick(${p.id}${fluid && f.qty ? ', ' + Number(f.qty) : ''})">${escapeHtml(p.name)}${fluid && f.qty ? ' · ' + csQty(f.qty) + ' ' + T.unit_l : ''}<em>${p.sell_price ? csMoney(p.sell_price) : ''}</em></button>`;
+      }).join('') + `</div>`;
+    }
+    const prevIds = new Set((LAST_VISIT_ITEMS || []).filter(it => it.key === key && it.product_id).map(it => String(it.product_id)));
+    const prev = all.filter(p => prevIds.has(String(p.id)));
+    if (prev.length) html += `<div class="ps-grp">${T.psh_last}</div>` + prev.map(row).join('');
+  }
+  const rest = prods.slice().sort((a, b) => ((availOf(b) > 0) - (availOf(a) > 0)) || String(a.name).localeCompare(String(b.name)));
+  html += `<div class="ps-grp">${T.cat_all_stock}</div>` + (rest.length ? rest.map(row).join('') : `<div class="pick-note">${T.pick_nothing}</div>`);
+  body.innerHTML = html;
+  foot.innerHTML = csFootHtml(fluid, !!CS.pid, rowHasValue(key));
+}
+function csFootHtml(fluid, ready, inRcpt) {
+  let h = '';
+  if (fluid) {
+    const opts = [1, 3, 3.5, 4, 4.5, 5];
+    h += `<div class="ps-grp" style="margin-top:0;">${T.psh_liters}</div><div class="ps-lit">` +
+      opts.map(v => `<button type="button" class="${CS.qty === v ? 'on' : ''}" onclick="CS.qty=${v}; renderCatSheet()">${csQty(v)}</button>`).join('') + `</div>` +
+      `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(0.5, Math.round((CS.qty-0.5)*10)/10); renderCatSheet()">−</button><b>${csQty(CS.qty)} ${T.unit_l}</b><button type="button" onclick="CS.qty=Math.round((CS.qty+0.5)*10)/10; renderCatSheet()">+</button></div>`;
+  }
+  if (ready) h += `<button type="button" class="ps-go" onclick="csApply()">${T.cat_add}${fluid && CS.qty ? ' · ' + csQty(CS.qty) + ' ' + T.unit_l : ''}</button>`;
+  if (inRcpt) h += `<button type="button" class="cs-del" onclick="csRemoveCur()">${T.cat_remove}</button>`;
+  return h;
+}
+function csPick(id, qty) {
+  CS.pid = String(id);
+  if (qty) CS.qty = qty;
+  // фильтр — одним нажатием сразу в чек; масло — ждём литры и «Добавить»
+  if (!isFluidKey(CS.key)) { csApply(); return; }
+  renderCatSheet();
+}
+function csApply() {
+  const key = CS.key;
+  if (!CS.pid) return;
+  setProductInField(key, CS.pid, isFluidKey(key) ? CS.qty : 0);
+  ROW_OPEN.add(key);
+  updateTotal();
+  closeObSheets();
+}
+function csRemoveCur() {
+  const key = CS.key;
+  if (key === 'other') {
+    document.getElementById('other_name').value = '';
+    document.getElementById('other_price').value = '';
+    updateTotal();
+  } else {
+    closeItemRow(key);
+  }
+  closeObSheets();
+}
+
+// категория без товаров на складе — ввод вручную: марка, цена, литры
+function renderCsManual(body, foot) {
+  const key = CS.key, fluid = isFluidKey(key);
+  const fi = FLUID_KEYS.indexOf(key), ti = FILTER_KEYS.indexOf(key);
+  const brandId = fi >= 0 ? `fluid_brand_${fi}` : `filter_brand_${ti}`;
+  const priceId = fi >= 0 ? `fluid_price_${fi}` : `filter_price_${ti}`;
+  if (!CS.manual) {
+    const be = document.getElementById(brandId), pe = document.getElementById(priceId);
+    CS.manual = { brand: be ? be.value : '', price: pe ? pe.value : '' };
+  }
+  const freq = csFreqFor(key).filter(f => f.label);
+  let html = '';
+  if (freq.length) {
+    html += `<div class="ps-grp" style="margin-top:0;">${T.cat_freq}</div><div class="cs-freq">` + freq.map((f, i) =>
+      `<button type="button" class="${(CS.manual.brand || '').trim().toUpperCase() === f.label.trim().toUpperCase() ? 'on' : ''}" onclick="csManFreq(${i})">${escapeHtml(f.label)}${fluid && f.qty ? ' · ' + csQty(f.qty) + ' ' + T.unit_l : ''}${f.price ? `<em>${csMoney(f.price)}</em>` : ''}</button>`).join('') + `</div>`;
+  }
+  html += `<div class="ps-grp">${T.cat_manual_title}</div><div class="cs-man">
+    <input id="cs_m_brand" placeholder="${T.brand_ph}" value="${escapeHtml(CS.manual.brand || '')}" oninput="CS.manual.brand=this.value">
+    <input id="cs_m_price" type="number" inputmode="numeric" placeholder="${fluid ? T.price_per_liter_ph : T.price_ph}" value="${escapeHtml(String(CS.manual.price || ''))}" oninput="CS.manual.price=this.value">
+  </div>`;
+  body.innerHTML = html;
+  foot.innerHTML = csFootHtml(fluid, false, rowHasValue(key)).replace(/^/, '') + `<button type="button" class="ps-go" style="margin-top:4px;" onclick="csManApply()">${T.cat_add}</button>`;
+}
+function csManFreq(i) {
+  const f = csFreqFor(CS.key).filter(x => x.label)[i];
+  if (!f) return;
+  CS.manual = { brand: f.label, price: f.price || '' };
+  if (isFluidKey(CS.key) && f.qty) CS.qty = Number(f.qty);
+  renderCatSheet();
+}
+function csManApply() {
+  const key = CS.key, fi = FLUID_KEYS.indexOf(key), ti = FILTER_KEYS.indexOf(key);
+  const price = parseFloat(CS.manual && CS.manual.price) || 0;
+  const brand = (CS.manual && CS.manual.brand || '').trim();
+  if (!brand && !price) { closeObSheets(); return; }
+  if (fi >= 0) {
+    document.getElementById(`fluid_brand_${fi}`).value = brand;
+    document.getElementById(`fluid_price_${fi}`).value = price || '';
+    document.getElementById(`fluid_liters_${fi}`).value = CS.qty || 1;
+  } else {
+    const be = document.getElementById(`filter_brand_${ti}`);
+    if (be) be.value = brand;
+    document.getElementById(`filter_price_${ti}`).value = price || '';
+  }
+  ROW_OPEN.add(key);
+  paymentSplitTouched = false;
+  updateTotal();
+  closeObSheets();
+}
+
+// работа / услуга: частые услуги этой точки + своя
+function renderCsWork(body, foot) {
+  if (!CS.manual) {
+    const n = (document.getElementById('other_name').value || '').trim();
+    CS.manual = { brand: n, price: document.getElementById('other_price').value || '' };
+  }
+  const freq = csFreqFor('other').map(f => ({ ...f, label: String(f.label || '').replace(T.other_prefix + ': ', '') }))
+    .filter(f => f.label && f.label !== T.other_unnamed);
+  const presets = [T.labor_name, T.cat_work_wash, T.cat_work_flush].filter(x => x && !freq.some(f => f.label.toUpperCase() === x.toUpperCase()));
+  let html = `<div class="ps-grp" style="margin-top:0;">${freq.length ? T.cat_freq : T.cat_work_quick}</div><div class="cs-freq">`
+    + freq.map((f, i) => `<button type="button" class="${CS.manual.brand === f.label ? 'on' : ''}" onclick="csWorkFreq(${i})">${escapeHtml(f.label)}${f.price ? `<em>${csMoney(f.price)}</em>` : ''}</button>`).join('')
+    + presets.map(x => `<button type="button" class="${CS.manual.brand === x ? 'on' : ''}" onclick="CS.manual.brand=${escapeHtml(JSON.stringify(x))}; renderCatSheet(); setTimeout(() => { const e = document.getElementById('cs_m_price'); if (e) e.focus(); }, 50)">${escapeHtml(x)}</button>`).join('')
+    + `</div>`;
+  html += `<div class="ps-grp">${T.cat_work_own}</div><div class="cs-man">
+    <input id="cs_m_brand" placeholder="${T.field_other_name_ph}" value="${escapeHtml(CS.manual.brand || '')}" oninput="CS.manual.brand=this.value">
+    <input id="cs_m_price" type="number" inputmode="numeric" placeholder="${T.field_price}" value="${escapeHtml(String(CS.manual.price || ''))}" oninput="CS.manual.price=this.value">
+  </div>`;
+  body.innerHTML = html;
+  const has = (parseFloat(document.getElementById('other_price').value) || 0) > 0;
+  foot.innerHTML = `<button type="button" class="ps-go" onclick="csWorkApply()">${T.cat_add}</button>` + (has ? `<button type="button" class="cs-del" onclick="csRemoveCur()">${T.cat_remove}</button>` : '');
+}
+function csWorkFreq(i) {
+  const freq = csFreqFor('other').map(f => ({ ...f, label: String(f.label || '').replace(T.other_prefix + ': ', '') }))
+    .filter(f => f.label && f.label !== T.other_unnamed);
+  const f = freq[i];
+  if (!f) return;
+  CS.manual = { brand: f.label, price: f.price || '' };
+  renderCatSheet();
+}
+function csWorkApply() {
+  const price = parseFloat(CS.manual && CS.manual.price) || 0;
+  document.getElementById('other_name').value = (CS.manual && CS.manual.brand || '').trim();
+  document.getElementById('other_price').value = price || '';
+  paymentSplitTouched = false;
+  updateTotal();
+  closeObSheets();
+}
+
+// прочие товары со склада: можно несколько, у каждого своё количество
+function renderCsGoods(body, foot) {
+  const words = (document.getElementById('cs_search').value || '').trim().split(' ').map(pickNorm).filter(Boolean);
+  const all = productsForCategory('other');
+  const prods = all.filter(p => !words.length || words.every(w => pickNorm(p.name).includes(w)));
+  const inR = new Set(collectOtherStockItems('other').map(it => String(it.product_id)));
+  const unitOf = p => p.unit === 'pc' ? T.unit_pc : T.unit_l;
+  let html = '';
+  const freq = words.length ? [] : csFreqFor('other_stock').filter(f => f.product_id && all.some(p => p.id === f.product_id));
+  if (freq.length) html += `<div class="ps-grp" style="margin-top:0;">${T.cat_freq}</div><div class="cs-freq">` + freq.map(f => {
+    const p = all.find(x => x.id === f.product_id);
+    return `<button type="button" class="${String(p.id) === String(CS.pid) ? 'on' : ''}" onclick="CS.pid='${p.id}'; CS.qty=${Number(f.qty) || 1}; renderCatSheet()">${escapeHtml(p.name)}<em>${p.sell_price ? csMoney(p.sell_price) : ''}</em></button>`;
+  }).join('') + `</div>`;
+  html += `<div class="ps-grp">${T.cat_all_stock}</div>` + (prods.length ? prods.map(p => {
+    const q = sellQty(p) || 0;
+    return `<button type="button" class="ps-item${String(p.id) === String(CS.pid) ? ' on' : ''}${!(q > 0) ? ' out' : ''}" onclick="CS.pid='${p.id}'; CS.qty=1; renderCatSheet()">
+      <div><b>${escapeHtml(p.name)}${inR.has(String(p.id)) ? ' ✓' : ''}</b><small class="${q > 0 ? '' : 'none'}">${q > 0 ? T.psh_instock + ' ' + whQty(q) + ' ' + unitOf(p) : T.psh_out}</small></div><em>${p.sell_price ? csMoney(p.sell_price) : '—'}</em></button>`;
+  }).join('') : `<div class="pick-note">${T.pick_nothing}</div>`);
+  body.innerHTML = html;
+  if (CS.pid) {
+    const p = all.find(x => String(x.id) === String(CS.pid));
+    const step = p && p.unit !== 'pc' ? 0.5 : 1;
+    foot.innerHTML = `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(${step}, Math.round((CS.qty-${step})*10)/10); renderCatSheet()">−</button><b>${csQty(CS.qty)} ${p ? unitOf(p) : ''}</b><button type="button" onclick="CS.qty=Math.round((CS.qty+${step})*10)/10; renderCatSheet()">+</button></div>`
+      + `<button type="button" class="ps-go" onclick="csGoodsApply()">${T.cat_add}</button>`;
+  } else {
+    foot.innerHTML = '';
+  }
+}
+function csGoodsApply() {
+  const p = productsForCategory('other').find(x => String(x.id) === String(CS.pid));
+  if (!p) return;
+  // уже есть в чеке — меняем количество, иначе новая строка
+  const ex = collectOtherStockItems('other').find(it => String(it.product_id) === String(p.id));
+  if (ex && ex._row) {
+    document.getElementById(`other_stock_qty_${ex._row}`).value = CS.qty;
+  } else {
+    addOtherStockRow('other');
+    const id = otherStockSeq;
+    const sel = document.getElementById(`other_stock_product_${id}`);
+    if (sel) { sel.value = String(p.id); onOtherStockPicked('other', id); }
+    const q = document.getElementById(`other_stock_qty_${id}`);
+    if (q) q.value = CS.qty;
+  }
+  paymentSplitTouched = false;
+  updateTotal();
+  closeObSheets();
 }
 
 // ---- Шторки формы замены (телефон) ----
@@ -8975,7 +9409,9 @@ function rcPrice(i) {
 function rcRemove(i) {
   const it = collectItems()[i];
   if (!it) return;
-  if (it.key === 'other') {
+  if (it.key === 'other_stock') {
+    if (it._row) removeOtherStockRow('other', it._row);
+  } else if (it.key === 'other') {
     document.getElementById('other_name').value = '';
     document.getElementById('other_price').value = '';
     updateTotal();
@@ -9207,9 +9643,9 @@ function renderDiscSummary(sub) {
 }
 function discChanged() {
   syncDiscUi();
-  paymentSplitTouched = false;
-  if (typeof PAY_MODE !== 'undefined' && PAY_MODE === 'debt') { updateTotal(); updateDebtRemaining(); }
-  else updateTotal();
+  // разбивку оплаты не сбрасываем: без долга updateTotal сам подгонит
+  // наличные под новую сумму (карту оставит), в долг — предоплата остаётся
+  updateTotal();
   if (document.getElementById('rcSheet') && document.getElementById('rcSheet').classList.contains('open')) renderReceiptSheet();
 }
 function setDiscount(p) {
@@ -9287,6 +9723,7 @@ function updateTotal() {
   }
   updateDebtRemaining();
   if (typeof syncItemRows === 'function') syncItemRows();
+  if (typeof renderCatTiles === 'function') { renderCatTiles(); renderItRcpt(_items, subtotal); }
 }
 
 function onPayCashInput() {
@@ -9588,7 +10025,10 @@ function applyPreset(i) {
 }
 document.addEventListener('DOMContentLoaded', () => {
   const p = document.getElementById('plate');
-  if (p) p.addEventListener('input', () => { const pl = document.getElementById('rcptPlate'); if (pl) pl.textContent = (p.value || '').trim().toUpperCase(); });
+  if (p) p.addEventListener('input', () => {
+    const pl = document.getElementById('rcptPlate'); if (pl) pl.textContent = (p.value || '').trim().toUpperCase();
+    const ih = document.querySelector('#itRcpt .ir-h b'); if (ih) ih.textContent = (p.value || '').trim().toUpperCase();
+  });
 });
 
 // Горячие клавиши (компьютер): F2 — новая замена, Ctrl+Enter — сохранить,
@@ -9896,19 +10336,42 @@ async function lookupPlate(force) {
     const mileageParts = [];
     if (last && last.mileage) mileageParts.push(`${T.kc_last_mileage} ${last.mileage.toLocaleString('ru-RU')} ${T.km_short}`);
     if (last && last.next_mileage) mileageParts.push(`${T.kc_due_mileage} ${last.next_mileage.toLocaleString('ru-RU')} ${T.km_short}`);
-    const lastVisitHtml = last ? `
+    // «История»: все визиты в эту точку (новые сверху), у каждого — пробег,
+    // что делали, сумма и заметка мастера
+    const visitHtml = h => {
+      let its = [];
+      try { its = h.items_json ? (JSON.parse(h.items_json) || []) : []; } catch (e) { its = []; }
+      const mp = [];
+      if (h.mileage) mp.push(`${T.kc_last_mileage} ${h.mileage.toLocaleString('ru-RU')} ${T.km_short}`);
+      if (h.next_mileage) mp.push(`${T.kc_due_mileage} ${h.next_mileage.toLocaleString('ru-RU')} ${T.km_short}`);
+      return `
       <div class="kc-last-visit">
         <div class="kc-lv-top">
           <div>
-            <div class="kc-lv-service">${escapeHtml(last.service_type || T.history_service_fallback)}</div>
-            <div class="kc-lv-date">${last.change_date}${visitCount > 1 ? ` · ${T.kc_visits_total} ${visitCount}` : ''}</div>
+            <div class="kc-lv-service">${escapeHtml(h.change_date || '')}</div>
+            ${mp.length ? `<div class="kc-lv-date">${mp.join(' · ')}</div>` : ''}
           </div>
-          <div class="kc-lv-cost">${last.cost ? last.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
+          <div class="kc-lv-cost">${h.cost ? h.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
         </div>
-        ${mileageParts.length ? `<div class="kc-lv-mileage">${mileageParts.join(' · ')}</div>` : ''}
-        ${lastItemsHtml}
-      </div>
-    ` : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
+        ${its.length ? '<div class="kc-lv-items">' + its.map(it =>
+          `<div class="kc-lv-item"><span>${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + escapeHtml(it.qty) + ' ' + T.liters_ph : ''}</span><span>${(Number(it.total) || 0).toLocaleString('ru-RU')} ${T.currency}</span></div>`
+        ).join('') + (h.discount_amount > 0 ? `<div class="kc-lv-item" style="color:#B3241C;"><span>${T.disc_title}</span><span>−${Number(h.discount_amount).toLocaleString('ru-RU')} ${T.currency}</span></div>` : '') + '</div>'
+          : (h.service_type ? `<div class="kc-lv-items"><div class="kc-lv-item"><span>${escapeHtml(h.service_type)}</span></div></div>` : '')}
+        ${h.notes ? `<div class="kc-note"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(h.notes)}</div>` : ''}
+      </div>`;
+    };
+    const lastVisitHtml = data.history.length
+      ? data.history.slice(0, 30).map(visitHtml).join('')
+      : `<div class="kc-last-visit"><span style="color:var(--hint); font-size:13px;">${T.kc_no_history}</span></div>`;
+
+    // заметки сразу на карточке, без «Истории»: последние две — и свои, и
+    // других мастеров OilBook (с названием их точки)
+    const allNotes = [
+      ...data.history.filter(h => h.notes).map(h => ({ date: h.change_date, text: h.notes, shop: '' })),
+      ...(data.cross_history || []).filter(h => h.notes).map(h => ({ date: h.change_date, text: h.notes, shop: h.shop_name || '' })),
+    ].sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 2);
+    const notesHtml = allNotes.length ? `<div class="kc-notes-box">${allNotes.map(n =>
+      `<div class="kc-note"><i class="fa-solid fa-note-sticky"></i> <b>${escapeHtml(n.date || '')}${n.shop ? ' · ' + escapeHtml(n.shop) : ''}:</b> ${escapeHtml(n.text)}</div>`).join('')}</div>` : '';
 
     // компактная карточка: имя + машина + одна строка «прошлый раз» +
     // быстрые кнопки; подробная история раскрывается по «История ›»
@@ -9928,13 +10391,14 @@ async function lookupPlate(force) {
           <button type="button" class="kc-more-btn" onclick="toggleKcDetails(this)" aria-expanded="false">${T.kc_history_btn} <i class="fa-solid fa-chevron-down"></i></button>
         </div>
         <div class="kc-last-line">${escapeHtml(lastShort)}${last && last.cost ? ` · <b>${last.cost.toLocaleString('ru-RU')}</b>` : ''}</div>
+        ${notesHtml}
         ${LAST_VISIT_ITEMS.length ? `<div class="kc-quick"><button type="button" class="kc-repeat" onclick="repeatLastVisit()"><i class="fa-solid fa-rotate-right"></i> ${T.kc_repeat_short}<kbd class="af-kbd">F4</kbd></button><div id="kcPresets" class="kc-presets"></div></div>` : '<div class="kc-quick"><div id="kcPresets" class="kc-presets"></div></div>'}
         <div class="kc-details" hidden>
           <div class="kc-detail-actions">
             <button type="button" class="kc-edit-data" onclick="showOwnerFields()"><i class="fa-solid fa-pen"></i> ${T.kc_edit_data}</button>
             <div id="kcPersonBox"><button type="button" class="kc-new-owner" onclick="startNewOwner()"><i class="fa-solid fa-user-pen"></i>${T.kc_new_owner_btn}</button></div>
           </div>
-          <div class="kc-history-label">${T.kc_history_label}</div>
+          <div class="kc-history-label">${T.kc_all_visits} (${visitCount})</div>
           ${lastVisitHtml}
         </div>
       </div>
@@ -9993,6 +10457,7 @@ function renderCrossNetworkHistory(crossHistory) {
           </div>
         </div>
         ${itemsHtml}
+        ${h.notes ? `<div class="kc-note"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(h.notes)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -10037,10 +10502,12 @@ function retryItemCatalog() {
 }
 window.addEventListener('online', () => { if (!ITEM_CATALOG_OK) loadItemCatalog(); });
 async function initItemForms() {
+  loadFrequentItems();
   renderItemLists();
   renderSvcItemLists();
   if (WAREHOUSE_ENABLED && !(await loadItemCatalog())) retryItemCatalog();
   restoreAddDraft();
+  updateTotal();
 }
 
 // ---- Черновик формы «Внести замену» ----
@@ -10057,7 +10524,7 @@ function addDraftFields() {
   if (!view) return [];
   return Array.from(view.querySelectorAll('input[id], select[id], textarea[id]')).filter(el =>
     el.type !== 'file' && el.type !== 'hidden' && el.type !== 'button' && !ADD_DRAFT_SKIP.includes(el.id)
-    && !/_stock_(product|price|qty)_/.test(el.id) && !/^pick/.test(el.id));
+    && !/_stock_(product|price|qty)_/.test(el.id) && !/^pick/.test(el.id) && !/^cs_/.test(el.id));
 }
 function saveAddDraft() {
   if (!ADD_DRAFT_READY) return;
@@ -10229,6 +10696,7 @@ async function submitCar() {
   if (data.ok) {
     window.ADD_TOKEN = null;
     clearAddDraft();
+    setTimeout(loadFrequentItems, 1500);
     showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
     ['plate','owner_name','owner_phone','car_model','vin','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
     SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
@@ -11123,9 +11591,15 @@ function svcDiscPct(p) {
   updateSvcTotal(true);
 }
 function updateSvcTotal(keepPct) {
-  if (keepPct !== true) {
-    const el = document.getElementById('svc_discount');
-    if (el && document.activeElement === el) svcDiscPctVal = null;
+  const del = document.getElementById('svc_discount');
+  if (keepPct !== true && del) {
+    if (document.activeElement === del) {
+      svcDiscPctVal = null;  // вписали сумму руками — это уже «своя» скидка
+    } else if (svcDiscPctVal) {
+      // скидка процентом: позиции поменяли — пересчитываем от новой суммы
+      const s0 = svcSubtotal();
+      del.value = Math.max(0, s0 - Math.round(s0 * (1 - svcDiscPctVal / 100) / 1000) * 1000) || '';
+    }
   }
   const sub = svcSubtotal();
   const disc = svcDiscount(sub);
@@ -11851,7 +12325,7 @@ self.onmessage = async (e) => {
       importScripts(m.base + 'ort.wasm.min.js');
       ort.env.wasm.wasmPaths = m.base;
       ort.env.wasm.numThreads = 1;
-      sess = await ort.InferenceSession.create(m.base + 'plate_det.onnx', { executionProviders: ['wasm'] });
+      sess = await ort.InferenceSession.create(m.base + 'plate_det_s256.onnx', { executionProviders: ['wasm'] });
       try { await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * S * S), [1, 3, S, S]) }); } catch (x) {}
       self.postMessage({ type: 'ready' });
     } catch (err) {
@@ -14347,6 +14821,17 @@ def _warehouse_required():
 def _store_on(shop) -> bool:
     """Включён ли «Склад магазина» (нужен и сам склад)."""
     return bool(shop and shop.get("warehouse_enabled") and shop.get("store_enabled"))
+
+
+@app.route("/api/frequent_items")
+@login_required
+def api_frequent_items():
+    """«Часто берут» по категориям для формы замены (только цены продажи)."""
+    try:
+        return jsonify(db.get_frequent_items(g.shop_id))
+    except Exception as e:
+        logger.warning(f"frequent_items: {e}")
+        return jsonify({})
 
 
 @app.route("/api/products")
