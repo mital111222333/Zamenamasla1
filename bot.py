@@ -81,6 +81,35 @@ def app_button(lang: str):
     return InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("bot_app_btn", lang), web_app=WebAppInfo(url=url))]])
 
 
+def panel_url(lang: str = "ru"):
+    """Веб-панель OilBook (для точек) как Telegram Mini App — только по https."""
+    base = (webapp.PUBLIC_URL or "").rstrip("/")
+    if not base.startswith("https://"):
+        return None
+    return f"{base}/tg" + ("?lang=uz" if lang == "uz" else "")
+
+
+async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/panel (и ссылка t.me/<бот>?start=panel из панели): кнопка, которая
+    открывает панель OilBook прямо в Telegram, + та же кнопка в меню чата
+    (слева от поля ввода) — только у этого человека, у клиентов всё как было."""
+    user = update.effective_user
+    lang = "uz" if (user.language_code or "").lower().startswith("uz") else "ru"
+    url = panel_url(lang)
+    if not url:
+        await update.message.reply_text("Панель в Telegram работает только когда PUBLIC_URL начинается с https://")
+        return ConversationHandler.END
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("bot_panel_btn", lang), web_app=WebAppInfo(url=url))]])
+    await update.message.reply_text(i18n.t("bot_panel_text", lang), reply_markup=markup)
+    try:
+        await context.bot.set_chat_menu_button(
+            chat_id=update.effective_chat.id,
+            menu_button=MenuButtonWebApp(text=i18n.t("bot_panel_btn", lang).split(" ", 1)[-1], web_app=WebAppInfo(url=url)))
+    except Exception as e:
+        logger.warning(f"Не удалось поставить кнопку панели в меню чата {update.effective_chat.id}: {e}")
+    return ConversationHandler.END
+
+
 async def send_app_intro(update: Update, lang: str):
     markup = app_button(lang)
     if markup:
@@ -149,6 +178,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if token and token.startswith("reg_"):
         await registration_bind(update, context, token[len("reg_"):])
         return ConversationHandler.END
+
+    if token == "panel":
+        return await panel_command(update, context)
 
     if is_admin(update):
         panel_note = f"\n{i18n.t('bot_panel_note', 'ru')} {webapp.PUBLIC_URL}" if webapp.PUBLIC_URL else ""
@@ -1098,6 +1130,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("myid", myid))
+    app.add_handler(CommandHandler("panel", panel_command))
     app.add_handler(CommandHandler("info", shop_info_button))  # то же, что кнопка «О пункте», если кнопок нет
     app.add_handler(add_conv)
     app.add_handler(find_conv)

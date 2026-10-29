@@ -257,12 +257,17 @@ if not os.environ.get("SECRET_KEY") or len(os.environ.get("SECRET_KEY", "")) < 3
                     "SECRET_KEY в переменных окружения хостинга")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # самый большой законный файл — резервная копия базы
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
-                  SESSION_COOKIE_SECURE=os.environ.get("PUBLIC_URL", "").startswith("https://"))
+# SameSite=None (только на https): иначе в веб-версии Telegram, где панель
+# открыта во фрейме, браузер не отправит cookie входа и войти будет нельзя.
+# От подделки запросов чужими сайтами защищает проверка Origin (_csrf_origin_check).
+_COOKIE_SECURE = os.environ.get("PUBLIC_URL", "").startswith("https://")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="None" if _COOKIE_SECURE else "Lax",
+                  SESSION_COOKIE_SECURE=_COOKIE_SECURE)
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+app.jinja_env.globals["tg_bot_username"] = BOT_USERNAME.lstrip("@")
 ADMIN_TELEGRAM_ID = os.environ.get("ADMIN_TELEGRAM_ID", "")
 
 
@@ -1918,16 +1923,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 </script>
-<script>
-// скрипт Telegram нужен, только если панель открыта внутри Telegram —
-// в обычном приложении/браузере его не грузим (раньше он держал белый экран)
-if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
-  const s = document.createElement('script');
-  s.src = 'https://telegram.org/js/telegram-web-app.js';
-  s.onload = () => { if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } };
-  document.head.appendChild(s);
-}
-</script>
+<!--__TG_PANEL_JS__-->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
@@ -3253,6 +3249,7 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
       {% if is_sub_owner %}<a class="more-item" href="/referral"><i class="fa-solid fa-gift"></i><span>{{ T.ref_menu }}</span></a>{% endif %}
       <a class="more-item more-install" href="/app?lang={{ lang }}"><i class="fa-solid fa-mobile-screen-button"></i><span>{{ T.inst_menu }}</span></a>
+      {% if tg_bot_username %}<a class="more-item tg-only-out" href="https://t.me/{{ tg_bot_username }}?start=panel" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i><span>{{ T.tg_open_menu }}</span></a>{% endif %}
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
       <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
   </div>
@@ -3739,8 +3736,8 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   <div id="view-export" class="card" style="display:none;">
     <p style="margin-top:0;">{{ T.export_p1 }}</p>
     <p class="hint-text">{{ T.export_p2 }}</p>
-    <button class="submit" onclick="window.location.href='/api/export'">{{ T.export_btn }}</button>
-    <button class="submit" style="background:#1a7a3d; margin-top:8px;" onclick="window.location.href='/api/export_excel'">{{ T.export_excel_btn }}</button>
+    <button class="submit" onclick="obDownload('/api/export')">{{ T.export_btn }}</button>
+    <button class="submit" style="background:#1a7a3d; margin-top:8px;" onclick="obDownload('/api/export_excel')">{{ T.export_excel_btn }}</button>
     <p class="hint-text">{{ T.export_excel_hint }}</p>
   </div>
 
@@ -6472,7 +6469,7 @@ function closeSupPayForm() {
 function downloadSupStatement() {
   const f = document.getElementById('ss_from').value, t = document.getElementById('ss_to').value;
   if (f && t && f > t) { showMsg(T.ss_err_period, false); return; }
-  window.location.href = `/api/suppliers/${SUP.cardId}/statement.xlsx?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+  obDownload(`/api/suppliers/${SUP.cardId}/statement.xlsx?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`);
 }
 
 function supNewToken() {
@@ -19311,6 +19308,104 @@ if (location.hash === '#map') admTab('map');
 assert ADMIN_PAGE.count(_SW_SNIPPET) == 1
 ADMIN_PAGE = ADMIN_PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
+# ---------- Панель внутри Telegram (кнопка в боте → /tg) ----------
+# Панель открывается как Telegram Mini App. Внутри Telegram: разворачиваем
+# окно на весь экран, отключаем «закрытие свайпом вниз» (мешало листать),
+# внешние ссылки открываем через Telegram, а файлы (Excel и т.п.) — скачать
+# внутри Telegram нельзя, поэтому сервер присылает их в чат с ботом.
+# Скрипт Telegram грузится только внутри Telegram — в браузере/приложении
+# ничего не меняется. ВНИМАНИЕ: строка не raw — в JS без обратных слэшей.
+TG_PANEL_JS = """<script>
+(function () {
+  var inTg = false;
+  try {
+    if (location.hash.indexOf('tgWebAppData') !== -1) sessionStorage.setItem('ob_tg', '1');
+    inTg = !!(window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1 || sessionStorage.getItem('ob_tg') === '1');
+  } catch (e) {}
+  var DL_RE = /^[/](api[/]export(_excel)?|api[/]products[/]import_template|api[/]suppliers[/][0-9]+[/]statement[.]xlsx|api[/]admin[/]income[/]export|download[/]plate-agent[.]zip)$/;
+  function tg() { var w = window.Telegram && window.Telegram.WebApp; return (w && w.initData) ? w : null; }
+  window.obDownload = function (u) { if (!(tg() && route(u, false))) location.href = u; };
+  if (!inTg) return;
+  document.documentElement.classList.add('in-tg');
+  var TXT = { wait: {{ T.tgdl_wait|tojson }}, sent: {{ T.tgdl_sent|tojson }}, fail: {{ T.tgdl_fail|tojson }} };
+
+  function toast(text, ms) {
+    var el = document.getElementById('obTgToast');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'obTgToast';
+      el.style.cssText = 'position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:88%;background:#0A2540;color:#fff;padding:11px 16px;border-radius:12px;font:600 14px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:99999;text-align:center;transition:opacity .2s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = text; el.style.opacity = '1';
+    clearTimeout(el._t); el._t = setTimeout(function () { el.style.opacity = '0'; }, ms || 3500);
+  }
+  var busy = false;
+  function sendFile(path) {
+    var w = tg();
+    if (busy || !w) return;
+    busy = true; toast(TXT.wait, 20000);
+    fetch('/api/tg/send_file', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': w.initData },
+      body: JSON.stringify({ path: path })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      var el = document.getElementById('obTgToast'); if (el) el.style.opacity = '0';
+      var text = d.ok ? TXT.sent : (d.error || TXT.fail);
+      try { w.HapticFeedback.notificationOccurred(d.ok ? 'success' : 'error'); } catch (e) {}
+      try { w.showAlert(text); } catch (e) { toast(text, 6000); }
+    }).catch(function () { toast(TXT.fail, 6000); }).then(function () { busy = false; });
+  }
+  // true — ссылку обработали сами (Telegram/файл в чат), false — пусть браузер
+  function route(url, newWin) {
+    var w = tg(); if (!w) return false;
+    var a = document.createElement('a'); a.href = url;
+    if (a.host === location.host) {
+      if (DL_RE.test(a.pathname)) { sendFile(a.pathname + a.search); return true; }
+      if (newWin) { w.openLink(a.href); return true; }
+      return false;
+    }
+    if (a.hostname === 't.me' || a.hostname === 'telegram.me') { w.openTelegramLink(a.href); return true; }
+    if (a.protocol === 'http:' || a.protocol === 'https:') { w.openLink(a.href); return true; }
+    return false;  // tel:, mailto: и т.п. — как обычно
+  }
+  var origOpen = window.open;
+  window.open = function (url) {
+    try { if (url && route(String(url), true)) return null; } catch (e) {}
+    return origOpen.apply(window, arguments);
+  };
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var h = a.getAttribute('href') || '';
+    if (!h || h.charAt(0) === '#' || h.indexOf('javascript:') === 0) return;
+    try { if (route(a.href, a.target === '_blank')) { e.preventDefault(); e.stopPropagation(); } } catch (err) {}
+  }, true);
+
+  function setup() {
+    var w = window.Telegram && window.Telegram.WebApp; if (!w) return;
+    try { w.ready(); w.expand(); } catch (e) {}
+    try { if (w.isVersionAtLeast('7.7')) w.disableVerticalSwipes(); } catch (e) {}
+    try {
+      var m = document.querySelector('meta[name=theme-color]');
+      if (w.isVersionAtLeast('6.1')) w.setHeaderColor(m ? m.content : '#0A2540');
+    } catch (e) {}
+  }
+  if (window.Telegram && window.Telegram.WebApp) { setup(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://telegram.org/js/telegram-web-app.js';
+  s.onload = setup;
+  document.head.appendChild(s);
+})();
+</script>
+<style>html.in-tg .more-install, html.in-tg .tg-only-out { display:none !important; }</style>
+"""
+assert "\\" not in TG_PANEL_JS
+assert PAGE.count("<!--__TG_PANEL_JS__-->") == 1
+PAGE = PAGE.replace("<!--__TG_PANEL_JS__-->", TG_PANEL_JS, 1)
+assert LOGIN_PAGE.count("</head>") == 1 and ADMIN_PAGE.count("</head>") == 1
+LOGIN_PAGE = LOGIN_PAGE.replace("</head>", TG_PANEL_JS + "</head>", 1)
+ADMIN_PAGE = ADMIN_PAGE.replace("</head>", TG_PANEL_JS + "</head>", 1)
+
 # Заставка при запуске приложения с иконки (вариант 2: капля наполняется маслом).
 # Показывается только в установленном приложении (standalone) и один раз за запуск:
 # при переходах между страницами больше не появляется. Исчезает, когда страница
@@ -23019,6 +23114,66 @@ def tg_client_required(view):
         g.tg_id = user["id"]
         return view(*args, **kwargs)
     return wrapped
+
+
+# ---------- Панель в Telegram: вход по кнопке бота и файлы в чат ----------
+@app.route("/tg")
+def tg_panel_entry():
+    """Сюда ведёт кнопка «Панель OilBook» в боте. Уже вошёл — сразу в панель,
+    нет — на страницу входа (логин и пароль как на сайте)."""
+    role = session.get("role")
+    if role == "admin":
+        return redirect(url_for("admin_page"))
+    if role in ("shop", "branch") and session.get("shop_id"):
+        return redirect(url_for("index"))
+    lang = request.args.get("lang")
+    return redirect(url_for("login_page", lang=lang if lang in ("ru", "uz") else None))
+
+
+_TG_DL_PATH_RE = re.compile(r"^/(api/export(_excel)?|api/products/import_template|"
+                            r"api/suppliers/\d+/statement\.xlsx|api/admin/income/export|"
+                            r"download/plate-agent\.zip)(\?[^#]*)?$")
+_TG_DL_MAX_BYTES = 45 * 1024 * 1024  # бот может отправить файл до 50 МБ
+
+
+@app.route("/api/tg/send_file", methods=["POST"])
+def api_tg_send_file():
+    """Внутри Telegram файлы не скачиваются — получаем тот же файл, что дала
+    бы кнопка «Скачать» (с теми же правами этого входа), и бот присылает его
+    человеку в чат. Кому слать — берём из подписанных данных Telegram."""
+    shop = db.get_shop(session["shop_id"]) if session.get("shop_id") else None
+    lang = ((shop or {}).get("language") or "ru") if session.get("role") != "admin" else "ru"
+    if session.get("role") not in ("shop", "branch", "admin"):
+        return jsonify({"ok": False, "error": "session", "login": True}), 401
+    user = _tg_verify_init_data(request.headers.get("X-Telegram-Init-Data") or "")
+    if not user:
+        return jsonify({"ok": False, "error": i18n.t("tgdl_no_tg", lang)}), 403
+    path = str((request.get_json(silent=True) or {}).get("path") or "")
+    if not _TG_DL_PATH_RE.match(path):
+        return jsonify({"ok": False, "error": i18n.t("tgdl_fail", lang)}), 400
+    try:
+        cookie_name = app.config.get("SESSION_COOKIE_NAME") or "session"
+        with app.test_client() as c:
+            # тот же вход, что у человека: передаём его cookie сессии
+            c.set_cookie(cookie_name, request.cookies.get(cookie_name, ""))
+            r = c.get(path, headers={"Accept": "application/octet-stream"})
+        disp = r.headers.get("Content-Disposition") or ""
+        if r.status_code != 200 or "attachment" not in disp.lower():
+            logger.warning(f"Файл для Telegram не получен: {path} → HTTP {r.status_code}")
+            return jsonify({"ok": False, "error": i18n.t("tgdl_fail", lang)}), 400
+        from werkzeug.http import parse_options_header
+        fname = parse_options_header(disp)[1].get("filename") or "oilbook_file"
+        data = r.get_data()
+    except Exception as e:
+        logger.error(f"Файл для Telegram: ошибка {path}: {e}")
+        return jsonify({"ok": False, "error": i18n.t("tgdl_fail", lang)}), 500
+    if len(data) > _TG_DL_MAX_BYTES:
+        return jsonify({"ok": False, "error": i18n.t("tgdl_too_big", lang)}), 400
+    sent = _tg_api("sendDocument", {"chat_id": user["id"], "caption": "OilBook · " + fname},
+                   {"document": (fname, data, r.mimetype or "application/octet-stream")})
+    if not sent:
+        return jsonify({"ok": False, "error": i18n.t("tgdl_fail", lang)}), 502
+    return jsonify({"ok": True})
 
 
 def _miniapp_texts(lang):
