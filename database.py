@@ -331,6 +331,13 @@ def _migrate(conn):
     if "language" not in shop_cols:
         conn.execute("ALTER TABLE shops ADD COLUMN language TEXT DEFAULT 'ru'")
     shop_cols.add("language")
+    # обучение для мастеров: у точек, зарегистрированных ДО появления этой
+    # колонки, — 0 (курс открыт, как и раньше). Новые точки с саморегистрации
+    # получают 1: курс (кроме 1-го модуля) открывается в подарок после оплаты
+    # 12 месяцев или «Безлимита» — и остаётся навсегда
+    if "course_gate" not in shop_cols:
+        conn.execute("ALTER TABLE shops ADD COLUMN course_gate INTEGER DEFAULT 0")
+    shop_cols.add("course_gate")
 
     new_shop_cols = {
         "password_plain": "TEXT",
@@ -5511,6 +5518,31 @@ def grace_days(settings: dict = None) -> int:
     return int(settings.get("grace_days") or 0)
 
 
+COURSE_GIFT_MONTHS = 12  # с какого срока подписки курс идёт в подарок
+
+
+def course_access(shop_id: int) -> dict:
+    """Доступ к обучению для точки (филиал и сотрудники — по главной точке).
+    gated — точка из «новых» (курс открывается подарком); unlocked — подарок
+    уже получен: есть подтверждённая оплата за 12+ месяцев или «Безлимит».
+    Считается по истории оплат, поэтому работает при любом способе оплаты
+    (чек, наличные через админку, автоплатёж), и доступ не пропадает, когда
+    потом продлевают на меньший срок."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id, role, parent_shop_id, course_gate, license_type FROM shops WHERE id=?",
+                           (shop_id,)).fetchone()
+        if row and row["role"] == "branch" and row["parent_shop_id"]:
+            row = conn.execute("SELECT id, role, parent_shop_id, course_gate, license_type FROM shops WHERE id=?",
+                               (row["parent_shop_id"],)).fetchone()
+        if not row or not row["course_gate"]:
+            return {"gated": False, "unlocked": True, "locked": False}
+        unlocked = row["license_type"] == "lifetime" or conn.execute(
+            "SELECT 1 FROM sub_payments WHERE shop_id=? AND status='confirmed' "
+            "AND (kind='lifetime' OR COALESCE(months, 0) >= ?) LIMIT 1",
+            (row["id"], COURSE_GIFT_MONTHS)).fetchone() is not None
+        return {"gated": True, "unlocked": unlocked, "locked": not unlocked}
+
+
 def trial_days() -> int:
     return max(1, int(get_platform_settings().get("trial_days") or 3))
 
@@ -7756,8 +7788,8 @@ def approve_registration(req_id: int) -> dict:
             INSERT INTO shops (username, password_hash, password_plain, role, shop_name, phone, address,
                                anpr_token, notify_telegram_id, language, is_active, owner_link_token,
                                warehouse_enabled, store_enabled, sms_enabled, paid_until, license_type, trial,
-                               self_registered, lat, lon)
-            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 1, 0, ?, 'sub', 1, 1, ?, ?)
+                               self_registered, lat, lon, course_gate)
+            VALUES (?, ?, NULL, 'shop', ?, ?, ?, ?, ?, ?, 1, ?, 1, 1, 0, ?, 'sub', 1, 1, ?, ?, 1)
         """, (req["username"], req["password_hash"], req["shop_name"], req.get("phone"), address,
               secrets.token_urlsafe(8), str(req["tg_id"]) if req.get("tg_id") else None,
               req.get("language") or "ru", secrets.token_urlsafe(12), until, req.get("lat"), req.get("lon")))

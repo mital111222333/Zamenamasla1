@@ -3136,6 +3136,13 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .cnode.open { background:#000; color:var(--ash); border:1px solid var(--hair); }
   .cnode.open:hover, .cnode.done:hover { border-color:var(--iris-2); color:#fff; }
   .cnode.cur { width:64px; height:64px; margin-left:-32px; background:var(--iris); color:#fff; border:0; box-shadow:0 0 0 8px rgba(128,82,255,.18), 0 0 40px rgba(128,82,255,.45); font-size:22px; }
+  .cnode.lock { background:#000; color:var(--ash); border:1px dashed var(--hair); font-size:13px; opacity:.75; }
+  .course-row.lock span.cr-t { color:var(--ash); }
+  .course-gate { max-width:620px; margin:18px auto 6px; border:1px solid rgba(255,184,41,.45); border-radius:20px; padding:18px 18px 20px; display:flex; flex-direction:column; gap:6px; background:rgba(255,184,41,.06); }
+  .course-gate .cg-tag { font-size:12px; font-weight:600; color:var(--saffron); text-transform:uppercase; letter-spacing:.025em; }
+  .course-gate .cg-t { font-size:20px; font-weight:400; color:#fff; line-height:1.25; }
+  .course-gate .cg-d { font-size:14px; color:var(--silver); }
+  .course-gate .cg-btn { align-self:flex-start; margin-top:10px; background:var(--saffron); color:#1a1200; border-radius:24px; padding:11px 18px; font-size:12.5px; font-weight:600; text-transform:uppercase; letter-spacing:.025em; text-decoration:none; }
   .cnode .cscore { position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); font-size:11px; font-weight:600; color:var(--saffron); white-space:nowrap; letter-spacing:.025em; }
   .ccard { position:absolute; width:150px; box-sizing:border-box; background:#000; color:#fff; border:1px solid var(--hair); border-radius:24px; padding:14px; display:flex; flex-direction:column; gap:8px; }
   .ccard .cc-meta { font-size:11px; font-weight:600; color:var(--saffron); text-transform:uppercase; letter-spacing:.025em; }
@@ -4801,11 +4808,26 @@ async function loadCourse() {
   } catch (e) { return; }
   if (seq !== COURSE_SEQ || !d || !d.ok) return;
   const mods = d.modules;
+  const gate = d.gate || {};
   const done = mods.filter(m => m.passed).length;
+  // курс закрыт (новая точка без годовой подписки): плашка «в подарок»
+  let gateBox = document.getElementById('courseGate');
+  if (!gateBox) {
+    gateBox = document.createElement('div');
+    gateBox.id = 'courseGate';
+    const top = document.getElementById('courseTop');
+    if (top) top.insertAdjacentElement('afterend', gateBox);
+  }
+  gateBox.innerHTML = gate.locked ? '<div class="course-gate"><span class="cg-tag">' + escapeHtml(T.cg_tag) + '</span>'
+    + '<span class="cg-t">' + escapeHtml(T.cg_title.replace('{n}', gate.months || 12)) + '</span>'
+    + '<span class="cg-d">' + escapeHtml(T.cg_desc) + '</span>'
+    + (gate.owner ? '<a class="cg-btn" href="/subscription">' + escapeHtml(T.cg_btn) + '</a>' : '<span class="cg-d" style="margin-top:10px;">' + escapeHtml(T.cg_staff) + '</span>')
+    + '</div>' : '';
   document.getElementById('courseHead').textContent = done === mods.length
     ? T.course_all_done
     : T.course_head.replace('{done}', done).replace('{left}', mods.length - done);
-  let cur = mods.find(m => !m.passed);
+  // текущий — первый непройденный из ОТКРЫТЫХ модулей
+  let cur = mods.find(m => !m.passed && !m.locked);
   const W = map.clientWidth || 340;
   const ROW = 96, TOP = 40;
   const xs = [0.5, 0.78, 0.5, 0.22];
@@ -4817,7 +4839,7 @@ async function loadCourse() {
     const a = pts[i - 1], b = pts[i], my = (a.y + b.y) / 2;
     path += ' C' + a.x + ' ' + my + ', ' + b.x + ' ' + my + ', ' + b.x + ' ' + b.y;
   }
-  const curIdx = cur ? mods.indexOf(cur) : mods.length - 1;
+  const curIdx = cur ? mods.indexOf(cur) : Math.max(0, mods.filter(m => !m.locked).length - 1);
   let donePath = 'M' + pts[0].x + ' ' + pts[0].y;
   for (let i = 1; i <= curIdx; i++) {
     const a = pts[i - 1], b = pts[i], my = (a.y + b.y) / 2;
@@ -4830,9 +4852,10 @@ async function loadCourse() {
   mods.forEach((m, i) => {
     const p = pts[i];
     const isCur = cur && m.n === cur.n;
-    const cls = isCur ? 'cur' : (m.passed ? 'done' : 'open');
+    const cls = isCur ? 'cur' : (m.locked ? 'lock' : (m.passed ? 'done' : 'open'));
     const sz = isCur ? 32 : 24;
-    html += '<a class="cnode ' + cls + '" href="/course/' + m.n + '" style="left:' + p.x + 'px; top:' + (p.y - sz) + 'px" aria-label="' + escapeHtml(m.n + '. ' + m.title) + '">' + m.n
+    const href = m.locked ? (gate.owner ? '/subscription' : '#courseGate') : '/course/' + m.n;
+    html += '<a class="cnode ' + cls + '" href="' + href + '" style="left:' + p.x + 'px; top:' + (p.y - sz) + 'px" aria-label="' + escapeHtml(m.n + '. ' + m.title) + '">' + (m.locked ? '<i class="fa-solid fa-lock"></i>' : m.n)
       + (m.passed && m.best != null ? '<span class="cscore">' + m.best + '/10</span>' : '') + '</a>';
   });
   if (cur) {
@@ -4848,8 +4871,8 @@ async function loadCourse() {
       + '<a href="/course/' + cur.n + '">' + (cur.opened ? T.course_continue : T.course_start) + '</a></div>';
   }
   map.innerHTML = html;
-  list.innerHTML = mods.map(m => '<a class="course-row' + (m.passed ? ' done' : '') + '" href="/course/' + m.n + '"><b>' + String(m.n).padStart(2, '0') + '</b><span class="cr-t">' + escapeHtml(m.title) + '</span>'
-    + (m.best != null ? '<span class="cr-s">' + m.best + '/10</span>' : '') + '</a>').join('');
+  list.innerHTML = mods.map(m => '<a class="course-row' + (m.passed ? ' done' : '') + (m.locked ? ' lock' : '') + '" href="' + (m.locked ? (gate.owner ? '/subscription' : '#courseGate') : '/course/' + m.n) + '"><b>' + String(m.n).padStart(2, '0') + '</b><span class="cr-t">' + escapeHtml(m.title) + '</span>'
+    + (m.locked ? '<span class="cr-s"><i class="fa-solid fa-lock"></i></span>' : (m.best != null ? '<span class="cr-s">' + m.best + '/10</span>' : (gate.locked && m.n === 1 ? '<span class="cr-s">' + escapeHtml(T.cg_free) + '</span>' : ''))) + '</a>').join('');
   const prog = document.getElementById('courseProg');
   if (prog) {
     prog.hidden = false;
@@ -4859,11 +4882,11 @@ async function loadCourse() {
   const bonusBox = document.getElementById('courseBonus');
   const b = d.bonus;
   if (bonusBox && b) {
-    bonusBox.innerHTML = '<a class="course-bonus" id="courseBonusCard" href="/course/' + b.n + '">'
-      + '<span class="cb-tag">' + escapeHtml(T.course_bonus_tag) + (b.passed ? ' · ' + b.best + '/10' : '') + '</span>'
+    bonusBox.innerHTML = '<a class="course-bonus" id="courseBonusCard" href="' + (b.locked ? (gate.owner ? '/subscription' : '#courseGate') : '/course/' + b.n) + '">'
+      + '<span class="cb-tag">' + (b.locked ? '<i class="fa-solid fa-lock"></i> ' + escapeHtml(T.cg_bonus_tag) : escapeHtml(T.course_bonus_tag) + (b.passed ? ' · ' + b.best + '/10' : '')) + '</span>'
       + '<span class="cb-t">' + escapeHtml(b.title) + '</span>'
       + '<span class="cb-d">' + escapeHtml(T.course_bonus_desc) + '</span>'
-      + '<span class="cb-foot"><span class="cb-btn">' + (b.opened ? T.course_continue : T.course_start) + '</span>'
+      + '<span class="cb-foot"><span class="cb-btn">' + (b.locked ? (gate.owner ? T.cg_btn : T.cg_locked_btn) : (b.opened ? T.course_continue : T.course_start)) + '</span>'
       + '<span class="cb-m">' + b.mins + ' ' + T.course_min + '</span></span></a>';
     if (window.DalaFX) DalaFX.attach(document.getElementById('courseBonusCard'), { brain: true, seed: 5, cx: 0.86, r: 0.12 });
   }
@@ -13454,7 +13477,23 @@ def _course_max() -> int:
     return COURSE_EMPLOYEE_MAX if g.is_employee else len(COURSE_MODULES)
 
 
+COURSE_FREE_MODULES = 1  # сколько первых модулей открыты всем (для пробы)
+
+
+def _course_locked() -> bool:
+    """Курс (кроме первых модулей) закрыт: новая точка ещё не получила его в
+    подарок с годовой подпиской или «Безлимитом». Считается раз на запрос."""
+    if not hasattr(g, "_course_locked"):
+        try:
+            g._course_locked = bool(db.course_access(g.shop_id)["locked"])
+        except Exception:
+            g._course_locked = False
+    return g._course_locked
+
+
 def _course_allowed(n: int) -> bool:
+    if _course_locked():
+        return 1 <= n <= min(COURSE_FREE_MODULES, _course_max())
     return 1 <= n <= _course_max() or n == COURSE_BONUS[0]
 
 
@@ -13606,12 +13645,15 @@ def api_course():
     for n, title, mins in COURSE_MODULES[:_course_max()]:
         p = prog.get(n) or {}
         mods.append({"n": n, "title": title, "mins": mins, "opened": bool(p.get("opened")),
-                     "best": p.get("best"), "passed": bool(p.get("passed"))})
+                     "best": p.get("best"), "passed": bool(p.get("passed")), "locked": not _course_allowed(n)})
     n, title, mins = COURSE_BONUS
     p = prog.get(n) or {}
     bonus = {"n": n, "title": title, "mins": mins, "opened": bool(p.get("opened")),
-             "best": p.get("best"), "passed": bool(p.get("passed"))}
-    return jsonify({"ok": True, "modules": mods, "bonus": bonus})
+             "best": p.get("best"), "passed": bool(p.get("passed")), "locked": not _course_allowed(n)}
+    # закрыт — показываем, как открыть: владелец — кнопкой на подписку,
+    # филиал и сотрудник — подсказкой (платит владелец главной точки)
+    gate = {"locked": _course_locked(), "owner": _is_sub_owner(), "months": db.COURSE_GIFT_MONTHS}
+    return jsonify({"ok": True, "modules": mods, "bonus": bonus, "gate": gate})
 
 
 @app.route("/api/course/progress", methods=["POST"])
@@ -20798,18 +20840,34 @@ def subscription_page():
         chip = ("ok", T["sub_status_active"])
     net = (T["sub_network_main"].format(sum=_fmt_sum(q["monthly"])) if q["branch_count"] == 0
            else T["sub_network_br"].format(n=q["branch_count"], sum=_fmt_sum(q["monthly"])))
+    # новая точка без курса: годовой срок и «Безлимит» дают обучение в подарок
+    try:
+        gift = bool(db.course_access(g.shop_id)["locked"])
+    except Exception:
+        gift = False
     options = []
     for o in q["options"]:
+        hero = o["months"] == db.COURSE_GIFT_MONTHS
+        full = (q["monthly"] or 0) * o["months"]
+        extra = q["branch_part"]["amount"] if q["branch_part"] else 0
         options.append({
             "months": o["months"], "label": T[f"sub_m{o['months']}"], "discount": o["discount"],
             "amount_txt": _fmt_sum(o["amount"]), "until_txt": _fmt_day(o["new_until"]),
             "sub_txt": _sub_option_text(T, o, q["branch_part"]),
-            "best": o["months"] == 12, "first": bool(o.get("first")),
+            "best": hero, "first": bool(o.get("first")), "hero": hero,
+            "full_txt": _fmt_sum(full + extra) if hero and o["discount"] and full + extra > o["amount"] else "",
+            "per_month_txt": _fmt_sum(int(round((o["amount"] - extra) / o["months"] / 100.0)) * 100) if o["months"] else "",
+            "monthly_txt": _fmt_sum(q["monthly"]) if q.get("monthly") else "",
+            "save_txt": (T["sub_hero_save"].format(sum=_fmt_sum(o["saving"]),
+                                                   n=str(round(o["saving"] / q["monthly"], 1)).replace(".", ","))
+                         if hero and o.get("saving") and q.get("monthly") else ""),
         })
+    # годовой — первым, крупной карточкой; остальные по возрастанию
+    options.sort(key=lambda o: (not o["hero"], o["months"]))
     first_txt = ""
     if q.get("first_disc") and q.get("first_amount"):
         first_txt = T["sub_first_text"].format(sum=_fmt_sum(q["first_amount"]), full=_fmt_sum(q["monthly"]))
-    checked = 1 if first_txt else 12
+    checked = 12 if gift else (1 if first_txt else 12)
     names = ", ".join(b["name"] for b in q["pending_branches"])
     branch_txt = None
     if q["branch_part"]:
@@ -20852,7 +20910,7 @@ def subscription_page():
         expired_title=T["trial_expired_title"] if st.get("trial") else T["sub_expired_title"],
         expired_txt=(T["trial_expired_text"] if st.get("trial") else T["sub_expired_text"]).format(
             date=_fmt_day(st.get("paid_until"))),
-        first_disc=q.get("first_disc") or 0, first_txt=first_txt, checked=checked,
+        first_disc=q.get("first_disc") or 0, first_txt=first_txt, checked=checked, gift=gift,
         lt_warn=(T["sub_lt_warn"].format(date=_fmt_day(st["paid_until"]))
                  if q.get("lifetime") and not st.get("trial") and st.get("days_left") is not None
                  and st["days_left"] >= 1 else ""),
@@ -21766,6 +21824,24 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 .gift b { font-size:16px; color:#3D2C00; }
 .ltc { font-size:12px; font-weight:700; color:#fff; background:#0B1F3A; padding:2px 8px; border-radius:999px; }
 .opt.lt { border-color:#0B1F3A33; }
+.opt.hero { display:block; padding:0; border-color:#9CC2F5; }
+.opt.hero.sel { border-color:var(--blue); background:#fff; box-shadow:0 6px 18px -8px rgba(29,111,224,.45); }
+.hero-in { display:flex; flex-direction:column; padding:12px 14px 6px; }
+.hero-badge { align-self:flex-start; font-size:12px; font-weight:700; color:#fff; background:var(--blue); padding:3px 10px; border-radius:999px; margin-bottom:8px; }
+.hero-top { display:flex; align-items:center; gap:12px; }
+.hero-top .nm { flex:1; font-size:18px; font-weight:800; }
+.hero-price { text-align:right; font-family:var(--mono); display:flex; flex-direction:column; }
+.hero-price s { font-size:12.5px; color:var(--muted); }
+.hero-price b { font-size:18px; font-weight:600; }
+.hero-save { margin:10px 0 4px; background:var(--green-bg); color:var(--green); border-radius:10px; padding:8px 10px; font-size:13.5px; font-weight:700; }
+.hero-ben { display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid var(--line); font-size:14px; font-weight:600; }
+.hero-ben:first-of-type { border-top:0; }
+.hero-ben > i { width:20px; text-align:center; color:var(--blue); margin-top:2px; flex:none; }
+.hero-ben.gf > i { color:#C27803; }
+.hero-ben small { display:block; font-size:12.5px; font-weight:500; color:var(--muted); margin-top:2px; }
+.hero-ben em { font-style:normal; font-size:11px; font-weight:800; color:#5C4300; background:#FFE58A; padding:1px 7px; border-radius:999px; margin-left:4px; white-space:nowrap; }
+.lt-gifts { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.lt-gifts span { font-size:11.5px; font-weight:700; color:#5C4300; background:#FFF4C2; padding:2px 8px; border-radius:999px; }
 .ltw { font-size:13px; font-weight:600; color:var(--warn); margin-top:2px; line-height:1.35; }
 .firstc { font-size:12px; font-weight:700; color:#5C4300; background:#FFE58A; padding:2px 8px; border-radius:999px; }
 .howto { display:flex; gap:6px; flex-wrap:wrap; }
@@ -21833,15 +21909,35 @@ h1 { margin:0; font-size:26px; font-weight:800; }
       {% endif %}
       <div class="h">{% if branch_txt %}{{ T.sub_or_extend }}{% else %}{{ T.sub_choose }}{% endif %}</div>
       {% for o in options %}
+      {% if o.hero %}
+      <label class="opt hero" data-opt>
+        <input type="radio" name="term" value="{{ o.months }}" data-amount="{{ o.amount_txt }}" data-until="{{ o.until_txt }}"{% if o.months == checked %} checked{% endif %}>
+        <span class="hero-in">
+          <span class="hero-badge"><i class="fa-solid fa-star"></i> {{ T.sub_best }}{% if o.discount %} · −{{ o.discount }}%{% endif %}</span>
+          <span class="hero-top">
+            <span class="radio"></span>
+            <span class="nm">{{ o.label }}</span>
+            <span class="hero-price">{% if o.full_txt %}<s>{{ o.full_txt }}</s>{% endif %}<b>{{ o.amount_txt }}</b></span>
+          </span>
+          {% if o.save_txt %}<span class="hero-save"><i class="fa-solid fa-piggy-bank"></i> {{ o.save_txt }}</span>{% endif %}
+          <span class="hero-ben"><i class="fa-solid fa-calendar-check"></i><span>{% if o.monthly_txt and o.discount %}{{ T.sub_hero_month.format(sum=o.per_month_txt, full=o.monthly_txt) }}{% else %}{{ o.sub_txt }}{% endif %}<small>{{ T.sub_hero_fixed }}</small></span></span>
+          {% if gift %}
+          <span class="hero-ben gf"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.sub_gift_course }} <em>{{ T.sub_gift_tag }}</em><small>{{ T.sub_gift_course_sub }}</small></span></span>
+          <span class="hero-ben gf"><i class="fa-solid fa-bolt"></i><span>{{ T.sub_gift_ev }} <em>{{ T.sub_gift_tag }}</em><small>{{ T.sub_gift_ev_sub }}</small></span></span>
+          {% endif %}
+        </span>
+      </label>
+      {% else %}
       <label class="opt" data-opt>
         <input type="radio" name="term" value="{{ o.months }}" data-amount="{{ o.amount_txt }}" data-until="{{ o.until_txt }}"{% if o.months == checked %} checked{% endif %}>
         <span class="radio"></span>
         <span class="mid">
-          <span class="nm">{{ o.label }}{% if o.discount %}<span class="disc">−{{ o.discount }}%</span>{% endif %}{% if o.first %}<span class="firstc">🎁 {{ T.sub_first_chip }}</span>{% elif o.best %}<span class="best">{{ T.sub_best }}</span>{% endif %}</span>
-          <span class="sub">{{ o.sub_txt }}</span>
+          <span class="nm">{{ o.label }}{% if o.discount %}<span class="disc">−{{ o.discount }}%</span>{% endif %}{% if o.first %}<span class="firstc">🎁 {{ T.sub_first_chip }}</span>{% endif %}</span>
+          <span class="sub">{{ o.sub_txt }}{% if gift %} · {{ T.sub_no_course }}{% endif %}</span>
         </span>
         <span class="amt">{{ o.amount_txt }}</span>
       </label>
+      {% endif %}
       {% endfor %}
       {% if lt %}
       <div class="h" style="margin-top:6px;">{{ T.sub_lt_or }}</div>
@@ -21851,6 +21947,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
         <span class="mid">
           <span class="nm">{{ T.sub_lt_title }}<span class="ltc">♾ {{ lt.usd }} $</span></span>
           <span class="sub">{{ lt_sub }}</span>
+          {% if gift %}<span class="lt-gifts"><span>+ {{ T.sub_gift_course }}</span><span>+ {{ T.sub_gift_ev }}</span><span>{{ T.sub_lt_never }}</span></span>{% endif %}
           {% if lt_warn %}<span class="ltw">⚠️ {{ lt_warn }}</span>{% endif %}
         </span>
         <span class="amt">{{ lt_amount_txt }}</span>
