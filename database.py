@@ -586,6 +586,10 @@ def _migrate(conn):
         "items_json": "TEXT",
         "cash_amount": "INTEGER",
         "card_amount": "INTEGER",
+        # скидка клиенту: сумма в сумах (cost = позиции − скидка) и процент,
+        # если скидку давали процентом (иначе NULL — «своя сумма»)
+        "discount_amount": "INTEGER DEFAULT 0",
+        "discount_pct": "REAL",
     }
     for col, ddl in to_add.items():
         if col not in cols:
@@ -2092,10 +2096,32 @@ def get_all_cars_overview(shop_id: int):
 # ---------- Замены масла / обслуживание ----------
 
 @_serialized
+def normalize_discount(subtotal, discount, discount_pct=None):
+    """Скидка не может быть меньше 0 и больше суммы позиций. Процент
+    сохраняем только если он разумный (0 < % ≤ 100)."""
+    try:
+        d = int(round(float(discount or 0)))
+    except (TypeError, ValueError):
+        raise ValueError("неверная скидка")
+    subtotal = int(round(subtotal or 0))
+    d = max(0, min(d, subtotal))
+    pct = None
+    if d > 0 and discount_pct not in (None, ""):
+        try:
+            pct = float(discount_pct)
+        except (TypeError, ValueError):
+            pct = None
+        if pct is not None and not (0 < pct <= 100):
+            pct = None
+        if pct is not None:
+            pct = round(pct, 2)
+    return d, pct
+
+
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
                     next_mileage=None, items=None, cash_amount=None, card_amount=None,
-                    allow_debt=False):
+                    allow_debt=False, discount=0, discount_pct=None):
     """items (необязательно) — детализированный список позиций вида
     [{"name": "Моторное масло", "brand": "MITANOL", "unit_price": 45000, "qty": 4, "total": 180000}, ...]
     Если передан — стоимость и итоговое описание считаются по нему, а service_type/oil_brand/cost
@@ -2113,6 +2139,8 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
         next_date = None
 
     items_json = None
+    if not items:
+        discount, discount_pct = 0, None  # без позиций (бот) скидки нет
     stock_moves = []  # (product_id, qty) — списываются ниже в ОДНОЙ транзакции с самой записью
     items = sanitize_items(items)
     if items:
@@ -2133,6 +2161,9 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
                 item["product_id"] = None
         items_json = json.dumps(items, ensure_ascii=False)
         cost = round(sum(i.get("total", 0) for i in items))
+        # скидка: клиент платит сумму позиций минус скидку
+        discount, discount_pct = normalize_discount(cost, discount, discount_pct)
+        cost -= discount
         names = [i["name"] for i in items]
         service_type = ", ".join(names) if names else "Обслуживание"
         motor_oil = next((i for i in items if i.get("key") == "fluid_0"), None)
@@ -2166,10 +2197,11 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
                  cash_amount, card_amount, interval_months, interval_unit, next_change_date,
-                 next_mileage, items_json, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                 next_mileage, items_json, notes, status, discount_amount, discount_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
-              cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes))
+              cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes,
+              discount, discount_pct))
         conn.commit()
         return cur.lastrowid, next_date
 
@@ -2189,7 +2221,7 @@ def get_oil_change_for_shop(oc_id: int, shop_id: int):
 @_serialized
 def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, next_mileage=None,
                        cost=None, interval_value=None, interval_unit=None, notes=None, items=None,
-                       cash_amount=None, card_amount=None):
+                       cash_amount=None, card_amount=None, discount=None, discount_pct=None):
     """Редактирует уже сохранённую запись. Если передан НЕПУСТОЙ items — полностью
     пересчитывает стоимость, детализацию (жидкости/фильтры) и итоговое
     описание по нему (так же, как при создании новой записи); cost, которое
@@ -2245,7 +2277,13 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
                     item["product_id"] = None
 
         fields["items_json"] = json.dumps(items, ensure_ascii=False)
-        fields["cost"] = round(sum(i.get("total", 0) for i in items))
+        subtotal = round(sum(i.get("total", 0) for i in items))
+        # скидка: новая (если прислали) или прежняя этой записи
+        if discount is None:
+            discount, discount_pct = existing.get("discount_amount") or 0, existing.get("discount_pct")
+        d, dp = normalize_discount(subtotal, discount, discount_pct)
+        fields["cost"] = subtotal - d
+        fields["discount_amount"], fields["discount_pct"] = d, dp
         names = [i["name"] for i in items]
         fields["service_type"] = ", ".join(names) if names else "Обслуживание"
         motor_oil = next((i for i in items if i.get("key") == "fluid_0"), None)
@@ -2253,6 +2291,12 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
         fields["filter_changed"] = int(any((i.get("key") or "").startswith("filter_") for i in items))
     elif cost is not None:
         fields["cost"] = cost
+    elif discount is not None and existing.get("items_json"):
+        # поменяли только скидку — сумма позиций та же
+        subtotal = (existing.get("cost") or 0) + (existing.get("discount_amount") or 0)
+        d, dp = normalize_discount(subtotal, discount, discount_pct)
+        fields["cost"] = subtotal - d
+        fields["discount_amount"], fields["discount_pct"] = d, dp
 
     if cash_amount is not None:
         fields["cash_amount"] = cash_amount
@@ -3064,6 +3108,7 @@ def get_net_profit_30d(shop_id: int) -> dict:
         "oil_profit": br["goods_profit"],
         "services": br["services"],
         "unpriced": br["unpriced"],
+        "discounts": br["discounts"],
         "expenses_total": expenses["total"],
         "net_profit": br["profit"] - expenses["total"],
         "net_profit_usd": usd["net_usd"],
@@ -3446,6 +3491,32 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
         return result
 
 
+def _row_profit_parts(items, discount=0):
+    """Одна запись замены → (прибыль по товарам, работа/услуги, непосчитанная
+    выручка, на сколько скидка уменьшила прибыль). Скидка делится
+    пропорционально: часть, приходящаяся на «непосчитанные» продажи,
+    уменьшает их, остальное — прибыль (иначе прибыль занижалась бы за товар,
+    который в неё и так не вошёл)."""
+    goods = services = unpriced = 0
+    subtotal = 0
+    for item in items or []:
+        total = item.get("total") or 0
+        subtotal += total
+        if item.get("cost_price") is not None and item.get("qty") is not None:
+            goods += total - item["qty"] * item["cost_price"]
+        elif item.get("product_id") or str(item.get("key") or "").startswith(("fluid_", "filter_")):
+            unpriced += total
+        else:
+            services += total
+    disc = discount or 0
+    disc_profit = 0
+    if disc and subtotal:
+        disc_unpriced = disc * unpriced / subtotal
+        unpriced -= disc_unpriced
+        disc_profit = disc - disc_unpriced
+    return goods, services, unpriced, disc_profit
+
+
 def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
     """Из чего складывается прибыль за период:
     • goods_profit — товары со склада: цена продажи − цена закупки на момент
@@ -3459,10 +3530,11 @@ def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
     profit = goods_profit + services."""
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT oc.items_json, oc.cost FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            SELECT oc.items_json, oc.cost, COALESCE(oc.discount_amount, 0) AS discount
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchall()
-    goods = services = unpriced = 0
+    goods = services = unpriced = discounts = disc_profit = 0
     for row in rows:
         items = None
         if row["items_json"]:
@@ -3473,16 +3545,18 @@ def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
         if not items:
             unpriced += row["cost"] or 0
             continue
-        for item in items:
-            total = item.get("total") or 0
-            if item.get("cost_price") is not None and item.get("qty") is not None:
-                goods += total - item["qty"] * item["cost_price"]
-            elif item.get("product_id") or str(item.get("key") or "").startswith(("fluid_", "filter_")):
-                unpriced += total
-            else:
-                services += total
-    goods, services, unpriced = round(goods), round(services), round(unpriced)
-    return {"goods_profit": goods, "services": services, "unpriced": unpriced, "profit": goods + services}
+        r_goods, r_services, r_unpriced, r_disc = _row_profit_parts(items, row["discount"])
+        goods += r_goods
+        services += r_services - r_disc
+        unpriced += r_unpriced
+        discounts += row["discount"] or 0
+        disc_profit += r_disc
+    goods, services, unpriced, disc_profit = round(goods), round(services), round(unpriced), round(disc_profit)
+    # services — уже за вычетом скидок (той их части, что приходится на
+    # посчитанные продажи); discounts — сколько всего скидок дали за период
+    return {"goods_profit": goods, "services": services, "unpriced": unpriced,
+            "profit": goods + services,
+            "discounts": round(discounts), "discount_profit": disc_profit}
 
 
 def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
@@ -3821,7 +3895,7 @@ def get_network_overview(shop_ids) -> dict:
             sum(c[p]["previous"] for c in cmp_parts), sum(c[p]["paid_previous"] for c in cmp_parts))
     profit = {p: sum(x[p] for x in prof) for p in periods}
 
-    net = {"oil_profit": 0, "services": 0, "unpriced": 0, "expenses_total": 0, "net_profit": 0}
+    net = {"oil_profit": 0, "services": 0, "unpriced": 0, "discounts": 0, "expenses_total": 0, "net_profit": 0}
     net_usd = []
     for sid in shop_ids:
         n = get_net_profit_30d(sid)
@@ -8350,7 +8424,8 @@ def profit_usd_range(shop_id: int, date_from: str, date_to: str, rate_on=None) -
     rate_on = rate_on or usd_rate_fn(shop_id)
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT oc.items_json, oc.change_date FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            SELECT oc.items_json, oc.change_date, COALESCE(oc.discount_amount, 0) AS discount
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchall()
         exp = conn.execute("""SELECT amount, expense_date FROM expense_entries
@@ -8362,15 +8437,8 @@ def profit_usd_range(shop_id: int, date_from: str, date_to: str, rate_on=None) -
             items = json.loads(row["items_json"]) if row["items_json"] else None
         except (ValueError, TypeError):
             items = None
-        p = 0
-        for item in items or []:
-            total = item.get("total") or 0
-            if item.get("cost_price") is not None and item.get("qty") is not None:
-                p += total - item["qty"] * item["cost_price"]
-            elif item.get("product_id") or str(item.get("key") or "").startswith(("fluid_", "filter_")):
-                pass
-            else:
-                p += total
+        g_, sv_, _u, dp_ = _row_profit_parts(items, row["discount"]) if items else (0, 0, 0, 0)
+        p = g_ + sv_ - dp_
         d = (row["change_date"] or "")[:10]
         per_day[d] = per_day.get(d, 0) + p
     profit = 0.0

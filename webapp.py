@@ -1300,6 +1300,7 @@ _OCR_FILES = {
     "ort-wasm-simd-threaded.mjs": "text/javascript",
     "ort-wasm-simd-threaded.wasm": "application/wasm",
     "plate_ocr_uz.onnx": "application/octet-stream",  # дообучена на номерах UZ / RU / KZ / KG / TJ
+    "plate_det.onnx": "application/octet-stream",  # «искатель»: находит номер в любом месте кадра
 }
 _ocr_gz_cache = {}
 _ocr_gz_lock = threading.Lock()
@@ -2352,6 +2353,21 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
   .flt-tile.on b::before { content:'✓ '; color:var(--blue); }
   .flt-tile.add b { color:var(--blue); }
   .labor-btn { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #FDE68A; background:#FFFBEB; color:#92400E; border-radius:999px; padding:7px 13px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; margin:2px 0 8px; }
+  .disc-seg { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
+  .disc-seg button, .disc-unit button { border:1.5px solid var(--border); background:#fff; border-radius:12px; padding:10px 4px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+  .disc-seg button.on, .disc-unit button.on { border-color:var(--blue); background:#EFF6FF; color:var(--blue); }
+  .disc-custom { display:flex; gap:6px; margin-top:8px; }
+  .disc-custom input { flex:1; min-width:0; margin:0; }
+  .disc-unit { display:flex; gap:4px; }
+  .disc-unit button { padding:8px 12px; }
+  .disc-sum { margin-top:10px; padding:10px 12px; background:var(--field-bg); border-radius:12px; font-size:13px; }
+  .disc-sum div { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
+  .disc-sum .d-minus { color:#B3241C; font-weight:700; }
+  .disc-sum .d-pay { font-size:16px; font-weight:800; padding-top:6px; margin-top:4px; border-top:1px dashed var(--border); }
+  .disc-sum .d-pay b, .disc-sum b { font-family:var(--font-mono); }
+  .disc-chip { border:1.5px solid var(--border); background:#fff; border-radius:10px; padding:0 12px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+  .disc-warn { color:#B3241C; font-size:12px; margin-top:6px; }
+  .rcpt-line.rcpt-disc em, .rc-line.rc-disc em { color:#B3241C; }
   .debt-terms { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 10px; }
   .debt-terms button { border:1px solid #F5D9A8; background:#fff; color:#8A4B06; border-radius:999px; padding:7px 12px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
   .debt-terms button.on { background:#8A4B06; color:#fff; border-color:#8A4B06; }
@@ -3328,7 +3344,22 @@ if (window.TelegramWebviewProxy || location.hash.indexOf('tgWebApp') !== -1) {
       <div id="rcptLines"><div class="rcpt-empty">{{ T.rcpt_empty }}</div></div>
     </div>
     <div class="af-sec af-pay">
-      <div class="af-h"><i class="fa-solid fa-wallet"></i>{{ T.af_payment }}</div>
+      <div class="af-h"><i class="fa-solid fa-tag"></i>{{ T.disc_title }}</div>
+      <div class="disc-seg" id="discSeg">
+        <button type="button" data-p="0" class="on" onclick="setDiscount(0)">0%</button>
+        <button type="button" data-p="5" onclick="setDiscount(5)">5%</button>
+        <button type="button" data-p="10" onclick="setDiscount(10)">10%</button>
+        <button type="button" data-p="c" onclick="setDiscountCustom()">{{ T.disc_custom }}</button>
+      </div>
+      <div id="discCustom" class="disc-custom" style="display:none;">
+        <input id="disc_value" type="number" inputmode="decimal" placeholder="0" aria-label="{{ T.disc_title }}" oninput="onDiscInput()">
+        <div class="disc-unit">
+          <button type="button" data-u="pct" class="on" onclick="setDiscUnit('pct')">%</button>
+          <button type="button" data-u="sum" onclick="setDiscUnit('sum')">{{ T.currency }}</button>
+        </div>
+      </div>
+      <div id="discSummary" class="disc-sum" style="display:none;"></div>
+      <div class="af-h" style="margin-top:16px;"><i class="fa-solid fa-wallet"></i>{{ T.af_payment }}</div>
       <div class="pay-seg" id="paySeg">
         <button type="button" data-m="cash" class="on" onclick="setPayMode('cash')"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</button>
         <button type="button" data-m="card" onclick="setPayMode('card')"><i class="fa-solid fa-credit-card"></i> {{ T.payment_card }}</button>
@@ -4334,8 +4365,18 @@ MODAL_AND_SCRIPT = """
     <button type="button" class="submit" style="padding:8px; background:var(--border);" onclick="addOtherStockRow('svcOther')">{{ T.wh_add_row }}</button>
     {% endif %}
 
+    <div class="field" style="margin-top:10px;">
+      <label>{{ T.disc_title }}, {{ T.currency }}</label>
+      <div style="display:flex; gap:6px;">
+        <input id="svc_discount" type="number" inputmode="numeric" placeholder="0" style="flex:1; min-width:0;" oninput="updateSvcTotal()">
+        <button type="button" class="disc-chip" onclick="svcDiscPct(5)">5%</button>
+        <button type="button" class="disc-chip" onclick="svcDiscPct(10)">10%</button>
+      </div>
+      <div id="svcDiscHint" style="font-size:12px; color:var(--hint); margin-top:4px;"></div>
+    </div>
+
     <div class="field" style="margin-top:10px; padding:12px; background:var(--field-bg); border-radius:10px;">
-      <label style="font-size:15px;">{{ T.field_total }}</label>
+      <label style="font-size:15px;">{{ T.disc_to_pay }}</label>
       <div id="svcTotalCost" style="font-size:22px; font-weight:600; color:var(--btn); font-family:var(--font-mono);">0</div>
     </div>
 
@@ -7469,6 +7510,8 @@ function renderNetProfitHtml(np) {
       ${np.net_profit_usd != null ? `<div style="font-size:13px; font-family:var(--font-mono); color:var(--hint); margin-top:2px;">${usdApprox(np.net_profit_usd)} · ${T.usd_by_day_rate}</div>` : ''}
       <div style="font-size:11px; color:var(--hint); margin-top:2px;">${T.dash_net_profit_label}</div>
     </div>
+    ${(np.discounts || 0) > 0 ? `
+    <div style="margin-top:10px; font-size:12px; color:var(--hint); text-align:center;"><i class="fa-solid fa-tag"></i> ${T.np_discounts_1} <b>−${(np.discounts).toLocaleString('ru-RU')} ${T.currency}</b> ${T.np_discounts_2}</div>` : ''}
     ${unpriced > 0 ? `
     <div style="margin-top:12px; padding:10px 12px; background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px; font-size:12.5px; color:#92400E;">
       ⚠️ ${T.np_unpriced_1} <b>${unpriced.toLocaleString('ru-RU')} ${T.currency}</b> ${T.np_unpriced_2}
@@ -8135,7 +8178,7 @@ async function applyStatsRange() {
     ${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data, profit: hasProfit ? data.profit : null, profitUsd: hasProfit ? data.profit_usd : null })}
     ${hasProfit ? `
     <div class="stats-card" style="margin-top:10px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
-      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit, net_profit_usd: data.net_profit_usd })}
+      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, discounts: data.discounts || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit, net_profit_usd: data.net_profit_usd })}
     </div>
     ` : ''}
     <div class="stats-card" style="margin-top:10px;">
@@ -8762,7 +8805,7 @@ function addLabor() {
 
 // долг: «вернёт через 1 нед / 2 нед / 1 мес» — одним платежом весь остаток
 function setDebtTerm(days) {
-  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const total = payTotal();
   const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
   const card = parseFloat(document.getElementById('pay_card').value) || 0;
   const rest = Math.max(0, Math.round(total - cash - card));
@@ -8903,8 +8946,11 @@ function renderReceiptSheet() {
     const q = it.qty && it.qty !== 1 ? `${String(it.qty).replace('.', ',')} × ${money(it.unit_price)}` : `1 × ${money(it.unit_price)}`;
     const canEdit = it.key !== 'other_stock';
     return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div><em>${money(it.total)}</em>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
-  }).join('') : `<div class="rcpt-empty" style="display:block;">${T.rcpt_empty}</div>`;
-  document.getElementById('rcSheetTotal').textContent = money(items.reduce((a, it) => a + it.total, 0));
+  }).join('') + (() => {
+    const d = discountFor(itemsSubtotal(items));
+    return d ? `<div class="rc-line rc-disc"><div><b>${T.disc_title}</b></div><em>−${money(d)}</em></div>` : '';
+  })() : `<div class="rcpt-empty" style="display:block;">${T.rcpt_empty}</div>`;
+  document.getElementById('rcSheetTotal').textContent = money(payTotal(items));
 }
 function rcPriceField(it) {
   const fi = FLUID_KEYS.indexOf(it.key), ti = FILTER_KEYS.indexOf(it.key);
@@ -9112,6 +9158,91 @@ function collectItems() {
 
 let paymentSplitTouched = false;
 
+// Скидка клиенту: 0% / 5% / 10% / своя (% или сумма). Клиент платит сумму
+// позиций минус скидку; при скидке процентом итог округляется до 1 000.
+let DISC = { mode: 'pct', pct: 0, custom: false, value: 0 };
+function itemsSubtotal(items) {
+  return (items || collectItems()).reduce((sum, i) => sum + i.total, 0);
+}
+function discountFor(sub) {
+  if (!(sub > 0)) return 0;
+  let d = 0;
+  if (DISC.mode === 'sum') {
+    d = Math.round(DISC.value || 0);
+  } else if (DISC.pct > 0) {
+    const pay = Math.round(sub * (1 - Math.min(DISC.pct, 100) / 100) / 1000) * 1000;
+    d = sub - pay;
+  }
+  return Math.max(0, Math.min(d, sub));
+}
+function discountPct() {
+  return DISC.mode === 'pct' && DISC.pct > 0 ? Math.min(DISC.pct, 100) : null;
+}
+function payTotal(items) {
+  const sub = itemsSubtotal(items);
+  return sub - discountFor(sub);
+}
+function syncDiscUi() {
+  document.querySelectorAll('#discSeg button').forEach(b => {
+    const p = b.dataset.p;
+    b.classList.toggle('on', DISC.custom ? p === 'c' : (DISC.mode === 'pct' && String(DISC.pct) === p));
+  });
+  const box = document.getElementById('discCustom');
+  if (box) box.style.display = DISC.custom ? 'flex' : 'none';
+  document.querySelectorAll('#discCustom .disc-unit button').forEach(b => b.classList.toggle('on', b.dataset.u === DISC.mode));
+}
+function renderDiscSummary(sub) {
+  const el = document.getElementById('discSummary');
+  if (!el) return;
+  const d = discountFor(sub);
+  const money = v => Math.round(v).toLocaleString('ru-RU');
+  let warn = '';
+  if (DISC.mode === 'sum' && (DISC.value || 0) > sub && sub > 0) warn = `<div class="disc-warn">${T.disc_too_big}</div>`;
+  if (!d) { el.style.display = warn ? 'block' : 'none'; el.innerHTML = warn; return; }
+  const pct = discountPct() || (sub ? Math.round(d / sub * 1000) / 10 : 0);
+  el.style.display = 'block';
+  el.innerHTML = `<div><span>${T.disc_subtotal}</span><b>${money(sub)}</b></div>`
+    + `<div class="d-minus"><span>${T.disc_title} (${String(pct).replace('.', ',')}%)</span><b>−${money(d)}</b></div>`
+    + `<div class="d-pay"><span>${T.disc_to_pay}</span><b>${money(sub - d)} ${T.currency}</b></div>` + warn;
+}
+function discChanged() {
+  syncDiscUi();
+  paymentSplitTouched = false;
+  if (typeof PAY_MODE !== 'undefined' && PAY_MODE === 'debt') { updateTotal(); updateDebtRemaining(); }
+  else updateTotal();
+  if (document.getElementById('rcSheet') && document.getElementById('rcSheet').classList.contains('open')) renderReceiptSheet();
+}
+function setDiscount(p) {
+  DISC = { mode: 'pct', pct: p, custom: false, value: 0 };
+  const v = document.getElementById('disc_value'); if (v) v.value = '';
+  discChanged();
+}
+function setDiscountCustom() {
+  DISC.custom = true;
+  if (DISC.mode === 'pct') { DISC.value = DISC.pct || 0; }
+  const v = document.getElementById('disc_value');
+  if (v) { v.value = DISC.mode === 'sum' ? (DISC.value || '') : (DISC.pct || ''); setTimeout(() => v.focus(), 50); }
+  discChanged();
+}
+function setDiscUnit(u) {
+  DISC.mode = u;
+  DISC.custom = true;
+  onDiscInput();
+}
+function onDiscInput() {
+  const v = document.getElementById('disc_value');
+  const num = Math.max(0, parseFloat(String((v && v.value) || '').replace(',', '.')) || 0);
+  if (DISC.mode === 'sum') { DISC.value = num; DISC.pct = 0; }
+  else { DISC.pct = Math.min(num, 100); DISC.value = 0; }
+  discChanged();
+}
+function resetDiscount() {
+  DISC = { mode: 'pct', pct: 0, custom: false, value: 0 };
+  const v = document.getElementById('disc_value'); if (v) v.value = '';
+  syncDiscUi();
+  renderDiscSummary(0);
+}
+
 // Чек справа (на компьютере): те же позиции, что уйдут в запись
 function renderReceipt(items) {
   const box = document.getElementById('rcptLines');
@@ -9124,13 +9255,18 @@ function renderReceipt(items) {
     const title = it.brand ? it.brand : it.name;
     const sub = (it.brand ? it.name + ' · ' : '') + (it.qty && it.qty !== 1 ? `${it.qty} × ${money(it.unit_price)}` : '1 × ' + money(it.unit_price));
     return `<div class="rcpt-line"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div><em>${money(it.total)}</em></div>`;
-  }).join('');
+  }).join('') + (() => {
+    const d = discountFor(itemsSubtotal(items));
+    return d ? `<div class="rcpt-line rcpt-disc"><div><b>${T.disc_title}</b></div><em>−${money(d)}</em></div>` : '';
+  })();
 }
 
 function updateTotal() {
   const _items = collectItems();
   renderReceipt(_items);
-  const total = _items.reduce((sum, i) => sum + i.total, 0);
+  const subtotal = itemsSubtotal(_items);
+  const total = subtotal - discountFor(subtotal);
+  renderDiscSummary(subtotal);
   document.getElementById('totalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
   const payCash = document.getElementById('pay_cash');
   const payCard = document.getElementById('pay_card');
@@ -9157,7 +9293,7 @@ function onPayCashInput() {
   paymentSplitTouched = true;
   const debtEnabled = document.getElementById('debt_enabled').checked;
   if (!debtEnabled) {
-    const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+    const total = payTotal();
     const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
     document.getElementById('pay_card').value = Math.max(0, Math.round(total - cash));
   }
@@ -9168,7 +9304,7 @@ function onPayCardInput() {
   paymentSplitTouched = true;
   const debtEnabled = document.getElementById('debt_enabled').checked;
   if (!debtEnabled) {
-    const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+    const total = payTotal();
     const card = parseFloat(document.getElementById('pay_card').value) || 0;
     document.getElementById('pay_cash').value = Math.max(0, Math.round(total - card));
   }
@@ -9178,7 +9314,7 @@ function onPayCardInput() {
 function updateDebtRemaining() {
   const debtEl = document.getElementById('debtRemaining');
   if (!debtEl) return;
-  const total = collectItems().reduce((sum, i) => sum + i.total, 0);
+  const total = payTotal();
   const cash = parseFloat(document.getElementById('pay_cash').value) || 0;
   const card = parseFloat(document.getElementById('pay_card').value) || 0;
   const remaining = Math.max(0, Math.round(total - cash - card));
@@ -9937,7 +10073,7 @@ function saveAddDraft() {
     const items = collectItems();
     if (!plate.trim() && !items.length) { localStorage.removeItem(ADD_DRAFT_KEY); return; }
     localStorage.setItem(ADD_DRAFT_KEY, JSON.stringify({
-      at: Date.now(), f, stock: collectOtherStockItems('other'), pay: typeof PAY_MODE !== 'undefined' ? PAY_MODE : 'cash',
+      at: Date.now(), f, stock: collectOtherStockItems('other'), pay: typeof PAY_MODE !== 'undefined' ? PAY_MODE : 'cash', disc: DISC,
       touched: !!paymentSplitTouched,
     }));
   } catch (e) { /* память телефона недоступна — просто без черновика */ }
@@ -9956,6 +10092,7 @@ function discardAddDraft() {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   resetItemInputs();
+  resetDiscount();
   setPayMode('cash');
   document.getElementById('msg').innerHTML = '';
   SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint(); renderQuickModels();
@@ -9968,7 +10105,13 @@ function restoreAddDraft() {
   if (!d || !d.f || Date.now() - (d.at || 0) > 24 * 3600 * 1000) { clearAddDraft(); return; }
   const plateEl = document.getElementById('plate');
   if (plateEl && plateEl.value.trim()) return;  // в форме уже что-то вводят — не мешаем
-  const pay = new Set(['pay_cash', 'pay_card', 'debt_enabled', 'debt_installment_amount', 'debt_interval_days']);
+  const pay = new Set(['pay_cash', 'pay_card', 'debt_enabled', 'debt_installment_amount', 'debt_interval_days', 'disc_value']);
+  if (d.disc && typeof d.disc === 'object') {
+    DISC = { mode: d.disc.mode === 'sum' ? 'sum' : 'pct', pct: Number(d.disc.pct) || 0, custom: !!d.disc.custom, value: Number(d.disc.value) || 0 };
+    const dv = document.getElementById('disc_value');
+    if (dv) dv.value = DISC.custom ? (DISC.mode === 'sum' ? (DISC.value || '') : (DISC.pct || '')) : '';
+    syncDiscUi();
+  }
   const main = {}, payF = {};
   Object.keys(d.f).forEach(id => { (pay.has(id) ? payF : main)[id] = d.f[id]; });
   Object.keys(main).forEach(id => {
@@ -10029,9 +10172,15 @@ async function submitCar() {
     notes: document.getElementById('notes').value.trim(),
     cash_amount: payCashEl ? payCashEl.value : null,
     card_amount: payCardEl ? payCardEl.value : null,
+    discount: discountFor(itemsSubtotal(items)),
+    discount_pct: discountPct(),
   };
+  if (DISC.mode === 'sum' && (DISC.value || 0) > itemsSubtotal(items) && itemsSubtotal(items) > 0) {
+    showMsg(T.disc_too_big, false);
+    return;
+  }
   if (debtEnabled) {
-    const total = items.reduce((sum, i) => sum + i.total, 0);
+    const total = payTotal(items);
     const cash = parseFloat(payCashEl.value) || 0;
     const card = parseFloat(payCardEl.value) || 0;
     payload.debt_amount = Math.max(0, Math.round(total - cash - card));
@@ -10094,6 +10243,7 @@ async function submitCar() {
     document.getElementById('interval_unit').value = 'months';
     paymentSplitTouched = false;
     resetDailyKm();
+    resetDiscount();
     setPayMode('cash');
     const payCash = document.getElementById('pay_cash');
     const payCard = document.getElementById('pay_card');
@@ -10699,7 +10849,9 @@ async function toggleHistory(plate) {
         const items = JSON.parse(h.items_json);
         itemsHtml = '<div class="kc-he-items">' + items.map(it =>
           `${escapeHtml(it.name)}${it.brand ? ' (' + escapeHtml(it.brand) + ')' : ''}${it.qty && it.qty !== 1 ? ' — ' + escapeHtml(it.qty) + ' ' + T.liters_ph : ''}: ${(Number(it.total) || 0).toLocaleString('ru-RU')} ${T.currency}`
-        ).join('<br>') + '</div>';
+        ).join('<br>') + (h.discount_amount > 0
+          ? `<br><span style="color:#B3241C; font-weight:700;"><i class="fa-solid fa-tag"></i> ${T.disc_title}${h.discount_pct ? ' ' + String(h.discount_pct).replace('.', ',') + '%' : ''}: −${Number(h.discount_amount).toLocaleString('ru-RU')} ${T.currency}</span>`
+          : '') + '</div>';
       } catch (e) { /* старая запись без items_json */ }
     }
     return `
@@ -10950,8 +11102,36 @@ function collectSvcItems() {
 let svcPaymentSplitTouched = false;
 let svcHasDebt = false;  // открыта на исправление запись, по которой есть долг
 
-function updateSvcTotal() {
-  const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+let svcDiscPctVal = null;  // скидку поставили кнопкой 5% / 10%
+function svcSubtotal() {
+  return collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+}
+function svcDiscount(sub) {
+  const el = document.getElementById('svc_discount');
+  const d = Math.round(parseFloat((el && el.value) || '') || 0);
+  return Math.max(0, Math.min(d, sub));
+}
+function svcPayTotal() {
+  const sub = svcSubtotal();
+  return sub - svcDiscount(sub);
+}
+function svcDiscPct(p) {
+  const sub = svcSubtotal();
+  const pay = Math.round(sub * (1 - p / 100) / 1000) * 1000;
+  document.getElementById('svc_discount').value = Math.max(0, sub - pay) || '';
+  svcDiscPctVal = p;
+  updateSvcTotal(true);
+}
+function updateSvcTotal(keepPct) {
+  if (keepPct !== true) {
+    const el = document.getElementById('svc_discount');
+    if (el && document.activeElement === el) svcDiscPctVal = null;
+  }
+  const sub = svcSubtotal();
+  const disc = svcDiscount(sub);
+  const total = sub - disc;
+  const hint = document.getElementById('svcDiscHint');
+  if (hint) hint.textContent = disc ? `${T.disc_subtotal}: ${sub.toLocaleString('ru-RU')} · −${(Math.round(disc / sub * 1000) / 10).toString().replace('.', ',')}%` : '';
   document.getElementById('svcTotalCost').textContent = total.toLocaleString('ru-RU') + ' ' + T.currency;
   const payCash = document.getElementById('svc_pay_cash');
   const payCard = document.getElementById('svc_pay_card');
@@ -10968,14 +11148,14 @@ function updateSvcTotal() {
 
 function onSvcPayCashInput() {
   svcPaymentSplitTouched = true;
-  const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+  const total = svcPayTotal();
   const cash = parseFloat(document.getElementById('svc_pay_cash').value) || 0;
   document.getElementById('svc_pay_card').value = Math.max(0, Math.round(total - cash));
 }
 
 function onSvcPayCardInput() {
   svcPaymentSplitTouched = true;
-  const total = collectSvcItems().reduce((sum, i) => sum + i.total, 0);
+  const total = svcPayTotal();
   const card = parseFloat(document.getElementById('svc_pay_card').value) || 0;
   document.getElementById('svc_pay_cash').value = Math.max(0, Math.round(total - card));
 }
@@ -10993,6 +11173,8 @@ function resetSvcItemInputs() {
   });
   document.getElementById('svc_other_name').value = '';
   document.getElementById('svc_other_price').value = '';
+  document.getElementById('svc_discount').value = '';
+  svcDiscPctVal = null;
   svcOtherStockRows = [];
   renderOtherStockRows('svcOther');
   clearPick('svc');
@@ -11050,7 +11232,9 @@ function openEditModal(plate, entry) {
   if (entry.items_json) {
     try { fillSvcItemsFrom(JSON.parse(entry.items_json)); } catch (e) {}
   }
-  updateSvcTotal();
+  document.getElementById('svc_discount').value = entry.discount_amount || '';
+  svcDiscPctVal = entry.discount_pct || null;
+  updateSvcTotal(true);
   document.getElementById('svc_pay_cash').value = entry.cash_amount ?? entry.cost ?? '';
   document.getElementById('svc_pay_card').value = entry.card_amount ?? '';
   svcPaymentSplitTouched = true;  // это реальная сохранённая разбивка, не пересчитывать автоматически
@@ -11087,12 +11271,14 @@ async function saveEdit() {
   const notes = document.getElementById('edit_notes').value;
   const cash_amount = document.getElementById('svc_pay_cash').value || null;
   const card_amount = document.getElementById('svc_pay_card').value || null;
+  const discount = svcDiscount(svcSubtotal());
+  const discount_pct = discount ? svcDiscPctVal : null;
 
   let res;
   if (svcModal.mode === 'edit') {
     res = await fetch('/api/oil_change/' + svcModal.id, {
       method: 'PUT', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ mileage, next_mileage, interval_value, interval_unit, notes, items, cash_amount, card_amount }),
+      body: JSON.stringify({ mileage, next_mileage, interval_value, interval_unit, notes, items, cash_amount, card_amount, discount, discount_pct }),
     });
   } else {
     const carRow = carsCache.find(c => c.plate_number === svcModal.plate);
@@ -11100,7 +11286,7 @@ async function saveEdit() {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         plate: svcModal.plate, owner_name: carRow ? carRow.owner_name : '', mileage, next_mileage,
-        interval_value, interval_unit, notes, items, cash_amount, card_amount,
+        interval_value, interval_unit, notes, items, cash_amount, card_amount, discount, discount_pct,
       }),
     });
   }
@@ -11533,6 +11719,18 @@ PLATE_SCAN_HTML = r"""<style>
   #psFrame .ps-line { position:absolute; left:8px; right:8px; top:50%; height:2px; background:#22d3ee; box-shadow:0 0 12px #22d3ee; animation:psLine 1.6s ease-in-out infinite; }
   @keyframes psLine { 0%,100% { top:15%; } 50% { top:85%; } }
   #psFrame.ps-hit b { border-color:#34d399; }
+  /* автопоиск: рамка-подсказка в центре бледная, а найденный номер
+     обводится отдельной рамкой, которая сама переезжает на него */
+  #psOverlay.auto #psFrame { box-shadow:none; opacity:.55; }
+  #psOverlay.auto #psFrame .ps-line { display:none; }
+  #psOverlay.auto.found #psFrame { opacity:0; transition:opacity .2s; }
+  #psBox { position:absolute; left:0; top:0; width:0; height:0; border:3px solid #34d399; border-radius:8px; display:none; pointer-events:none;
+           box-shadow:0 0 0 200vmax rgba(0,0,0,.35); transition:left .12s linear, top .12s linear, width .12s linear, height .12s linear; }
+  #psOverlay.auto.found #psBox { display:block; }
+  #psBox span { position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); white-space:nowrap; background:#34d399; color:#052e1c;
+                font-family:var(--font-mono); font-weight:800; font-size:15px; letter-spacing:1px; padding:4px 10px; border-radius:8px; }
+  #psBox span:empty { display:none; }
+  #psOverlay.result #psBox, #psOverlay.auto.found.result #psBox { display:none; }
   .ps-top { position:absolute; top:0; left:0; right:0; padding:calc(14px + env(safe-area-inset-top, 0px)) 14px 14px; color:#fff; display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:15px; }
   .ps-ib { width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.16); color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; }
   .ps-ib.on { background:#facc15; color:#111; }
@@ -11581,6 +11779,7 @@ PLATE_SCAN_HTML = r"""<style>
 <div id="psOverlay" role="dialog" aria-modal="true">
   <video id="psVideo" playsinline muted autoplay></video>
   <div id="psFrame"><b class="a"></b><b class="b"></b><b class="c"></b><b class="d"></b><div class="ps-line"></div></div>
+  <div id="psBox"><span></span></div>
   <div class="ps-top">
     <button type="button" class="ps-ib" onclick="closePlateScanner()" aria-label="close"><i class="fa-solid fa-xmark"></i></button>
     <div>{{ T.ps_title }}</div>
@@ -11595,6 +11794,7 @@ PLATE_SCAN_HTML = r"""<style>
   </div>
   <div id="psSheet"></div>
   <canvas id="psCanvas" width="128" height="64" style="display:none;"></canvas>
+  <canvas id="psDetCanvas" width="384" height="384" style="display:none;"></canvas>
 </div>
 
 <script>
@@ -11610,6 +11810,8 @@ const PS_MIN_CONF = 0.55;     // кадр учитывается, если мо�
 const PS_NEED_HITS = 2;       // сколько раз подряд должен прочитаться один и тот же номер
 const PS_INSTANT_CONF = 0.97; // при такой уверенности хватает одного кадра
 const PS_BASE_CONF = 0.5;     // для номера, который уже есть в базе, достаточно такой
+const PS_DET = 384;           // размер кадра для «искателя»
+const PS_DET_MIN = 0.4;       // с какой уверенности «искатель» считает, что это номер
 
 function psLoadScript(src) {
   return new Promise((resolve, reject) => {
@@ -11636,6 +11838,24 @@ function psLoadModel() {
   return PS.loading;
 }
 
+// «искатель» номера: маленькая YOLO-модель смотрит на весь кадр и говорит,
+// где номер. Если не загрузилась (старый телефон, нет памяти) — сканер
+// просто работает по-старому, по рамке в центре.
+function psLoadDetector() {
+  if (PS.det) return Promise.resolve(PS.det);
+  if (PS.detFailed) return Promise.resolve(null);
+  if (!PS.detLoading) {
+    PS.detLoading = (async () => {
+      await psLoadModel();  // движок ort уже подключён
+      const d = await ort.InferenceSession.create('/ocr/v1/plate_det.onnx', { executionProviders: ['wasm'] });
+      try { await d.run({ [d.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * PS_DET * PS_DET), [1, 3, PS_DET, PS_DET]) }); } catch (e) {}
+      PS.det = d;
+      return d;
+    })().catch(() => { PS.detFailed = true; PS.detLoading = null; return null; });
+  }
+  return PS.detLoading;
+}
+
 function psSetStatus(text, isErr) {
   const st = document.getElementById('psStatus');
   st.classList.toggle('err', !!isErr);
@@ -11659,7 +11879,9 @@ async function openPlateScanner() {
   const ov = document.getElementById('psOverlay');
   PS.gen++;
   PS.result = null; PS.editing = false; PS.hits = {};
-  ov.classList.remove('result');
+  ov.classList.remove('result', 'found');
+  ov.classList.toggle('auto', !!PS.det);
+  PS.box = null; PS.lost = 0;
   ov.classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('psFrame').classList.remove('ps-hit');
@@ -11674,6 +11896,7 @@ async function openPlateScanner() {
   psSetStatus(PS.session ? T.ps_scanning : T.ps_loading);
   const gen = PS.gen;
   const modelP = psLoadModel();
+  const detP = psLoadDetector();
   try {
     await psStartCamera();
     // iPhone иногда отдаёт «пустую» камеру: картинки нет, хотя доступ дан
@@ -11716,7 +11939,10 @@ async function openPlateScanner() {
     psSetStatus(T.ps_load_fail, true);
     return;
   }
+  await detP;
   if (gen !== PS.gen || !ov.classList.contains('open')) return;
+  ov.classList.toggle('auto', !!PS.det);
+  document.getElementById('psHint').textContent = PS.det ? T.ps_hint_auto : T.ps_hint;
   psSetStatus(T.ps_scanning);
   PS.running = true;
   PS.startedAt = Date.now();
@@ -11729,7 +11955,10 @@ async function psStartCamera() {
     audio: false,
     // без жёсткого разрешения: камера включается быстрее, а модели хватает
     // и обычного качества (номер всё равно ужимается до 128×64)
-    video: { facingMode: { ideal: 'environment' } }
+    // «искателю» нужен чёткий кадр: просим HD (если камера не умеет — даст что может)
+    video: PS.det || !PS.detFailed
+      ? { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      : { facingMode: { ideal: 'environment' } }
   });
   if (!document.getElementById('psOverlay').classList.contains('open')) {
     stream.getTracks().forEach(t => t.stop());
@@ -11800,7 +12029,8 @@ function closePlateScanner() {
   if (PS.tapResolve) { const r = PS.tapResolve; PS.tapResolve = null; r(false); }
   psStopCamera();
   const ov = document.getElementById('psOverlay');
-  ov.classList.remove('open', 'result');
+  ov.classList.remove('open', 'result', 'found');
+  PS.box = null;
   document.getElementById('psSheet').innerHTML = '';
   document.body.style.overflow = '';
 }
@@ -11836,15 +12066,124 @@ function psCropTensor(inset) {
 
 function psDecode(probs) { return plateDecode(probs); }
 
+// кадр камеры → вход «искателя»: весь кадр вписан в квадрат 384×384 с серыми полями
+function psDetTensor() {
+  const v = document.getElementById('psVideo');
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return null;
+  const S = PS_DET, r = Math.min(S / vw, S / vh);
+  const nw = Math.round(vw * r), nh = Math.round(vh * r);
+  const dx = Math.round((S - nw) / 2), dy = Math.round((S - nh) / 2);
+  const c = document.getElementById('psDetCanvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = 'rgb(114,114,114)';
+  ctx.fillRect(0, 0, S, S);
+  ctx.drawImage(v, 0, 0, vw, vh, dx, dy, nw, nh);
+  const px = ctx.getImageData(0, 0, S, S).data;
+  const n = S * S, f = new Float32Array(3 * n);
+  for (let i = 0, j = 0; j < n; i += 4, j++) {
+    f[j] = px[i] / 255; f[n + j] = px[i + 1] / 255; f[2 * n + j] = px[i + 2] / 255;
+  }
+  return { t: new ort.Tensor('float32', f, [1, 3, S, S]), r, dx, dy, vw, vh };
+}
+
+// где номер в кадре (в пикселях видео) — или null. Из нескольких номеров
+// берём самый уверенный, а при равенстве — ближе к центру и крупнее.
+async function psDetect() {
+  const d = PS.det;
+  const inp = psDetTensor();
+  if (!d || !inp) return null;
+  const out = await d.run({ [d.inputNames[0]]: inp.t });
+  const data = out[d.outputNames[0]].data;
+  let best = null, bestScore = 0;
+  for (let k = 0; k + 6 < data.length; k += 7) {
+    const sc = data[k + 6];
+    if (sc < PS_DET_MIN) continue;
+    const x1 = (data[k + 1] - inp.dx) / inp.r, y1 = (data[k + 2] - inp.dy) / inp.r;
+    const x2 = (data[k + 3] - inp.dx) / inp.r, y2 = (data[k + 4] - inp.dy) / inp.r;
+    const cx = (x1 + x2) / 2 / inp.vw - 0.5, cy = (y1 + y2) / 2 / inp.vh - 0.5;
+    const area = Math.max(0, x2 - x1) * Math.max(0, y2 - y1) / (inp.vw * inp.vh);
+    const rank = sc + Math.min(area * 4, 0.15) - Math.min(Math.hypot(cx, cy) * 0.3, 0.2);
+    if (rank > bestScore) { bestScore = rank; best = { x1, y1, x2, y2, score: sc }; }
+  }
+  if (!best || best.x2 - best.x1 < 12 || best.y2 - best.y1 < 5) return null;
+  return best;
+}
+
+// найденный номер (в пикселях видео) → тензор для модели чтения, с запасом
+// вокруг (pad — доля ширины/высоты), прямо из полного кадра камеры
+function psBoxTensor(b, pad) {
+  const v = document.getElementById('psVideo');
+  const w = b.x2 - b.x1, h = b.y2 - b.y1;
+  const sx = Math.max(0, b.x1 - w * pad[0]), sy = Math.max(0, b.y1 - h * pad[1]);
+  const ex = Math.min(v.videoWidth, b.x2 + w * pad[0]), ey = Math.min(v.videoHeight, b.y2 + h * pad[1]);
+  if (ex - sx < 4 || ey - sy < 2) return null;
+  const c = document.getElementById('psCanvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(v, sx, sy, ex - sx, ey - sy, 0, 0, 128, 64);
+  const px = ctx.getImageData(0, 0, 128, 64).data;
+  const rgb = new Uint8Array(128 * 64 * 3);
+  for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { rgb[j] = px[i]; rgb[j + 1] = px[i + 1]; rgb[j + 2] = px[i + 2]; }
+  return new ort.Tensor('uint8', rgb, [1, 64, 128, 3]);
+}
+
+// рамка на экране поверх найденного номера (видео растянуто «cover»)
+function psShowBox(b, label) {
+  const v = document.getElementById('psVideo');
+  const ov = document.getElementById('psOverlay');
+  const box = document.getElementById('psBox');
+  if (!b) {
+    ov.classList.remove('found');
+    box.querySelector('span').textContent = '';
+    return;
+  }
+  const ew = v.clientWidth, eh = v.clientHeight, vw = v.videoWidth, vh = v.videoHeight;
+  const scale = Math.max(ew / vw, eh / vh);
+  const offX = (vw * scale - ew) / 2, offY = (vh * scale - eh) / 2;
+  const padX = (b.x2 - b.x1) * 0.06, padY = (b.y2 - b.y1) * 0.18;
+  box.style.left = Math.round((b.x1 - padX) * scale - offX) + 'px';
+  box.style.top = Math.round((b.y1 - padY) * scale - offY) + 'px';
+  box.style.width = Math.round((b.x2 - b.x1 + 2 * padX) * scale) + 'px';
+  box.style.height = Math.round((b.y2 - b.y1 + 2 * padY) * scale) + 'px';
+  if (label !== undefined) box.querySelector('span').textContent = label;
+  ov.classList.add('found');
+}
+
 async function psRecognize() {
   const sess = PS.session;
-  // по очереди: вся рамка / чуть плотнее (номер не всегда ровно на всю рамку) —
-  // один прогон модели на кадр, чтобы кадры шли чаще
   PS.tickN = (PS.tickN || 0) + 1;
-  const t = psCropTensor(PS.tickN % 2 ? [0, 0] : [0.06, 0.14]);
+  let t = null;
+  if (PS.det) {
+    let b = null;
+    try { b = await psDetect(); } catch (e) { b = null; }
+    if (b) {
+      // сглаживаем: рамка не дёргается от кадра к кадру
+      if (PS.box) {
+        const k = 0.55;
+        b = { x1: PS.box.x1 + (b.x1 - PS.box.x1) * k, y1: PS.box.y1 + (b.y1 - PS.box.y1) * k,
+              x2: PS.box.x2 + (b.x2 - PS.box.x2) * k, y2: PS.box.y2 + (b.y2 - PS.box.y2) * k, score: b.score };
+      }
+      PS.box = b; PS.lost = 0;
+      // мелкий номер (далеко) читается с ошибками — просим подойти ближе
+      PS.boxSmall = (b.x2 - b.x1) < 120;
+      psShowBox(b);
+      t = psBoxTensor(b, PS.tickN % 2 ? [0.08, 0.2] : [0.03, 0.1]);
+    } else {
+      // номер пропал на 1–2 кадра (блик, тряска) — держим рамку, потом прячем
+      PS.lost = (PS.lost || 0) + 1;
+      if (PS.lost > 3) { PS.box = null; PS.boxSmall = false; psShowBox(null); }
+      // запасной путь: номер вплотную или «искатель» не узнал его — читаем центр
+      if (PS.tickN % 3 === 0) t = psCropTensor([0, 0]);
+    }
+  } else {
+    // по очереди: вся рамка / чуть плотнее (номер не всегда ровно на всю рамку)
+    t = psCropTensor(PS.tickN % 2 ? [0, 0] : [0.06, 0.14]);
+  }
   if (!t) return null;
   const out = await sess.run({ [sess.inputNames[0]]: t });
-  return psDecode(out[sess.outputNames[0]].data);
+  const r = psDecode(out[sess.outputNames[0]].data);
+  if (r && PS.box && r.fmt && r.conf >= 0.9) psShowBox(PS.box, psPretty(r.plate));
+  return r;
 }
 
 async function psTick(gen) {
@@ -11857,15 +12196,22 @@ async function psTick(gen) {
     document.getElementById('psFrame').classList.add('ps-hit');
     // номер уже есть в базе этой точки — хватает одного уверенного кадра
     const inBase = r.conf >= PS_BASE_CONF && PS.plateSet && PS.plateSet.has(r.plate);
-    if (inBase || r.conf >= PS_INSTANT_CONF || PS.hits[r.plate] >= PS_NEED_HITS) {
+    // далёкий мелкий номер: только если уверенно и три раза подряд одинаково
+    const smallOk = !PS.boxSmall || (r.fmt && r.conf >= 0.8 && PS.hits[r.plate] >= 3);
+    if (PS.boxSmall) document.getElementById('psHint').textContent = T.ps_closer;
+    if (smallOk && (inBase || r.conf >= PS_INSTANT_CONF || PS.hits[r.plate] >= PS_NEED_HITS)) {
       if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
       psShowResult(r.plate);
       return;
     }
   } else {
     document.getElementById('psFrame').classList.remove('ps-hit');
+    if (PS.boxSmall) document.getElementById('psHint').textContent = T.ps_closer;
   }
-  if (Date.now() - PS.startedAt > 8000) document.getElementById('psHint').textContent = T.ps_hint_slow;
+  if (PS.det && !PS.boxSmall && document.getElementById('psHint').textContent === T.ps_closer) {
+    document.getElementById('psHint').textContent = T.ps_hint_auto;
+  }
+  if (Date.now() - PS.startedAt > 8000 && !PS.boxSmall) document.getElementById('psHint').textContent = PS.det ? T.ps_hint_slow_auto : T.ps_hint_slow;
   psNextFrame(gen);
 }
 
@@ -13239,6 +13585,8 @@ def api_update_oil_change(oc_id):
             items=data.get("items"),
             cash_amount=int(data["cash_amount"]) if data.get("cash_amount") not in (None, "") else None,
             card_amount=int(data["card_amount"]) if data.get("card_amount") not in (None, "") else None,
+            discount=int(float(data["discount"])) if data.get("discount") not in (None, "") else None,
+            discount_pct=data.get("discount_pct"),
         )
     except (ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -13299,7 +13647,7 @@ def api_delete_car(plate):
     return jsonify({"ok": True})
 
 
-def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date):
+def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date, discount=0):
     """Присылает клиенту чек в Telegram сразу после внесения замены — что
     залили, сколько стоило, когда следующая. Отдельно от напоминания о
     следующей замене (то приходит позже, ближе к сроку). Молча ничего не
@@ -13317,6 +13665,9 @@ def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_dat
         + f": {int(it.get('total') or 0):,}".replace(",", " ")
         for it in (items or [])
     )
+    if discount:
+        total -= discount
+        lines += "\n" + i18n.t("bot_receipt_discount", lang, amount=f"{int(discount):,}".replace(",", " "))
     text = i18n.t(
         "bot_service_receipt", lang,
         plate=plate, shop=shop.get("shop_name") or shop.get("username") or "",
@@ -13351,6 +13702,8 @@ def api_add():
         cash_amount = int(data["cash_amount"]) if data.get("cash_amount") not in (None, "") else None
         card_amount = int(data["card_amount"]) if data.get("card_amount") not in (None, "") else None
         debt_amount = int(data["debt_amount"]) if data.get("debt_amount") not in (None, "") else 0
+        discount = int(float(data["discount"])) if data.get("discount") not in (None, "") else 0
+        discount_pct = data.get("discount_pct")
         installment_amount = int(data["installment_amount"]) if data.get("installment_amount") not in (None, "") else None
         interval_days = int(data["interval_days"]) if data.get("interval_days") not in (None, "") else None
         try:
@@ -13397,8 +13750,10 @@ def api_add():
             oc_id, next_date = db.add_oil_change(
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount,
-                allow_debt=debt_amount > 0
+                allow_debt=debt_amount > 0, discount=discount, discount_pct=discount_pct
             )
+            _saved_rec = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
+            saved_discount = _saved_rec.get("discount_amount") or 0
             if debt_amount > 0:
                 # сумму долга считает сервер: сумма замены − нал − карта (раньше
                 # бралась из браузера и могла не совпасть с самой записью)
@@ -13431,14 +13786,14 @@ def api_add():
                 if shop:
                     shop["_receipt_telegram_id"] = car_after["telegram_id"]
                     # чек в Telegram — в фоне: не задерживаем ответ и не держим запрос
-                    def _bg_receipt(shop=shop, plate=plate, items=items, cash=cash_amount, card=card_amount, nd=next_date, oc=oc_id, sid=g.shop_id):
+                    def _bg_receipt(shop=shop, plate=plate, items=items, cash=cash_amount, card=card_amount, nd=next_date, oc=oc_id, sid=g.shop_id, disc=saved_discount):
                         try:
                             # 12 с ждём: мастер может нажать «Отменить» на экране
                             # «Сохранено» — тогда чек клиенту не уходит
                             time.sleep(12)
                             if not db.get_oil_change_for_shop(oc, sid):
                                 return
-                            _send_service_receipt(shop, plate, items, cash, card, nd)
+                            _send_service_receipt(shop, plate, items, cash, card, nd, disc)
                         except Exception as ex:
                             logger.warning(f"чек не отправлен: {ex}")
                     threading.Thread(target=_bg_receipt, daemon=True).start()
@@ -13909,6 +14264,7 @@ def api_stats_range():
         result["goods_profit"] = pb["goods_profit"]
         result["services"] = pb["services"]
         result["unpriced"] = pb["unpriced"]
+        result["discounts"] = pb["discounts"]
         result["expenses"] = expenses
         result["net_profit"] = pb["profit"] - expenses
         usd = db.profit_usd_range(g.shop_id, date_from, date_to)
