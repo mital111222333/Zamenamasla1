@@ -542,6 +542,8 @@ def login_required(view):
         g.lang = shop.get("language") or "ru"
         g.T = i18n.get_texts(g.lang)
         g.is_employee = bool(session.get("is_employee"))
+        # кто из сотрудников работает — его наличные копятся в его «кассе»
+        g.employee_id = emp["id"] if g.is_employee else None
         g.is_branch = shop.get("role") == "branch"
         g.parent_shop_id = shop.get("parent_shop_id")
         # подписка: не оплачено (или новый филиал ещё не оплачен) — вся
@@ -3107,6 +3109,51 @@ if ('serviceWorker' in navigator) {
   .staff-creds-t { font-size:13px; font-weight:700; color:#166534; margin-bottom:8px; }
   .staff-creds-v { white-space:pre-line; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:14px; color:#14532D; background:#fff; border-radius:8px; padding:10px; user-select:all; }
   .staff-copy { margin-top:8px; border:0; border-radius:8px; padding:8px 14px; background:#16A34A; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+  .cash-total { background:linear-gradient(135deg,#0F52BA,#1E6FD9); color:#fff; border-radius:16px; padding:16px 18px; margin-bottom:14px; }
+  .cash-total .ct-l { font-size:13px; opacity:.85; font-weight:600; }
+  .cash-total .ct-v { font-size:28px; font-weight:800; margin:4px 0 2px; font-family:'Space Grotesk',sans-serif; }
+  .cash-total .ct-h { font-size:12px; opacity:.8; }
+  .cash-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .cash-card.off { opacity:.75; }
+  .cash-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .cash-name { font-weight:700; font-size:15px; color:var(--text); }
+  .cash-sub { font-size:12px; color:var(--hint); margin-top:2px; }
+  .cash-bal { text-align:right; }
+  .cash-bal b { display:block; font-size:21px; font-weight:800; color:#0F52BA; font-family:'Space Grotesk',sans-serif; white-space:nowrap; }
+  .cash-bal.zero b { color:#16A34A; font-size:15px; }
+  .cash-bal.neg b { color:#B3241C; }
+  .cash-bal span { font-size:11px; color:var(--hint); }
+  .cash-lines { margin:10px 0 0; border-top:1px dashed var(--border); padding-top:8px; }
+  .cash-line { display:flex; justify-content:space-between; font-size:13px; padding:3px 0; color:var(--text); }
+  .cash-line.muted { color:var(--hint); }
+  .cash-line b { font-weight:700; white-space:nowrap; }
+  .cash-card > .cash-lines:first-child { border-top:0; margin-top:0; padding-top:0; }
+  #cashAccRest { margin:6px 0 10px; }
+  .cash-warn { font-size:12px; color:#92400E; background:#FEF3C7; border-radius:8px; padding:6px 8px; margin-top:8px; }
+  .cash-btns { display:flex; gap:8px; margin-top:12px; }
+  .cash-btns button { flex:1; border:0; border-radius:10px; padding:11px 10px; font-size:14px; font-weight:700; cursor:pointer; }
+  .cash-btns .acc { background:#16A34A; color:#fff; }
+  .cash-btns .acc:disabled { background:#CBD5E1; color:#fff; cursor:default; }
+  .cash-btns .det { background:#EEF2F7; color:#334155; flex:0 0 auto; }
+  .cash-more { margin-top:10px; }
+  .cash-sec { font-size:12.5px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:.3px; margin:12px 0 4px; }
+  .cash-row { display:flex; justify-content:space-between; gap:8px; align-items:center; font-size:13px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .cash-row:last-child { border-bottom:0; }
+  .cash-row .cr-l { min-width:0; }
+  .cash-row .cr-l small { display:block; color:var(--hint); font-size:11.5px; }
+  .cash-row .cr-r { text-align:right; white-space:nowrap; }
+  .cash-row .cr-r small { display:block; color:var(--hint); font-size:11px; }
+  .cash-row.cancelled { opacity:.5; text-decoration:line-through; }
+  .cash-row .cr-x { border:1px solid #F5C2BE; background:#FDECEA; color:#B3241C; border-radius:8px; padding:4px 8px; font-size:11.5px; font-weight:700; cursor:pointer; margin-left:6px; text-decoration:none; }
+  .cash-m-title { font-size:17px; font-weight:800; color:var(--text); }
+  .cash-m-who { font-size:13px; color:var(--hint); margin:2px 0 12px; }
+  .cash-m-exp { display:flex; justify-content:space-between; align-items:center; background:#EFF6FF; border-radius:10px; padding:10px 12px; margin-bottom:6px; font-size:13px; color:#1E3A8A; }
+  .cash-m-exp b { font-size:18px; }
+  .cash-ok-btn { background:#16A34A !important; }
+  #view-cash { max-width:760px; }
+  .staff-cash a { color:#16A34A; font-weight:700; text-decoration:none; }
+  .staff-cash { font-size:12.5px; margin-top:4px; color:var(--hint); }
+  .staff-cash b { color:#0F52BA; }
   .staff-row { padding:10px 0; border-bottom:1px dashed var(--border); }
   .staff-row:last-child { border-bottom:0; }
   .staff-row.off .staff-who b { opacity:.55; }
@@ -3191,6 +3238,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-group">{{ T.nav_grp_work }}</div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+    {% if is_employee or has_staff %}<div class="side-item" id="tab-cash" data-tab="cash" onclick="showTab('cash')"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
     {% if not is_employee or (warehouse_enabled and store_enabled) %}<div class="side-group">{{ T.nav_grp_business }}</div>{% endif %}
@@ -3238,6 +3286,7 @@ if ('serviceWorker' in navigator) {
 <div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
   <div class="more-list">
+      {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
       {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
       <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
@@ -3707,6 +3756,28 @@ if ('serviceWorker' in navigator) {
 
   <div id="view-help" style="display:none;">
 """ + HELP_VIEW + """
+  </div>
+
+  <div id="view-cash" style="display:none;">
+    {% if is_employee %}
+    <div id="cashMy">{{ T.stats_loading }}</div>
+    {% else %}
+    <div id="cashOwner">{{ T.stats_loading }}</div>
+    <div class="modal-overlay" id="cashAcceptModal" onclick="if (event.target === this) closeCashAccept()">
+      <div class="modal modal-wide" style="text-align:left;">
+        <div class="cash-m-title">{{ T.cash_modal_title }}</div>
+        <div class="cash-m-who" id="cashAccWho"></div>
+        <div class="cash-m-exp"><span>{{ T.cash_modal_expected }}</span><b id="cashAccExp"></b></div>
+        <label for="cashAccAmount">{{ T.cash_modal_got }}</label>
+        <input id="cashAccAmount" type="text" inputmode="numeric" autocomplete="off" oninput="cashAccInput()">
+        <div class="hint-text" id="cashAccRest" style="min-height:18px;"></div>
+        <label for="cashAccNote">{{ T.cash_modal_note }}</label>
+        <input id="cashAccNote" maxlength="200" autocomplete="off">
+        <button class="submit cash-ok-btn" id="cashAccBtn" onclick="submitCashAccept()"></button>
+        <button class="submit" style="background:#E2E8F0; color:#334155;" onclick="closeCashAccept()">{{ T.cancel }}</button>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   {% if not is_employee %}
@@ -4611,6 +4682,11 @@ function showTab(t, keepScroll) {
   if (myshopView) myshopView.style.display = t === 'myshop' ? 'block' : 'none';
   if (myshopTab) myshopTab.classList.toggle('active', t === 'myshop');
   if (t === 'myshop') loadMyShop();
+  const cashView = document.getElementById('view-cash');
+  const cashTab = document.getElementById('tab-cash');
+  if (cashView) cashView.style.display = t === 'cash' ? 'block' : 'none';
+  if (cashTab) cashTab.classList.toggle('active', t === 'cash');
+  if (t === 'cash') loadCash();
   const helpView = document.getElementById('view-help');
   const helpTab = document.getElementById('tab-help');
   if (helpView) helpView.style.display = t === 'help' ? 'block' : 'none';
@@ -4657,6 +4733,7 @@ async function loadStaff() {
       <div class="staff-who"><b>${escapeHtml(e.full_name || e.username)}</b>
         <span class="hint-text">@${escapeHtml(e.username)}</span>
         <span class="staff-pill ${e.is_active ? 'on' : ''}">${escapeHtml(e.is_active ? T.staff_active : T.staff_off)}</span></div>
+      ${e.cash_balance ? `<div class="staff-cash">${escapeHtml(T.cash_in_hand)}: <b>${fmtNum(e.cash_balance)} ${escapeHtml(T.currency)}</b> · <a href="#" onclick="showTab('cash'); return false;">${escapeHtml(T.cash_accept_btn)}</a></div>` : ''}
       <div class="staff-btns">
         <button type="button" onclick="staffResetPw(${e.id}, ${nm}, ${escapeHtml(JSON.stringify(e.username))})"><i class="fa-solid fa-key"></i> ${escapeHtml(T.staff_btn_pw)}</button>
         <button type="button" onclick="staffToggle(${e.id}, ${e.is_active ? 0 : 1}, ${nm})">${e.is_active ? '<i class="fa-solid fa-pause"></i> ' + escapeHtml(T.staff_btn_off) : '<i class="fa-solid fa-play"></i> ' + escapeHtml(T.staff_btn_on)}</button>
@@ -4701,6 +4778,188 @@ async function staffDelete(id, name) {
   if (!d.ok) { alert(d.error); return; }
   document.getElementById('staffCreds').innerHTML = '';
   loadStaff();
+}
+
+// ---------- Касса сотрудника: наличные копятся, пока владелец не примет ----------
+const CASH = { seq: 0, data: null, open: {}, acc: null };
+function cashMoney(n) { return fmtNum(n) + ' ' + T.currency; }
+function cashDate(d) {
+  if (!d) return '';
+  const p = String(d).slice(0, 10).split('-');
+  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(d);
+}
+function cashDateTime(d) {
+  if (!d) return '';
+  const t = String(d).slice(11, 16);
+  return cashDate(d) + (t ? ' ' + t : '');
+}
+function cashParse(v) { const n = parseInt(String(v || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; }
+function cashLines(c) {
+  const rows = [];
+  if (c.services) rows.push(`<div class="cash-line"><span>${escapeHtml(staffFmt(T.cash_services_n, { n: c.services }))}${c.since ? ' · ' + escapeHtml(staffFmt(T.cash_since, { date: cashDate(c.since) })) : ''}</span><b></b></div>`);
+  if (c.services_cash) rows.push(`<div class="cash-line"><span>${escapeHtml(T.cash_from_services)}</span><b>${cashMoney(c.services_cash)}</b></div>`);
+  if (c.debt_cash) rows.push(`<div class="cash-line"><span>${escapeHtml(staffFmt(T.cash_from_debts, { n: c.debt_payments }))}</span><b>${cashMoney(c.debt_cash)}</b></div>`);
+  if (c.carry) rows.push(`<div class="cash-line"><span>${escapeHtml(T.cash_carry)}</span><b>${c.carry > 0 ? '' : '−'}${cashMoney(Math.abs(c.carry))}</b></div>`);
+  if (c.services_card) rows.push(`<div class="cash-line muted"><span>${escapeHtml(T.cash_card_info)}</span><b>${cashMoney(c.services_card)}</b></div>`);
+  return rows.length ? `<div class="cash-lines">${rows.join('')}</div>` : '';
+}
+function cashBalHtml(c) {
+  if (c.balance > 0) return `<div class="cash-bal"><span>${escapeHtml(T.cash_in_hand)}</span><b>${cashMoney(c.balance)}</b></div>`;
+  if (c.balance < 0) return `<div class="cash-bal neg"><span>${escapeHtml(T.cash_in_hand)}</span><b>−${cashMoney(-c.balance)}</b></div>`;
+  return `<div class="cash-bal zero"><b>${escapeHtml(T.cash_zero)}</b></div>`;
+}
+function cashEntriesHtml(entries) {
+  if (!entries || !entries.length) return `<div class="hint-text" style="font-size:12.5px;">${escapeHtml(T.cash_entries_empty)}</div>`;
+  return entries.map(x => `<div class="cash-row">
+      <div class="cr-l"><b>${escapeHtml(x.plate || '—')}</b><small>${cashDate(x.d)}${x.kind === 'debt' ? ' · ' + escapeHtml(T.cash_kind_debt) : ''}</small></div>
+      <div class="cr-r"><b>${cashMoney(x.cash)}</b>${x.card ? `<small>${escapeHtml(T.cash_card_short)} ${fmtNum(x.card)}</small>` : ''}</div>
+    </div>`).join('');
+}
+function cashHistoryHtml(hist, canCancel) {
+  if (!hist || !hist.length) return `<div class="hint-text" style="font-size:12.5px;">${escapeHtml(T.cash_hist_empty)}</div>`;
+  const lastActive = hist.find(h => h.status === 'active');
+  return hist.map(h => {
+    const off = h.status !== 'active';
+    const partial = !off && h.expected && h.expected !== h.amount;
+    return `<div class="cash-row ${off ? 'cancelled' : ''}">
+      <div class="cr-l"><b>${cashDateTime(h.created_at)}</b>${h.note ? `<small>${escapeHtml(h.note)}</small>` : ''}${off ? `<small>${escapeHtml(T.cash_hist_cancelled)}</small>` : ''}</div>
+      <div class="cr-r"><b>${cashMoney(h.amount)}</b>${partial ? `<small>${escapeHtml(staffFmt(T.cash_hist_of, { sum: fmtNum(h.expected) }))}</small>` : ''}</div>
+      ${canCancel && lastActive && lastActive.id === h.id ? `<button type="button" class="cr-x" onclick="cancelCashHandover(${h.id}, ${h.amount})">${escapeHtml(T.cash_hist_cancel)}</button>` : ''}
+    </div>`;
+  }).join('');
+}
+async function loadCash() {
+  const seq = ++CASH.seq;
+  if (IS_EMPLOYEE) {
+    let d;
+    try { d = await (await fetch('/api/cash/my', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+    if (seq !== CASH.seq || !d || !d.ok) return;
+    const c = d.cash;
+    document.getElementById('cashMy').innerHTML = `
+      <div class="cash-total">
+        <div class="ct-l">${escapeHtml(T.cash_my_title)}</div>
+        <div class="ct-v">${c.balance < 0 ? '−' : ''}${cashMoney(Math.abs(c.balance))}</div>
+        <div class="ct-h">${c.last_handover ? escapeHtml(staffFmt(T.cash_my_last, { date: cashDateTime(c.last_handover.created_at), sum: fmtNum(c.last_handover.amount) })) : escapeHtml(T.cash_my_hint)}</div>
+      </div>
+      <div class="cash-card">${cashLines(c) || `<div class="hint-text" style="margin:0;">${escapeHtml(T.cash_my_hint)}</div>`}</div>
+      <div class="cash-card"><div class="cash-sec" style="margin-top:0;">${escapeHtml(T.cash_entries_title)}</div>${cashEntriesHtml(d.entries)}</div>
+      <div class="cash-card"><div class="cash-sec" style="margin-top:0;">${escapeHtml(T.cash_hist_title)}</div>${cashHistoryHtml(d.history, false)}</div>`;
+    return;
+  }
+  let d;
+  try { d = await (await fetch('/api/cash/staff', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (seq !== CASH.seq || !d || !d.ok) return;
+  CASH.data = d.staff || [];
+  const box = document.getElementById('cashOwner');
+  if (!CASH.data.length) { box.innerHTML = `<div class="card"><div class="hint-text" style="margin:0;">${escapeHtml(T.cash_empty_staff)}</div></div>`; return; }
+  const total = CASH.data.reduce((a, e) => a + Math.max(0, e.balance), 0);
+  box.innerHTML = `
+    <div class="cash-total">
+      <div class="ct-l">${escapeHtml(T.cash_total_title)}</div>
+      <div class="ct-v">${cashMoney(total)}</div>
+      <div class="ct-h">${escapeHtml(T.cash_total_hint)}</div>
+    </div>` + CASH.data.map(e => `
+    <div class="cash-card ${e.is_active ? '' : 'off'}" id="cash_emp_${e.employee_id}">
+      <div class="cash-head">
+        <div><div class="cash-name">${escapeHtml(e.name)}</div>
+          <div class="cash-sub">@${escapeHtml(e.username)}${e.is_active ? '' : ' · ' + escapeHtml(T.staff_off)}</div></div>
+        ${cashBalHtml(e)}
+      </div>
+      ${cashLines(e)}
+      ${e.balance < 0 ? `<div class="cash-warn">${escapeHtml(T.cash_negative)}</div>` : ''}
+      <div class="cash-btns">
+        <button type="button" class="acc" ${e.balance > 0 ? '' : 'disabled'} onclick="openCashAccept(${e.employee_id})"><i class="fa-solid fa-check"></i> ${escapeHtml(T.cash_accept_btn)}</button>
+        <button type="button" class="det" onclick="toggleCashDetails(${e.employee_id})"><i class="fa-solid fa-list"></i> ${escapeHtml(T.cash_details)}</button>
+      </div>
+      <div class="cash-more" id="cash_more_${e.employee_id}" style="display:none;"></div>
+    </div>`).join('');
+  Object.keys(CASH.open).forEach(id => { if (CASH.open[id]) toggleCashDetails(Number(id), true); });
+}
+async function toggleCashDetails(id, forceOpen) {
+  const box = document.getElementById('cash_more_' + id);
+  if (!box) return;
+  if (box.style.display !== 'none' && !forceOpen) { box.style.display = 'none'; CASH.open[id] = false; return; }
+  CASH.open[id] = true;
+  let d;
+  try { d = await (await fetch(`/api/cash/staff/${id}`, { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (!d || !d.ok) return;
+  box.innerHTML = `<div class="cash-sec">${escapeHtml(T.cash_entries_title)}</div>${cashEntriesHtml(d.entries)}
+    <div class="cash-sec">${escapeHtml(T.cash_hist_title)}</div>${cashHistoryHtml(d.history, true)}`;
+  box.style.display = 'block';
+}
+function openCashAccept(id) {
+  const e = (CASH.data || []).find(x => x.employee_id === id);
+  if (!e || e.balance <= 0) return;
+  CASH.acc = { id: id, expected: e.balance };
+  document.getElementById('cashAccWho').textContent = e.name;
+  document.getElementById('cashAccExp').textContent = cashMoney(e.balance);
+  document.getElementById('cashAccAmount').value = fmtNum(e.balance);
+  document.getElementById('cashAccNote').value = '';
+  cashAccInput();
+  document.getElementById('cashAcceptModal').classList.add('open');
+}
+function closeCashAccept() {
+  document.getElementById('cashAcceptModal').classList.remove('open');
+  CASH.acc = null;
+}
+function cashAccInput() {
+  if (!CASH.acc) return;
+  const inp = document.getElementById('cashAccAmount');
+  const n = cashParse(inp.value);
+  const shown = n ? fmtNum(n) : '';
+  if (inp.value !== shown) inp.value = shown;
+  const rest = CASH.acc.expected - n;
+  const restEl = document.getElementById('cashAccRest');
+  const btn = document.getElementById('cashAccBtn');
+  if (n <= 0 || rest < 0) {
+    restEl.textContent = T.cash_err_amount;
+    restEl.style.color = '#B3241C';
+    btn.disabled = true;
+    btn.textContent = T.cash_accept_btn;
+    btn.style.opacity = '.5';
+    return;
+  }
+  restEl.style.color = '';
+  restEl.textContent = rest > 0 ? staffFmt(T.cash_modal_rest, { sum: fmtNum(rest) }) : T.cash_modal_full;
+  btn.disabled = false;
+  btn.style.opacity = '';
+  btn.textContent = staffFmt(T.cash_modal_confirm, { sum: fmtNum(n) });
+}
+async function submitCashAccept() {
+  if (!CASH.acc) return;
+  const amount = cashParse(document.getElementById('cashAccAmount').value);
+  if (amount <= 0 || amount > CASH.acc.expected) { cashAccInput(); return; }
+  const id = CASH.acc.id;
+  let res, d;
+  try {
+    res = await fetch(`/api/cash/staff/${id}/accept`, { method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ expected: CASH.acc.expected, amount: amount, note: document.getElementById('cashAccNote').value.trim() }) });
+    d = await res.json();
+  } catch (e) { showMsg(T.msg_error, false); return; }
+  if (d && d.ok) {
+    closeCashAccept();
+    showMsg(T.cash_done, true);
+    loadCash();
+    return;
+  }
+  if (d && d.error === 'changed') {
+    closeCashAccept();
+    alert(staffFmt(T.cash_changed, { sum: fmtNum(d.balance) }));
+    loadCash();
+    return;
+  }
+  if (d && d.readonly) { closeCashAccept(); showMsg(d.error, false); return; }
+  alert((d && d.error) || T.msg_error);
+}
+async function cancelCashHandover(hid, amount) {
+  if (!confirm(staffFmt(T.cash_cancel_confirm, { sum: fmtNum(amount) }))) return;
+  let d;
+  try { d = await (await fetch(`/api/cash/handover/${hid}/cancel`, { method: 'POST', credentials: 'same-origin' })).json(); }
+  catch (e) { showMsg(T.msg_error, false); return; }
+  if (!d || !d.ok) { alert((d && d.error) || T.msg_error); return; }
+  showMsg(T.cash_cancel_done, true);
+  loadCash();
 }
 
 // ---------- Моя точка: телефон, адрес, часы, локация — то, что клиент видит в боте ----------
@@ -11929,7 +12188,7 @@ guardOnce(['submitCar', 'sendPassportTg', 'saveEdit', 'saveCarEdit', 'deleteEntr
   'submitCatalog', 'applyImport', 'editBranchPrice', 'submitStoreMove', 'submitStoreQty',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
   'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct',
-  'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete']);
+  'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete', 'submitCashAccept', 'cancelCashHandover']);
 </script>
 </body>
 </html>
@@ -13435,6 +13694,7 @@ def index():
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         store_enabled=_store_on(shop),
         is_employee=g.is_employee,
+        has_staff=(not g.is_employee) and bool(db.list_shop_employees(g.shop_id)),
         is_branch=g.is_branch,
         usd_rate=_effective_usd_rate(shop),
         usd_rate_own=shop.get("usd_rate") if shop else None,
@@ -14343,7 +14603,8 @@ def api_add():
             oc_id, next_date = db.add_oil_change(
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount,
-                allow_debt=debt_amount > 0, discount=discount, discount_pct=discount_pct
+                allow_debt=debt_amount > 0, discount=discount, discount_pct=discount_pct,
+                employee_id=g.employee_id
             )
             _saved_rec = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
             saved_discount = _saved_rec.get("discount_amount") or 0
@@ -14591,7 +14852,8 @@ def api_pay_debt(plan_id):
             raise ValueError()
     except (KeyError, ValueError, TypeError):
         return jsonify({"ok": False, "error": "укажите положительную сумму платежа"}), 400
-    plan = db.log_installment_payment(plan_id, g.shop_id, amount, data.get("paid_date"))
+    plan = db.log_installment_payment(plan_id, g.shop_id, amount, data.get("paid_date"),
+                                      employee_id=g.employee_id)
     if not plan:
         return jsonify({"ok": False, "error": "долг не найден"}), 404
     if plan.get("error") == "overpay":
@@ -19979,6 +20241,9 @@ def api_admin_delete_employee(employee_id):
     if not shop_id:
         shop_id = request.args.get("shop_id", type=int)
     ok = db.delete_shop_employee(employee_id, shop_id)
+    if ok == "has_cash":
+        return jsonify({"ok": False, "error": "у сотрудника в кассе есть несданные деньги — "
+                                              "сначала владелец точки должен принять кассу"}), 400
     if not ok:
         return jsonify({"ok": False, "error": "сотрудник не найден"}), 404
     return jsonify({"ok": True})
@@ -22986,7 +23251,15 @@ _STAFF_LOGIN_RE = re.compile(r"^[A-Za-z0-9_]{3,30}$")
 @login_required
 @employee_blocked
 def api_staff_list():
-    return jsonify({"ok": True, "employees": db.list_shop_employees(g.shop_id)})
+    emps = db.list_shop_employees(g.shop_id)
+    try:
+        bal = {c["employee_id"]: c["balance"] for c in db.list_staff_cash(g.shop_id)}
+    except Exception as e:  # касса не должна ломать список сотрудников
+        logger.warning(f"касса сотрудников: {e}")
+        bal = {}
+    for e in emps:
+        e["cash_balance"] = bal.get(e["id"], 0)
+    return jsonify({"ok": True, "employees": emps})
 
 
 @app.route("/api/staff", methods=["POST"])
@@ -23034,9 +23307,81 @@ def api_staff_set_active(employee_id):
 @login_required
 @employee_blocked
 def api_staff_delete(employee_id):
-    if not db.delete_shop_employee(employee_id, g.shop_id):
+    ok = db.delete_shop_employee(employee_id, g.shop_id)
+    if ok == "has_cash":
+        return jsonify({"ok": False, "error": g.T["cash_err_delete"]}), 400
+    if not ok:
         return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
     return jsonify({"ok": True})
+
+
+# ---------- Касса сотрудника ----------
+# Сотрудник видит только свою кассу; принимает кассу владелец точки
+# (главная, самостоятельная или филиал — у своих сотрудников).
+
+@app.route("/api/cash/my")
+@login_required
+def api_cash_my():
+    if not g.is_employee or not g.employee_id:
+        return jsonify({"ok": False, "error": "недоступно для этого аккаунта"}), 403
+    return jsonify({"ok": True,
+                    "cash": db.get_employee_cash(g.shop_id, g.employee_id),
+                    "entries": db.employee_cash_entries(g.shop_id, g.employee_id, limit=60),
+                    "history": db.list_cash_handovers(g.shop_id, g.employee_id, limit=10)})
+
+
+@app.route("/api/cash/staff")
+@login_required
+@employee_blocked
+def api_cash_staff():
+    return jsonify({"ok": True, "staff": db.list_staff_cash(g.shop_id)})
+
+
+@app.route("/api/cash/staff/<int:employee_id>")
+@login_required
+@employee_blocked
+def api_cash_staff_one(employee_id):
+    if not any(e["id"] == employee_id for e in db.list_shop_employees(g.shop_id)):
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    return jsonify({"ok": True,
+                    "cash": db.get_employee_cash(g.shop_id, employee_id),
+                    "entries": db.employee_cash_entries(g.shop_id, employee_id, limit=100),
+                    "history": db.list_cash_handovers(g.shop_id, employee_id, limit=30)})
+
+
+@app.route("/api/cash/staff/<int:employee_id>/accept", methods=["POST"])
+@login_required
+@employee_blocked
+def api_cash_accept(employee_id):
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        expected = int(data.get("expected"))
+        amount = int(data.get("amount"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": g.T["cash_err_amount"]}), 400
+    res = db.accept_cash_handover(g.shop_id, employee_id, expected, amount, data.get("note"))
+    err = res.get("error")
+    if err == "not_found":
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    if err == "changed":
+        return jsonify({"ok": False, "error": "changed", "balance": res["balance"]}), 409
+    if err == "empty":
+        return jsonify({"ok": False, "error": g.T["cash_err_empty"]}), 400
+    if err:
+        return jsonify({"ok": False, "error": g.T["cash_err_amount"]}), 400
+    return jsonify(res)
+
+
+@app.route("/api/cash/handover/<int:handover_id>/cancel", methods=["POST"])
+@login_required
+@employee_blocked
+def api_cash_cancel(handover_id):
+    res = db.cancel_cash_handover(g.shop_id, handover_id)
+    if res.get("error") == "not_last":
+        return jsonify({"ok": False, "error": g.T["cash_err_not_last"]}), 400
+    if res.get("error"):
+        return jsonify({"ok": False, "error": g.T["cash_err_not_found"]}), 404
+    return jsonify(res)
 
 
 # ---------- «Моя точка»: контакты и локация для клиентов в боте ----------

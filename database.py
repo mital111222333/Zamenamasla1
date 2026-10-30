@@ -305,6 +305,7 @@ def init_db():
         _migrate_vin(conn)
         _migrate_debts(conn)
         _migrate_usd(conn)
+        _migrate_cash(conn)
         _bootstrap_accounts(conn)
 
 
@@ -1121,9 +1122,14 @@ def list_shop_employees(shop_id: int):
 
 
 @_serialized
-def delete_shop_employee(employee_id: int, shop_id: int) -> bool:
-    """Удаляет логин сотрудника — только если он реально принадлежит этой точке."""
+def delete_shop_employee(employee_id: int, shop_id: int):
+    """Удаляет логин сотрудника — только если он реально принадлежит этой точке.
+    "has_cash" — у сотрудника в кассе остались несданные деньги: сначала
+    принять кассу (иначе деньги «пропали» бы вместе с ним)."""
     with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM shop_users WHERE id=? AND shop_id=?", (employee_id, shop_id)).fetchone():
+            if _cash_state(conn, shop_id, employee_id)["balance"] > 0:
+                return "has_cash"
         cur = conn.execute("DELETE FROM shop_users WHERE id=? AND shop_id=?", (employee_id, shop_id))
         conn.commit()
         return cur.rowcount > 0
@@ -2131,8 +2137,10 @@ def normalize_discount(subtotal, discount, discount_pct=None):
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
                     next_mileage=None, items=None, cash_amount=None, card_amount=None,
-                    allow_debt=False, discount=0, discount_pct=None):
-    """items (необязательно) — детализированный список позиций вида
+                    allow_debt=False, discount=0, discount_pct=None, employee_id=None):
+    """employee_id — кто из сотрудников внёс запись (None — владелец/бот):
+    наличные этой записи попадают в «кассу» сотрудника до сдачи владельцу.
+    items (необязательно) — детализированный список позиций вида
     [{"name": "Моторное масло", "brand": "MITANOL", "unit_price": 45000, "qty": 4, "total": 180000}, ...]
     Если передан — стоимость и итоговое описание считаются по нему, а service_type/oil_brand/cost
     выше игнорируются (оставлены для обратной совместимости со старым простым способом внесения,
@@ -2207,11 +2215,11 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
                  cash_amount, card_amount, interval_months, interval_unit, next_change_date,
-                 next_mileage, items_json, notes, status, discount_amount, discount_pct)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                 next_mileage, items_json, notes, status, discount_amount, discount_pct, employee_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
               cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes,
-              discount, discount_pct))
+              discount, discount_pct, employee_id))
         conn.commit()
         return cur.lastrowid, next_date
 
@@ -2808,7 +2816,7 @@ def _debt_flow(conn, shop_id: int, date_from: str, date_to: str) -> dict:
 
 
 @_serialized
-def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None):
+def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: str = None, employee_id=None):
     """Отмечает поступивший платёж по долгу — увеличивает paid_amount,
     сдвигает следующую дату на interval_days вперёд, и закрывает план,
     если долг полностью погашен. Возвращает обновлённый план, None — если
@@ -2828,8 +2836,8 @@ def log_installment_payment(plan_id: int, shop_id: int, amount: int, paid_date: 
     next_due = (datetime.strptime(plan["next_due_date"], "%Y-%m-%d") + timedelta(days=plan["interval_days"])).strftime("%Y-%m-%d")
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO installment_payments (plan_id, amount, paid_date) VALUES (?, ?, ?)",
-            (plan_id, amount, paid_date)
+            "INSERT INTO installment_payments (plan_id, amount, paid_date, employee_id) VALUES (?, ?, ?, ?)",
+            (plan_id, amount, paid_date, employee_id)
         )
         conn.execute(
             "UPDATE installment_plans SET paid_amount=paid_amount+?, next_due_date=?, status=?, closed_at=? "
@@ -4343,6 +4351,7 @@ def delete_branch_with_data(branch_id: int) -> bool:
             conn.execute("DELETE FROM recurring_expenses WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM broadcasts WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM shop_users WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM cash_handovers WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM password_reset_codes WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM shops WHERE id=? AND role='branch'", (branch_id,))
             conn.commit()
@@ -8792,3 +8801,208 @@ def client_lang_by_telegram(telegram_id: int) -> str:
             WHERE cl.telegram_id=? ORDER BY cl.linked_at DESC, cl.id DESC LIMIT 1
         """, (telegram_id,)).fetchone()
     return (row["language"] if row else None) or "ru"
+
+
+
+# ---------- Касса сотрудника: наличные копятся, пока владелец не примет ----------
+# Остаток в кассе НЕ хранится отдельной цифрой — он всегда считается заново:
+#   наличные из замен, внесённых сотрудником
+# + погашения долгов, принятые сотрудником
+# − всё, что владелец уже принял (cash_handovers, кроме отменённых).
+# Поэтому исправление/удаление записи сразу честно меняет кассу, а сбой
+# посреди операции не может «потерять» деньги. Записи, внесённые до появления
+# этой функции (employee_id пустой), в кассу не попадают — касса стартует с 0.
+
+def _migrate_cash(conn):
+    oc_cols = {r[1] for r in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
+    if "employee_id" not in oc_cols:
+        conn.execute("ALTER TABLE oil_changes ADD COLUMN employee_id INTEGER")
+    pay_cols = {r[1] for r in conn.execute("PRAGMA table_info(installment_payments)").fetchall()}
+    if "employee_id" not in pay_cols:
+        conn.execute("ALTER TABLE installment_payments ADD COLUMN employee_id INTEGER")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS cash_handovers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        employee_name TEXT,
+        expected INTEGER NOT NULL DEFAULT 0,
+        amount INTEGER NOT NULL,
+        last_oc_id INTEGER NOT NULL DEFAULT 0,
+        last_pay_id INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        cancelled_at TEXT
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cash_handovers_emp ON cash_handovers(shop_id, employee_id, status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_emp ON oil_changes(employee_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_installment_payments_emp ON installment_payments(employee_id)")
+    conn.commit()
+
+
+def _cash_state(conn, shop_id: int, employee_id: int) -> dict:
+    """Касса одного сотрудника: остаток + что накопилось после последней сдачи."""
+    oc = conn.execute("""
+        SELECT COALESCE(SUM(oc.cash_amount), 0) AS cash, COALESCE(MAX(oc.id), 0) AS max_id
+        FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+        WHERE oc.employee_id=? AND c.shop_id=?
+    """, (employee_id, shop_id)).fetchone()
+    pay = conn.execute("""
+        SELECT COALESCE(SUM(CASE WHEN p.status='active' THEN p.amount ELSE 0 END), 0) AS cash,
+               COALESCE(MAX(p.id), 0) AS max_id
+        FROM installment_payments p JOIN installment_plans ip ON ip.id = p.plan_id
+        WHERE p.employee_id=? AND ip.shop_id=?
+    """, (employee_id, shop_id)).fetchone()
+    taken = conn.execute("""
+        SELECT COALESCE(SUM(amount), 0) FROM cash_handovers
+        WHERE shop_id=? AND employee_id=? AND status='active'
+    """, (shop_id, employee_id)).fetchone()[0] or 0
+    last = conn.execute("""
+        SELECT * FROM cash_handovers WHERE shop_id=? AND employee_id=? AND status='active'
+        ORDER BY id DESC LIMIT 1
+    """, (shop_id, employee_id)).fetchone()
+    last_oc = last["last_oc_id"] if last else 0
+    last_pay = last["last_pay_id"] if last else 0
+    # что пришло ПОСЛЕ последней сдачи — для расшифровки «за что эти деньги»
+    since = conn.execute("""
+        SELECT COUNT(*) AS n, COALESCE(SUM(oc.cash_amount), 0) AS cash,
+               COALESCE(SUM(oc.card_amount), 0) AS card, COALESCE(SUM(oc.cost), 0) AS total,
+               MIN(oc.change_date) AS d_from
+        FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+        WHERE oc.employee_id=? AND c.shop_id=? AND oc.id > ?
+    """, (employee_id, shop_id, last_oc)).fetchone()
+    since_pay = conn.execute("""
+        SELECT COUNT(*) AS n, COALESCE(SUM(p.amount), 0) AS cash, MIN(p.paid_date) AS d_from
+        FROM installment_payments p JOIN installment_plans ip ON ip.id = p.plan_id
+        WHERE p.employee_id=? AND ip.shop_id=? AND p.status='active' AND p.id > ?
+    """, (employee_id, shop_id, last_pay)).fetchone()
+    balance = int((oc["cash"] or 0) + (pay["cash"] or 0) - taken)
+    d_from = min([d for d in (since["d_from"], since_pay["d_from"]) if d] or [None]) if (since["n"] or since_pay["n"]) else None
+    # остаток с прошлых сдач (принято не всё) или поправки старых записей
+    carry = balance - int(since["cash"] or 0) - int(since_pay["cash"] or 0)
+    return {
+        "balance": balance,
+        "carry": carry,
+        "services": since["n"] or 0,
+        "services_cash": int(since["cash"] or 0),
+        "services_card": int(since["card"] or 0),
+        "services_total": int(since["total"] or 0),
+        "debt_payments": since_pay["n"] or 0,
+        "debt_cash": int(since_pay["cash"] or 0),
+        "since": d_from,
+        "last_handover": dict(last) if last else None,
+        "_max_oc": int(oc["max_id"] or 0),
+        "_max_pay": int(pay["max_id"] or 0),
+    }
+
+
+def _public_cash(st: dict) -> dict:
+    return {k: v for k, v in st.items() if not k.startswith("_")}
+
+
+def get_employee_cash(shop_id: int, employee_id: int) -> dict:
+    with get_conn() as conn:
+        return _public_cash(_cash_state(conn, shop_id, employee_id))
+
+
+def list_staff_cash(shop_id: int) -> list:
+    """Кассы всех сотрудников точки (и выключенных тоже — деньги у них могут остаться)."""
+    with get_conn() as conn:
+        emps = conn.execute("SELECT id, username, full_name, is_active FROM shop_users WHERE shop_id=? "
+                            "ORDER BY is_active DESC, COALESCE(full_name, username)", (shop_id,)).fetchall()
+        out = []
+        for e in emps:
+            st = _public_cash(_cash_state(conn, shop_id, e["id"]))
+            st.update({"employee_id": e["id"], "name": e["full_name"] or e["username"],
+                       "username": e["username"], "is_active": e["is_active"]})
+            out.append(st)
+        return out
+
+
+def employee_cash_entries(shop_id: int, employee_id: int, limit: int = 100) -> list:
+    """Что входит в текущую кассу: замены и погашения долгов после последней сдачи."""
+    with get_conn() as conn:
+        last = conn.execute("""SELECT last_oc_id, last_pay_id FROM cash_handovers
+                               WHERE shop_id=? AND employee_id=? AND status='active' ORDER BY id DESC LIMIT 1""",
+                            (shop_id, employee_id)).fetchone()
+        last_oc = last["last_oc_id"] if last else 0
+        last_pay = last["last_pay_id"] if last else 0
+        rows = conn.execute("""
+            SELECT 'service' AS kind, oc.id AS id, oc.change_date AS d, c.plate_number AS plate,
+                   oc.cost AS total, COALESCE(oc.cash_amount, 0) AS cash, COALESCE(oc.card_amount, 0) AS card
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE oc.employee_id=? AND c.shop_id=? AND oc.id > ?
+            UNION ALL
+            SELECT 'debt' AS kind, p.id AS id, p.paid_date AS d, c.plate_number AS plate,
+                   p.amount AS total, p.amount AS cash, 0 AS card
+            FROM installment_payments p JOIN installment_plans ip ON ip.id = p.plan_id
+            LEFT JOIN cars c ON c.id = ip.car_id
+            WHERE p.employee_id=? AND ip.shop_id=? AND p.status='active' AND p.id > ?
+            ORDER BY d DESC, id DESC LIMIT ?
+        """, (employee_id, shop_id, last_oc, employee_id, shop_id, last_pay, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_cash_handovers(shop_id: int, employee_id: int = None, limit: int = 30) -> list:
+    with get_conn() as conn:
+        if employee_id:
+            rows = conn.execute("""SELECT * FROM cash_handovers WHERE shop_id=? AND employee_id=?
+                                   ORDER BY id DESC LIMIT ?""", (shop_id, employee_id, limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM cash_handovers WHERE shop_id=? ORDER BY id DESC LIMIT ?",
+                                (shop_id, limit)).fetchall()
+        return [{k: r[k] for k in ("id", "employee_id", "employee_name", "expected", "amount",
+                                   "status", "created_at", "cancelled_at", "note")} for r in rows]
+
+
+@_serialized
+def accept_cash_handover(shop_id: int, employee_id: int, expected: int, amount: int, note: str = None) -> dict:
+    """Владелец принимает кассу. expected — остаток, который он видел на экране:
+    если за это время сотрудник внёс ещё одну замену (или запись исправили),
+    ничего не принимаем и просим обновить — чтобы не «принять» деньги, которых
+    владелец не видел. amount — сколько реально получено (можно меньше остатка:
+    разница так и остаётся в кассе сотрудника)."""
+    with get_conn() as conn:
+        emp = conn.execute("SELECT id, username, full_name FROM shop_users WHERE id=? AND shop_id=?",
+                           (employee_id, shop_id)).fetchone()
+        if not emp:
+            return {"error": "not_found"}
+        st = _cash_state(conn, shop_id, employee_id)
+        if st["balance"] != expected:
+            return {"error": "changed", "balance": st["balance"]}
+        if st["balance"] <= 0:
+            return {"error": "empty", "balance": st["balance"]}
+        if amount <= 0 or amount > st["balance"]:
+            return {"error": "amount", "balance": st["balance"]}
+        cur = conn.execute("""
+            INSERT INTO cash_handovers (shop_id, employee_id, employee_name, expected, amount,
+                                        last_oc_id, last_pay_id, note, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+        """, (shop_id, employee_id, emp["full_name"] or emp["username"], st["balance"], amount,
+              st["_max_oc"], st["_max_pay"], (note or "").strip()[:200] or None, _now_str()))
+        conn.commit()
+        hid = cur.lastrowid
+        after = _public_cash(_cash_state(conn, shop_id, employee_id))
+    return {"ok": True, "id": hid, "cash": after}
+
+
+@_serialized
+def cancel_cash_handover(shop_id: int, handover_id: int) -> dict:
+    """Отмена ошибочно принятой кассы — только самой последней у сотрудника
+    (иначе запутается «что после какой сдачи»). Запись остаётся в истории
+    как «отменено», деньги снова числятся у сотрудника."""
+    with get_conn() as conn:
+        h = conn.execute("SELECT * FROM cash_handovers WHERE id=? AND shop_id=?", (handover_id, shop_id)).fetchone()
+        if not h or h["status"] != "active":
+            return {"error": "not_found"}
+        last = conn.execute("""SELECT id FROM cash_handovers WHERE shop_id=? AND employee_id=? AND status='active'
+                               ORDER BY id DESC LIMIT 1""", (shop_id, h["employee_id"])).fetchone()
+        if not last or last["id"] != handover_id:
+            return {"error": "not_last"}
+        conn.execute("UPDATE cash_handovers SET status='cancelled', cancelled_at=? WHERE id=?",
+                     (_now_str(), handover_id))
+        conn.commit()
+        after = _public_cash(_cash_state(conn, shop_id, h["employee_id"]))
+    return {"ok": True, "cash": after}
