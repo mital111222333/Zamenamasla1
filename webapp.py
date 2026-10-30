@@ -2401,6 +2401,10 @@ if ('serviceWorker' in navigator) {
   .cs-qty { display:flex; align-items:center; gap:8px; margin:6px 0 10px; }
   .cs-qty button { width:44px; height:44px; border:1px solid var(--border); border-radius:10px; background:#fff; font:inherit; font-size:20px; font-weight:700; cursor:pointer; color:var(--blue); }
   .cs-qty b { font-family:var(--font-mono); font-size:18px; min-width:70px; text-align:center; }
+  .cs-qty label { display:flex; align-items:baseline; justify-content:center; gap:6px; min-width:110px; padding:0 6px; cursor:text; font-family:var(--font-mono); font-size:18px; font-weight:700; }
+  .cs-qty label { color:var(--text); }
+  .cs-qty input { width:3.4em; margin:0; border:0; border-bottom:2px dashed #c8d3e6; border-radius:0; background:transparent; box-shadow:none; font:inherit; color:inherit; text-align:center; padding:2px 0; outline:none; }
+  .cs-qty input:focus { border-color:transparent; border-bottom-color:var(--blue); box-shadow:none; }
   .cs-del { width:100%; margin-top:8px; height:44px; border:1.5px solid #FECACA; background:#FEF2F2; color:#B3241C; border-radius:12px; font:inherit; font-weight:700; cursor:pointer; }
   .flt-tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; margin:4px 0 8px; }
   @media (min-width:600px) { .flt-tiles { grid-template-columns:repeat(4, minmax(0,1fr)); } }
@@ -9112,11 +9116,42 @@ function csFootHtml(fluid, ready, inRcpt) {
     const opts = [1, 3, 3.5, 4, 4.5, 5];
     h += `<div class="ps-grp" style="margin-top:0;">${T.psh_liters}</div><div class="ps-lit">` +
       opts.map(v => `<button type="button" class="${CS.qty === v ? 'on' : ''}" onclick="CS.qty=${v}; renderCatSheet()">${csQty(v)}</button>`).join('') + `</div>` +
-      `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(0.5, Math.round((CS.qty-0.5)*10)/10); renderCatSheet()">−</button><b>${csQty(CS.qty)} ${T.unit_l}</b><button type="button" onclick="CS.qty=Math.round((CS.qty+0.5)*10)/10; renderCatSheet()">+</button></div>`;
+      `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(0.5, Math.round((CS.qty-0.5)*10)/10); renderCatSheet()">−</button><label><input id="csQtyIn" type="text" inputmode="decimal" autocomplete="off" value="${csQty(CS.qty)}" onfocus="this.select()" oninput="csQtyType(this)" onchange="csQtyDone(this)" onkeydown="if(event.key==='Enter'){this.blur();}"><span>${T.unit_l}</span></label><button type="button" onclick="CS.qty=Math.round((CS.qty+0.5)*10)/10; renderCatSheet()">+</button></div>`;
   }
-  if (ready) h += `<button type="button" class="ps-go" onclick="csApply()">${T.cat_add}${fluid && CS.qty ? ' · ' + csQty(CS.qty) + ' ' + T.unit_l : ''}</button>`;
+  if (ready) h += `<button type="button" class="ps-go" id="csGoBtn" onclick="csApply()">${csGoText(fluid)}</button>`;
   if (inRcpt) h += `<button type="button" class="cs-del" onclick="csRemoveCur()">${T.cat_remove}</button>`;
   return h;
+}
+function csGoText(fluid) {
+  return T.cat_add + (fluid && CS.qty ? ' · ' + csQty(CS.qty) + ' ' + T.unit_l : '');
+}
+// свой литраж вручную (например 3,8): пока печатают — только обновляем кнопку, без перерисовки
+function csParseQty(v) {
+  const n = parseFloat(String(v || '').replace(',', '.'));
+  return n > 0 ? Math.min(Math.round(n * 100) / 100, 999) : 0;
+}
+function csQtyType(el) {
+  el.value = el.value.replace(el.dataset.int ? /[^0-9]/g : /[^0-9.,]/g, '');
+  const n = csParseQty(el.value);
+  if (n) CS.qty = n;
+  csQtyMark(el);
+}
+// подсветка готовых кнопок и текст «Добавить» — без перерисовки шторки,
+// чтобы нажатие «Добавить» сразу после ввода не потерялось
+function csQtyMark(el) {
+  const box = el.closest('.cs-qty');
+  const lit = box && box.previousElementSibling;
+  if (lit && lit.classList.contains('ps-lit')) {
+    lit.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.textContent.trim() === csQty(CS.qty)));
+  }
+  const b = document.getElementById('csGoBtn');
+  if (b) b.textContent = csGoText(true);
+}
+function csQtyDone(el) {
+  const n = csParseQty(el.value);
+  if (n) CS.qty = n;
+  el.value = csQty(CS.qty);
+  csQtyMark(el);
 }
 function csPick(id, qty) {
   CS.pid = String(id);
@@ -9255,7 +9290,7 @@ function renderCsGoods(body, foot) {
   if (CS.pid) {
     const p = all.find(x => String(x.id) === String(CS.pid));
     const step = p && p.unit !== 'pc' ? 0.5 : 1;
-    foot.innerHTML = `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(${step}, Math.round((CS.qty-${step})*10)/10); renderCatSheet()">−</button><b>${csQty(CS.qty)} ${p ? unitOf(p) : ''}</b><button type="button" onclick="CS.qty=Math.round((CS.qty+${step})*10)/10; renderCatSheet()">+</button></div>`
+    foot.innerHTML = `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(${step}, Math.round((CS.qty-${step})*10)/10); renderCatSheet()">−</button><label><input id="csQtyIn" type="text" inputmode="${step === 1 ? 'numeric' : 'decimal'}" data-int="${step === 1 ? 1 : ''}" autocomplete="off" value="${csQty(CS.qty)}" onfocus="this.select()" oninput="csQtyType(this)" onchange="csQtyDone(this)" onkeydown="if(event.key==='Enter'){this.blur();}"><span>${p ? unitOf(p) : ''}</span></label><button type="button" onclick="CS.qty=Math.round((CS.qty+${step})*10)/10; renderCatSheet()">+</button></div>`
       + `<button type="button" class="ps-go" onclick="csGoodsApply()">${T.cat_add}</button>`;
   } else {
     foot.innerHTML = '';
