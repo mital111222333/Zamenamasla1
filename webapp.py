@@ -3163,6 +3163,100 @@ if ('serviceWorker' in navigator) {
   .staff-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .staff-btns button { border:1px solid var(--border); background:#F8FAFC; color:var(--text); border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:600; cursor:pointer; }
   .staff-btns button.del { color:#B3241C; border-color:#F5C2BE; background:#FDECEA; }
+  #view-team { max-width:820px; }
+  .tm-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .tm-month { display:flex; align-items:center; gap:6px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:4px; }
+  .tm-month button { border:0; background:#EEF2F7; color:#334155; width:34px; height:34px; border-radius:9px; cursor:pointer; font-size:14px; }
+  .tm-month b { min-width:118px; text-align:center; font-size:14.5px; color:var(--text); }
+  .tm-head select { flex:1; min-width:150px; max-width:260px; margin:0; }
+  .tm-tiles { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+  .tm-tile { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:10px 12px; min-width:0; }
+  .tm-tile span { display:block; font-size:12px; color:var(--hint); font-weight:600; }
+  .tm-tile b { display:block; font-size:18px; font-weight:800; color:var(--text); font-family:'Space Grotesk',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tm-tile.blue { background:linear-gradient(135deg,#0F52BA,#1E6FD9); border-color:transparent; }
+  .tm-tile.blue span, .tm-tile.blue b { color:#fff; }
+  .tm-tile.green b { color:#16A34A; }
+  .tm-leader { display:flex; align-items:center; gap:12px; background:#FFFBEB; border:1.5px solid #FCD34D; border-radius:14px; padding:12px 14px; margin-bottom:12px; }
+  .tm-leader i.fa-award { font-size:28px; color:#D97706; }
+  .tm-leader .tl-t { font-weight:800; font-size:15px; color:#78350F; }
+  .tm-leader .tl-s { font-size:12.5px; color:#92400E; margin-top:2px; }
+  .tm-leader .tl-certs { margin-left:auto; display:flex; flex-direction:column; gap:6px; flex:0 0 auto; }
+  .tm-leader a { flex:0 0 auto; background:#D97706; color:#fff; text-decoration:none; font-weight:700; font-size:13px; border-radius:10px; padding:9px 12px; white-space:nowrap; }
+  .tm-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:12px; }
+  .tm-card-t { font-size:13px; font-weight:800; color:var(--hint); text-transform:uppercase; letter-spacing:.3px; margin-bottom:10px; display:flex; justify-content:space-between; gap:8px; }
+  .tm-card-t small { text-transform:none; letter-spacing:0; font-weight:600; }
+  .tm-podium { display:flex; align-items:flex-end; justify-content:center; gap:10px; padding-top:6px; }
+  .tm-pod { flex:1; max-width:130px; text-align:center; min-width:0; }
+  .tm-pod .av { width:46px; height:46px; margin:0 auto 4px; }
+  .tm-pod .nm { font-size:13.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tm-pod .pt { font-size:12px; color:var(--hint); margin-bottom:4px; }
+  .tm-pod .st { border-radius:10px 10px 0 0; color:#fff; font-weight:800; font-size:22px; font-family:'Space Grotesk',sans-serif; padding-top:8px; }
+  .tm-pod.p1 .st { background:#0F52BA; height:92px; }
+  .tm-pod.p2 .st { background:#5B8FD9; height:68px; }
+  .tm-pod.p3 .st { background:#A9C4EC; height:50px; color:#0A2540; }
+  .tm-pod .crown { color:#D97706; font-size:18px; height:20px; }
+  .tm-pod.empty { visibility:hidden; }
+  .av { border-radius:50%; background:#DBEAFE; color:#1E40AF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; }
+  .tm-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--border); font-size:13.5px; color:var(--text); }
+  .tm-row .pl { width:22px; text-align:center; font-weight:800; color:var(--hint); }
+  .tm-row .av { width:32px; height:32px; font-size:13px; flex:0 0 auto; }
+  .tm-row .who { flex:1; min-width:0; }
+  .tm-row .who b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tm-row .who small { color:var(--hint); font-size:11.5px; }
+  .tm-row .num { text-align:right; white-space:nowrap; }
+  .tm-row .num b { display:block; }
+  .tm-row .num small { color:var(--hint); font-size:11.5px; }
+  .tm-mv { font-size:11.5px; font-weight:800; margin-left:4px; }
+  .tm-mv.up { color:#16A34A; } .tm-mv.down { color:#DC2626; }
+  .tm-row.me { background:#EFF6FF; border-radius:10px; padding-left:6px; padding-right:6px; }
+  .tm-rule { font-size:12px; color:var(--hint); margin-top:8px; }
+  .tm-sal { border-top:1px solid var(--border); padding:12px 0; }
+  .tm-sal:first-of-type { border-top:0; padding-top:0; }
+  .tm-sal-h { display:flex; align-items:center; gap:10px; }
+  .tm-sal-h .av { width:38px; height:38px; flex:0 0 auto; }
+  .tm-sal-h .who { flex:1; min-width:0; }
+  .tm-sal-h .who b { display:block; font-size:14.5px; color:var(--text); }
+  .tm-sal-h .who small { color:var(--hint); font-size:12px; }
+  .tm-sal-h .sum { text-align:right; }
+  .tm-sal-h .sum b { display:block; font-size:17px; font-weight:800; color:var(--text); font-family:'Space Grotesk',sans-serif; white-space:nowrap; }
+  .tm-sal-h .sum small { color:var(--hint); font-size:11.5px; white-space:nowrap; }
+  .tm-sal-h .sum small.due { color:#B45309; font-weight:700; }
+  .tm-bar { height:7px; background:#E2E8F0; border-radius:4px; overflow:hidden; margin-top:4px; }
+  .tm-bar i { display:block; height:100%; background:#0F52BA; border-radius:4px; }
+  .tm-bar.done i { background:#16A34A; }
+  .tm-plan { font-size:12px; color:var(--hint); margin-top:8px; }
+  .tm-btns { display:flex; gap:8px; margin-top:10px; }
+  .tm-btns button { flex:1; border:0; border-radius:10px; padding:10px; font-size:13.5px; font-weight:700; cursor:pointer; background:#EEF2F7; color:#334155; }
+  .tm-btns button.pay { background:#16A34A; color:#fff; }
+  .tm-lines { margin:6px 0 10px; }
+  .tm-line { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:5px 0; color:var(--text); border-bottom:1px dashed var(--border); }
+  .tm-line span { min-width:0; }
+  .tm-line b { white-space:nowrap; }
+  .tm-line.muted { color:var(--hint); }
+  .tm-line.tot { border-bottom:0; font-size:15.5px; font-weight:800; padding-top:8px; }
+  .tm-line.tot b { color:#16A34A; }
+  .tm-sec { font-size:12.5px; font-weight:800; color:var(--hint); text-transform:uppercase; letter-spacing:.3px; margin:16px 0 6px; }
+  .tm-grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .tm-grid2 label, #view-team label, #teamModal label { display:block; font-size:12.5px; font-weight:600; color:var(--text); margin:8px 0 4px; }
+  .tm-badges { display:flex; flex-wrap:wrap; gap:6px; }
+  .tm-badge { display:inline-flex; align-items:center; gap:6px; background:#EFF6FF; color:#1E3A8A; border-radius:999px; padding:5px 10px; font-size:12px; font-weight:700; }
+  .tm-badge.gold { background:#FEF3C7; color:#78350F; }
+  .tm-badge.off { background:#F1F5F9; color:#94A3B8; }
+  .tm-hist { display:flex; justify-content:space-between; gap:8px; align-items:center; font-size:13px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .tm-hist.cancelled { opacity:.5; text-decoration:line-through; }
+  .tm-hist small { display:block; color:var(--hint); font-size:11.5px; }
+  .tm-hist button { border:1px solid #F5C2BE; background:#FDECEA; color:#B3241C; border-radius:8px; padding:4px 8px; font-size:11.5px; font-weight:700; cursor:pointer; }
+  .tm-me { background:linear-gradient(135deg,#0F52BA,#1E6FD9); color:#fff; border-radius:16px; padding:16px; margin-bottom:12px; }
+  .tm-me .l { font-size:13px; opacity:.85; font-weight:600; }
+  .tm-me .v { font-size:30px; font-weight:800; font-family:'Space Grotesk',sans-serif; }
+  .tm-me .s { font-size:12.5px; opacity:.85; }
+  .tm-me .tm-bar { background:rgba(255,255,255,.25); }
+  .tm-me .tm-bar i { background:#fff; }
+  .tm-me .tm-plan { color:#fff; opacity:.85; }
+  .tm-details summary { cursor:pointer; font-weight:700; font-size:14px; color:var(--text); list-style:none; }
+  .tm-details summary::-webkit-details-marker { display:none; }
+  .tm-details summary i { color:var(--hint); margin-right:6px; }
+  @media (max-width:420px) { .tm-tile b { font-size:15.5px; } .tm-month b { min-width:100px; } }
 
   /* ---------- Обучение: карта курса ---------- */
   /* дизайн «Dala» (DESIGN.md): чёрная пустота, один фиолетовый акцент, янтарные подписи, Inter 400/300 */
@@ -3239,6 +3333,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     {% if is_employee or has_staff %}<div class="side-item" id="tab-cash" data-tab="cash" onclick="showTab('cash')"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
+    {% if team_on %}<div class="side-item" id="tab-team" data-tab="team" onclick="showTab('team')"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
     {% if sms_enabled %}<div class="side-item" id="tab-sms" data-tab="sms" onclick="showTab('sms')"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
     {% if not is_employee or (warehouse_enabled and store_enabled) %}<div class="side-group">{{ T.nav_grp_business }}</div>{% endif %}
@@ -3287,6 +3382,7 @@ if ('serviceWorker' in navigator) {
   <div class="more-grab"></div>
   <div class="more-list">
       {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
+      {% if team_on %}<div class="more-item" data-tab="team" data-more-slot="team" onclick="showTab('team'); closeMore();"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
       {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
       <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
       {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
@@ -3526,6 +3622,8 @@ if ('serviceWorker' in navigator) {
           <button type="button" data-d="30" onclick="setDebtTerm(30)">{{ T.debt_1m }}</button>
         </div>
       </div>
+      {% if is_employee or has_staff %}<div class="af-sub" style="margin-top:14px;">{{ T.team_master }}</div>
+      <select id="master_id"></select>{% endif %}
       <div class="af-sub" style="margin-top:14px;">{{ T.field_notes }}</div>
       <textarea id="notes" rows="2" placeholder="{{ T.notes_ph }}"></textarea>
       <div class="notes-shared-hint"><i class="fa-solid fa-eye"></i> {{ T.notes_shared_hint }}</div>
@@ -3780,6 +3878,19 @@ if ('serviceWorker' in navigator) {
     {% endif %}
   </div>
 
+  {% if team_on %}
+  <div id="view-team" style="display:none;">
+    <div id="teamBox">{{ T.stats_loading }}</div>
+    {% if not is_employee %}
+    <div class="modal-overlay" id="teamModal" onclick="if (event.target === this) closeTeamModal()">
+      <div class="modal modal-wide" style="text-align:left;">
+        <div id="teamModalBody"></div>
+        <button class="submit" style="background:#E2E8F0; color:#334155;" onclick="closeTeamModal()">{{ T.team_close }}</button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
   {% if not is_employee %}
   <div id="view-staff" style="display:none;">
     <div class="card">
@@ -4480,6 +4591,10 @@ MODAL_AND_SCRIPT = """
       <label>{{ T.field_next_mileage }}</label>
       <input id="edit_next_mileage" type="number">
     </div>
+    {% if has_staff %}<div class="field" id="editMasterWrap">
+      <label>{{ T.team_master }}</label>
+      <select id="edit_master_id"></select>
+    </div>{% endif %}
 
     {% if warehouse_enabled %}
     <div class="field pick-search">
@@ -4574,6 +4689,8 @@ const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
 const STORE_ENABLED = {{ store_enabled|tojson }};  // «Склад магазина»: основной склад + магазин
 const IS_BRANCH = {{ is_branch|tojson }};
+const IS_EMP_TEAM = {{ is_employee|tojson }};
+const MY_EMP_ID = {{ my_employee_id|tojson }};
 const IS_EMPLOYEE = {{ is_employee|tojson }};
 const CAR_MODELS = {{ car_models|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
@@ -4691,6 +4808,358 @@ function showTab(t, keepScroll) {
   const helpTab = document.getElementById('tab-help');
   if (helpView) helpView.style.display = t === 'help' ? 'block' : 'none';
   if (helpTab) helpTab.classList.toggle('active', t === 'help');
+  const teamView = document.getElementById('view-team');
+  if (teamView) teamView.style.display = t === 'team' ? 'block' : 'none';
+  if (t === 'team') loadTeam();
+}
+
+// ---------- Команда: рейтинг, зарплата, награды ----------
+const TEAM = { period: null, shop: null, data: null, seq: 0, shops: null, emp: null };
+function teamPeriodNow() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function teamShift(n) {
+  const p = TEAM.period.split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1 + n, 1);
+  const next = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (next > teamPeriodNow()) return;
+  TEAM.period = next;
+  loadTeam();
+}
+function teamPrevPeriod(per) { const p = per.split('-').map(Number); const d = new Date(p[0], p[1] - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function teamMonthLabel(per) { const p = per.split('-').map(Number); return (String(T.team_months).split(',')[p[1] - 1] || p[1]) + ' ' + p[0]; }
+function teamPos(code) { return T['team_pos_' + (code || 'master')] || code || ''; }
+function teamMoney(n) { return fmtNum(Math.round(n || 0)) + ' ' + T.currency; }
+function teamFmt(s, vars) { return String(s).replace(/{([a-z_]+)}/g, (m, k) => (k in vars ? vars[k] : m)); }
+function teamInitials(name) {
+  const parts = String(name || '?').trim().split(/ +/).filter(Boolean);
+  return escapeHtml(((parts[0] || '?')[0] + (parts[1] ? parts[1][0] : '')).toUpperCase());
+}
+function teamShopQs() { return (TEAM.shop && TEAM.shop !== 'net') ? '&shop=' + encodeURIComponent(TEAM.shop) : ''; }
+function teamParseAmount(raw, allowMinus) {
+  const s = String(raw || '').trim();
+  const neg = allowMinus && (s.startsWith('-') || s.startsWith('−'));
+  const n = parseInt(s.replace(/[^0-9]/g, ''), 10) || 0;
+  return neg ? -n : n;
+}
+function teamAmountInput(el) {
+  const s = String(el.value || '');
+  const neg = el.dataset.minus === '1' && (s.trim().startsWith('-') || s.trim().startsWith('−'));
+  const digits = s.replace(/[^0-9]/g, '');
+  el.value = (neg ? '−' : '') + (digits ? Number(digits).toLocaleString('ru-RU') : '');
+}
+
+async function loadTeam() {
+  if (!TEAM.period) TEAM.period = teamPeriodNow();
+  const box = document.getElementById('teamBox');
+  if (!box) return;
+  const seq = ++TEAM.seq;
+  const url = TEAM.shop === 'net'
+    ? '/api/team/network?period=' + TEAM.period
+    : '/api/team?period=' + TEAM.period + teamShopQs();
+  let d;
+  try { d = await (await fetch(url, { credentials: 'same-origin', cache: 'no-store' })).json(); }
+  catch (e) { if (seq === TEAM.seq) box.innerHTML = `<div class="card">${escapeHtml(T.msg_no_connection || T.team_err)}</div>`; return; }
+  if (seq !== TEAM.seq) return;
+  if (!d.ok) { box.innerHTML = `<div class="card">${escapeHtml(d.error || T.team_err)}</div>`; return; }
+  TEAM.data = d;
+  if (d.shops) TEAM.shops = d.shops;
+  let body;
+  if (TEAM.shop === 'net') body = teamBoardCard(d.board, true, null);
+  else if (IS_EMP_TEAM) body = teamEmployeeHtml(d);
+  else body = teamOwnerHtml(d);
+  box.innerHTML = teamHeader(d) + body;
+}
+
+function teamHeader(d) {
+  let sel = '';
+  if (!IS_EMP_TEAM && TEAM.shops && TEAM.shops.length > 1) {
+    const cur = TEAM.shop || String(TEAM.shops[0].id);
+    sel = `<select onchange="TEAM.shop = this.value; loadTeam();">` +
+      TEAM.shops.map((s, i) => `<option value="${s.id}" ${String(s.id) === cur ? 'selected' : ''}>${escapeHtml(i === 0 ? T.team_my_shop + ' · ' + s.name : s.name)}</option>`).join('') +
+      `<option value="net" ${cur === 'net' ? 'selected' : ''}>${escapeHtml(T.team_net)}</option></select>`;
+  }
+  const done = d && d.finished ? ` <small style="color:var(--hint); font-size:12px;">· ${escapeHtml(T.team_finished)}</small>` : '';
+  return `<div class="tm-head"><div class="tm-month">
+      <button type="button" onclick="teamShift(-1)" aria-label="prev"><i class="fa-solid fa-chevron-left"></i></button>
+      <b>${escapeHtml(teamMonthLabel(TEAM.period))}</b>
+      <button type="button" onclick="teamShift(1)" aria-label="next" ${TEAM.period >= teamPeriodNow() ? 'style="visibility:hidden"' : ''}><i class="fa-solid fa-chevron-right"></i></button>
+    </div>${sel}${done}</div>`;
+}
+
+function teamPodium(board) {
+  // первые три по порядку (при равенстве очков у двоих одно и то же место)
+  const top = board.filter(r => r.place).slice(0, 3);
+  if (!top.length) return '';
+  const pod = (i) => {
+    const r = top[i];
+    if (!r) return `<div class="tm-pod p${i + 1} empty"><div class="crown"></div><div class="av"></div><div class="nm">-</div><div class="pt">-</div><div class="st">${i + 1}</div></div>`;
+    return `<div class="tm-pod p${i + 1}"><div class="crown">${r.place === 1 ? '<i class="fa-solid fa-crown"></i>' : ''}</div>
+      <div class="av">${teamInitials(r.name)}</div><div class="nm">${escapeHtml(r.name)}</div>
+      <div class="pt">${fmtNum(r.points)} ${escapeHtml(T.team_points)}</div><div class="st">${r.place}</div></div>`;
+  };
+  return `<div class="tm-podium">${pod(1)}${pod(0)}${pod(2)}</div>`;
+}
+
+function teamMove(r) {
+  if (r.move === null || r.move === undefined || r.move === 0) return '';
+  return r.move > 0 ? `<span class="tm-mv up">▲${r.move}</span>` : `<span class="tm-mv down">▼${-r.move}</span>`;
+}
+
+function teamBoardCard(board, network, meId) {
+  if (!board || !board.length || !board.some(r => r.services > 0)) {
+    return `<div class="tm-card"><div class="tm-card-t">${escapeHtml(T.team_rating)}</div><div class="hint-text" style="margin:0;">${escapeHtml(T.team_no_data)}</div></div>`;
+  }
+  const rule = (TEAM.data && TEAM.data.points_rule) || { service: 10, filter: 5, repeat: 5 };
+  const rows = board.map(r => `<div class="tm-row ${meId && r.id === meId ? 'me' : ''}">
+      <div class="pl">${r.place || '–'}</div><div class="av">${teamInitials(r.name)}</div>
+      <div class="who"><b>${escapeHtml(r.name)}${teamMove(r)}</b><small>${escapeHtml(network ? (r.shop || '') : teamPos(r.position))}${r.is_active === 0 ? ' · ' + escapeHtml(T.team_inactive) : ''}</small></div>
+      <div class="num"><b>${fmtNum(r.points)} ${escapeHtml(T.team_points)}</b><small>${fmtNum(r.services)} ${escapeHtml(T.team_services)}</small></div></div>`).join('');
+  return `<div class="tm-card"><div class="tm-card-t">${escapeHtml(T.team_rating)}</div>${teamPodium(board)}
+    <div style="margin-top:10px;">${rows}</div>
+    <div class="tm-rule">${escapeHtml(teamFmt(T.team_points_rule, { s: rule.service, f: rule.filter, r: rule.repeat }))}</div></div>`;
+}
+
+function teamLeaderCard(d, withCert) {
+  const b = d.board || [];
+  const leaders = b.filter(r => r.place === 1);
+  if (!leaders.length || !d.lead) return '';
+  let sub;
+  if (leaders.length > 1) sub = teamFmt(T.team_tie, { n: fmtNum(leaders[0].points) });
+  else if (d.lead.over && d.lead.by > 0) sub = teamFmt(T.team_lead_by, { name: d.lead.over, n: fmtNum(d.lead.by) });
+  else sub = teamFmt(T.team_cert_stats, { services: fmtNum(leaders[0].services), points: fmtNum(leaders[0].points) });
+  const cert = withCert ? leaders.map(r => `<a href="/api/team/certificate?period=${TEAM.period}&emp=${r.id}${teamShopQs()}" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(T.team_cert)}${leaders.length > 1 ? ' · ' + escapeHtml(r.name.split(' ')[0]) : ''}</a>`).join('') : '';
+  return `<div class="tm-leader"><i class="fa-solid fa-award"></i><div style="min-width:0;">
+      <div class="tl-t">${escapeHtml(d.finished ? T.team_leader : T.team_leader_so_far)}: ${escapeHtml(leaders.map(r => r.name).join(', '))}</div>
+      <div class="tl-s">${escapeHtml(sub)}</div></div><div class="tl-certs">${cert}</div></div>`;
+}
+
+function teamPlanHtml(r) {
+  if (!r.plan) return '';
+  const pct = Math.min(100, Math.round(r.services * 100 / r.plan));
+  return `<div class="tm-plan">${escapeHtml(teamFmt(T.team_plan, { done: fmtNum(r.services), plan: fmtNum(r.plan) }))}</div>
+    <div class="tm-bar ${r.services >= r.plan ? 'done' : ''}"><i style="width:${pct}%"></i></div>`;
+}
+
+function teamOwnerHtml(d) {
+  const tiles = `<div class="tm-tiles">
+    <div class="tm-tile blue"><span>${escapeHtml(T.team_fund)}</span><b>${escapeHtml(fmtShort(d.fund))}</b></div>
+    <div class="tm-tile"><span>${escapeHtml(T.team_paid)}</span><b>${escapeHtml(fmtShort(d.paid))}</b></div>
+    <div class="tm-tile green"><span>${escapeHtml(T.team_due)}</span><b>${escapeHtml(fmtShort(d.due))}</b></div></div>`;
+  const sal = (d.board || []).map(r => {
+    const s = r.salary;
+    return `<div class="tm-sal"><div class="tm-sal-h"><div class="av">${teamInitials(r.name)}</div>
+        <div class="who"><b>${escapeHtml(r.name)}</b><small>${escapeHtml(teamPos(r.position))}${r.place ? ' · ' + r.place + ' ' + escapeHtml(T.team_place_short) : ''}</small></div>
+        <div class="sum"><b>${escapeHtml(fmtShort(s.accrued))}</b>
+          <small class="${s.due > 0 ? 'due' : ''}">${escapeHtml(T.team_due)}: ${escapeHtml(fmtShort(s.due))}</small></div></div>
+      ${teamPlanHtml(r)}
+      <div class="tm-btns"><button type="button" onclick="openTeamEmp(${r.id})">${escapeHtml(T.team_details)}</button>
+        <button type="button" class="pay" onclick="openTeamEmp(${r.id}, true)">${escapeHtml(T.team_pay_btn)}</button></div></div>`;
+  }).join('') || `<div class="hint-text" style="margin:0;">${escapeHtml(T.team_no_staff)}</div>`;
+  const st = d.settings || { positions: {}, top_bonus: 0 };
+  const posInputs = ['intern', 'master', 'senior', 'expert', 'cashier'].map(k =>
+    `<div><label>${escapeHtml(teamPos(k))}</label><input id="tmPos_${k}" inputmode="numeric" autocomplete="off" oninput="teamAmountInput(this)" value="${fmtNum(st.positions[k] || 0)}"></div>`).join('');
+  const settings = `<div class="tm-card"><details class="tm-details"><summary><i class="fa-solid fa-gear"></i>${escapeHtml(T.team_settings)}</summary>
+      <div class="hint-text" style="margin:8px 0 0;">${escapeHtml(T.team_settings_hint)} ${escapeHtml(teamFmt(T.team_terms_from, { month: teamMonthLabel(TEAM.period) }))}</div>
+      <div class="tm-grid2">${posInputs}<div><label>${escapeHtml(T.team_top_bonus)}</label><input id="tmTopBonus" inputmode="numeric" autocomplete="off" oninput="teamAmountInput(this)" value="${fmtNum(st.top_bonus || 0)}"></div></div>
+      <button class="submit" type="button" onclick="saveTeamSettings()">${escapeHtml(T.team_save)}</button></details></div>`;
+  const prevBanner = d.prev_due > 0 ? `<div class="cash-warn" style="margin:0 0 12px; font-size:13px; display:flex; gap:8px; align-items:center; justify-content:space-between;">
+      <span>${escapeHtml(teamFmt(T.team_prev_due, { month: teamMonthLabel(teamPrevPeriod(TEAM.period)), sum: fmtShort(d.prev_due) }))}</span>
+      <button type="button" class="staff-copy" style="margin:0; background:#B45309; flex:0 0 auto;" onclick="teamShift(-1)">${escapeHtml(T.team_open)}</button></div>` : '';
+  return prevBanner + tiles + teamLeaderCard(d, true) + teamBoardCard(d.board, false, null)
+    + `<div class="tm-card"><div class="tm-card-t">${escapeHtml(T.team_salary)}<small>${escapeHtml(teamMonthLabel(TEAM.period))}</small></div>${sal}</div>` + settings;
+}
+
+function teamSalaryLines(s, services) {
+  const L = [];
+  const line = (label, val, cls) => L.push(`<div class="tm-line ${cls || ''}"><span>${escapeHtml(label)}</span><b>${escapeHtml(val)}</b></div>`);
+  line(T.team_l_fixed, teamMoney(s.fixed));
+  if (s.pct_goods) line(teamFmt(T.team_l_goods, { p: s.pct_goods, sum: fmtShort(s.goods_money) }), teamMoney(s.from_goods));
+  if (s.pct_work) line(teamFmt(T.team_l_work, { p: s.pct_work, sum: fmtShort(s.work_money) }), teamMoney(s.from_work));
+  if (s.plan && s.plan_bonus_amount) line(teamFmt(T.team_l_plan, { n: fmtNum(s.plan) }), s.plan_done ? teamMoney(s.plan_bonus) : fmtNum(services) + ' / ' + fmtNum(s.plan), s.plan_done ? '' : 'muted');
+  if (s.top_bonus) line(s.top_shared ? T.team_l_top_shared : T.team_l_top, teamMoney(s.top_bonus));
+  if (s.top_bonus_possible) line(teamFmt(T.team_l_top_possible, { sum: fmtShort(s.top_bonus_possible) }), '', 'muted');
+  if (s.adjust) line(T.team_l_adjust, (s.adjust > 0 ? '+' : '−') + teamMoney(Math.abs(s.adjust)));
+  line(T.team_accrued, teamMoney(s.accrued));
+  if (s.paid) line(T.team_l_paid, '−' + teamMoney(s.paid), 'muted');
+  line(T.team_l_due, teamMoney(s.due), 'tot');
+  return `<div class="tm-lines">${L.join('')}</div>`;
+}
+
+function teamBadgesHtml(b) {
+  if (!b) return '';
+  const out = [];
+  (b.master_of_month || []).length && out.push(`<span class="tm-badge gold"><i class="fa-solid fa-crown"></i>${escapeHtml(teamFmt(T.team_badge_mom, { n: b.master_of_month.length }))}</span>`);
+  (b.milestones || []).slice().reverse().forEach(m => out.push(`<span class="tm-badge"><i class="fa-solid fa-medal"></i>${escapeHtml(teamFmt(T.team_badge_n, { n: fmtNum(m) }))}</span>`));
+  if (b.next_milestone) out.push(`<span class="tm-badge off"><i class="fa-solid fa-lock"></i>${escapeHtml(teamFmt(T.team_badge_next, { n: fmtNum(b.next_milestone), left: fmtNum(b.next_milestone - b.total_services) }))}</span>`);
+  return `<div class="tm-badges">${out.join('')}</div>`;
+}
+
+function teamEmployeeHtml(d) {
+  const me = (d.board || []).find(r => r.id === MY_EMP_ID);
+  let head = '';
+  if (me && me.salary) {
+    head = `<div class="tm-me"><div class="l">${escapeHtml(T.team_my_salary)} · ${escapeHtml(teamMonthLabel(TEAM.period))}</div>
+      <div class="v">${escapeHtml(teamMoney(me.salary.accrued))}</div>
+      <div class="s">${escapeHtml(T.team_my_place)}: ${me.place ? '<b>' + me.place + '</b>' : escapeHtml(T.team_no_place)} · ${fmtNum(me.points)} ${escapeHtml(T.team_points)} · ${fmtNum(me.services)} ${escapeHtml(T.team_services)}</div>
+      ${teamPlanHtml(me)}</div>
+      <div class="tm-card"><div class="tm-card-t">${escapeHtml(T.team_salary)}</div>${teamSalaryLines(me.salary, me.services)}</div>`;
+  }
+  const badges = d.my_badges ? `<div class="tm-card"><div class="tm-card-t">${escapeHtml(T.team_badges)}</div>${teamBadgesHtml(d.my_badges)}</div>` : '';
+  return head + teamLeaderCard(d, false) + teamBoardCard(d.board, false, MY_EMP_ID) + badges;
+}
+
+// ----- карточка сотрудника (владелец) -----
+async function openTeamEmp(id, focusPay) {
+  TEAM.emp = id;
+  const body = document.getElementById('teamModalBody');
+  body.innerHTML = escapeHtml(T.stats_loading);
+  document.getElementById('teamModal').classList.add('open');
+  await renderTeamEmp(focusPay);
+}
+function closeTeamModal() { document.getElementById('teamModal').classList.remove('open'); TEAM.emp = null; }
+
+async function renderTeamEmp(focusPay) {
+  const id = TEAM.emp;
+  if (!id) return;
+  let d;
+  try { d = await (await fetch(`/api/team/emp/${id}?period=${TEAM.period}${teamShopQs()}`, { credentials: 'same-origin', cache: 'no-store' })).json(); }
+  catch (e) { return; }
+  if (id !== TEAM.emp) return;
+  const body = document.getElementById('teamModalBody');
+  if (!d.ok) { body.innerHTML = escapeHtml(d.error || T.team_err); return; }
+  const r = d.row, s = r.salary, e = d.emp;
+  TEAM.empRow = r;
+  const posDef = (d.settings.positions || {})[e.position || 'master'] || 0;
+  const hist = (d.ops || []).map(o => `<div class="tm-hist ${o.status !== 'active' ? 'cancelled' : ''}">
+      <div><b>${o.kind === 'payout' ? escapeHtml(T.team_k_payout) : escapeHtml(T.team_k_adjust)} · ${(o.kind === 'adjust' && o.amount > 0 ? '+' : (o.amount < 0 ? '−' : ''))}${escapeHtml(teamMoney(Math.abs(o.amount)))}</b>
+      <small>${escapeHtml(String(o.created_at || '').slice(0, 16))} · ${escapeHtml(teamMonthLabel(o.period))}${o.note ? ' · ' + escapeHtml(o.note) : ''}${o.status === 'removed' ? ' · ' + escapeHtml(T.team_removed) : ''}</small></div>
+      ${o.status === 'active' ? `<button type="button" onclick="cancelTeamOp(${o.id})">${escapeHtml(T.cancel)}</button>` : ''}</div>`).join('');
+  const posOpts = ['intern', 'master', 'senior', 'expert', 'cashier'].map(k => `<option value="${k}" ${k === (e.position || 'master') ? 'selected' : ''}>${escapeHtml(teamPos(k))}</option>`).join('');
+  const v = (x) => (x === null || x === undefined || x === 0 || x === '') ? '' : x;
+  body.innerHTML = `<div class="cash-m-title">${escapeHtml(r.name)}</div>
+    <div class="cash-m-who">${escapeHtml(teamPos(e.position))} · ${escapeHtml(teamMonthLabel(TEAM.period))}${r.place ? ' · ' + r.place + ' ' + escapeHtml(T.team_place_short) : ''} · ${fmtNum(r.points)} ${escapeHtml(T.team_points)} · ${fmtNum(r.services)} ${escapeHtml(T.team_services)}</div>
+    ${teamSalaryLines(s, r.services)}
+    <div class="tm-sec">${escapeHtml(T.team_pay_title)} · ${escapeHtml(teamMonthLabel(TEAM.period))}</div>
+    <label for="tmPayAmt">${escapeHtml(T.team_pay_amount)}</label>
+    <input id="tmPayAmt" inputmode="numeric" autocomplete="off" oninput="teamAmountInput(this)" value="${s.due > 0 ? fmtNum(s.due) : ''}">
+    <label for="tmPayNote">${escapeHtml(T.team_pay_note)}</label>
+    <input id="tmPayNote" maxlength="200" autocomplete="off">
+    <div class="hint-text">${escapeHtml(T.team_pay_hint)}</div>
+    <button class="submit cash-ok-btn" type="button" onclick="submitTeamPay()">${escapeHtml(T.team_pay_btn)}</button>
+    <div class="tm-sec">${escapeHtml(T.team_adj_title)}</div>
+    <div class="hint-text" style="margin-top:0;">${escapeHtml(T.team_adj_hint)}</div>
+    <div class="tm-grid2"><input id="tmAdjAmt" data-minus="1" inputmode="text" autocomplete="off" placeholder="+300 000 / −200 000" oninput="teamAmountInput(this)">
+      <input id="tmAdjNote" maxlength="200" autocomplete="off" placeholder="${escapeHtml(T.team_adj_note_ph)}"></div>
+    <div style="display:flex; gap:6px; margin-top:6px;"><button type="button" class="staff-copy" style="background:#16A34A;" onclick="submitTeamAdjust(1)">+ ${escapeHtml(T.team_adj_plus)}</button>
+      <button type="button" class="staff-copy" style="background:#B3241C;" onclick="submitTeamAdjust(-1)">− ${escapeHtml(T.team_adj_minus)}</button></div>
+    <div class="tm-sec">${escapeHtml(T.team_pay_rules)}</div>
+    <div class="tm-grid2">
+      <div><label>${escapeHtml(T.team_f_position)}</label><select id="tmPos" onchange="teamPosHint()">${posOpts}</select></div>
+      <div><label>${escapeHtml(T.team_f_fixed)}</label><input id="tmFixed" inputmode="numeric" autocomplete="off" oninput="teamAmountInput(this)" value="${e.salary_fixed !== null && e.salary_fixed !== undefined ? fmtNum(e.salary_fixed) : ''}" placeholder="${escapeHtml(teamFmt(T.team_f_fixed_ph, { sum: fmtNum(posDef) }))}"></div>
+      <div><label>${escapeHtml(T.team_f_pct_goods)}</label><input id="tmPctG" inputmode="decimal" autocomplete="off" value="${v(e.pct_goods)}" placeholder="0"></div>
+      <div><label>${escapeHtml(T.team_f_pct_work)}</label><input id="tmPctW" inputmode="decimal" autocomplete="off" value="${v(e.pct_work)}" placeholder="0"></div>
+      <div><label>${escapeHtml(T.team_f_plan)}</label><input id="tmPlan" inputmode="numeric" autocomplete="off" value="${v(e.plan_services)}" placeholder="0"></div>
+      <div><label>${escapeHtml(T.team_f_plan_bonus)}</label><input id="tmPlanBonus" inputmode="numeric" autocomplete="off" oninput="teamAmountInput(this)" value="${e.plan_bonus ? fmtNum(e.plan_bonus) : ''}" placeholder="0"></div>
+    </div>
+    <div class="hint-text">${escapeHtml(T.team_f_hint)} ${escapeHtml(teamFmt(T.team_terms_from, { month: teamMonthLabel(TEAM.period) }))}</div>
+    <button class="submit" type="button" onclick="saveTeamPaySettings()">${escapeHtml(T.team_save)}</button>
+    <div class="tm-sec">${escapeHtml(T.team_badges)}</div>${teamBadgesHtml(d.badges)}
+    ${hist ? `<div class="tm-sec">${escapeHtml(T.team_history)}</div>${hist}` : ''}`;
+  if (focusPay) { const el = document.getElementById('tmPayAmt'); if (el) el.focus(); }
+}
+function teamPosHint() {
+  const pos = document.getElementById('tmPos').value;
+  const def = ((TEAM.data && TEAM.data.settings && TEAM.data.settings.positions) || {})[pos] || 0;
+  document.getElementById('tmFixed').placeholder = teamFmt(T.team_f_fixed_ph, { sum: fmtNum(def) });
+}
+async function teamPost(url, payload) {
+  try {
+    const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    return await res.json();
+  } catch (e) { return { ok: false, error: T.msg_no_connection || T.team_err }; }
+}
+function teamShopId() { return (TEAM.shop && TEAM.shop !== 'net') ? TEAM.shop : null; }
+async function submitTeamPay() {
+  const amount = teamParseAmount(document.getElementById('tmPayAmt').value, false);
+  if (amount <= 0) { alertTeam(T.team_err_amount); return; }
+  const row = TEAM.empRow;
+  const due = row && row.salary ? row.salary.due : 0;
+  if (amount > due && !confirm(teamFmt(T.team_pay_over_q, { sum: fmtNum(amount), due: fmtNum(Math.max(0, due)), month: teamMonthLabel(TEAM.period) }))) return;
+  const d = await teamPost(`/api/team/emp/${TEAM.emp}/op`, { shop: teamShopId(), period: TEAM.period, kind: 'payout', amount, note: document.getElementById('tmPayNote').value });
+  if (!d.ok) { alertTeam(d.error); return; }
+  showMsg(T.team_paid_ok, true);
+  await renderTeamEmp(); loadTeam();
+}
+async function submitTeamAdjust(sign) {
+  const amount = Math.abs(teamParseAmount(document.getElementById('tmAdjAmt').value, true)) * sign;
+  if (!amount) { alertTeam(T.team_err_amount); return; }
+  const d = await teamPost(`/api/team/emp/${TEAM.emp}/op`, { shop: teamShopId(), period: TEAM.period, kind: 'adjust', amount, note: document.getElementById('tmAdjNote').value });
+  if (!d.ok) { alertTeam(d.error); return; }
+  await renderTeamEmp(); loadTeam();
+}
+async function cancelTeamOp(opId) {
+  if (!confirm(T.team_cancel_q)) return;
+  const d = await teamPost(`/api/team/op/${opId}/cancel`, { shop: teamShopId() });
+  if (!d.ok) { alertTeam(d.error); return; }
+  await renderTeamEmp(); loadTeam();
+}
+async function saveTeamPaySettings() {
+  const fixedRaw = document.getElementById('tmFixed').value.trim();
+  const payload = {
+    shop: teamShopId(), period: TEAM.period, position: document.getElementById('tmPos').value,
+    salary_fixed: fixedRaw ? teamParseAmount(fixedRaw, false) : null,
+    pct_goods: document.getElementById('tmPctG').value.replace(',', '.'),
+    pct_work: document.getElementById('tmPctW').value.replace(',', '.'),
+    plan_services: document.getElementById('tmPlan').value,
+    plan_bonus: teamParseAmount(document.getElementById('tmPlanBonus').value, false),
+  };
+  const d = await teamPost(`/api/team/emp/${TEAM.emp}/pay_settings`, payload);
+  if (!d.ok) { alertTeam(d.error); return; }
+  showMsg(T.team_saved, true);
+  await renderTeamEmp(); loadTeam();
+}
+async function saveTeamSettings() {
+  const positions = {};
+  ['intern', 'master', 'senior', 'expert', 'cashier'].forEach(k => { positions[k] = teamParseAmount(document.getElementById('tmPos_' + k).value, false); });
+  const d = await teamPost('/api/team/settings', { shop: teamShopId(), period: TEAM.period, positions, top_bonus: teamParseAmount(document.getElementById('tmTopBonus').value, false) });
+  if (!d.ok) { alertTeam(d.error); return; }
+  showMsg(T.team_saved, true);
+  loadTeam();
+}
+function alertTeam(text) { alert(text || T.team_err); }
+
+// ----- «Мастер» в форме замены -----
+async function loadTeamMasters() {
+  const sel = document.getElementById('master_id');
+  if (!sel) return;
+  let d;
+  try { d = await (await fetch('/api/team/masters', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (!d.ok) return;
+  TEAM.masters = d.masters;
+  const keep = sel.value;
+  const opts = IS_EMP_TEAM ? [] : [`<option value="">${escapeHtml(T.team_master_me)}</option>`];
+  d.masters.forEach(m => opts.push(`<option value="${m.id}">${escapeHtml(m.name)}</option>`));
+  sel.innerHTML = opts.join('');
+  if (keep && d.masters.some(m => String(m.id) === keep)) sel.value = keep;
+  else if (IS_EMP_TEAM && MY_EMP_ID) sel.value = String(MY_EMP_ID);
+}
+loadTeamMasters();
+function teamFillEditMaster(entry) {
+  const sel = document.getElementById('edit_master_id');
+  if (!sel) return;
+  const list = TEAM.masters || [];
+  let cur = '';
+  if (entry) cur = entry.master_id === 0 ? '' : String(entry.master_id || entry.employee_id || '');
+  const opts = [`<option value="">${escapeHtml(T.team_master_me)}</option>`]
+    .concat(list.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`));
+  if (cur && !list.some(m => String(m.id) === cur)) opts.push(`<option value="${escapeHtml(cur)}">(${escapeHtml(T.team_inactive)})</option>`);
+  sel.innerHTML = opts.join('');
+  sel.value = cur;
+  sel.dataset.orig = cur;
+}
+function teamEditMasterPayload() {
+  const sel = document.getElementById('edit_master_id');
+  if (!sel || sel.value === sel.dataset.orig) return {};
+  return { master_id: sel.value };
 }
 
 // ---------- Сотрудники: владелец точки сам ----------
@@ -10957,6 +11426,7 @@ async function submitCar() {
     card_amount: payCardEl ? payCardEl.value : null,
     discount: discountFor(itemsSubtotal(items)),
     discount_pct: discountPct(),
+    master_id: (document.getElementById('master_id') || {}).value || '',
   };
   if (DISC.mode === 'sum' && (DISC.value || 0) > itemsSubtotal(items) && itemsSubtotal(items) > 0) {
     showMsg(T.disc_too_big, false);
@@ -12029,11 +12499,13 @@ function openEditModal(plate, entry) {
   document.getElementById('svc_pay_card').value = entry.card_amount ?? '';
   svcPaymentSplitTouched = true;  // это реальная сохранённая разбивка, не пересчитывать автоматически
   svcHasDebt = (entry.cost || 0) > (entry.cash_amount || 0) + (entry.card_amount || 0);
+  teamFillEditMaster(entry);
   document.getElementById('editModal').classList.add('open');
 }
 
 function openAddServiceModal(plate) {
   svcModal = { mode: 'add', id: null, plate };
+  teamFillEditMaster(null);
   svcHasDebt = false;
   document.getElementById('svcModalTitle').textContent = T.add_service_title;
   document.getElementById('edit_mileage').value = '';
@@ -12068,7 +12540,7 @@ async function saveEdit() {
   if (svcModal.mode === 'edit') {
     res = await fetch('/api/oil_change/' + svcModal.id, {
       method: 'PUT', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ mileage, next_mileage, interval_value, interval_unit, notes, items, cash_amount, card_amount, discount, discount_pct }),
+      body: JSON.stringify(Object.assign({ mileage, next_mileage, interval_value, interval_unit, notes, items, cash_amount, card_amount, discount, discount_pct }, teamEditMasterPayload())),
     });
   } else {
     const carRow = carsCache.find(c => c.plate_number === svcModal.plate);
@@ -12077,6 +12549,7 @@ async function saveEdit() {
       body: JSON.stringify({
         plate: svcModal.plate, owner_name: carRow ? carRow.owner_name : '', mileage, next_mileage,
         interval_value, interval_unit, notes, items, cash_amount, card_amount, discount, discount_pct,
+        master_id: (teamEditMasterPayload().master_id || ''),
       }),
     });
   }
@@ -12188,7 +12661,8 @@ guardOnce(['submitCar', 'sendPassportTg', 'saveEdit', 'saveCarEdit', 'deleteEntr
   'submitCatalog', 'applyImport', 'editBranchPrice', 'submitStoreMove', 'submitStoreQty',
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
   'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct',
-  'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete', 'submitCashAccept', 'cancelCashHandover']);
+  'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete', 'submitCashAccept', 'cancelCashHandover',
+  'submitTeamPay', 'submitTeamAdjust', 'cancelTeamOp', 'saveTeamPaySettings', 'saveTeamSettings']);
 </script>
 </body>
 </html>
@@ -13685,6 +14159,7 @@ PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 def index():
     import json as _json
     shop = db.get_shop(g.shop_id)
+    _has_staff = (not g.is_employee) and bool(db.list_shop_employees(g.shop_id))
     return render_template_string(
         PAGE, brands=CAR_BRANDS, car_models=CAR_MODELS, service_types=SERVICE_TYPES,
         shop_name=session.get("shop_name") or "Замена масла",
@@ -13694,7 +14169,9 @@ def index():
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         store_enabled=_store_on(shop),
         is_employee=g.is_employee,
-        has_staff=(not g.is_employee) and bool(db.list_shop_employees(g.shop_id)),
+        has_staff=_has_staff,
+        team_on=g.is_employee or _has_staff or ((not g.is_branch) and bool(db.get_branches(g.shop_id))),
+        my_employee_id=g.employee_id or 0,
         is_branch=g.is_branch,
         usd_rate=_effective_usd_rate(shop),
         usd_rate_own=shop.get("usd_rate") if shop else None,
@@ -14445,6 +14922,17 @@ def api_update_oil_change(oc_id):
         return jsonify({"ok": False, "error": str(e)}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    # «Мастер» меняет только владелец (сотрудник не может переписать замену на себя)
+    if "master_id" in data and not g.is_employee:
+        raw = data.get("master_id")
+        try:
+            if raw in (None, "", 0, "0"):
+                rec = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
+                db.set_oil_change_master(oc_id, g.shop_id, 0 if rec.get("employee_id") else None)
+            elif db.is_shop_employee(g.shop_id, raw):
+                db.set_oil_change_master(oc_id, g.shop_id, int(raw))
+        except Exception as e:
+            logger.warning(f"мастер замены не сохранён: {e}")
     return jsonify({"ok": True})
 
 
@@ -14604,7 +15092,7 @@ def api_add():
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount,
                 allow_debt=debt_amount > 0, discount=discount, discount_pct=discount_pct,
-                employee_id=g.employee_id
+                employee_id=g.employee_id, master_id=_master_arg(data.get("master_id"))
             )
             _saved_rec = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
             saved_discount = _saved_rec.get("discount_amount") or 0
@@ -23382,6 +23870,302 @@ def api_cash_cancel(handover_id):
     if res.get("error"):
         return jsonify({"ok": False, "error": g.T["cash_err_not_found"]}), 404
     return jsonify(res)
+
+
+# ---------- Команда: рейтинг, зарплата, награды ----------
+# Владелец точки — своих сотрудников; главная точка — ещё и сотрудников
+# своих филиалов (параметр shop). Сотрудник видит рейтинг (очки и замены,
+# без чужих денег) и только СВОЮ зарплату.
+
+def _team_target_shop(raw):
+    """Точка, с которой работает владелец: своя или филиал главной. None — нельзя."""
+    if g.is_employee:
+        return None
+    try:
+        sid = int(raw) if raw not in (None, "", "null") else g.shop_id
+    except (TypeError, ValueError):
+        return None
+    if sid == g.shop_id:
+        return sid
+    if not g.is_branch and db.is_branch_of(sid, g.shop_id):
+        return sid
+    return None
+
+
+def _team_period_arg(raw):
+    """Месяц 'ГГГГ-ММ'; будущие месяцы не принимаем (там нечего считать и платить)."""
+    p = str(raw or "") or db.team_current_period()
+    if not db.team_period_bounds(p) or p > db.team_current_period():
+        return None
+    return p
+
+
+def _team_shops_list():
+    shop = db.get_shop(g.shop_id) or {}
+    out = [{"id": g.shop_id, "name": shop.get("shop_name") or shop.get("username") or ""}]
+    if not g.is_branch and not g.is_employee:
+        out += [{"id": b["id"], "name": b.get("shop_name") or b.get("username") or ""}
+                for b in db.get_branches(g.shop_id)]
+    return out
+
+
+@app.route("/api/team")
+@login_required
+def api_team():
+    period = _team_period_arg(request.args.get("period"))
+    if not period:
+        return jsonify({"ok": False, "error": g.T["team_err"]}), 400
+    if g.is_employee:
+        if not g.employee_id:
+            return jsonify({"ok": False, "error": "недоступно"}), 403
+        res = db.team_overview(g.shop_id, period, with_money=False, only_employee=g.employee_id)
+        res["my_badges"] = db.team_badges(g.shop_id, g.employee_id)
+        return jsonify({"ok": True, **res})
+    sid = _team_target_shop(request.args.get("shop"))
+    if not sid:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    res = db.team_overview(sid, period, with_money=True)
+    return jsonify({"ok": True, "shop_id": sid, "shops": _team_shops_list(), **res})
+
+
+@app.route("/api/team/network")
+@login_required
+@employee_blocked
+def api_team_network():
+    if g.is_branch:
+        return jsonify({"ok": False, "error": "только для главной точки"}), 403
+    period = _team_period_arg(request.args.get("period"))
+    if not period:
+        return jsonify({"ok": False, "error": g.T["team_err"]}), 400
+    res = db.team_network_board(g.shop_id, period)
+    return jsonify({"ok": True, "shops": _team_shops_list(),
+                    "points_rule": {"service": db.TEAM_PTS_SERVICE, "filter": db.TEAM_PTS_FILTER,
+                                    "repeat": db.TEAM_PTS_REPEAT}, **res})
+
+
+@app.route("/api/team/emp/<int:employee_id>")
+@login_required
+@employee_blocked
+def api_team_emp(employee_id):
+    sid = _team_target_shop(request.args.get("shop"))
+    period = _team_period_arg(request.args.get("period"))
+    if not sid or not period:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    ov = db.team_overview(sid, period, with_money=True)
+    row = next((r for r in ov.get("board", []) if r["id"] == employee_id), None)
+    emp = next((e for e in db.list_shop_employees_pay(sid, period) if e["id"] == employee_id), None)
+    if not emp:
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    if not row:  # выключенный без замен в этом месяце — всё равно показываем
+        ov2 = db.team_overview(sid, period, with_money=True, include_all=True)
+        row = next((r for r in ov2.get("board", []) if r["id"] == employee_id), None)
+    return jsonify({"ok": True, "row": row, "emp": emp, "settings": ov["settings"],
+                    "ops": db.list_salary_ops(sid, employee_id), "badges": db.team_badges(sid, employee_id)})
+
+
+def _num_or_none(v, cast=int, lo=0, hi=10 ** 10):
+    if v in (None, ""):
+        return None
+    try:
+        n = cast(str(v).replace(",", ".").replace(" ", ""))
+    except (TypeError, ValueError):
+        raise ValueError
+    if n < lo or n > hi:
+        raise ValueError
+    return n
+
+
+@app.route("/api/team/emp/<int:employee_id>/pay_settings", methods=["POST"])
+@login_required
+@employee_blocked
+def api_team_pay_settings(employee_id):
+    data = request.get_json(force=True, silent=True) or {}
+    sid = _team_target_shop(data.get("shop"))
+    period = _team_period_arg(data.get("period"))
+    if not sid or not period:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    try:
+        fixed = _num_or_none(data.get("salary_fixed"))
+        pg = _num_or_none(data.get("pct_goods"), float, 0, 100)
+        pw = _num_or_none(data.get("pct_work"), float, 0, 100)
+        plan = _num_or_none(data.get("plan_services"), int, 0, 100000)
+        plan_bonus = _num_or_none(data.get("plan_bonus"))
+    except ValueError:
+        return jsonify({"ok": False, "error": g.T["team_err_values"]}), 400
+    ok = db.save_employee_pay(sid, employee_id, data.get("position"), fixed,
+                              round(pg, 2) if pg else None, round(pw, 2) if pw else None,
+                              plan or None, plan_bonus or None, period=period)
+    if not ok:
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/team/settings", methods=["POST"])
+@login_required
+@employee_blocked
+def api_team_settings():
+    data = request.get_json(force=True, silent=True) or {}
+    sid = _team_target_shop(data.get("shop"))
+    period = _team_period_arg(data.get("period"))
+    if not sid or not period:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    try:
+        positions = {k: _num_or_none((data.get("positions") or {}).get(k)) or 0 for k in db.TEAM_POSITIONS}
+        top_bonus = _num_or_none(data.get("top_bonus")) or 0
+    except ValueError:
+        return jsonify({"ok": False, "error": g.T["team_err_values"]}), 400
+    return jsonify({"ok": True, "settings": db.save_team_settings(sid, positions, top_bonus, period=period)})
+
+
+@app.route("/api/team/emp/<int:employee_id>/op", methods=["POST"])
+@login_required
+@employee_blocked
+def api_team_op(employee_id):
+    data = request.get_json(force=True, silent=True) or {}
+    sid = _team_target_shop(data.get("shop"))
+    period = _team_period_arg(data.get("period"))
+    if not sid or not period:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    try:
+        amount = int(data.get("amount"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": g.T["team_err_amount"]}), 400
+    if abs(amount) > 10 ** 10:
+        return jsonify({"ok": False, "error": g.T["team_err_amount"]}), 400
+    kind = data.get("kind")
+    emp = next((e for e in db.list_shop_employees(sid) if e["id"] == employee_id), None)
+    if not emp:
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    label = g.T["team_exp_label"].format(name=emp.get("full_name") or emp.get("username"),
+                                         period=period[5:7] + "." + period[:4])
+    res = db.add_salary_op(sid, employee_id, period, kind, amount, data.get("note"),
+                           expense_label=label)
+    if res.get("error") == "not_found":
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    if res.get("error"):
+        return jsonify({"ok": False, "error": g.T["team_err_amount"]}), 400
+    return jsonify(res)
+
+
+@app.route("/api/team/op/<int:op_id>/cancel", methods=["POST"])
+@login_required
+@employee_blocked
+def api_team_op_cancel(op_id):
+    data = request.get_json(force=True, silent=True) or {}
+    sid = _team_target_shop(data.get("shop"))
+    if not sid:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    res = db.cancel_salary_op(sid, op_id)
+    if res.get("error"):
+        return jsonify({"ok": False, "error": g.T["cash_err_not_found"]}), 404
+    return jsonify(res)
+
+
+@app.route("/api/team/masters")
+@login_required
+def api_team_masters():
+    return jsonify({"ok": True, "masters": db.team_masters(g.shop_id)})
+
+
+@app.route("/api/team/certificate")
+@login_required
+@employee_blocked
+def api_team_certificate():
+    sid = _team_target_shop(request.args.get("shop"))
+    period = _team_period_arg(request.args.get("period"))
+    if not sid or not period:
+        return jsonify({"ok": False, "error": "это не ваша точка"}), 403
+    try:
+        emp_id = int(request.args.get("emp"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": g.T["staff_err_notfound"]}), 404
+    ov = db.team_overview(sid, period, with_money=False)
+    row = next((r for r in ov.get("board", []) if r["id"] == emp_id), None)
+    if not row or row.get("place") != 1:
+        return jsonify({"ok": False, "error": g.T["team_cert_none"]}), 400
+    shop = db.get_shop(sid) or {}
+    pdf = _team_certificate_pdf(row, shop.get("shop_name") or shop.get("username") or "", period, g.T)
+    fname = f"OilBook_{period}_{row['id']}.pdf"
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{fname}"', "Cache-Control": "no-store"})
+
+
+def _team_certificate_pdf(row, shop_name, period, T) -> bytes:
+    import io
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.colors import HexColor
+    _register_pdf_fonts()
+    buf = io.BytesIO()
+    W, H = landscape(A4)
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    blue, dark, gold, grey = HexColor("#0F52BA"), HexColor("#0A2540"), HexColor("#D97706"), HexColor("#64748B")
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.rect(0, 0, W, H, stroke=0, fill=1)
+    c.setStrokeColor(blue)
+    c.setLineWidth(6)
+    c.rect(22, 22, W - 44, H - 44, stroke=1, fill=0)
+    c.setStrokeColor(gold)
+    c.setLineWidth(1.5)
+    c.rect(34, 34, W - 68, H - 68, stroke=1, fill=0)
+    c.setFillColor(blue)
+    c.setFont("DejaVuSans-Bold", 22)
+    c.drawString(60, H - 80, "Oil")
+    c.setFillColor(dark)
+    c.drawString(60 + c.stringWidth("Oil", "DejaVuSans-Bold", 22), H - 80, "Book")
+    c.setFillColor(grey)
+    c.setFont("DejaVuSans", 11)
+    c.drawRightString(W - 60, H - 78, shop_name[:60])
+    c.setFillColor(dark)
+    c.setFont("DejaVuSans-Bold", 46)
+    c.drawCentredString(W / 2, H - 175, T["team_cert_title"])
+    c.setFillColor(grey)
+    c.setFont("DejaVuSans", 15)
+    c.drawCentredString(W / 2, H - 210, T["team_cert_sub"])
+    name = row["name"][:40]
+    size = 40 if len(name) <= 22 else 30
+    c.setFillColor(blue)
+    c.setFont("DejaVuSans-Bold", size)
+    c.drawCentredString(W / 2, H - 275, name)
+    c.setStrokeColor(gold)
+    c.setLineWidth(2)
+    c.line(W / 2 - 170, H - 292, W / 2 + 170, H - 292)
+    c.setFillColor(dark)
+    c.setFont("DejaVuSans-Bold", 17)
+    c.drawCentredString(W / 2, H - 330, T["team_cert_reason"])
+    months = str(T["team_months"]).split(",")
+    try:
+        mname = months[int(period[5:7]) - 1] + " " + period[:4]
+    except (ValueError, IndexError):
+        mname = period
+    c.setFont("DejaVuSans", 15)
+    c.drawCentredString(W / 2, H - 358, mname)
+    c.setFillColor(grey)
+    c.setFont("DejaVuSans", 13)
+    c.drawCentredString(W / 2, H - 386, T["team_cert_stats"].format(services=row["services"], points=row["points"]))
+    # медаль
+    cx, cy = W / 2, 108
+    c.setFillColor(gold)
+    c.circle(cx, cy, 34, stroke=0, fill=1)
+    c.setFillColor(HexColor("#FDE68A"))
+    c.circle(cx, cy, 26, stroke=0, fill=1)
+    c.setFillColor(HexColor("#78350F"))
+    c.setFont("DejaVuSans-Bold", 28)
+    c.drawCentredString(cx, cy - 10, "1")
+    c.setFillColor(grey)
+    c.setFont("DejaVuSans", 10)
+    c.drawString(60, 52, "oilbook.uz")
+    c.drawRightString(W - 60, 52, datetime.now().strftime("%d.%m.%Y"))
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def _master_arg(raw):
+    """«Мастер» из формы замены — только активный сотрудник этой же точки."""
+    if raw in (None, "", 0, "0"):
+        return None
+    return int(raw) if db.is_shop_employee(g.shop_id, raw) else None
 
 
 # ---------- «Моя точка»: контакты и локация для клиентов в боте ----------

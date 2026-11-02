@@ -306,6 +306,7 @@ def init_db():
         _migrate_debts(conn)
         _migrate_usd(conn)
         _migrate_cash(conn)
+        _migrate_team(conn)
         _bootstrap_accounts(conn)
 
 
@@ -2137,8 +2138,10 @@ def normalize_discount(subtotal, discount, discount_pct=None):
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
                     next_mileage=None, items=None, cash_amount=None, card_amount=None,
-                    allow_debt=False, discount=0, discount_pct=None, employee_id=None):
-    """employee_id — кто из сотрудников внёс запись (None — владелец/бот):
+                    allow_debt=False, discount=0, discount_pct=None, employee_id=None, master_id=None):
+    """master_id — кто из сотрудников ДЕЛАЛ замену (для зарплаты и рейтинга);
+    если не указан — тот, кто внёс (employee_id).
+    employee_id — кто из сотрудников внёс запись (None — владелец/бот):
     наличные этой записи попадают в «кассу» сотрудника до сдачи владельцу.
     items (необязательно) — детализированный список позиций вида
     [{"name": "Моторное масло", "brand": "MITANOL", "unit_price": 45000, "qty": 4, "total": 180000}, ...]
@@ -2215,11 +2218,11 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
                  cash_amount, card_amount, interval_months, interval_unit, next_change_date,
-                 next_mileage, items_json, notes, status, discount_amount, discount_pct, employee_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+                 next_mileage, items_json, notes, status, discount_amount, discount_pct, employee_id, master_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
               cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes,
-              discount, discount_pct, employee_id))
+              discount, discount_pct, employee_id, master_id))
         conn.commit()
         return cur.lastrowid, next_date
 
@@ -4352,6 +4355,9 @@ def delete_branch_with_data(branch_id: int) -> bool:
             conn.execute("DELETE FROM broadcasts WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM shop_users WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM cash_handovers WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM salary_ops WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM team_settings WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM team_terms WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM password_reset_codes WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM shops WHERE id=? AND role='branch'", (branch_id,))
             conn.commit()
@@ -9006,3 +9012,574 @@ def cancel_cash_handover(shop_id: int, handover_id: int) -> dict:
         conn.commit()
         after = _public_cash(_cash_state(conn, shop_id, h["employee_id"]))
     return {"ok": True, "cash": after}
+
+
+
+# ---------- Команда: зарплата, KPI-очки, рейтинг, значки ----------
+# Всё считается «на лету» из записей замен — отдельных цифр не храним,
+# поэтому исправление/удаление замены сразу честно меняет и зарплату,
+# и рейтинг. Хранятся только настройки и деньги, которые реально выдали
+# (salary_ops: выплаты и ручные поправки).
+#
+# Кому засчитывается замена: master_id (кто делал), иначе employee_id
+# (кто внёс). Замены владельца (оба пустые) никому не засчитываются.
+#
+# Деньги для % — только реально полученные: оплата при замене (нал + карта)
+# в день замены + погашения долга по этой замене в день погашения.
+# Сумма делится на «товары» и «работу» в той же пропорции, что позиции чека.
+
+TEAM_POSITIONS = ("intern", "master", "senior", "expert", "cashier")
+# по умолчанию фиксы нет — владелец сам вписывает суммы по должностям
+TEAM_POS_DEFAULT = {"intern": 0, "master": 0, "senior": 0, "expert": 0, "cashier": 0}
+TEAM_PTS_SERVICE, TEAM_PTS_FILTER, TEAM_PTS_REPEAT = 10, 5, 5
+TEAM_MILESTONES = (10, 50, 100, 250, 500, 1000, 2500)
+TEAM_PAY_FIELDS = ("position", "salary_fixed", "pct_goods", "pct_work", "plan_services", "plan_bonus")
+# Условия зарплаты хранятся с месяцем «действует с» (team_terms): если владелец
+# в декабре поменял фиксу или процент, октябрь и ноябрь считаются по старым
+# условиям — уже выданная зарплата задним числом не «пересчитывается».
+# employee_id = 0 — настройки точки (фикса по должностям, премия за 1 место).
+
+
+def _migrate_team(conn):
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(shop_users)").fetchall()}
+    for col, ddl in (("position", "TEXT"), ("salary_fixed", "INTEGER"), ("pct_goods", "REAL"),
+                     ("pct_work", "REAL"), ("plan_services", "INTEGER"), ("plan_bonus", "INTEGER")):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE shop_users ADD COLUMN {col} {ddl}")
+    oc_cols = {r[1] for r in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
+    if "master_id" not in oc_cols:
+        conn.execute("ALTER TABLE oil_changes ADD COLUMN master_id INTEGER")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS team_settings (
+        shop_id INTEGER PRIMARY KEY,
+        pos_json TEXT,
+        top_bonus INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT
+    )""")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS team_terms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL DEFAULT 0,
+        from_period TEXT NOT NULL,
+        terms_json TEXT NOT NULL,
+        updated_at TEXT
+    )""")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_team_terms_key ON team_terms(shop_id, employee_id, from_period)")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS salary_ops (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        employee_name TEXT,
+        period TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        note TEXT,
+        expense_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        cancelled_at TEXT
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_salary_ops_emp ON salary_ops(shop_id, employee_id, period)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_oil_changes_master ON oil_changes(master_id)")
+    conn.commit()
+
+
+def team_period_bounds(period: str):
+    """'2026-11' → ('2026-11-01', '2026-11-30'); неверный формат → None."""
+    p = str(period or "")
+    if len(p) != 7:
+        return None
+    try:
+        d0 = datetime.strptime(p + "-01", "%Y-%m-%d")
+    except ValueError:
+        return None
+    d1 = d0 + relativedelta(months=1) - timedelta(days=1)
+    return d0.strftime("%Y-%m-%d"), d1.strftime("%Y-%m-%d")
+
+
+def team_current_period() -> str:
+    return datetime.now().strftime("%Y-%m")
+
+
+def team_prev_period(period: str) -> str:
+    d0 = datetime.strptime(period + "-01", "%Y-%m-%d")
+    return (d0 - relativedelta(months=1)).strftime("%Y-%m")
+
+
+def _terms_for(conn, shop_id: int, employee_id: int, period: str):
+    """Условия, действующие в этом месяце: последние «с месяца ≤ period».
+    До первой настройки условий нет — за прошлые месяцы, когда зарплату
+    платили вне OilBook, ничего «к выдаче» не появляется."""
+    row = conn.execute("""SELECT terms_json FROM team_terms WHERE shop_id=? AND employee_id=? AND from_period<=?
+                          ORDER BY from_period DESC LIMIT 1""", (shop_id, employee_id, period)).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["terms_json"]) or {}
+    except (ValueError, TypeError):
+        return None
+
+
+def _put_terms(conn, shop_id: int, employee_id: int, period: str, terms: dict):
+    conn.execute("""INSERT INTO team_terms (shop_id, employee_id, from_period, terms_json, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(shop_id, employee_id, from_period) DO UPDATE SET
+                    terms_json=excluded.terms_json, updated_at=excluded.updated_at""",
+                 (shop_id, employee_id, period, json.dumps(terms, ensure_ascii=False), _now_str()))
+
+
+def _shop_terms(conn, shop_id: int, period: str) -> dict:
+    pos = dict(TEAM_POS_DEFAULT)
+    top = 0
+    t = _terms_for(conn, shop_id, 0, period)
+    if t:
+        for k, v in (t.get("positions") or {}).items():
+            if k in pos:
+                try:
+                    pos[k] = max(0, int(v or 0))
+                except (TypeError, ValueError):
+                    pass
+        try:
+            top = max(0, int(t.get("top_bonus") or 0))
+        except (TypeError, ValueError):
+            top = 0
+    return {"positions": pos, "top_bonus": top}
+
+
+def get_team_settings(shop_id: int, period: str = None) -> dict:
+    with get_conn() as conn:
+        return _shop_terms(conn, shop_id, period or team_current_period())
+
+
+@_serialized
+def save_team_settings(shop_id: int, positions: dict, top_bonus: int, period: str = None) -> dict:
+    period = period if team_period_bounds(period) else team_current_period()
+    pos = dict(TEAM_POS_DEFAULT)
+    for k in TEAM_POSITIONS:
+        pos[k] = max(0, min(int((positions or {}).get(k) or 0), 10 ** 10))
+    top_bonus = max(0, min(int(top_bonus or 0), 10 ** 10))
+    with get_conn() as conn:
+        _put_terms(conn, shop_id, 0, period, {"positions": pos, "top_bonus": top_bonus})
+        conn.commit()
+        return _shop_terms(conn, shop_id, period)
+
+
+def _team_emp_rows(conn, shop_ids) -> list:
+    q = ",".join("?" * len(shop_ids))
+    rows = conn.execute(f"""SELECT id, shop_id, username, full_name, is_active, created_at, position, salary_fixed,
+                                   pct_goods, pct_work, plan_services, plan_bonus
+                            FROM shop_users WHERE shop_id IN ({q})
+                            ORDER BY is_active DESC, COALESCE(full_name, username)""", tuple(shop_ids)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _emp_terms(conn, e: dict, period: str) -> dict:
+    """Условия сотрудника на месяц (из истории); нет — должность «Мастер», остальное пусто."""
+    t = _terms_for(conn, e["shop_id"], e["id"], period) or {}
+    out = {k: t.get(k) for k in TEAM_PAY_FIELDS}
+    if out["position"] not in TEAM_POSITIONS:
+        out["position"] = "master"
+    return out
+
+
+@_serialized
+def save_employee_pay(shop_id: int, employee_id: int, position, salary_fixed, pct_goods, pct_work,
+                      plan_services, plan_bonus, period: str = None) -> bool:
+    if position not in TEAM_POSITIONS:
+        position = "master"
+    period = period if team_period_bounds(period) else team_current_period()
+    terms = {"position": position, "salary_fixed": salary_fixed, "pct_goods": pct_goods, "pct_work": pct_work,
+             "plan_services": plan_services, "plan_bonus": plan_bonus}
+    with get_conn() as conn:
+        if not conn.execute("SELECT 1 FROM shop_users WHERE id=? AND shop_id=?", (employee_id, shop_id)).fetchone():
+            return False
+        _put_terms(conn, shop_id, employee_id, period, terms)
+        # в карточке — самые свежие условия (для списков и подсказок)
+        latest = conn.execute("""SELECT terms_json FROM team_terms WHERE shop_id=? AND employee_id=?
+                                 ORDER BY from_period DESC LIMIT 1""", (shop_id, employee_id)).fetchone()
+        lt = json.loads(latest["terms_json"])
+        conn.execute("""UPDATE shop_users SET position=?, salary_fixed=?, pct_goods=?, pct_work=?,
+                        plan_services=?, plan_bonus=? WHERE id=? AND shop_id=?""",
+                     (lt.get("position"), lt.get("salary_fixed"), lt.get("pct_goods"), lt.get("pct_work"),
+                      lt.get("plan_services"), lt.get("plan_bonus"), employee_id, shop_id))
+        conn.commit()
+        return True
+
+
+def _items_goods_share(items_json) -> float:
+    """Какая доля суммы чека — товары (масло, фильтры, со склада), остальное — работа."""
+    if not items_json:
+        return 1.0  # старые записи без разбивки считаем продажей товара
+    try:
+        items = json.loads(items_json) or []
+    except (ValueError, TypeError):
+        return 1.0
+    goods = total = 0
+    for it in items:
+        t = it.get("total") or 0
+        total += t
+        if (it.get("product_id") or it.get("cost_price") is not None
+                or str(it.get("key") or "").startswith(("fluid_", "filter_"))):
+            goods += t
+    return (goods / total) if total else 1.0
+
+
+def _team_month_data(conn, shop_ids, date_from: str, date_to: str) -> dict:
+    """employee_id → показатели за период: замены, очки, деньги для %.
+    Кому засчитывается: master_id (кто делал), иначе employee_id (кто внёс);
+    master_id = 0 — «делал владелец», никому."""
+    q = ",".join("?" * len(shop_ids))
+    out = {}
+
+    def slot(eid):
+        return out.setdefault(eid, {"services": 0, "points": 0, "filters": 0, "repeat": 0, "revenue": 0,
+                                    "paid_count": 0, "goods_money": 0.0, "work_money": 0.0})
+    rows = conn.execute(f"""
+        SELECT COALESCE(oc.master_id, oc.employee_id) AS eid, oc.id, oc.car_id, oc.cost,
+               COALESCE(oc.cash_amount, 0) + COALESCE(oc.card_amount, 0) AS paid,
+               oc.filter_changed, oc.items_json,
+               EXISTS(SELECT 1 FROM oil_changes p WHERE p.car_id = oc.car_id AND p.id < oc.id) AS rep
+        FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+        WHERE c.shop_id IN ({q}) AND COALESCE(oc.master_id, oc.employee_id, 0) > 0
+          AND oc.change_date >= ? AND oc.change_date <= ?
+    """, (*shop_ids, date_from, date_to)).fetchall()
+    for r in rows:
+        s = slot(r["eid"])
+        s["services"] += 1
+        pts = TEAM_PTS_SERVICE
+        if r["filter_changed"]:
+            s["filters"] += 1
+            pts += TEAM_PTS_FILTER
+        if r["rep"]:
+            s["repeat"] += 1
+            pts += TEAM_PTS_REPEAT
+        s["points"] += pts
+        s["revenue"] += r["cost"] or 0
+        if (r["cost"] or 0) > 0:
+            s["paid_count"] += 1
+        share = _items_goods_share(r["items_json"])
+        paid = max(0, r["paid"] or 0)
+        s["goods_money"] += paid * share
+        s["work_money"] += paid * (1 - share)
+    # погашения долгов в этом периоде по заменам сотрудника — в день погашения
+    pays = conn.execute(f"""
+        SELECT COALESCE(oc.master_id, oc.employee_id) AS eid, p.amount, oc.items_json
+        FROM installment_payments p
+        JOIN installment_plans ip ON ip.id = p.plan_id
+        JOIN oil_changes oc ON oc.id = ip.oil_change_id
+        WHERE ip.shop_id IN ({q}) AND p.status='active'
+          AND COALESCE(oc.master_id, oc.employee_id, 0) > 0
+          AND p.paid_date >= ? AND p.paid_date <= ?
+    """, (*shop_ids, date_from, date_to)).fetchall()
+    for r in pays:
+        s = slot(r["eid"])
+        share = _items_goods_share(r["items_json"])
+        amt = max(0, r["amount"] or 0)
+        s["goods_money"] += amt * share
+        s["work_money"] += amt * (1 - share)
+    return out
+
+
+def _team_ranked(emps, data, date_to: str, include_ids=()) -> list:
+    """Кто попадает в месяц: сотрудник уже был создан к концу месяца и
+    (активен, или у него были замены/выплаты в этом месяце). По очкам."""
+    rows = []
+    for e in emps:
+        if str(e.get("created_at") or "")[:10] > date_to:
+            continue  # ещё не работал в этом месяце — ни фиксы, ни места
+        d = data.get(e["id"])
+        if not e["is_active"] and not d and e["id"] not in include_ids:
+            continue
+        d = d or {"services": 0, "points": 0, "filters": 0, "repeat": 0, "revenue": 0, "paid_count": 0,
+                  "goods_money": 0, "work_money": 0}
+        rows.append((e, d))
+    rows.sort(key=lambda x: (-x[1]["points"], -x[1]["services"], (x[0]["full_name"] or x[0]["username"]).lower()))
+    return rows
+
+
+def _team_place_map(ranked) -> dict:
+    """employee_id → место. Равные очки — одно место (1, 1, 3…);
+    у кого 0 очков — без места."""
+    places, prev_pts, prev_place = {}, None, 0
+    n = 0
+    for e, d in ranked:
+        if d["points"] <= 0:
+            continue
+        n += 1
+        if d["points"] != prev_pts:
+            prev_place, prev_pts = n, d["points"]
+        places[e["id"]] = prev_place
+    return places
+
+
+def _salary_ops_sum(conn, shop_id, employee_id, period):
+    """Выплаты считаются по связанной записи в «Расходах»: если расход
+    исправили — выплата тоже, если удалили — выплата не засчитывается."""
+    adj = conn.execute("""SELECT COALESCE(SUM(amount), 0) FROM salary_ops
+                          WHERE shop_id=? AND employee_id=? AND period=? AND status='active' AND kind='adjust'""",
+                       (shop_id, employee_id, period)).fetchone()[0] or 0
+    paid = conn.execute("""SELECT COALESCE(SUM(e.amount), 0) FROM salary_ops o
+                           JOIN expense_entries e ON e.id = o.expense_id AND e.shop_id = o.shop_id
+                           WHERE o.shop_id=? AND o.employee_id=? AND o.period=? AND o.status='active'
+                             AND o.kind='payout'""", (shop_id, employee_id, period)).fetchone()[0] or 0
+    return {"adjust": int(adj), "payout": int(paid)}
+
+
+def _calc_salary(t, d, shop_t, place, n_first, finished, ops) -> dict:
+    fixed = t["salary_fixed"] if t["salary_fixed"] is not None else shop_t["positions"].get(t["position"], 0)
+    fixed = int(fixed or 0)
+    pg, pw = float(t["pct_goods"] or 0), float(t["pct_work"] or 0)
+    goods_money = int(round(d.get("goods_money", 0)))
+    work_money = int(round(d.get("work_money", 0)))
+    from_goods = int(round(goods_money * pg / 100))
+    from_work = int(round(work_money * pw / 100))
+    plan = int(t["plan_services"] or 0)
+    plan_bonus_amt = int(t["plan_bonus"] or 0)
+    plan_done = bool(plan) and d.get("services", 0) >= plan
+    plan_bonus = plan_bonus_amt if plan_done else 0
+    # премия за 1 место — после окончания месяца; при равенстве делится поровну
+    top_full = int(shop_t["top_bonus"] or 0)
+    top_share = int(round(top_full / n_first)) if (place == 1 and n_first) else 0
+    top = top_share if finished else 0
+    adjust = ops.get("adjust", 0)
+    accrued = fixed + from_goods + from_work + plan_bonus + top + adjust
+    paid = ops.get("payout", 0)
+    return {"fixed": fixed, "pct_goods": pg, "pct_work": pw, "goods_money": goods_money, "work_money": work_money,
+            "from_goods": from_goods, "from_work": from_work, "plan": plan, "plan_bonus_amount": plan_bonus_amt,
+            "plan_done": plan_done, "plan_bonus": plan_bonus, "top_bonus": top,
+            "top_bonus_possible": top_share if not finished else 0, "top_shared": n_first > 1 and place == 1,
+            "adjust": adjust, "accrued": accrued, "paid": paid, "due": accrued - paid}
+
+
+def _team_board(conn, shop_id: int, period: str, with_money: bool, only_employee=None, include_all=False):
+    d_from, d_to = team_period_bounds(period)
+    finished = d_to < datetime.now().strftime("%Y-%m-%d")
+    shop_t = _shop_terms(conn, shop_id, period)
+    emps = _team_emp_rows(conn, [shop_id])
+    data = _team_month_data(conn, [shop_id], d_from, d_to)
+    with_ops = {r[0] for r in conn.execute("""SELECT DISTINCT employee_id FROM salary_ops
+                                             WHERE shop_id=? AND period=? AND status='active'""",
+                                          (shop_id, period)).fetchall()}
+    if include_all:
+        with_ops |= {e["id"] for e in emps}
+    ranked = _team_ranked(emps, data, d_to, with_ops)
+    places = _team_place_map(ranked)
+    n_first = sum(1 for v in places.values() if v == 1)
+    pf, pt = team_period_bounds(team_prev_period(period))
+    prev_places = _team_place_map(_team_ranked(emps, _team_month_data(conn, [shop_id], pf, pt), pt))
+    board = []
+    for e, d in ranked:
+        pl = places.get(e["id"])
+        prev = prev_places.get(e["id"])
+        t = _emp_terms(conn, e, period)
+        row = {"id": e["id"], "name": e["full_name"] or e["username"], "position": t["position"],
+               "is_active": e["is_active"], "place": pl, "prev_place": prev,
+               "move": (prev - pl) if (pl and prev) else None,
+               "points": d["points"], "services": d["services"], "filters": d["filters"], "repeat": d["repeat"],
+               "plan": int(t["plan_services"] or 0)}
+        if with_money:
+            row["revenue"] = int(d["revenue"])
+            row["avg_check"] = int(d["revenue"] / d["paid_count"]) if d["paid_count"] else 0
+        if with_money or only_employee == e["id"]:
+            ops = _salary_ops_sum(conn, shop_id, e["id"], period)
+            row["salary"] = _calc_salary(t, d, shop_t, pl, n_first, finished, ops)
+        board.append(row)
+    return board, shop_t, finished, d_from, d_to
+
+
+def team_overview(shop_id: int, period: str, with_money: bool = True, only_employee: int = None,
+                  include_all: bool = False) -> dict:
+    """Всё для экрана «Команда» одной точки за месяц: рейтинг, зарплаты, сводка.
+    with_money=False — для сотрудника: без чужих денег (только очки и замены).
+    only_employee — для сотрудника: его собственная зарплата."""
+    if not team_period_bounds(period):
+        return {"error": "period"}
+    with get_conn() as conn:
+        board, shop_t, finished, d_from, d_to = _team_board(conn, shop_id, period, with_money,
+                                                             only_employee, include_all)
+        prev_due = 0
+        if with_money and period == team_current_period():
+            pboard = _team_board(conn, shop_id, team_prev_period(period), True)[0]
+            prev_due = sum(max(0, r["salary"]["due"]) for r in pboard)
+    res = {"period": period, "from": d_from, "to": d_to, "finished": finished,
+           "settings": shop_t if with_money else {"top_bonus": shop_t["top_bonus"]},
+           "points_rule": {"service": TEAM_PTS_SERVICE, "filter": TEAM_PTS_FILTER, "repeat": TEAM_PTS_REPEAT},
+           "board": board}
+    leaders = [r for r in board if r["place"] == 1]
+    if leaders:
+        second = next((r for r in board if r["place"] and r["place"] > 1), None)
+        res["lead"] = {"names": [r["name"] for r in leaders],
+                       "over": second["name"] if second else None,
+                       "by": (leaders[0]["points"] - second["points"]) if second else None}
+    if with_money:
+        res["fund"] = sum(r["salary"]["accrued"] for r in board)
+        res["paid"] = sum(r["salary"]["paid"] for r in board)
+        res["due"] = sum(max(0, r["salary"]["due"]) for r in board)
+        res["prev_due"] = prev_due
+    return res
+
+
+def team_network_board(parent_shop_id: int, period: str) -> dict:
+    """Общий рейтинг всей сети (главная + филиалы) — только очки и замены."""
+    bounds = team_period_bounds(period)
+    if not bounds:
+        return {"error": "period"}
+    shops = {parent_shop_id: None}
+    for b in get_branches(parent_shop_id):
+        shops[b["id"]] = None
+    with get_conn() as conn:
+        for sid in shops:
+            r = conn.execute("SELECT shop_name, username FROM shops WHERE id=?", (sid,)).fetchone()
+            shops[sid] = (r["shop_name"] or r["username"]) if r else ""
+        emps = _team_emp_rows(conn, list(shops))
+        ranked = _team_ranked(emps, _team_month_data(conn, list(shops), *bounds), bounds[1])
+        places = _team_place_map(ranked)
+        out = []
+        for e, d in ranked:
+            t = _emp_terms(conn, e, period)
+            out.append({"id": e["id"], "name": e["full_name"] or e["username"], "shop": shops.get(e["shop_id"], ""),
+                        "place": places.get(e["id"]), "points": d["points"], "services": d["services"],
+                        "position": t["position"], "is_active": e["is_active"]})
+    return {"period": period, "board": out}
+
+
+def team_badges(shop_id: int, employee_id: int) -> dict:
+    """Значки: рубежи по числу замен и «Мастер месяца» за последние 12 месяцев."""
+    with get_conn() as conn:
+        total = conn.execute("""SELECT COUNT(*) FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+                                WHERE c.shop_id=? AND COALESCE(oc.master_id, oc.employee_id)=?""",
+                             (shop_id, employee_id)).fetchone()[0] or 0
+        emps = _team_emp_rows(conn, [shop_id])
+        months = []
+        p = team_current_period()
+        for _ in range(12):
+            p = team_prev_period(p)
+            f, t = team_period_bounds(p)
+            places = _team_place_map(_team_ranked(emps, _team_month_data(conn, [shop_id], f, t), t))
+            if places.get(employee_id) == 1:
+                months.append(p)
+    milestones = [m for m in TEAM_MILESTONES if total >= m]
+    nxt = next((m for m in TEAM_MILESTONES if total < m), None)
+    return {"total_services": total, "milestones": milestones, "next_milestone": nxt,
+            "master_of_month": months}
+
+
+@_serialized
+def add_salary_op(shop_id: int, employee_id: int, period: str, kind: str, amount: int,
+                  note: str = None, expense_category: str = "Зарплата", expense_label: str = None) -> dict:
+    """kind='payout' — выдали деньги (сразу пишется в «Расходы» точки);
+    kind='adjust' — ручная поправка начисления (+ премия / − за пропуски),
+    в расходы не идёт."""
+    if kind not in ("payout", "adjust") or not team_period_bounds(period):
+        return {"error": "bad"}
+    if kind == "payout" and amount <= 0:
+        return {"error": "amount"}
+    if kind == "adjust" and amount == 0:
+        return {"error": "amount"}
+    with get_conn() as conn:
+        emp = conn.execute("SELECT id, username, full_name FROM shop_users WHERE id=? AND shop_id=?",
+                           (employee_id, shop_id)).fetchone()
+        if not emp:
+            return {"error": "not_found"}
+        name = emp["full_name"] or emp["username"]
+        note = (note or "").strip()[:200] or None
+        expense_id = None
+        try:
+            if kind == "payout":
+                cur = conn.execute("""INSERT INTO expense_entries (shop_id, category, name, amount, expense_date)
+                                      VALUES (?, ?, ?, ?, ?)""",
+                                   (shop_id, expense_category, (expense_label or name)[:120], amount,
+                                    datetime.now().strftime("%Y-%m-%d")))
+                expense_id = cur.lastrowid
+            cur = conn.execute("""INSERT INTO salary_ops (shop_id, employee_id, employee_name, period, kind, amount,
+                                                          note, expense_id, status, created_at)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)""",
+                               (shop_id, employee_id, name, period, kind, amount, note, expense_id, _now_str()))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return {"ok": True, "id": cur.lastrowid}
+
+
+@_serialized
+def cancel_salary_op(shop_id: int, op_id: int) -> dict:
+    """Отмена ошибочной выплаты/поправки: запись остаётся как «отменено»,
+    связанный расход удаляется (одной транзакцией)."""
+    with get_conn() as conn:
+        op = conn.execute("SELECT * FROM salary_ops WHERE id=? AND shop_id=?", (op_id, shop_id)).fetchone()
+        if not op or op["status"] != "active":
+            return {"error": "not_found"}
+        try:
+            if op["expense_id"]:
+                conn.execute("DELETE FROM expense_entries WHERE id=? AND shop_id=?", (op["expense_id"], shop_id))
+            conn.execute("UPDATE salary_ops SET status='cancelled', cancelled_at=? WHERE id=?", (_now_str(), op_id))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {"ok": True, "employee_id": op["employee_id"]}
+
+
+def list_salary_ops(shop_id: int, employee_id: int, limit: int = 40) -> list:
+    """История: сумма выплаты — как сейчас в «Расходах»; если расход удалили
+    там — выплата показана отменённой."""
+    with get_conn() as conn:
+        rows = conn.execute("""SELECT o.id, o.period, o.kind, o.amount, o.note, o.status, o.created_at,
+                                      o.expense_id, e.id AS exp_exists, e.amount AS exp_amount
+                               FROM salary_ops o
+                               LEFT JOIN expense_entries e ON e.id = o.expense_id AND e.shop_id = o.shop_id
+                               WHERE o.shop_id=? AND o.employee_id=? ORDER BY o.id DESC LIMIT ?""",
+                            (shop_id, employee_id, limit)).fetchall()
+    out = []
+    for r in rows:
+        d = {k: r[k] for k in ("id", "period", "kind", "amount", "note", "status", "created_at")}
+        if r["kind"] == "payout":
+            if r["exp_exists"] is None and d["status"] == "active":
+                d["status"] = "removed"
+            elif r["exp_amount"] is not None:
+                d["amount"] = r["exp_amount"]
+        out.append(d)
+    return out
+
+
+def list_shop_employees_pay(shop_id: int, period: str = None) -> list:
+    """Сотрудники с условиями зарплаты, действующими в этом месяце."""
+    period = period if team_period_bounds(period) else team_current_period()
+    with get_conn() as conn:
+        out = []
+        for e in _team_emp_rows(conn, [shop_id]):
+            e.update(_emp_terms(conn, e, period))
+            out.append(e)
+        return out
+
+
+def team_masters(shop_id: int) -> list:
+    """Список для выбора «Мастер» в форме замены — только имена активных."""
+    with get_conn() as conn:
+        rows = conn.execute("""SELECT id, COALESCE(full_name, username) AS name FROM shop_users
+                               WHERE shop_id=? AND is_active=1 ORDER BY name""", (shop_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def is_shop_employee(shop_id: int, employee_id) -> bool:
+    try:
+        employee_id = int(employee_id)
+    except (TypeError, ValueError):
+        return False
+    with get_conn() as conn:
+        return bool(conn.execute("SELECT 1 FROM shop_users WHERE id=? AND shop_id=? AND is_active=1",
+                                 (employee_id, shop_id)).fetchone())
+
+
+@_serialized
+def set_oil_change_master(oc_id: int, shop_id: int, master_id) -> bool:
+    """master_id: id сотрудника; 0 — «делал владелец» (никому не засчитывать);
+    None — тому, кто внёс."""
+    with get_conn() as conn:
+        cur = conn.execute("""UPDATE oil_changes SET master_id=? WHERE id=?
+                              AND car_id IN (SELECT id FROM cars WHERE shop_id=?)""", (master_id, oc_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
