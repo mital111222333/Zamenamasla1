@@ -307,6 +307,7 @@ def init_db():
         _migrate_usd(conn)
         _migrate_cash(conn)
         _migrate_team(conn)
+        _migrate_action_log(conn)
         _bootstrap_accounts(conn)
 
 
@@ -2256,7 +2257,7 @@ def get_oil_change_for_shop(oc_id: int, shop_id: int):
     проверка прав перед редактированием/удалением."""
     with get_conn() as conn:
         row = conn.execute("""
-            SELECT oc.* FROM oil_changes oc
+            SELECT oc.*, c.plate_number AS plate_number FROM oil_changes oc
             JOIN cars c ON c.id = oc.car_id
             WHERE oc.id=? AND c.shop_id=?
         """, (oc_id, shop_id)).fetchone()
@@ -9062,6 +9063,51 @@ TEAM_PAY_FIELDS = ("position", "salary_fixed", "pct_goods", "pct_work", "plan_se
 # в декабре поменял фиксу или процент, октябрь и ноябрь считаются по старым
 # условиям — уже выданная зарплата задним числом не «пересчитывается».
 # employee_id = 0 — настройки точки (фикса по должностям, премия за 1 место).
+
+
+# ---------- Журнал действий: кто удалил / исправил деньги ----------
+# Удаление записи о замене, правка её суммы и удаление машины пишутся сюда
+# (кем бы ни были сделаны) — владелец видит журнал в разделе «Сотрудники».
+# Так удалённая «за наличные» запись не исчезает бесследно.
+
+def _migrate_action_log(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS action_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        actor TEXT,
+        is_employee INTEGER NOT NULL DEFAULT 0,
+        action TEXT NOT NULL,
+        details TEXT,
+        created_at TEXT NOT NULL
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_action_log_shop ON action_log(shop_id, id)")
+
+
+@_serialized
+def log_action(shop_id: int, actor: str, is_employee: bool, action: str, details: dict = None):
+    with get_conn() as conn:
+        conn.execute("INSERT INTO action_log (shop_id, actor, is_employee, action, details, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?)",
+                     (shop_id, (actor or "")[:64], int(bool(is_employee)), action[:32],
+                      json.dumps(details or {}, ensure_ascii=False)[:2000],
+                      datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+
+
+def list_action_log(shop_id: int, limit: int = 100) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, actor, is_employee, action, details, created_at FROM action_log "
+                            "WHERE shop_id=? ORDER BY id DESC LIMIT ?", (shop_id, limit)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["details"] = json.loads(d["details"] or "{}")
+        except (TypeError, ValueError):
+            d["details"] = {}
+        out.append(d)
+    return out
 
 
 def _migrate_team(conn):

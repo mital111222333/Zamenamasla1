@@ -3941,6 +3941,11 @@ if ('serviceWorker' in navigator) {
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.staff_list_title }}</label>
       <div id="staffList">{{ T.stats_loading }}</div>
     </div>
+    <div class="card" style="margin-top:16px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.alog_title }}</label>
+      <div class="hint-text" style="margin:0 0 10px;">{{ T.alog_hint }}</div>
+      <div id="actionLog">{{ T.stats_loading }}</div>
+    </div>
   </div>
 
   <div id="view-myshop" style="display:none;">
@@ -5217,7 +5222,29 @@ async function copyStaffCreds(btn) {
   }
   btn.textContent = T.staff_copied;
 }
+// ---- Журнал: удаления и правки сумм (видит только владелец) ----
+async function loadActionLog() {
+  const box = document.getElementById('actionLog');
+  if (!box) return;
+  let d;
+  try { d = await (await fetch('/api/action_log', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (!d || !d.ok) return;
+  if (!d.log.length) { box.innerHTML = `<div class="hint-text">${escapeHtml(T.alog_empty)}</div>`; return; }
+  const sum = v => (v == null ? '—' : fmtNum(v));
+  box.innerHTML = d.log.map(r => {
+    const x = r.details || {};
+    const what = { delete_service: T.alog_delete_service, edit_service: T.alog_edit_service, delete_car: T.alog_delete_car }[r.action] || r.action;
+    let info = [x.plate ? `<span class="pl-mini">${escapeHtml(x.plate)}</span>` : '', x.date ? escapeHtml(x.date) : ''].filter(Boolean).join(' · ');
+    if (r.action === 'delete_service') info += ` · ${sum(x.cost)} ${T.currency}`;
+    if (r.action === 'edit_service' && x.before && x.after) info += ` · ${sum(x.before.cost)} → <b>${sum(x.after.cost)}</b> ${T.currency}`;
+    const who = escapeHtml(r.actor || '—') + (r.is_employee ? ` <span class="staff-pill">${escapeHtml(T.alog_employee)}</span>` : '');
+    return `<div class="staff-row" style="${r.action === 'edit_service' ? '' : 'border-left:3px solid #DC2626;'}">
+      <div class="staff-who"><b>${escapeHtml(what)}</b><span class="hint-text">${info}</span>
+        <span class="hint-text">${escapeHtml(String(r.created_at || '').slice(0, 16))} · ${who}</span></div></div>`;
+  }).join('');
+}
 async function loadStaff() {
+  loadActionLog();
   const seq = ++STAFF_SEQ;
   let d;
   try { d = await (await fetch('/api/staff', { credentials: 'same-origin' })).json(); } catch (e) { return; }
@@ -14993,10 +15020,41 @@ def api_entry_presets():
     return jsonify({"sets": sets})
 
 
+def _employee_record_guard(rec):
+    """Сотрудник правит и удаляет только СВОИ записи и только за сегодня —
+    иначе запись «за наличные» можно было бы убрать или уменьшить задним
+    числом. Владелец и филиал — без ограничений."""
+    if not g.is_employee:
+        return None
+    today = datetime.now().strftime("%Y-%m-%d")
+    if rec.get("employee_id") == g.employee_id and str(rec.get("change_date") or "")[:10] == today:
+        return None
+    return jsonify({"ok": False, "error": g.T["emp_only_own_today"]}), 403
+
+
+def _log_action(action, details):
+    """Журнал для владельца (удаления и правки денег). Сбой журнала не должен
+    ломать само действие — только пишем в лог сервера."""
+    try:
+        db.log_action(g.shop_id, session.get("username"), g.is_employee, action, details)
+    except Exception as e:
+        logger.error(f"Журнал действий не записан ({action}): {e}")
+
+
+def _money(rec):
+    return {"cost": rec.get("cost"), "cash": rec.get("cash_amount"), "card": rec.get("card_amount")}
+
+
 @app.route("/api/oil_change/<int:oc_id>", methods=["PUT"])
 @login_required
 def api_update_oil_change(oc_id):
     data = request.get_json(force=True)
+    before = db.get_oil_change_for_shop(oc_id, g.shop_id)
+    if not before:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    denied = _employee_record_guard(before)
+    if denied:
+        return denied
     try:
         ok = db.update_oil_change(
             oc_id, g.shop_id,
@@ -15016,6 +15074,10 @@ def api_update_oil_change(oc_id):
         return jsonify({"ok": False, "error": str(e)}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    after = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
+    if _money(after) != _money(before):
+        _log_action("edit_service", {"plate": before.get("plate_number"), "date": before.get("change_date"),
+                                     "before": _money(before), "after": _money(after)})
     # «Мастер» меняет только владелец (сотрудник не может переписать замену на себя)
     if "master_id" in data and not g.is_employee:
         raw = data.get("master_id")
@@ -15033,11 +15095,19 @@ def api_update_oil_change(oc_id):
 @app.route("/api/oil_change/<int:oc_id>", methods=["DELETE"])
 @login_required
 def api_delete_oil_change(oc_id):
+    rec = db.get_oil_change_for_shop(oc_id, g.shop_id)
+    if not rec:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    denied = _employee_record_guard(rec)
+    if denied:
+        return denied
     ok = db.delete_oil_change(oc_id, g.shop_id)
     if ok == "has_debt":
         return jsonify({"ok": False, "error": "has_debt"}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    _log_action("delete_service", {"plate": rec.get("plate_number"), "date": rec.get("change_date"),
+                                   "service": rec.get("service_type"), **_money(rec)})
     return jsonify({"ok": True})
 
 
@@ -15073,13 +15143,23 @@ def _owner_change_error(code):
 
 @app.route("/api/car/<plate>", methods=["DELETE"])
 @login_required
+@employee_blocked
 def api_delete_car(plate):
     """Полное удаление машины — сама машина, вся её история, связанные
-    долги. Клиент (владелец) остаётся, если у него есть другие машины."""
+    долги. Клиент (владелец) остаётся, если у него есть другие машины.
+    Только владелец/филиал: сотрудник не может стереть историю целиком."""
     ok = db.delete_car_completely(g.shop_id, plate)
     if not ok:
         return jsonify({"ok": False, "error": "машина не найдена"}), 404
+    _log_action("delete_car", {"plate": db.normalize_plate(plate)})
     return jsonify({"ok": True})
+
+
+@app.route("/api/action_log")
+@login_required
+@employee_blocked
+def api_action_log():
+    return jsonify({"ok": True, "log": db.list_action_log(g.shop_id)})
 
 
 def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date, discount=0):
@@ -15712,6 +15792,7 @@ def api_stats_range():
 
 @app.route("/api/sms_settings", methods=["POST"])
 @login_required
+@employee_blocked
 def api_sms_settings():
     shop = db.get_shop(g.shop_id)
     if not shop or not shop.get("sms_enabled"):
