@@ -25,6 +25,7 @@ from urllib.parse import quote
 from flask import Flask, request, jsonify, render_template_string, Response, session, redirect, url_for, g, send_file, make_response
 
 import database as db
+import backup_store
 import i18n
 import help_content
 import glass_theme
@@ -322,23 +323,32 @@ def _create_and_send_backup(chat_id, caption_note=""):
     import sqlite3
     today_str = datetime.now().strftime("%Y-%m-%d")
     backup_path, gz_path = db.make_compressed_backup(f"manual_{today_str}")
-    parts = []
+    parts, extra = [], []
     try:
         size_mb = os.path.getsize(gz_path) / 1024 / 1024
+        # шифруем паролем (если задан) — в копии телефоны клиентов всех точек
+        path, name, enc = backup_store.prepare(gz_path, f"oilbot_backup_{today_str}.db.gz")
+        if path != gz_path:
+            extra.append(path)
+        lock = "🔒 зашифрована" if enc else "⚠️ без шифрования — задайте BACKUP_PASSWORD"
         # больше лимита Telegram — шлём частями (иначе копия не дошла бы вовсе)
-        parts = db.split_backup(gz_path)
-        name = f"oilbot_backup_{today_str}.db.gz"
+        parts = db.split_backup(path)
         for i, part in enumerate(parts, 1):
-            caption = f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая){caption_note}"
+            caption = (f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая, "
+                       f"{lock}){caption_note}")
             if len(parts) > 1:
                 caption += f"\nЧасть {i} из {len(parts)} — для восстановления выберите все части сразу"
             ok, err = _send_telegram_document(
                 chat_id, part, name if len(parts) == 1 else f"{name}.part{i:02d}", caption=caption)
             if not ok:
                 return False, err, size_mb
+        # вторая копия — в Google Диск (если настроен); старше 30 дней удаляются там сами
+        gd_ok, gd_err = backup_store.to_gdrive(path, name)
+        if gd_ok is False:
+            _send_telegram_message(chat_id, f"⚠️ Копия НЕ загружена в Google Диск: {gd_err}")
         return True, None, size_mb
     finally:
-        for pth in {backup_path, gz_path, *parts}:
+        for pth in {backup_path, gz_path, *parts, *extra}:
             if os.path.exists(pth):
                 os.remove(pth)
 
@@ -374,6 +384,12 @@ def _restore_from_backup(uploaded_bytes, notify_chat_id=None):
     базу владельцу как safety-копию — чтобы даже ошибочное восстановление
     можно было откатить."""
     same_dir_tmp = os.path.join(os.path.dirname(os.path.abspath(db.DB_PATH)), ".restore_upload.db")
+    if backup_store.is_encrypted(uploaded_bytes):
+        # зашифрованная копия (.enc) — сначала расшифровываем паролем с сервера
+        try:
+            uploaded_bytes = backup_store.decrypt_bytes(uploaded_bytes, backup_store.backup_password())
+        except ValueError as e:
+            return False, f"Не удалось расшифровать копию: {e}"
     if uploaded_bytes[:2] == b"\x1f\x8b":
         # сжатая копия (.db.gz) — распаковываем, но не больше RESTORE_MAX_BYTES:
         # маленький «gz-бомба» файл иначе раздулся бы в памяти до гигабайт
