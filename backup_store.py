@@ -120,20 +120,27 @@ def prepare(gz_path: str, name: str):
 
 # ---------- Google Диск ----------
 
+def _env(key: str) -> str:
+    # при вставке в Render легко захватить пробел, кавычки или перенос строки
+    return (os.environ.get(key) or "").strip().strip("'\"").strip()
+
+
 def gdrive_enabled() -> bool:
-    return all(os.environ.get(k) for k in ("GDRIVE_CLIENT_ID", "GDRIVE_CLIENT_SECRET", "GDRIVE_REFRESH_TOKEN"))
+    return all(_env(k) for k in ("GDRIVE_CLIENT_ID", "GDRIVE_CLIENT_SECRET", "GDRIVE_REFRESH_TOKEN"))
 
 
 def _gd_token() -> str:
     r = requests.post(GD_TOKEN_URL, data={
-        "client_id": os.environ["GDRIVE_CLIENT_ID"],
-        "client_secret": os.environ["GDRIVE_CLIENT_SECRET"],
-        "refresh_token": os.environ["GDRIVE_REFRESH_TOKEN"],
+        "client_id": _env("GDRIVE_CLIENT_ID"),
+        "client_secret": _env("GDRIVE_CLIENT_SECRET"),
+        "refresh_token": _env("GDRIVE_REFRESH_TOKEN"),
         "grant_type": "refresh_token",
     }, timeout=30)
     if r.status_code != 200:
-        raise RuntimeError(f"Google не пустил (HTTP {r.status_code}): {r.text[:200]} — "
-                           f"возможно, доступ отозван, нужен новый GDRIVE_REFRESH_TOKEN")
+        hint = ("проверьте GDRIVE_CLIENT_ID и GDRIVE_CLIENT_SECRET (скопированы целиком?)"
+                if "invalid_client" in r.text else
+                "возможно, доступ отозван, нужен новый GDRIVE_REFRESH_TOKEN")
+        raise RuntimeError(f"Google не пустил (HTTP {r.status_code}): {r.text[:200]} — {hint}")
     return r.json()["access_token"]
 
 
