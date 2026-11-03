@@ -27,6 +27,7 @@ from flask import Flask, request, jsonify, render_template_string, Response, ses
 import database as db
 import i18n
 import help_content
+import glass_theme
 
 logger = logging.getLogger(__name__)
 
@@ -3352,6 +3353,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item" id="tab-help" data-tab="help" onclick="showTab('help')"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
   </nav>
   <div class="side-foot">
+    <button class="lang-btn gl-theme-btn" onclick="glToggle()"><i class="fa-solid fa-circle-half-stroke"></i> <span class="gl-on-only" title="{{ T.theme_to_classic }}">{{ T.theme_short }}</span><span class="gl-off-only" title="{{ T.theme_to_glass }}">{{ T.theme_short }}</span></button>
     <button class="lang-btn" onclick="switchLanguage()">{{ T.lang_switch }}</button>
     <a class="logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> {{ T.logout }}</a>
   </div>
@@ -3401,6 +3403,7 @@ if ('serviceWorker' in navigator) {
       {% if is_sub_owner %}<a class="more-item" href="/referral"><i class="fa-solid fa-gift"></i><span>{{ T.ref_menu }}</span></a>{% endif %}
       <a class="more-item more-install" href="/app?lang={{ lang }}"><i class="fa-solid fa-mobile-screen-button"></i><span>{{ T.inst_menu }}</span></a>
       {% if tg_bot_username %}<a class="more-item tg-only-out" href="https://t.me/{{ tg_bot_username }}?start=panel" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i><span>{{ T.tg_open_menu }}</span></a>{% endif %}
+      <div class="more-item" onclick="glToggle()"><i class="fa-solid fa-circle-half-stroke"></i><span class="gl-on-only">{{ T.theme_to_classic }}</span><span class="gl-off-only">{{ T.theme_to_glass }}</span></div>
       <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
       <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
   </div>
@@ -4706,7 +4709,7 @@ function ensureChartJs() {
   const s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
   s.crossOrigin = 'anonymous';
-  s.onload = () => { if (CURRENT_TAB === 'stats') refreshCurrentView(); };
+  s.onload = () => { if (window.glChartTheme) glChartTheme(); if (CURRENT_TAB === 'stats') refreshCurrentView(); };
   s.onerror = () => { CHART_LOADING = false; s.remove(); };
   document.head.appendChild(s);
 }
@@ -4781,6 +4784,7 @@ function showTab(t, keepScroll) {
   const bbMore = document.getElementById('bbMore');
   if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(t));
   if (!keepScroll) window.scrollTo(0, 0);
+  if (window.glEnter && !keepScroll) glEnter('view-' + t);
   if (t === 'stats') { ensureChartJs(); loadStats(); }
   if (t === 'warehouse') loadWarehouse();
   if (t === 'suppliers') loadSuppliersTab();
@@ -6064,7 +6068,8 @@ function renderWarehouseSummary(key) {
   }
   boxes.push(`<div class="wh-kpi ${problems ? 'bad' : ''}"><b>${problems}</b><span>${T.whs_kpi_low}</span></div>`);
   boxes.push(`<div class="wh-kpi ${s.dead_count ? 'muted' : ''}"><b>${s.dead_count}</b><span>${T.whs_kpi_dead}</span></div>`);
-  kpis.innerHTML = boxes.join('');
+  kpis.innerHTML = boxes.join('') + whHealthHtml(ctx.products || []);
+  if (window.glCount) glCount(kpis);
 
   const att = whEl(key, 'Attention');
   const list = ctx.products;
@@ -6107,6 +6112,23 @@ function renderWarehouseSummary(key) {
     }
   }
   att.innerHTML = html;
+}
+
+function whHealthHtml(list) {
+  // инфографика «Здоровье склада»: доля товаров в норме / мало / нет / без продаж
+  if (!list.length) return '';
+  const out = list.filter(p => p.status === 'out').length;
+  const low = list.filter(p => p.status === 'low').length;
+  const dead = list.filter(p => p.status !== 'out' && p.status !== 'low' && p.dead).length;
+  const ok = list.length - out - low - dead;
+  const parts = [[ok, '#22C55E', T.ig_ok], [low, '#F59E0B', T.ig_low], [out, '#EF4444', T.ig_out], [dead, '#94A3B8', T.ig_dead]]
+    .filter(x => x[0] > 0);
+  const pct = Math.round(ok / list.length * 100);
+  return `<div class="ig-health">
+    <div class="ig-health-h"><span>${T.ig_health_title}</span><b>${T.ig_health_ok.replace('{pct}', pct)}</b></div>
+    <div class="ig-bar">${parts.map(x => `<i style="width:${x[0] / list.length * 100}%; background:${x[1]};"></i>`).join('')}</div>
+    <div class="ig-legend">${parts.map(x => `<span style="--c:${x[1]};">${x[2]} <b>${x[0]}</b></span>`).join('')}</div>
+  </div>`;
 }
 
 function whStatusText(p) {
@@ -8179,6 +8201,23 @@ function rvDateLabel(iso, withWeekday) {
   return (withWeekday ? wd[dow] + ', ' : '') + d + ' ' + months[m - 1];
 }
 
+function rvWeekdayHtml(dailyData) {
+  const sum = [0, 0, 0, 0, 0, 0, 0], cnt = [0, 0, 0, 0, 0, 0, 0];
+  (dailyData || []).forEach(d => {
+    const [y, m, dd] = d.date.split('-').map(Number);
+    const dow = (new Date(y, m - 1, dd).getDay() + 6) % 7;  // с понедельника
+    sum[dow] += d.total || 0;
+    cnt[dow] += 1;
+  });
+  const avgs = sum.map((s, i) => cnt[i] ? Math.round(s / cnt[i]) : 0);
+  const max = Math.max(...avgs);
+  if (!max) return '';
+  const best = avgs.indexOf(max);
+  const wd = T.st_weekdays.split(',');
+  return `<div class="ig-wd-h"><span>${T.ig_wd_title}</span><b>${T.ig_wd_best.replace('{day}', wd[best]).replace('{sum}', fmtShort(max))}</b></div>
+    <div class="ig-wd">${avgs.map((v, i) => `<div class="${i === best ? 'top' : ''}" title="${wd[i]}: ${fmtNum(v)} ${T.currency}"><em><i style="height:${Math.max(3, v / max * 100)}%;"></i></em><span>${wd[i]}</span></div>`).join('')}</div>`;
+}
+
 function drawRevenueBars(canvasId, summaryId, dailyData, prevInstance) {
   // Столбик на каждый день. Лучший день подсвечен красным, пунктир — средняя
   // выручка за рабочий день (дни без продаж в среднее не входят).
@@ -8217,6 +8256,15 @@ function drawRevenueBars(canvasId, summaryId, dailyData, prevInstance) {
     ${bestIdx >= 0 ? `<span><i style="background:#E63946;"></i>${T.rv_best_day}</span>` : ''}
     ${avg ? `<span><i style="background:repeating-linear-gradient(90deg,#F59E0B 0 4px,transparent 4px 7px); height:3px; vertical-align:3px;"></i>${T.rv_avg_short}: ${fmtShort(avg)}</span>` : ''}
   `;
+  // инфографика «по дням недели»: средняя выручка в понедельник, вторник…
+  let wdEl = legend.nextElementSibling;
+  if (!wdEl || !wdEl.classList.contains('ig-wd-wrap')) {
+    wdEl = document.createElement('div');
+    wdEl.className = 'ig-wd-wrap';
+    legend.after(wdEl);
+  }
+  wdEl.innerHTML = rvWeekdayHtml(dailyData);
+  wdEl.hidden = !wdEl.innerHTML;
 
   const colors = totals.map((v, i) => i === bestIdx ? '#E63946' : '#0F52BA');
   const avgLine = {
@@ -8512,10 +8560,10 @@ function renderBrandDonut(p, c, centerValue, centerUnit) {
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#0F172A';
+      ctx.fillStyle = window.glColor ? glColor('#0F172A') : '#0F172A';
       ctx.font = "700 20px 'Space Grotesk', sans-serif";
       ctx.fillText(centerValue, x, y - 8);
-      ctx.fillStyle = '#64748B';
+      ctx.fillStyle = window.glColor ? glColor('#64748B') : '#64748B';
       ctx.font = "500 12px sans-serif";
       ctx.fillText(centerUnit, x, y + 13);
       ctx.restore();
@@ -8808,6 +8856,7 @@ async function loadStats() {
       label, d: s[key], cmp: s.comparison && s.comparison[key], cmpNote: note,
       profit: profit ? profit[key] : null, profitUsd: profit && profit.usd ? profit.usd[key] : null,
     })).join('')}</div>`;
+  if (window.glCount) glCount(document.getElementById('statsGrid'));
 
   if (!IS_BRANCH) {
     try {
@@ -14668,6 +14717,27 @@ _VIN_WMI = {
 }
 # коды производителей нужны и сканеру на телефоне (выбор варианта VIN)
 PAGE = PAGE.replace("__VIN_WMI__", json.dumps(sorted(_VIN_WMI)), 1)
+# тема «Тёмное стекло»: стили строятся из уже собранной страницы (все вкладки
+# и окна), отдаются отдельным файлом /ui/glass.css с версией в адресе
+GLASS = glass_theme.Theme(PAGE)
+PAGE = GLASS.install(PAGE)
+
+
+def _glass_asset(body, mimetype):
+    resp = Response(body, mimetype=mimetype)
+    # адрес меняется при каждом изменении темы (?v=...) — можно хранить долго
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
+@app.route("/ui/glass.css")
+def glass_css():
+    return _glass_asset(GLASS.css, "text/css")
+
+
+@app.route("/ui/glass.js")
+def glass_js():
+    return _glass_asset(GLASS.js, "application/javascript")
 _VIN_YEAR_CODES = "ABCDEFGHJKLMNPRSTVWXY123456789"
 _VIN_TRANSLIT = {**{c: i + 1 for i, c in enumerate("ABCDEFGH")}, **{c: i + 1 for i, c in enumerate("JKLMN")},
                  "P": 7, "R": 9, **{c: i + 2 for i, c in enumerate("STUVWXYZ")}}
