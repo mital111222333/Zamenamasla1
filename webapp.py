@@ -116,6 +116,22 @@ def _security_headers(resp):
 _CSRF_EXEMPT_PREFIXES = ("/api/anpr/", "/api/hamyon/")
 
 
+# Общий предел MAX_CONTENT_LENGTH (300 МБ) нужен только восстановлению базы.
+# Остальным адресам хватает 20 МБ (чек, Excel, фото) — иначе любой вошедший
+# (а регистрация открыта) мог бы слать огромные запросы и забивать память
+# единственного процесса, где работают и сайт, и бот.
+UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024
+_BIG_UPLOAD_PATHS = ("/api/admin/restore_backup",)
+
+
+@app.before_request
+def _limit_request_size():
+    n = request.content_length
+    if n and n > UPLOAD_LIMIT_BYTES and request.path not in _BIG_UPLOAD_PATHS:
+        return jsonify({"ok": False, "error": "файл слишком большой"}), 413
+    return None
+
+
 @app.before_request
 def _csrf_origin_check():
     """Защита от CSRF: изменяющий запрос (POST/PUT/DELETE) принимаем, только
@@ -288,7 +304,7 @@ def _send_telegram_document(chat_id, file_path, filename, caption=""):
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
                 data={"chat_id": chat_id, "caption": caption},
                 files={"document": (filename, f)},
-                timeout=60,
+                timeout=300,  # часть копии до 45 МБ на медленном канале
             )
         if resp.ok:
             return True, None
@@ -306,15 +322,23 @@ def _create_and_send_backup(chat_id, caption_note=""):
     import sqlite3
     today_str = datetime.now().strftime("%Y-%m-%d")
     backup_path, gz_path = db.make_compressed_backup(f"manual_{today_str}")
+    parts = []
     try:
         size_mb = os.path.getsize(gz_path) / 1024 / 1024
-        ok, err = _send_telegram_document(
-            chat_id, gz_path, f"oilbot_backup_{today_str}.db.gz",
-            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая){caption_note}",
-        )
-        return ok, err, size_mb
+        # больше лимита Telegram — шлём частями (иначе копия не дошла бы вовсе)
+        parts = db.split_backup(gz_path)
+        name = f"oilbot_backup_{today_str}.db.gz"
+        for i, part in enumerate(parts, 1):
+            caption = f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая){caption_note}"
+            if len(parts) > 1:
+                caption += f"\nЧасть {i} из {len(parts)} — для восстановления выберите все части сразу"
+            ok, err = _send_telegram_document(
+                chat_id, part, name if len(parts) == 1 else f"{name}.part{i:02d}", caption=caption)
+            if not ok:
+                return False, err, size_mb
+        return True, None, size_mb
     finally:
-        for pth in (backup_path, gz_path):
+        for pth in {backup_path, gz_path, *parts}:
             if os.path.exists(pth):
                 os.remove(pth)
 
@@ -3917,6 +3941,11 @@ if ('serviceWorker' in navigator) {
       <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.staff_list_title }}</label>
       <div id="staffList">{{ T.stats_loading }}</div>
     </div>
+    <div class="card" style="margin-top:16px;">
+      <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;">{{ T.alog_title }}</label>
+      <div class="hint-text" style="margin:0 0 10px;">{{ T.alog_hint }}</div>
+      <div id="actionLog">{{ T.stats_loading }}</div>
+    </div>
   </div>
 
   <div id="view-myshop" style="display:none;">
@@ -5193,7 +5222,29 @@ async function copyStaffCreds(btn) {
   }
   btn.textContent = T.staff_copied;
 }
+// ---- Журнал: удаления и правки сумм (видит только владелец) ----
+async function loadActionLog() {
+  const box = document.getElementById('actionLog');
+  if (!box) return;
+  let d;
+  try { d = await (await fetch('/api/action_log', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+  if (!d || !d.ok) return;
+  if (!d.log.length) { box.innerHTML = `<div class="hint-text">${escapeHtml(T.alog_empty)}</div>`; return; }
+  const sum = v => (v == null ? '—' : fmtNum(v));
+  box.innerHTML = d.log.map(r => {
+    const x = r.details || {};
+    const what = { delete_service: T.alog_delete_service, edit_service: T.alog_edit_service, delete_car: T.alog_delete_car }[r.action] || r.action;
+    let info = [x.plate ? `<span class="pl-mini">${escapeHtml(x.plate)}</span>` : '', x.date ? escapeHtml(x.date) : ''].filter(Boolean).join(' · ');
+    if (r.action === 'delete_service') info += ` · ${sum(x.cost)} ${T.currency}`;
+    if (r.action === 'edit_service' && x.before && x.after) info += ` · ${sum(x.before.cost)} → <b>${sum(x.after.cost)}</b> ${T.currency}`;
+    const who = escapeHtml(r.actor || '—') + (r.is_employee ? ` <span class="staff-pill">${escapeHtml(T.alog_employee)}</span>` : '');
+    return `<div class="staff-row" style="${r.action === 'edit_service' ? '' : 'border-left:3px solid #DC2626;'}">
+      <div class="staff-who"><b>${escapeHtml(what)}</b><span class="hint-text">${info}</span>
+        <span class="hint-text">${escapeHtml(String(r.created_at || '').slice(0, 16))} · ${who}</span></div></div>`;
+  }).join('');
+}
 async function loadStaff() {
+  loadActionLog();
   const seq = ++STAFF_SEQ;
   let d;
   try { d = await (await fetch('/api/staff', { credentials: 'same-origin' })).json(); } catch (e) { return; }
@@ -14969,10 +15020,41 @@ def api_entry_presets():
     return jsonify({"sets": sets})
 
 
+def _employee_record_guard(rec):
+    """Сотрудник правит и удаляет только СВОИ записи и только за сегодня —
+    иначе запись «за наличные» можно было бы убрать или уменьшить задним
+    числом. Владелец и филиал — без ограничений."""
+    if not g.is_employee:
+        return None
+    today = datetime.now().strftime("%Y-%m-%d")
+    if rec.get("employee_id") == g.employee_id and str(rec.get("change_date") or "")[:10] == today:
+        return None
+    return jsonify({"ok": False, "error": g.T["emp_only_own_today"]}), 403
+
+
+def _log_action(action, details):
+    """Журнал для владельца (удаления и правки денег). Сбой журнала не должен
+    ломать само действие — только пишем в лог сервера."""
+    try:
+        db.log_action(g.shop_id, session.get("username"), g.is_employee, action, details)
+    except Exception as e:
+        logger.error(f"Журнал действий не записан ({action}): {e}")
+
+
+def _money(rec):
+    return {"cost": rec.get("cost"), "cash": rec.get("cash_amount"), "card": rec.get("card_amount")}
+
+
 @app.route("/api/oil_change/<int:oc_id>", methods=["PUT"])
 @login_required
 def api_update_oil_change(oc_id):
     data = request.get_json(force=True)
+    before = db.get_oil_change_for_shop(oc_id, g.shop_id)
+    if not before:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    denied = _employee_record_guard(before)
+    if denied:
+        return denied
     try:
         ok = db.update_oil_change(
             oc_id, g.shop_id,
@@ -14992,6 +15074,10 @@ def api_update_oil_change(oc_id):
         return jsonify({"ok": False, "error": str(e)}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    after = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
+    if _money(after) != _money(before):
+        _log_action("edit_service", {"plate": before.get("plate_number"), "date": before.get("change_date"),
+                                     "before": _money(before), "after": _money(after)})
     # «Мастер» меняет только владелец (сотрудник не может переписать замену на себя)
     if "master_id" in data and not g.is_employee:
         raw = data.get("master_id")
@@ -15009,11 +15095,19 @@ def api_update_oil_change(oc_id):
 @app.route("/api/oil_change/<int:oc_id>", methods=["DELETE"])
 @login_required
 def api_delete_oil_change(oc_id):
+    rec = db.get_oil_change_for_shop(oc_id, g.shop_id)
+    if not rec:
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    denied = _employee_record_guard(rec)
+    if denied:
+        return denied
     ok = db.delete_oil_change(oc_id, g.shop_id)
     if ok == "has_debt":
         return jsonify({"ok": False, "error": "has_debt"}), 400
     if not ok:
         return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    _log_action("delete_service", {"plate": rec.get("plate_number"), "date": rec.get("change_date"),
+                                   "service": rec.get("service_type"), **_money(rec)})
     return jsonify({"ok": True})
 
 
@@ -15049,13 +15143,23 @@ def _owner_change_error(code):
 
 @app.route("/api/car/<plate>", methods=["DELETE"])
 @login_required
+@employee_blocked
 def api_delete_car(plate):
     """Полное удаление машины — сама машина, вся её история, связанные
-    долги. Клиент (владелец) остаётся, если у него есть другие машины."""
+    долги. Клиент (владелец) остаётся, если у него есть другие машины.
+    Только владелец/филиал: сотрудник не может стереть историю целиком."""
     ok = db.delete_car_completely(g.shop_id, plate)
     if not ok:
         return jsonify({"ok": False, "error": "машина не найдена"}), 404
+    _log_action("delete_car", {"plate": db.normalize_plate(plate)})
     return jsonify({"ok": True})
+
+
+@app.route("/api/action_log")
+@login_required
+@employee_blocked
+def api_action_log():
+    return jsonify({"ok": True, "log": db.list_action_log(g.shop_id)})
 
 
 def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_date, discount=0):
@@ -15688,6 +15792,7 @@ def api_stats_range():
 
 @app.route("/api/sms_settings", methods=["POST"])
 @login_required
+@employee_blocked
 def api_sms_settings():
     shop = db.get_shop(g.shop_id)
     if not shop or not shop.get("sms_enabled"):
@@ -16154,9 +16259,12 @@ def _read_import_sheet(file_storage):
     """Читает первый лист Excel: колонки узнаём по заголовкам (на русском или
     узбекском), поэтому подойдёт и шаблон, и свой прайс с похожими колонками."""
     from openpyxl import load_workbook
+    from itertools import islice
     wb = load_workbook(file_storage, read_only=True, data_only=True)
     ws = wb.worksheets[0]
-    rows = list(ws.iter_rows(values_only=True))
+    # читаем не больше 5001 строки и 40 колонок: файл в пару МБ может
+    # содержать миллионы сжатых строк, и list() по всему листу съел бы память
+    rows = list(islice(ws.iter_rows(values_only=True, max_col=40), 5001))
     if not rows:
         return None, "empty"
     header = [str(h or "").strip().lower() for h in rows[0]]
@@ -17352,7 +17460,7 @@ if ('serviceWorker' in navigator) {
       </p>
       <div class="field">
         <label>Файл резервной копии (.db)</label>
-        <input type="file" id="restore_file" accept=".db,.gz">
+        <input type="file" id="restore_file" multiple>
       </div>
       <div class="field">
         <label>Чтобы подтвердить, впиши слово <code>ЗАМЕНИТЬ</code></label>
@@ -18988,7 +19096,7 @@ async function triggerRestore() {
   const confirmInput = document.getElementById('restore_confirm');
   const resultEl = document.getElementById('restoreResult');
   const file = fileInput.files[0];
-  if (!file) { resultEl.innerHTML = `<div class="msg err">Выбери файл резервной копии</div>`; return; }
+  if (!file) { resultEl.innerHTML = `<div class="msg err">Выбери файл резервной копии (если копия пришла частями — выбери все части сразу)</div>`; return; }
   if (confirmInput.value.trim() !== 'ЗАМЕНИТЬ') {
     resultEl.innerHTML = `<div class="msg err">Впиши точно слово ЗАМЕНИТЬ, чтобы подтвердить</div>`;
     return;
@@ -19001,7 +19109,7 @@ async function triggerRestore() {
   resultEl.innerHTML = '';
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    for (const f of fileInput.files) formData.append('file', f);
     formData.append('confirm', confirmInput.value.trim());
     const res = await fetch('/api/admin/restore_backup', { method: 'POST', body: formData });
     const data = await res.json();
@@ -20517,10 +20625,12 @@ def api_admin_restore_backup():
     раз действие необратимо без отдельной резервной копии."""
     if request.form.get("confirm") != "ЗАМЕНИТЬ":
         return jsonify({"ok": False, "error": "не подтверждено — введите точно 'ЗАМЕНИТЬ'"}), 400
-    uploaded = request.files.get("file")
-    if not uploaded:
+    # большая копия приходит в Telegram частями (.part01, .part02…) — их
+    # выбирают все разом, склеиваем по порядку имён
+    files = sorted((f for f in request.files.getlist("file") if f and f.filename), key=lambda f: f.filename)
+    if not files:
         return jsonify({"ok": False, "error": "файл не выбран"}), 400
-    ok, err = _restore_from_backup(uploaded.read(), notify_chat_id=ADMIN_TELEGRAM_ID or None)
+    ok, err = _restore_from_backup(b"".join(f.read() for f in files), notify_chat_id=ADMIN_TELEGRAM_ID or None)
     if not ok:
         return jsonify({"ok": False, "error": err}), 400
     return jsonify({"ok": True})
@@ -22252,8 +22362,15 @@ def api_hamyon_callback():
     ext = str(ext_id or p.get("ext_id") or "")
     verified = _hy_sign_ok(ext, amount, sign)
     if status in ("paid", "success", "completed"):
-        if not verified and ext:
-            verified = hamyon_status(ext) in ("paid", "success", "completed")
+        if not verified:
+            # Без верной подписи верим только статусу ЭТОГО ЖЕ платежа у Hamyon:
+            # номер должен совпасть с тем, что Hamyon выдал нам при создании.
+            # Иначе чужой оплаченный номер (или свой старый) можно было
+            # «подставить» к другому заказу и продлить подписку без оплаты.
+            own_ext = str(p.get("ext_id") or "")
+            if own_ext and ext == own_ext and hamyon_status(own_ext) in ("paid", "success", "completed"):
+                verified = True
+                amount = None  # сумма в запросе не подписана — берём ожидаемую из нашей записи
         if not verified:
             logger.warning(f"Hamyon: подпись не сошлась, оплату {p['id']} не засчитываем ({data})")
             return jsonify({"ok": False, "error": "sign"})
