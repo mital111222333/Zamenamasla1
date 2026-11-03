@@ -1812,6 +1812,56 @@ if ('serviceWorker' in navigator) {
 """
 
 
+# Политика конфиденциальности: публичная страница (нужна по закону о
+# персональных данных и для подключения Google Диска к резервным копиям).
+PRIVACY_TEXT = {
+    "ru": ("Политика конфиденциальности OilBook", [
+        ("Кто мы", "OilBook — сервис учёта для пунктов замены масла: клиенты, автомобили, замены, склад, напоминания."),
+        ("Какие данные храним", "Данные точки (название, адрес, телефон, логин), данные клиентов точки, которые вносит сама точка (гос. номер, телефон, имя, пробег, история обслуживания), и Telegram ID клиентов, подписавшихся на напоминания."),
+        ("Зачем", "Только для работы сервиса: учёт обслуживания, статистика точки и напоминания клиентам о следующей замене. Мы не продаём и не передаём данные третьим лицам для рекламы."),
+        ("Кто видит данные", "Каждая точка видит только свои данные. Доступ администратора сервиса используется только для поддержки и восстановления."),
+        ("Резервные копии", "Ежедневные копии базы шифруются паролем (AES-256) и хранятся в Telegram и Google Диске владельца сервиса не дольше 30 дней. Приложение имеет доступ только к созданным им файлам на Диске."),
+        ("Ваши права", "Точка может изменить или удалить данные клиента в панели. Клиент может отписаться от напоминаний в боте или попросить точку удалить его данные."),
+        ("Контакты", "Вопросы о данных: напишите в Telegram-бот OilBook или администратору сервиса."),
+    ]),
+    "uz": ("OilBook maxfiylik siyosati", [
+        ("Biz kimmiz", "OilBook — moy almashtirish shoxobchalari uchun hisob xizmati: mijozlar, avtomobillar, almashtirishlar, ombor, eslatmalar."),
+        ("Qanday ma'lumotlar saqlanadi", "Shoxobcha ma'lumotlari (nomi, manzili, telefoni, logini), shoxobcha o'zi kiritgan mijozlar ma'lumotlari (davlat raqami, telefon, ism, probeg, xizmat tarixi) va eslatmalarga obuna bo'lgan mijozlarning Telegram ID raqami."),
+        ("Nima uchun", "Faqat xizmat ishlashi uchun: xizmat hisobi, shoxobcha statistikasi va mijozlarga keyingi almashtirish haqida eslatma. Ma'lumotlar reklama uchun sotilmaydi va uchinchi shaxslarga berilmaydi."),
+        ("Ma'lumotlarni kim ko'radi", "Har bir shoxobcha faqat o'z ma'lumotlarini ko'radi. Xizmat administratori kirishidan faqat yordam va tiklash uchun foydalaniladi."),
+        ("Zaxira nusxalar", "Bazaning kunlik nusxalari parol bilan shifrlanadi (AES-256) va xizmat egasining Telegram va Google Diskida 30 kundan ko'p saqlanmaydi. Ilova Diskda faqat o'zi yaratgan fayllarga kira oladi."),
+        ("Sizning huquqlaringiz", "Shoxobcha panelda mijoz ma'lumotlarini o'zgartirishi yoki o'chirishi mumkin. Mijoz botda eslatmalardan voz kechishi yoki shoxobchadan ma'lumotlarini o'chirishni so'rashi mumkin."),
+        ("Aloqa", "Ma'lumotlar bo'yicha savollar: OilBook Telegram-botiga yoki xizmat administratoriga yozing."),
+    ]),
+}
+
+PRIVACY_PAGE = """<!doctype html>
+<html lang="{{ lang }}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+body{margin:0;background:#f5f6f8;color:#1d2330;font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 48px}
+h1{font-size:26px;line-height:1.25;margin:0 0 8px}
+h2{font-size:18px;margin:24px 0 4px}
+p{margin:0}
+.lang{margin-bottom:20px;font-size:14px}.lang a{color:#2563eb}
+</style></head><body><main>
+<div class="lang"><a href="?lang=ru">Русский</a> · <a href="?lang=uz">O'zbekcha</a></div>
+<h1>{{ title }}</h1>
+{% for h, p in sections %}<h2>{{ h }}</h2><p>{{ p }}</p>{% endfor %}
+</main></body></html>"""
+
+
+@app.route("/privacy")
+def privacy_page():
+    lang = request.args.get("lang")
+    if lang not in ("ru", "uz"):
+        lang = "ru"
+    title, sections = PRIVACY_TEXT[lang]
+    return render_template_string(PRIVACY_PAGE, lang=lang, title=title, sections=sections)
+
+
 @app.route("/app")
 @app.route("/install")
 def app_install_page():
