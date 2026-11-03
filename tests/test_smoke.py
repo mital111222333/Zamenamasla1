@@ -21,7 +21,7 @@ def test_site_imports_and_db_initialises(app):
     assert app is not None
 
 
-@pytest.mark.parametrize("path", ["/login", "/register", "/app"])
+@pytest.mark.parametrize("path", ["/login", "/register", "/app", "/privacy", "/privacy?lang=uz"])
 def test_public_pages_open(app, path):
     r = app.test_client().get(path)
     assert r.status_code == 200, path
