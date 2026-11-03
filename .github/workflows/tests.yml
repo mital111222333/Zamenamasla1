@@ -1,0 +1,25 @@
+# Тесты OilBook запускаются на серверах GitHub при каждом изменении —
+# компьютер разработчика для этого не нужен. Красный крестик у коммита =
+# что-то сломалось или пропала защита (в отчёте написано, что именно).
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Установка зависимостей
+        run: pip install -r requirements.txt pytest
+      - name: Проверка синтаксиса
+        run: python -m py_compile bot.py webapp.py database.py i18n.py backup_store.py sms.py
+      - name: Тесты
+        run: python -m pytest -q tests

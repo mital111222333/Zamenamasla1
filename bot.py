@@ -38,6 +38,7 @@ from telegram.ext import (
 )
 
 import database as db
+import backup_store
 import webapp
 import i18n
 import sms
@@ -1030,13 +1031,16 @@ async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
         paths = await asyncio.to_thread(db.make_compressed_backup, today_str)
         gz_path = paths[1]
         size_mb = os.path.getsize(gz_path) / 1024 / 1024
+        # шифруем паролем (если задан) — в копии телефоны клиентов всех точек
+        path, name, enc = await asyncio.to_thread(
+            backup_store.prepare, gz_path, f"oilbot_backup_{today_str}.db.gz")
+        lock = "🔒 зашифрована" if enc else "⚠️ без шифрования — задайте BACKUP_PASSWORD"
         # больше лимита Telegram (50 МБ) — шлём частями; раньше в этом случае
         # копия не отправлялась совсем
-        parts = await asyncio.to_thread(db.split_backup, gz_path)
-        paths = tuple({*paths, *parts})
-        name = f"oilbot_backup_{today_str}.db.gz"
+        parts = await asyncio.to_thread(db.split_backup, path)
+        paths = tuple({*paths, path, *parts})
         for i, part in enumerate(parts, 1):
-            caption = f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая)"
+            caption = f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая, {lock})"
             if len(parts) > 1:
                 caption += f"\nЧасть {i} из {len(parts)} — для восстановления выберите все части сразу"
             with open(part, "rb") as f:
@@ -1048,6 +1052,11 @@ async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
                     read_timeout=300, write_timeout=300,
                 )
         logger.info(f"Резервная копия базы отправлена ({size_mb:.1f} МБ, частей: {len(parts)})")
+        # вторая копия — в Google Диск (если настроен); старше 30 дней удаляются там сами
+        gd_ok, gd_err = await asyncio.to_thread(backup_store.to_gdrive, path, name)
+        if gd_ok is False:
+            await context.bot.send_message(chat_id=ADMIN_TELEGRAM_ID,
+                                           text=f"⚠️ Ночная копия НЕ загружена в Google Диск: {gd_err}")
     except Exception as e:
         logger.error(f"Не удалось создать/отправить резервную копию базы: {e}")
         # раньше ошибка была видна только в логах сервера — теперь сразу сообщаем
