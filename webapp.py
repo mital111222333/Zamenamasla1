@@ -9317,8 +9317,8 @@ async function loadBroadcastInfo() {
   const items = await res2.json();
   document.getElementById('broadcastHistory').innerHTML = items.length ? items.map(b => `
     <div style="padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;">
-      <div>${b.message.length > 80 ? b.message.slice(0,80) + '…' : b.message}</div>
-      <div class="hint-text">${b.created_at} — ${T.broadcast_status_label} ${b.status}${b.status === 'done' ? `, ${T.broadcast_delivered} ${b.total_sent}, ${T.broadcast_failed} ${b.total_failed}` : ''}</div>
+      <div>${escapeHtml(b.message.length > 80 ? b.message.slice(0,80) + '…' : b.message)}</div>
+      <div class="hint-text">${escapeHtml(b.created_at)} — ${T.broadcast_status_label} ${escapeHtml(b.status)}${b.status === 'done' ? `, ${T.broadcast_delivered} ${b.total_sent}, ${T.broadcast_failed} ${b.total_failed}` : ''}</div>
     </div>
   `).join('') : `<div class="hint-text">${T.broadcast_none_yet}</div>`;
 }
@@ -15580,7 +15580,16 @@ def api_pay_debt(plan_id):
             raise ValueError()
     except (KeyError, ValueError, TypeError):
         return jsonify({"ok": False, "error": "укажите положительную сумму платежа"}), 400
-    plan = db.log_installment_payment(plan_id, g.shop_id, amount, data.get("paid_date"),
+    # дата платежа — настоящая и не в будущем; сотрудник вносит только сегодняшним
+    # днём (иначе деньги «уезжают» в другой день статистики и кассы)
+    today = datetime.now().date()
+    try:
+        paid_day = datetime.strptime(str(data.get("paid_date") or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        paid_day = today
+    if paid_day > today or g.is_employee:
+        paid_day = today
+    plan = db.log_installment_payment(plan_id, g.shop_id, amount, paid_day.strftime("%Y-%m-%d"),
                                       employee_id=g.employee_id)
     if not plan:
         return jsonify({"ok": False, "error": "долг не найден"}), 404
@@ -15638,13 +15647,23 @@ def api_broadcast_history():
     return jsonify(db.get_recent_broadcasts(g.shop_id))
 
 
+BROADCAST_MAX_LEN = 3500   # у Telegram предел 4096 символов на сообщение
+
+
 @app.route("/api/broadcast", methods=["POST"])
 @login_required
+@employee_blocked
 def api_broadcast_create():
-    data = request.get_json(force=True)
-    message = (data.get("message") or "").strip()
+    data = request.get_json(force=True, silent=True) or {}
+    message = str(data.get("message") or "").strip()
     if not message:
         return jsonify({"ok": False, "error": "empty message"}), 400
+    if len(message) > BROADCAST_MAX_LEN:
+        return jsonify({"ok": False, "error": g.T["broadcast_too_long"].format(n=BROADCAST_MAX_LEN)}), 400
+    # частые рассылки — клиенты блокируют бота, и Telegram может закрыть его
+    # для всех точек сразу; поэтому не больше одной в очереди и N в сутки
+    if not db.broadcast_allowed(g.shop_id):
+        return jsonify({"ok": False, "error": g.T["broadcast_limit"].format(n=db.BROADCAST_PER_DAY)}), 429
     broadcast_id = db.create_broadcast(g.shop_id, message)
     return jsonify({"ok": True, "id": broadcast_id})
 

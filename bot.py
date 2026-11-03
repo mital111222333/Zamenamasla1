@@ -719,6 +719,9 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
                 db.mark_reminder_sent(item["id"])
+            except Forbidden:
+                # клиент остановил бота — отмечаем, иначе попытка повторялась каждый час
+                db.mark_reminder_sent(item["id"])
             except Exception as e:
                 logger.error(f"Не удалось отправить напоминание {item['id']}: {e}")
 
@@ -792,6 +795,8 @@ async def check_supplier_debts(context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(chat_id=sup["notify_telegram_id"], text=text)
             db.mark_supplier_debt_reminded(sup["id"])
+        except Forbidden:
+            db.mark_supplier_debt_reminded(sup["id"])  # владелец остановил бота
         except Exception as e:
             logger.error(f"Не удалось напомнить о долге поставщику {sup['id']}: {e}")
 

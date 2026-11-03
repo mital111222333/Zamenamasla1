@@ -3288,6 +3288,21 @@ def get_all_linked_clients(shop_id: int):
         return [dict(r) for r in rows]
 
 
+BROADCAST_PER_DAY = 2
+
+
+def broadcast_allowed(shop_id: int) -> bool:
+    """Новая рассылка: пока прежняя не ушла — нельзя, и не больше
+    BROADCAST_PER_DAY за последние сутки."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT SUM(status IN ('pending', 'sending')) AS waiting,
+                   SUM(created_at > datetime('now', '-1 day')) AS today
+            FROM broadcasts WHERE shop_id=?
+        """, (shop_id,)).fetchone()
+    return not (row["waiting"] or 0) and (row["today"] or 0) < BROADCAST_PER_DAY
+
+
 @_serialized
 def create_broadcast(shop_id: int, message: str) -> int:
     with get_conn() as conn:
@@ -4384,6 +4399,17 @@ def delete_branch_with_data(branch_id: int) -> bool:
             conn.execute("DELETE FROM team_settings WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM team_terms WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM password_reset_codes WHERE shop_id=?", (branch_id,))
+            # раньше эти данные филиала оставались в базе после удаления
+            conn.execute("DELETE FROM store_moves WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM supplier_order_lines WHERE order_id IN "
+                         "(SELECT id FROM supplier_orders WHERE shop_id=?)", (branch_id,))
+            conn.execute("DELETE FROM supplier_orders WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM supplier_payments WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM suppliers WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM add_request_tokens WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM course_progress WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM usd_rate_history WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM action_log WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM shops WHERE id=? AND role='branch'", (branch_id,))
             conn.commit()
         except Exception:
