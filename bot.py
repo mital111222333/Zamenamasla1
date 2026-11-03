@@ -1030,17 +1030,24 @@ async def send_daily_backup(context: ContextTypes.DEFAULT_TYPE):
         paths = await asyncio.to_thread(db.make_compressed_backup, today_str)
         gz_path = paths[1]
         size_mb = os.path.getsize(gz_path) / 1024 / 1024
-        if size_mb > 48:
-            raise RuntimeError(f"сжатая копия {size_mb:.1f} МБ — больше лимита Telegram (50 МБ)")
-        with open(gz_path, "rb") as f:
-            await context.bot.send_document(
-                chat_id=ADMIN_TELEGRAM_ID,
-                document=f,
-                filename=f"oilbot_backup_{today_str}.db.gz",
-                caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая)",
-                read_timeout=120, write_timeout=120,
-            )
-        logger.info(f"Резервная копия базы отправлена ({size_mb:.1f} МБ)")
+        # больше лимита Telegram (50 МБ) — шлём частями; раньше в этом случае
+        # копия не отправлялась совсем
+        parts = await asyncio.to_thread(db.split_backup, gz_path)
+        paths = tuple({*paths, *parts})
+        name = f"oilbot_backup_{today_str}.db.gz"
+        for i, part in enumerate(parts, 1):
+            caption = f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая)"
+            if len(parts) > 1:
+                caption += f"\nЧасть {i} из {len(parts)} — для восстановления выберите все части сразу"
+            with open(part, "rb") as f:
+                await context.bot.send_document(
+                    chat_id=ADMIN_TELEGRAM_ID,
+                    document=f,
+                    filename=name if len(parts) == 1 else f"{name}.part{i:02d}",
+                    caption=caption,
+                    read_timeout=300, write_timeout=300,
+                )
+        logger.info(f"Резервная копия базы отправлена ({size_mb:.1f} МБ, частей: {len(parts)})")
     except Exception as e:
         logger.error(f"Не удалось создать/отправить резервную копию базы: {e}")
         # раньше ошибка была видна только в логах сервера — теперь сразу сообщаем

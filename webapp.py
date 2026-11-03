@@ -116,6 +116,22 @@ def _security_headers(resp):
 _CSRF_EXEMPT_PREFIXES = ("/api/anpr/", "/api/hamyon/")
 
 
+# Общий предел MAX_CONTENT_LENGTH (300 МБ) нужен только восстановлению базы.
+# Остальным адресам хватает 20 МБ (чек, Excel, фото) — иначе любой вошедший
+# (а регистрация открыта) мог бы слать огромные запросы и забивать память
+# единственного процесса, где работают и сайт, и бот.
+UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024
+_BIG_UPLOAD_PATHS = ("/api/admin/restore_backup",)
+
+
+@app.before_request
+def _limit_request_size():
+    n = request.content_length
+    if n and n > UPLOAD_LIMIT_BYTES and request.path not in _BIG_UPLOAD_PATHS:
+        return jsonify({"ok": False, "error": "файл слишком большой"}), 413
+    return None
+
+
 @app.before_request
 def _csrf_origin_check():
     """Защита от CSRF: изменяющий запрос (POST/PUT/DELETE) принимаем, только
@@ -288,7 +304,7 @@ def _send_telegram_document(chat_id, file_path, filename, caption=""):
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
                 data={"chat_id": chat_id, "caption": caption},
                 files={"document": (filename, f)},
-                timeout=60,
+                timeout=300,  # часть копии до 45 МБ на медленном канале
             )
         if resp.ok:
             return True, None
@@ -306,15 +322,23 @@ def _create_and_send_backup(chat_id, caption_note=""):
     import sqlite3
     today_str = datetime.now().strftime("%Y-%m-%d")
     backup_path, gz_path = db.make_compressed_backup(f"manual_{today_str}")
+    parts = []
     try:
         size_mb = os.path.getsize(gz_path) / 1024 / 1024
-        ok, err = _send_telegram_document(
-            chat_id, gz_path, f"oilbot_backup_{today_str}.db.gz",
-            caption=f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая){caption_note}",
-        )
-        return ok, err, size_mb
+        # больше лимита Telegram — шлём частями (иначе копия не дошла бы вовсе)
+        parts = db.split_backup(gz_path)
+        name = f"oilbot_backup_{today_str}.db.gz"
+        for i, part in enumerate(parts, 1):
+            caption = f"📦 Резервная копия базы данных за {today_str} ({size_mb:.1f} МБ, сжатая){caption_note}"
+            if len(parts) > 1:
+                caption += f"\nЧасть {i} из {len(parts)} — для восстановления выберите все части сразу"
+            ok, err = _send_telegram_document(
+                chat_id, part, name if len(parts) == 1 else f"{name}.part{i:02d}", caption=caption)
+            if not ok:
+                return False, err, size_mb
+        return True, None, size_mb
     finally:
-        for pth in (backup_path, gz_path):
+        for pth in {backup_path, gz_path, *parts}:
             if os.path.exists(pth):
                 os.remove(pth)
 
@@ -16154,9 +16178,12 @@ def _read_import_sheet(file_storage):
     """Читает первый лист Excel: колонки узнаём по заголовкам (на русском или
     узбекском), поэтому подойдёт и шаблон, и свой прайс с похожими колонками."""
     from openpyxl import load_workbook
+    from itertools import islice
     wb = load_workbook(file_storage, read_only=True, data_only=True)
     ws = wb.worksheets[0]
-    rows = list(ws.iter_rows(values_only=True))
+    # читаем не больше 5001 строки и 40 колонок: файл в пару МБ может
+    # содержать миллионы сжатых строк, и list() по всему листу съел бы память
+    rows = list(islice(ws.iter_rows(values_only=True, max_col=40), 5001))
     if not rows:
         return None, "empty"
     header = [str(h or "").strip().lower() for h in rows[0]]
@@ -17352,7 +17379,7 @@ if ('serviceWorker' in navigator) {
       </p>
       <div class="field">
         <label>Файл резервной копии (.db)</label>
-        <input type="file" id="restore_file" accept=".db,.gz">
+        <input type="file" id="restore_file" multiple>
       </div>
       <div class="field">
         <label>Чтобы подтвердить, впиши слово <code>ЗАМЕНИТЬ</code></label>
@@ -18988,7 +19015,7 @@ async function triggerRestore() {
   const confirmInput = document.getElementById('restore_confirm');
   const resultEl = document.getElementById('restoreResult');
   const file = fileInput.files[0];
-  if (!file) { resultEl.innerHTML = `<div class="msg err">Выбери файл резервной копии</div>`; return; }
+  if (!file) { resultEl.innerHTML = `<div class="msg err">Выбери файл резервной копии (если копия пришла частями — выбери все части сразу)</div>`; return; }
   if (confirmInput.value.trim() !== 'ЗАМЕНИТЬ') {
     resultEl.innerHTML = `<div class="msg err">Впиши точно слово ЗАМЕНИТЬ, чтобы подтвердить</div>`;
     return;
@@ -19001,7 +19028,7 @@ async function triggerRestore() {
   resultEl.innerHTML = '';
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    for (const f of fileInput.files) formData.append('file', f);
     formData.append('confirm', confirmInput.value.trim());
     const res = await fetch('/api/admin/restore_backup', { method: 'POST', body: formData });
     const data = await res.json();
@@ -20517,10 +20544,12 @@ def api_admin_restore_backup():
     раз действие необратимо без отдельной резервной копии."""
     if request.form.get("confirm") != "ЗАМЕНИТЬ":
         return jsonify({"ok": False, "error": "не подтверждено — введите точно 'ЗАМЕНИТЬ'"}), 400
-    uploaded = request.files.get("file")
-    if not uploaded:
+    # большая копия приходит в Telegram частями (.part01, .part02…) — их
+    # выбирают все разом, склеиваем по порядку имён
+    files = sorted((f for f in request.files.getlist("file") if f and f.filename), key=lambda f: f.filename)
+    if not files:
         return jsonify({"ok": False, "error": "файл не выбран"}), 400
-    ok, err = _restore_from_backup(uploaded.read(), notify_chat_id=ADMIN_TELEGRAM_ID or None)
+    ok, err = _restore_from_backup(b"".join(f.read() for f in files), notify_chat_id=ADMIN_TELEGRAM_ID or None)
     if not ok:
         return jsonify({"ok": False, "error": err}), 400
     return jsonify({"ok": True})
@@ -22252,8 +22281,15 @@ def api_hamyon_callback():
     ext = str(ext_id or p.get("ext_id") or "")
     verified = _hy_sign_ok(ext, amount, sign)
     if status in ("paid", "success", "completed"):
-        if not verified and ext:
-            verified = hamyon_status(ext) in ("paid", "success", "completed")
+        if not verified:
+            # Без верной подписи верим только статусу ЭТОГО ЖЕ платежа у Hamyon:
+            # номер должен совпасть с тем, что Hamyon выдал нам при создании.
+            # Иначе чужой оплаченный номер (или свой старый) можно было
+            # «подставить» к другому заказу и продлить подписку без оплаты.
+            own_ext = str(p.get("ext_id") or "")
+            if own_ext and ext == own_ext and hamyon_status(own_ext) in ("paid", "success", "completed"):
+                verified = True
+                amount = None  # сумма в запросе не подписана — берём ожидаемую из нашей записи
         if not verified:
             logger.warning(f"Hamyon: подпись не сошлась, оплату {p['id']} не засчитываем ({data})")
             return jsonify({"ok": False, "error": "sign"})

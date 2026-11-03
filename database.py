@@ -772,6 +772,30 @@ def make_compressed_backup(tag: str):
     return raw, gz
 
 
+BACKUP_PART_BYTES = 45 * 1024 * 1024  # Telegram принимает от бота файлы до 50 МБ
+
+
+def split_backup(gz_path: str, part_bytes: int = BACKUP_PART_BYTES) -> list:
+    """Копия больше лимита Telegram — режем её на части по part_bytes (просто
+    кусками файла), иначе с ростом базы ночные копии перестали бы приходить
+    вообще. Восстановить: в админке выбрать все части разом — сервер склеит
+    их по порядку имён. Маленькая копия возвращается как есть ([gz_path]).
+    Удалить части — забота вызывающего."""
+    if os.path.getsize(gz_path) <= part_bytes:
+        return [gz_path]
+    parts = []
+    with open(gz_path, "rb") as f:
+        while True:
+            chunk = f.read(part_bytes)
+            if not chunk:
+                break
+            part = f"{gz_path}.part{len(parts) + 1:02d}"
+            with open(part, "wb") as out:
+                out.write(chunk)
+            parts.append(part)
+    return parts
+
+
 # Один общий замок на все ЗАПИСИ в базу. Бот и веб-панель работают в одном
 # процессе (разными потоками), поэтому замок надёжно выстраивает в очередь
 # одновременные «прочитал — проверил — записал» с разных телефонов: без него
