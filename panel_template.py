@@ -773,6 +773,14 @@ if ('serviceWorker' in navigator) {
     .pay-seg { grid-template-columns:repeat(2, minmax(0,1fr)); }
     .add-form .row2 .field { min-width:0; }
   }
+  /* Широкий монитор: три колонки — машина и пробег | товары и работа | чек.
+     Масло и фильтры видны сразу, без прокрутки; справа нет пустой полосы */
+  @media (min-width: 1600px) {
+    .container { max-width:1800px; }
+    .af-main { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0 20px; align-items:start; }
+    .af-main > .af-sec { grid-column:1; }
+    .af-main > .af-sec.af-items { grid-column:2; grid-row:1 / span 2; }
+  }
   .known-client .kc-lv-item {
     display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
     padding:3px 0;
@@ -1739,7 +1747,7 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
 
-    <div class="af-sec">
+    <div class="af-sec af-items">
       <div class="af-h"><i class="fa-solid fa-oil-can"></i>{{ T.af_items }}</div>
       <div class="cat-tiles" id="catTiles"></div>
       <div class="it-rcpt" id="itRcpt"></div>
