@@ -52,7 +52,10 @@ def test_branch_delete_removes_all_branch_rows(head_id):
 GUARDS = {
     "webapp.py": [
         r"@employee_blocked\s+def api_broadcast_create", r"db\.broadcast_allowed\(",
-        r"escapeHtml\(b\.message", r"paid_day > today or g\.is_employee",
+        r"paid_day > today or g\.is_employee",
+    ],
+    "panel_template.py": [
+        r"escapeHtml\(b\.message",
         # фильтр можно взять несколько штук (2 топливных на машине с двумя баками)
         r"const qty = filterQty\(i, ''\);", r"const qty = filterQty\(i, 'svc_'\);",
     ],

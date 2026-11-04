@@ -65,11 +65,12 @@ GUARDS = {
         r"db\.sanitize_items\(", r"_reset_request_limited\(", r"def _employee_record_guard",
         r"@employee_blocked\s+def api_delete_car", r"@employee_blocked\s+def api_sms_settings",
         r"islice\(ws\.iter_rows", r"backup_store\.is_encrypted",
-        r"escapeHtml\(it\.qty\)",
         # разделы, вынесенные в отдельные файлы, должны быть подключены
+        r"^from panel_template import PAGE\b", r"^from panel_template import MODAL_AND_SCRIPT\b",
         r"^import display\b", r"^import registration\b", r"^import subscription\b",
         r"^import admin_routes\b",
     ],
+    "panel_template.py": [r"escapeHtml\(it\.qty\)"],
     "subscription.py": [r"own_ext and ext == own_ext"],
     "database.py": [r"def sanitize_items", r"def split_backup", r"def log_action"],
     "bot.py": [r"backup_store\.to_gdrive", r"db\.split_backup"],
