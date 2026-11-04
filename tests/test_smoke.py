@@ -67,7 +67,7 @@ GUARDS = {
         r"islice\(ws\.iter_rows", r"backup_store\.is_encrypted",
         r"escapeHtml\(it\.qty\)",
         # разделы, вынесенные в отдельные файлы, должны быть подключены
-        r"^import subscription\b", r"^import admin_routes\b",
+        r"^import registration\b", r"^import subscription\b", r"^import admin_routes\b",
     ],
     "subscription.py": [r"own_ext and ext == own_ext"],
     "database.py": [r"def sanitize_items", r"def split_backup", r"def log_action"],
