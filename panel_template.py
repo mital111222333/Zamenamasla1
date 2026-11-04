@@ -773,13 +773,23 @@ if ('serviceWorker' in navigator) {
     .pay-seg { grid-template-columns:repeat(2, minmax(0,1fr)); }
     .add-form .row2 .field { min-width:0; }
   }
-  /* Широкий монитор: три колонки — машина и пробег | товары и работа | чек.
-     Масло и фильтры видны сразу, без прокрутки; справа нет пустой полосы */
-  @media (min-width: 1600px) {
-    .container { max-width:1800px; }
-    .af-main { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0 20px; align-items:start; }
-    .af-main > .af-sec { grid-column:1; }
-    .af-main > .af-sec.af-items { grid-column:2; grid-row:1 / span 2; }
+  /* Компьютер: товары сразу под машиной (их выбирают всегда), пробег ниже
+     и в одну строку; имя и телефон рядом. На телефоне порядок прежний */
+  @media (min-width: 1200px) {
+    .af-main { display:flex; flex-direction:column; }
+    .af-main > .af-sec { order:1; }
+    .af-main > .af-sec.af-items { order:2; }
+    .af-main > .af-sec.af-mil { order:3; }
+    .af-owner { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:12px; }
+    .af-owner > * { grid-column:1 / -1; }
+    .af-owner > .field:nth-child(1), .af-owner > .field:nth-child(2) { grid-column:auto; }
+    .af-mil { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr); gap:0 14px; align-items:end; }
+    .af-mil > * { grid-column:1 / -1; }
+    .af-mil > .mil-grid { grid-column:1; grid-row:2; }
+    .af-mil > .mil-daily { grid-column:2; grid-row:2; }
+    .af-mil > .mil-int { grid-column:3; grid-row:2; }
+    .af-mil > .mil-daily .mil-l, .af-mil > .mil-int .mil-l { margin-top:0 !important; }
+    .af-mil > #kmChips { margin-top:10px; }
   }
   .known-client .kc-lv-item {
     display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
@@ -1718,7 +1728,7 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
 
-    <div class="af-sec">
+    <div class="af-sec af-mil">
       <div class="af-h"><i class="fa-solid fa-gauge-high"></i>{{ T.af_mileage }}</div>
       <div class="mil-grid">
         <div>
@@ -1733,10 +1743,11 @@ if ('serviceWorker' in navigator) {
       </div>
       <div id="mileageCompare"></div>
       <div class="km-chips km-seg" id="kmChips"></div>
+      <div class="mil-daily">
       <div class="mil-l" style="margin-top:12px;">{{ T.daily_km_label }}</div>
       <div class="mil-f"><input id="daily_km" type="number" inputmode="numeric" placeholder="{{ T.daily_km_ph }}" oninput="DK.intervalManual = false; applyDailyKm()" enterkeyhint="next"><span>{{ T.km_per_day }}</span></div>
-      <div id="dkSuggest"></div>
-      <div id="dkHint" class="dk-hint"></div>
+      </div>
+      <div class="mil-int">
       <div class="mil-l" style="margin-top:12px;">{{ T.field_interval }}</div>
       <div style="display:flex; gap:8px;">
         <input id="interval_value" type="number" placeholder="3" value="3" style="flex:1;" oninput="DK.intervalManual = true; applyDailyKm()">
@@ -1745,6 +1756,9 @@ if ('serviceWorker' in navigator) {
           <option value="days">{{ T.unit_days }}</option>
         </select>
       </div>
+      </div>
+      <div id="dkSuggest"></div>
+      <div id="dkHint" class="dk-hint"></div>
     </div>
 
     <div class="af-sec af-items">
