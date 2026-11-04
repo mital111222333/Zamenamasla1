@@ -8829,10 +8829,13 @@ function renderReceipt(items) {
   if (pl && plate) pl.textContent = (plate.value || '').trim().toUpperCase();
   if (!items.length) { box.innerHTML = `<div class="rcpt-empty">${T.rcpt_empty}</div>`; return; }
   const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
-  box.innerHTML = items.map(it => {
+  box.innerHTML = items.map((it, i) => {
     const title = it.brand ? it.brand : it.name;
     const sub = (it.brand ? it.name + ' · ' : '') + (it.qty && it.qty !== 1 ? `${it.qty} × ${money(it.unit_price)}` : '1 × ' + money(it.unit_price));
-    return `<div class="rcpt-line"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div><em>${money(it.total)}</em></div>`;
+    // фильтр — сколько штук (−/+), как в чеке на телефоне
+    const step = FILTER_KEYS.indexOf(it.key) >= 0
+      ? `<span class="ir-step"><button type="button" onclick="irStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="irStep(${i}, 1)" aria-label="+">+</button></span>` : '';
+    return `<div class="rcpt-line"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div>${step}<em>${money(it.total)}</em></div>`;
   }).join('') + (() => {
     const d = discountFor(itemsSubtotal(items));
     return d ? `<div class="rcpt-line rcpt-disc"><div><b>${T.disc_title}</b></div><em>−${money(d)}</em></div>` : '';
