@@ -27,7 +27,7 @@ import re
 import sqlite3
 import asyncio
 import logging
-from datetime import datetime, time as dtime
+from datetime import datetime, time as dtime, timedelta, timezone
 
 from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton,
                       ReplyKeyboardRemove, MenuButtonWebApp, WebAppInfo)
@@ -39,6 +39,7 @@ from telegram.ext import (
 
 import database as db
 import backup_store
+import digest
 import webapp
 import i18n
 import sms
@@ -801,6 +802,73 @@ async def check_supplier_debts(context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Не удалось напомнить о долге поставщику {sup['id']}: {e}")
 
 
+# ============ ЕЖЕДНЕВНАЯ СВОДКА ВЛАДЕЛЬЦУ (8:00 и 22:00) ============
+# Узбекистан живёт по UTC+5 без перехода на летнее время
+DIGEST_TZ = timezone(timedelta(hours=5))
+
+
+async def send_digests(context: ContextTypes.DEFAULT_TYPE):
+    """Утренняя (data='morning') или вечерняя сводка всем точкам; текст и
+    советы собирает digest.py, на языке точки."""
+    kind = context.job.data
+    shops = await asyncio.to_thread(db.digest_shops)
+    sent = 0
+    for shop in shops:
+        try:
+            text = await asyncio.to_thread(digest.build, shop, kind)
+        except Exception as e:
+            logger.error(f"Сводка для точки {shop['id']} не собрана: {e}")
+            continue
+        if not text:
+            continue
+        lang = shop.get("language") if shop.get("language") in digest.TEXT else "ru"
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(
+            digest.TEXT[lang]["off_btn"], callback_data=f"digest:off:{shop['id']}")]])
+        try:
+            await context.bot.send_message(chat_id=int(shop["notify_telegram_id"]), text=text, reply_markup=keyboard)
+            sent += 1
+        except Forbidden:
+            pass  # владелец остановил бота
+        except Exception as e:
+            logger.warning(f"Сводка для точки {shop['id']} не отправлена: {e}")
+        await asyncio.sleep(0.05)
+    logger.info(f"Сводка ({kind}) отправлена: {sent} из {len(shops)} точек")
+
+
+async def digest_off_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Кнопка «Не присылать сводки» — отключить может только чат самой точки."""
+    query = update.callback_query
+    try:
+        shop_id = int(query.data.split(":")[2])
+    except (IndexError, ValueError):
+        await query.answer()
+        return
+    shop = db.get_shop(shop_id)
+    if not shop or str(shop.get("notify_telegram_id") or "") != str(query.message.chat_id):
+        await query.answer()
+        return
+    await asyncio.to_thread(db.set_digest_off, shop_id, True)
+    lang = shop.get("language") if shop.get("language") in digest.TEXT else "ru"
+    await query.answer(digest.TEXT[lang]["off_done"], show_alert=True)
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
+async def digest_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/svodka — снова включить сводки для точек, чьи уведомления идут в этот чат."""
+    shops = await asyncio.to_thread(db.shops_by_notify_chat, update.effective_chat.id)
+    lang = (shops[0].get("language") if shops else None) or "ru"
+    T = digest.TEXT.get(lang) or digest.TEXT["ru"]
+    if not shops:
+        await update.message.reply_text(T["on_none"])
+        return
+    for s in shops:
+        await asyncio.to_thread(db.set_digest_off, s["id"], False)
+    await update.message.reply_text(T["on_done"])
+
+
 async def sub_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Кнопки ✅/❌ под чеком об оплате подписки — нажимать может только
     администратор платформы (ADMIN_TELEGRAM_ID)."""
@@ -1163,6 +1231,8 @@ def main():
     app.add_handler(CallbackQueryHandler(broadcast_confirm_callback, pattern="^bc_"))
     app.add_handler(CallbackQueryHandler(sub_payment_callback, pattern="^subpay:"))
     app.add_handler(CallbackQueryHandler(registration_decide_callback, pattern="^reg:"))
+    app.add_handler(CallbackQueryHandler(digest_off_callback, pattern="^digest:"))
+    app.add_handler(CommandHandler("svodka", digest_on_command))
     app.add_handler(MessageHandler(filters.CONTACT, registration_contact))
     app.add_handler(MessageHandler(filters.LOCATION, registration_location))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\s*\d{8}\s*$"),
@@ -1180,6 +1250,9 @@ def main():
     # 4:00 UTC = 9:00 по Ташкенту; внутри проверяется, что сегодня понедельник
     job_queue.run_daily(send_weekly_data_check, time=dtime(hour=4, minute=0))
     job_queue.run_repeating(process_pending_broadcasts, interval=15, first=15)
+    # сводка владельцу: 8:00 и 22:00 по Ташкенту (часовой пояс указан явно)
+    job_queue.run_daily(send_digests, time=dtime(hour=8, minute=0, tzinfo=DIGEST_TZ), data="morning")
+    job_queue.run_daily(send_digests, time=dtime(hour=22, minute=0, tzinfo=DIGEST_TZ), data="evening")
 
     app.add_error_handler(on_error)
 

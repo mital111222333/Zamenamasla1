@@ -308,6 +308,7 @@ def init_db():
         _migrate_cash(conn)
         _migrate_team(conn)
         _migrate_action_log(conn)
+        _migrate_digest(conn)
         _bootstrap_accounts(conn)
 
 
@@ -9679,3 +9680,114 @@ def set_oil_change_master(oc_id: int, shop_id: int, master_id) -> bool:
                               AND car_id IN (SELECT id FROM cars WHERE shop_id=?)""", (master_id, oc_id, shop_id))
         conn.commit()
         return cur.rowcount > 0
+
+
+# ======================================================================
+# Ежедневная сводка владельцу (8:00 и 22:00) — цифры для digest.py
+# ======================================================================
+
+def _migrate_digest(conn):
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    if "digest_off" not in cols:
+        conn.execute("ALTER TABLE shops ADD COLUMN digest_off INTEGER NOT NULL DEFAULT 0")
+    conn.commit()
+
+
+def digest_shops() -> list:
+    """Кому слать сводку: активные точки и филиалы с Telegram владельца,
+    которые не отключили сводки."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT * FROM shops WHERE role IN ('shop', 'branch') AND is_active=1
+              AND COALESCE(notify_telegram_id, '') != '' AND COALESCE(digest_off, 0) = 0
+            ORDER BY id
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+@_serialized
+def set_digest_off(shop_id: int, off: bool) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE shops SET digest_off=? WHERE id=?", (1 if off else 0, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def shops_by_notify_chat(chat_id) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM shops WHERE notify_telegram_id=? AND role IN ('shop', 'branch')",
+                            (str(chat_id),)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def digest_last_change(shop_id: int):
+    with get_conn() as conn:
+        row = conn.execute("""SELECT MAX(oc.change_date) AS d FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+                              WHERE c.shop_id=?""", (shop_id,)).fetchone()
+    return row["d"] if row else None
+
+
+def digest_staff_day(shop_id: int, day: str) -> list:
+    """Кто сколько замен сделал за день (засчитывается как в «Команде»:
+    мастер, иначе тот, кто внёс; замены владельца — отдельной строкой)."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT COALESCE(oc.master_id, oc.employee_id) AS uid, COUNT(*) AS cnt,
+                   COALESCE(SUM(oc.cost), 0) AS revenue
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date=?
+            GROUP BY uid ORDER BY cnt DESC, revenue DESC
+        """, (shop_id, day)).fetchall()
+        names = {r["id"]: r["name"] for r in conn.execute(
+            "SELECT id, COALESCE(full_name, username) AS name FROM shop_users WHERE shop_id=?", (shop_id,))}
+    return [{"name": names.get(r["uid"]) if r["uid"] else None, "count": r["cnt"], "revenue": r["revenue"]}
+            for r in rows]
+
+
+def digest_due(shop_id: int, date_from: str, date_to: str, limit: int = 30) -> list:
+    """Машины, которым по плану пора на замену в эти дни (последняя замена
+    каждой машины — status='active')."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT c.plate_number AS plate, cl.full_name AS owner_name, oc.next_change_date AS due
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id LEFT JOIN clients cl ON cl.id = c.client_id
+            WHERE c.shop_id=? AND oc.status='active' AND oc.next_change_date >= ? AND oc.next_change_date <= ?
+            ORDER BY oc.next_change_date, c.plate_number LIMIT ?
+        """, (shop_id, date_from, date_to, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def digest_debts(shop_id: int, today: str) -> dict:
+    """Долги клиентов: всего и сколько уже просрочено (дата платежа прошла)."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount - paid_amount), 0) AS remaining,
+                   SUM(CASE WHEN next_due_date < ? THEN 1 ELSE 0 END) AS overdue_cnt,
+                   COALESCE(SUM(CASE WHEN next_due_date < ? THEN total_amount - paid_amount ELSE 0 END), 0) AS overdue_sum
+            FROM installment_plans WHERE shop_id=? AND status='active'
+        """, (today, today, shop_id)).fetchone()
+    return {"count": row["cnt"] or 0, "remaining": row["remaining"] or 0,
+            "overdue_count": row["overdue_cnt"] or 0, "overdue_sum": row["overdue_sum"] or 0}
+
+
+def digest_item_rates(shop_id: int, date_from: str, date_to: str) -> dict:
+    """Как часто к замене масла берут фильтры: из визитов с моторным маслом —
+    сколько с масляным / воздушным / салонным фильтром."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ?
+        """, (shop_id, date_from, date_to)).fetchall()
+    out = {"oil_visits": 0, "filter_0": 0, "filter_1": 0, "filter_2": 0}
+    for r in rows:
+        try:
+            keys = {i.get("key") for i in json.loads(r["items_json"] or "[]") if isinstance(i, dict)}
+        except (TypeError, ValueError):
+            continue
+        if "fluid_0" not in keys:
+            continue
+        out["oil_visits"] += 1
+        for k in ("filter_0", "filter_1", "filter_2"):
+            if k in keys:
+                out[k] += 1
+    return out
