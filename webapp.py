@@ -9706,6 +9706,7 @@ function renderItemLists() {
       <span class="item-name" style="flex:${prods.length ? '1.3' : '2.3'};">${T[key]}</span>
       ${brandField}
       <input id="filter_price_${i}" type="number" placeholder="${T.price_ph}" oninput="updateTotal()">
+      ${filterQtyHtml('', i)}
       <button type="button" class="row-x" onclick="closeItemRow('${key}')" aria-label="${T.af_remove}">✕</button>
     </div>
   `;
@@ -9757,7 +9758,8 @@ function renderFilterTiles() {
     if (on) {
       const { brand } = readBrandField(`filter_brand_${i}`);
       const pr = parseFloat((document.getElementById(`filter_price_${i}`) || {}).value) || 0;
-      sub = [brand, pr ? pr.toLocaleString('ru-RU') : ''].filter(Boolean).join(' · ');
+      const q = filterQty(i, '');
+      sub = [brand, q > 1 ? '× ' + q : '', pr ? pr.toLocaleString('ru-RU') : ''].filter(Boolean).join(' · ');
     } else if (prods.length === 1 && prods[0].sell_price) {
       sub = Number(prods[0].sell_price).toLocaleString('ru-RU');
     } else if (prods.length > 1) {
@@ -9778,6 +9780,24 @@ function toggleFilterTile(key) {
     return;
   }
   openItemRow(key);
+}
+
+// сколько штук фильтра (например, 2 топливных на машине с двумя баками);
+// пустое поле = 1 шт. pre: '' — форма «Внести замену», 'svc_' — окно правки
+function filterQtyHtml(pre, i) {
+  return `<span class="lit-step"><button type="button" onclick="stepFilterQty(${i}, -1, '${pre}')" aria-label="−">−</button><input id="${pre}filter_qty_${i}" type="number" inputmode="numeric" min="1" step="1" placeholder="1 ${T.unit_pc}" aria-label="${T.qty_ph}" oninput="${pre ? 'updateSvcTotal' : 'updateTotal'}()"><button type="button" onclick="stepFilterQty(${i}, 1, '${pre}')" aria-label="+">+</button></span>`;
+}
+function filterQty(i, pre) {
+  const el = document.getElementById(`${pre || ''}filter_qty_${i}`);
+  const n = Math.round(parseFloat(el && el.value) || 1);
+  return Math.min(Math.max(n, 1), 99);
+}
+function stepFilterQty(i, d, pre) {
+  const el = document.getElementById(`${pre || ''}filter_qty_${i}`);
+  if (!el) return;
+  const v = Math.min(Math.max(filterQty(i, pre) + d, 1), 99);
+  el.value = v > 1 ? String(v) : '';
+  if (pre) updateSvcTotal(); else updateTotal();
 }
 
 // литры кнопками −/+ по 0,5 л
@@ -9818,6 +9838,8 @@ function openItemRow(key) {
 }
 function closeItemRow(key) {
   rowFieldIds(key).forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const qEl = document.getElementById(`filter_qty_${FILTER_KEYS.indexOf(key)}`);
+  if (qEl) qEl.value = '';
   ROW_OPEN.delete(key);
   updateTotal();
 }
@@ -9864,7 +9886,8 @@ function renderCatTiles() {
     let sub;
     if (mine.length) {
       sub = mine.map(it => (it.key === 'other' ? String(it.name || '').replace(T.other_prefix + ': ', '') : (it.brand || it.name))
-        + (isFluidKey(it.key) && it.qty ? ' · ' + csQty(it.qty) + ' ' + T.unit_l : '')).join(', ');
+        + (isFluidKey(it.key) && it.qty ? ' · ' + csQty(it.qty) + ' ' + T.unit_l : '')
+        + (FILTER_KEYS.indexOf(it.key) >= 0 && it.qty > 1 ? ' × ' + it.qty : '')).join(', ');
     } else if (c.id === 'wk') {
       sub = T.cat_work_sub;
     } else {
@@ -9889,7 +9912,7 @@ function renderItRcpt(items, subtotal) {
     const catName = it.key === 'other_stock' ? T.cat_goods : (it.key === 'other' ? T.cat_work : (T[it.key] || ''));
     const fluid = isFluidKey(it.key);
     const qtyTxt = (it.qty && it.qty !== 1) || fluid ? csQty(it.qty) + (fluid ? ' ' + T.unit_l : '') + ' × ' + csMoney(it.unit_price) : '';
-    const step = fluid || it.key === 'other_stock'
+    const step = fluid || it.key === 'other_stock' || FILTER_KEYS.indexOf(it.key) >= 0
       ? `<span class="ir-step"><button type="button" onclick="irStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="irStep(${i}, 1)" aria-label="+">+</button></span>` : '';
     return `<div class="ir-line"><div class="ir-main" onclick="openCatSheet('${c ? c.id : ''}', '${it.key}')"><b>${escapeHtml(title || '')}</b><span>${escapeHtml(catName)}${qtyTxt ? ' · ' + qtyTxt : ''}</span></div>${step}<span class="ir-sum">${csMoney(it.total)}</span><button type="button" class="ir-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button></div>`;
   }).join('');
@@ -9903,6 +9926,13 @@ function irStep(i, dir) {
   const it = collectItems()[i];
   if (!it) return;
   if (isFluidKey(it.key)) { stepLiters(FLUID_KEYS.indexOf(it.key), dir * 0.5); return; }
+  const ti = FILTER_KEYS.indexOf(it.key);
+  if (ti >= 0) {
+    // «−» у одного фильтра убирает его из чека, как у прочих товаров
+    if (dir < 0 && filterQty(ti, '') <= 1) { closeItemRow(it.key); return; }
+    stepFilterQty(ti, dir, '');
+    return;
+  }
   if (it.key === 'other_stock' && it._row) {
     const el = document.getElementById(`other_stock_qty_${it._row}`);
     if (!el) return;
@@ -10531,7 +10561,8 @@ function collectItems() {
     const brandEl = document.getElementById(`filter_brand_${i}`);
     const { brand, product_id } = brandEl ? readBrandField(`filter_brand_${i}`) : { brand: null, product_id: null };
     if (price > 0 || product_id) {
-      items.push({key, name: T[key], brand, product_id, unit_price: price, qty: 1, total: Math.round(price)});
+      const qty = filterQty(i, '');
+      items.push({key, name: T[key], brand, product_id, unit_price: price, qty, total: Math.round(price * qty)});
     }
   });
   const otherName = document.getElementById('other_name').value.trim();
@@ -10866,7 +10897,7 @@ function repeatLastVisit(itemsArg, doneMsg) {
     ['fluid_brand_', 'fluid_price_', 'fluid_liters_'].forEach(pfx => { const el = document.getElementById(pfx + i); if (el) el.value = ''; });
   });
   FILTER_KEYS.forEach((_, i) => {
-    ['filter_brand_', 'filter_price_'].forEach(pfx => { const el = document.getElementById(pfx + i); if (el) el.value = ''; });
+    ['filter_brand_', 'filter_price_', 'filter_qty_'].forEach(pfx => { const el = document.getElementById(pfx + i); if (el) el.value = ''; });
   });
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
@@ -10902,6 +10933,8 @@ function repeatLastVisit(itemsArg, doneMsg) {
       const opt = pickBrand(document.getElementById(`filter_brand_${fl}`), it);
       if (isSelect(`filter_brand_${fl}`) && !opt) return;
       document.getElementById(`filter_price_${fl}`).value = (opt && opt.dataset.price) || it.unit_price || '';
+      const qEl = document.getElementById(`filter_qty_${fl}`);
+      if (qEl) qEl.value = it.qty > 1 ? Math.round(it.qty) : '';
     } else if (it.key === 'other') {
       document.getElementById('other_name').value = String(it.name || '').replace(/^[^:]+:\\s*/, '');
       document.getElementById('other_price').value = it.unit_price || it.total || '';
@@ -11164,6 +11197,8 @@ function resetItemInputs() {
     document.getElementById(`filter_price_${i}`).value = '';
     const fb = document.getElementById(`filter_brand_${i}`);
     if (fb) fb.value = '';
+    const fq = document.getElementById(`filter_qty_${i}`);
+    if (fq) fq.value = '';
   });
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
@@ -12467,6 +12502,7 @@ function renderSvcItemLists() {
       <span class="item-name" style="flex:${prods.length ? '1.3' : '2.3'};">${T[key]}</span>
       ${brandField}
       <input id="svc_filter_price_${i}" type="number" placeholder="${T.price_ph}" oninput="updateSvcTotal()">
+      ${filterQtyHtml('svc_', i)}
     </div>
   `;
   }).join('');
@@ -12507,7 +12543,8 @@ function collectSvcItems() {
     const brandEl = document.getElementById(`svc_filter_brand_${i}`);
     const { brand, product_id } = brandEl ? readBrandField(`svc_filter_brand_${i}`) : { brand: null, product_id: null };
     if (price > 0 || product_id) {
-      items.push({key, name: T[key], brand, product_id, unit_price: price, qty: 1, total: Math.round(price)});
+      const qty = filterQty(i, 'svc_');
+      items.push({key, name: T[key], brand, product_id, unit_price: price, qty, total: Math.round(price * qty)});
     }
   });
   const otherName = document.getElementById('svc_other_name').value.trim();
@@ -12596,6 +12633,7 @@ function resetSvcItemInputs() {
     document.getElementById(`svc_filter_price_${i}`).value = '';
     const brandEl = document.getElementById(`svc_filter_brand_${i}`);
     if (brandEl) brandEl.value = '';
+    document.getElementById(`svc_filter_qty_${i}`).value = '';
   });
   document.getElementById('svc_other_name').value = '';
   document.getElementById('svc_other_price').value = '';
@@ -12634,7 +12672,10 @@ function fillSvcItemsFrom(items) {
     if (filI !== -1) {
       const brandEl = document.getElementById(`svc_filter_brand_${filI}`);
       if (brandEl) selectOrPreserveBrand(brandEl, it);
-      document.getElementById(`svc_filter_price_${filI}`).value = it.total ?? '';
+      // цена за штуку и количество (раньше фильтр всегда был 1 шт, и цена = сумма)
+      const q = Math.round(Number(it.qty) || 1);
+      document.getElementById(`svc_filter_price_${filI}`).value = (q > 1 ? it.unit_price : (it.unit_price || it.total)) ?? '';
+      document.getElementById(`svc_filter_qty_${filI}`).value = q > 1 ? q : '';
     }
   });
   fillOtherStockRowsFrom('svcOther', otherStockItems);
