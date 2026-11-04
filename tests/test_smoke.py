@@ -32,6 +32,15 @@ def test_panel_requires_login(app):
     assert r.status_code in (302, 401, 403)
 
 
+@pytest.mark.parametrize("path", ["/admin", "/api/admin/shops", "/api/admin/restore_backup"])
+def test_admin_routes_registered_and_closed(app, path):
+    # маршруты админки вынесены в admin_routes.py — они должны быть подключены
+    # и по-прежнему закрыты для всех, кто не вошёл администратором
+    assert any(r.rule == path for r in app.url_map.iter_rules()), path
+    r = app.test_client().get(path)
+    assert r.status_code in (302, 401, 403, 405), path
+
+
 def test_security_headers(app):
     r = app.test_client().get("/login")
     assert "frame-ancestors" in r.headers.get("Content-Security-Policy", "")
