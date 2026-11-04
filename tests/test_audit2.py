@@ -53,6 +53,8 @@ GUARDS = {
     "webapp.py": [
         r"@employee_blocked\s+def api_broadcast_create", r"db\.broadcast_allowed\(",
         r"escapeHtml\(b\.message", r"paid_day > today or g\.is_employee",
+        # фильтр можно взять несколько штук (2 топливных на машине с двумя баками)
+        r"const qty = filterQty\(i, ''\);", r"const qty = filterQty\(i, 'svc_'\);",
     ],
     "bot.py": [r"except Forbidden:\s+# клиент остановил бота"],
 }
