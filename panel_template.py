@@ -8167,9 +8167,32 @@ function csFootHtml(fluid, ready, inRcpt) {
       opts.map(v => `<button type="button" class="${CS.qty === v ? 'on' : ''}" onclick="CS.qty=${v}; renderCatSheet()">${csQty(v)}</button>`).join('') + `</div>` +
       `<div class="cs-qty"><button type="button" onclick="CS.qty=Math.max(0.5, Math.round((CS.qty-0.5)*10)/10); renderCatSheet()">−</button><label><input id="csQtyIn" type="text" inputmode="decimal" autocomplete="off" value="${csQty(CS.qty)}" onfocus="this.select()" oninput="csQtyType(this)" onchange="csQtyDone(this)" onkeydown="if(event.key==='Enter'){this.blur();}"><span>${T.unit_l}</span></label><button type="button" onclick="CS.qty=Math.round((CS.qty+0.5)*10)/10; renderCatSheet()">+</button></div>`;
   }
+  const ti = FILTER_KEYS.indexOf(CS.key);
+  if (ti >= 0 && inRcpt) {
+    // фильтр уже в чеке — сколько штук (2 топливных на машине с двумя баками)
+    h += `<div class="ps-grp" style="margin-top:0;">${T.qty_ph}</div>` +
+      `<div class="cs-qty"><button type="button" onclick="csFltStep(-1)" aria-label="−">−</button><b>${filterQty(ti, '')} ${T.unit_pc}</b><button type="button" onclick="csFltStep(1)" aria-label="+">+</button></div>`;
+  }
   if (ready) h += `<button type="button" class="ps-go" id="csGoBtn" onclick="csApply()">${csGoText(fluid)}</button>`;
   if (inRcpt) h += `<button type="button" class="cs-del" onclick="csRemoveCur()">${T.cat_remove}</button>`;
   return h;
+}
+function csFltStep(d) {
+  const ti = FILTER_KEYS.indexOf(CS.key);
+  if (ti < 0) return;
+  stepFilterQty(ti, d, '');
+  renderCatSheet();
+}
+// тот же фильтр нажали ещё раз — ещё одна штука (а не замена на тот же товар)
+function addSameFilter(key, id) {
+  const ti = FILTER_KEYS.indexOf(key);
+  if (ti < 0 || !rowHasValue(key)) return false;
+  const sel = document.getElementById(`filter_brand_${ti}`);
+  if (!sel || sel.tagName !== 'SELECT' || sel.value !== String(id)) return false;
+  stepFilterQty(ti, 1, '');
+  const p = productsCache.find(x => String(x.id) === String(id));
+  showMsg(`${p ? p.name : T[key]} × ${filterQty(ti, '')}`, true);
+  return true;
 }
 function csGoText(fluid) {
   return T.cat_add + (fluid && CS.qty ? ' · ' + csQty(CS.qty) + ' ' + T.unit_l : '');
@@ -8205,8 +8228,13 @@ function csQtyDone(el) {
 function csPick(id, qty) {
   CS.pid = String(id);
   if (qty) CS.qty = qty;
-  // фильтр — одним нажатием сразу в чек; масло — ждём литры и «Добавить»
-  if (!isFluidKey(CS.key)) { csApply(); return; }
+  // фильтр — одним нажатием сразу в чек (повторное нажатие — ещё 1 шт);
+  // масло — ждём литры и «Добавить»
+  if (!isFluidKey(CS.key)) {
+    if (addSameFilter(CS.key, id)) { closeObSheets(); return; }
+    csApply();
+    return;
+  }
   renderCatSheet();
 }
 function csApply() {
@@ -8461,6 +8489,7 @@ function pickSheetChoose(id) {
     renderPickSheet();
     return;
   }
+  if (fi < 0 && addSameFilter(PSH.key, id)) { closeObSheets(); return; }
   setProductInField(PSH.key, id, fi >= 0 ? PSH.liters : 0);
   closeObSheets();
 }
@@ -8485,7 +8514,9 @@ function renderReceiptSheet() {
     const title = it.brand || it.name;
     const q = it.qty && it.qty !== 1 ? `${String(it.qty).replace('.', ',')} × ${money(it.unit_price)}` : `1 × ${money(it.unit_price)}`;
     const canEdit = it.key !== 'other_stock';
-    return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div><em>${money(it.total)}</em>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
+    const step = FILTER_KEYS.indexOf(it.key) >= 0
+      ? `<span class="ir-step"><button type="button" onclick="rcStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="rcStep(${i}, 1)" aria-label="+">+</button></span>` : '';
+    return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div>${step}<em>${money(it.total)}</em>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
   }).join('') + (() => {
     const d = discountFor(itemsSubtotal(items));
     return d ? `<div class="rc-line rc-disc"><div><b>${T.disc_title}</b></div><em>−${money(d)}</em></div>` : '';
@@ -8510,6 +8541,10 @@ function rcPrice(i) {
   el.value = v;
   paymentSplitTouched = false;
   updateTotal();
+  renderReceiptSheet();
+}
+function rcStep(i, dir) {
+  irStep(i, dir);
   renderReceiptSheet();
 }
 function rcRemove(i) {
