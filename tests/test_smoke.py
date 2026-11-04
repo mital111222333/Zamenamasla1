@@ -64,9 +64,12 @@ GUARDS = {
         r"def _csrf_origin_check", r"def _security_headers", r"def _limit_request_size",
         r"db\.sanitize_items\(", r"_reset_request_limited\(", r"def _employee_record_guard",
         r"@employee_blocked\s+def api_delete_car", r"@employee_blocked\s+def api_sms_settings",
-        r"own_ext and ext == own_ext", r"islice\(ws\.iter_rows", r"backup_store\.is_encrypted",
+        r"islice\(ws\.iter_rows", r"backup_store\.is_encrypted",
         r"escapeHtml\(it\.qty\)",
+        # разделы, вынесенные в отдельные файлы, должны быть подключены
+        r"^import subscription\b", r"^import admin_routes\b",
     ],
+    "subscription.py": [r"own_ext and ext == own_ext"],
     "database.py": [r"def sanitize_items", r"def split_backup", r"def log_action"],
     "bot.py": [r"backup_store\.to_gdrive", r"db\.split_backup"],
 }
@@ -75,4 +78,4 @@ GUARDS = {
 @pytest.mark.parametrize("fname,pattern", [(f, p) for f, ps in GUARDS.items() for p in ps])
 def test_security_guards_present(fname, pattern):
     src = open(os.path.join(ROOT, fname), encoding="utf-8").read()
-    assert re.search(pattern, src), f"{fname}: пропала защита /{pattern}/"
+    assert re.search(pattern, src, re.M), f"{fname}: пропала защита /{pattern}/"
