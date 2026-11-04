@@ -4,7 +4,7 @@
 
 Маршруты регистрируются на общем app из webapp.py при импорте этого файла
 (webapp.py импортирует его в самом конце). Нужные остальной программе
-функции (sub_decide, _tg_api и др.) webapp.py берёт отсюда обратно."""
+функции (sub_decide и др.) webapp.py берёт отсюда обратно."""
 import json
 import os
 import re
@@ -20,9 +20,10 @@ import database as db
 import i18n
 from webapp import (
     ADMIN_TELEGRAM_ID, BOT_TOKEN, PUBLIC_URL, _fmt_day, _fmt_sum, _is_sub_owner,
-    _ref_sync, _send_telegram_message, admin_required, app, logger, login_required,
+    _send_telegram_message, _tg_api, admin_required, app, logger, login_required,
     sub_exempt,
 )
+from registration import _ref_sync
 
 
 # ---------- Курс доллара для тарифа «Безлимит» ----------
@@ -125,19 +126,6 @@ def _sub_admin_caption(p: dict) -> str:
     return "\n".join(lines)
 
 
-def _tg_api(method: str, data: dict = None, files: dict = None):
-    if not BOT_TOKEN:
-        return None
-    try:
-        resp = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/{method}",
-                             data=data, files=files, timeout=30)
-        if not resp.ok:
-            logger.warning(f"Telegram {method}: HTTP {resp.status_code} — {resp.text[:300]}")
-            return None
-        return resp.json().get("result")
-    except Exception as e:
-        logger.error(f"Telegram {method} не выполнен: {e}")
-        return None
 
 
 def _send_receipt_to_admin(p: dict, data_bytes: bytes, fname: str, mime: str):
