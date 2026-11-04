@@ -20,6 +20,6 @@ jobs:
       - name: Установка зависимостей
         run: pip install -r requirements.txt pytest
       - name: Проверка синтаксиса
-        run: python -m py_compile bot.py webapp.py database.py i18n.py backup_store.py sms.py
+        run: python -m py_compile *.py
       - name: Тесты
         run: python -m pytest -q tests
