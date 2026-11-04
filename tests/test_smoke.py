@@ -73,7 +73,8 @@ GUARDS = {
     "panel_template.py": [r"escapeHtml\(it\.qty\)"],
     "subscription.py": [r"own_ext and ext == own_ext"],
     "database.py": [r"def sanitize_items", r"def split_backup", r"def log_action"],
-    "bot.py": [r"backup_store\.to_gdrive", r"db\.split_backup"],
+    "bot.py": [r"backup_store\.to_gdrive", r"db\.split_backup",
+               r"run_daily\(send_digests, time=dtime\(hour=8", r"run_daily\(send_digests, time=dtime\(hour=22"],
 }
 
 
