@@ -374,6 +374,7 @@ SCANNER_PAGE = """
   </div>
 </div>
 <canvas id="c" width="128" height="64"></canvas>
+<canvas id="dc" width="256" height="256" style="display:none"></canvas>
 <script>
 const T = {{ t_json|safe }};
 const TOKEN = {{ anpr_token|tojson }};
@@ -563,9 +564,110 @@ async function readWindow(win) {
   const out = await S.session.run({ [S.session.inputNames[0]]: t });
   return decode(out[S.session.outputNames[0]].data);
 }
+// «Искатель» номера — та же маленькая YOLO-модель, что у сканера в панели:
+// сама находит номер во всём кадре (в отдельном потоке), рамку рисовать не
+// нужно. Если поток не запустился (очень старое устройство) — работает зона.
+const DET = 256, DET_MIN = 0.4;
+const DET_WORKER = `
+let sess = null, S = 256;
+self.onmessage = async (e) => {
+  const m = e.data;
+  if (m.type === 'init') {
+    try {
+      S = m.size;
+      importScripts(m.base + 'ort.wasm.min.js');
+      ort.env.wasm.wasmPaths = m.base;
+      ort.env.wasm.numThreads = 1;
+      sess = await ort.InferenceSession.create(m.base + 'plate_det_s256.onnx', { executionProviders: ['wasm'] });
+      self.postMessage({ type: 'ready' });
+    } catch (err) { self.postMessage({ type: 'fail' }); }
+    return;
+  }
+  if (m.type === 'frame' && sess) {
+    const px = new Uint8ClampedArray(m.buf), n = S * S, f = new Float32Array(3 * n);
+    for (let i = 0, j = 0; j < n; i += 4, j++) { f[j] = px[i] / 255; f[n + j] = px[i + 1] / 255; f[2 * n + j] = px[i + 2] / 255; }
+    let boxes = [];
+    try {
+      const out = await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', f, [1, 3, S, S]) });
+      const d = out[sess.outputNames[0]].data;
+      for (let k = 0; k + 6 < d.length; k += 7) boxes.push([d[k + 1], d[k + 2], d[k + 3], d[k + 4], d[k + 6]]);
+    } catch (x) { boxes = []; }
+    self.postMessage({ type: 'boxes', id: m.id, boxes });
+  }
+};`;
+function startDetector() {
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([DET_WORKER], { type: 'text/javascript' })));
+    S.detWorker = w;
+    w.onmessage = e => {
+      const m = e.data;
+      if (m.type === 'ready') {
+        S.det = true;
+        // рамка больше не нужна — номер находится сам
+        document.getElementById('zone').style.display = 'none';
+        document.getElementById('zoneBtn').hidden = true;
+        detPump();
+      } else if (m.type === 'fail') { S.det = false; }
+      else if (m.type === 'boxes') { S.detBusy = false; if (S.detMap && m.id === S.detMap.id) onBoxes(m.boxes, S.detMap); setTimeout(detPump, 0); }
+    };
+    w.onerror = () => { S.det = false; };
+    w.postMessage({ type: 'init', base: location.origin + '/ocr/v1/', size: DET });
+  } catch (e) { S.det = false; }
+}
+function detPump() {
+  if (!S.det || S.detBusy || !S.detWorker) return;
+  const v = document.getElementById('v');
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) { setTimeout(detPump, 100); return; }
+  const r = Math.min(DET / vw, DET / vh), nw = Math.round(vw * r), nh = Math.round(vh * r);
+  const dx = Math.round((DET - nw) / 2), dy = Math.round((DET - nh) / 2);
+  const c = document.getElementById('dc');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = 'rgb(114,114,114)'; ctx.fillRect(0, 0, DET, DET);
+  ctx.drawImage(v, 0, 0, vw, vh, dx, dy, nw, nh);
+  const buf = ctx.getImageData(0, 0, DET, DET).data.buffer;
+  S.detSeq = (S.detSeq || 0) + 1;
+  S.detMap = { id: S.detSeq, r, dx, dy, vw, vh };
+  S.detBusy = true;
+  S.detWorker.postMessage({ type: 'frame', id: S.detSeq, buf }, [buf]);
+}
+// самый уверенный и крупный номер в кадре
+function onBoxes(boxes, map) {
+  let best = null, bestRank = 0;
+  for (const bx of boxes) {
+    if (bx[4] < DET_MIN) continue;
+    const x1 = (bx[0] - map.dx) / map.r, y1 = (bx[1] - map.dy) / map.r;
+    const x2 = (bx[2] - map.dx) / map.r, y2 = (bx[3] - map.dy) / map.r;
+    const area = Math.max(0, x2 - x1) * Math.max(0, y2 - y1) / (map.vw * map.vh);
+    const rank = bx[4] + Math.min(area * 4, 0.15);
+    if (rank > bestRank && x2 - x1 >= 12 && y2 - y1 >= 5) { bestRank = rank; best = { x1, y1, x2, y2 }; }
+  }
+  if (best) { S.box = best; S.boxAt = Date.now(); }
+}
+// найденный номер с запасом вокруг → окно для модели чтения
+function boxWindow(b, pad) {
+  const v = document.getElementById('v');
+  const w = b.x2 - b.x1, h = b.y2 - b.y1;
+  const x = Math.max(0, b.x1 - w * pad[0]), y = Math.max(0, b.y1 - h * pad[1]);
+  return { x: x, y: y, w: Math.min(v.videoWidth, b.x2 + w * pad[0]) - x, h: Math.min(v.videoHeight, b.y2 + h * pad[1]) - y };
+}
+
 // за кадр — две рамки: «удачная» (где номер читался в прошлый раз) и
-// следующая по очереди; берём более уверенное прочтение
+// следующая по очереди; берём более уверенное прочтение. Если «искатель»
+// только что нашёл номер — читаем прямо его место (два варианта запаса).
 async function recognize() {
+  if (S.det && S.box && Date.now() - (S.boxAt || 0) < 900) {
+    S.tickN++;
+    let best = null, bestWin = null;
+    for (const pad of [[0.08, 0.2], [0.03, 0.1]]) {
+      const win = boxWindow(S.box, pad);
+      const r = win.w > 4 && win.h > 2 ? await readWindow(win) : null;
+      if (r && (!best || r.conf > best.conf)) { best = r; bestWin = win; }
+    }
+    if (bestWin) peek(bestWin);
+    return best;
+  }
+  if (S.det) return null;  // «искатель» работает, но номера в кадре нет
   const wins = searchWindows();
   if (!wins.length) return null;
   S.tickN++;
@@ -661,6 +763,7 @@ async function tick() {
   fillCameras();
   keepAwake();
   try { S.session = await modelP; } catch (e) { status(esc(T.scn_load_fail), true); return; }
+  startDetector();
   status(esc(T.scn_waiting));
   tick();
 })();
