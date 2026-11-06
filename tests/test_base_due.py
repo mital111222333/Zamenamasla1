@@ -67,3 +67,52 @@ def test_bot_reminder_once_a_day(sid):
     assert not db.bot_reminded_today(sid, car)
     db.log_call(sid, car, "bot")
     assert db.bot_reminded_today(sid, car)
+
+
+def _set_call_date(car, days_ago):
+    when = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
+    with sqlite3.connect(db.DB_PATH) as c:
+        c.execute("UPDATE call_log SET created_at=? WHERE id=(SELECT MAX(id) FROM call_log WHERE car_id=?)", (when, car))
+        c.commit()
+
+
+def test_no_answer_yesterday_goes_to_recall(sid):
+    car = _visit(sid, "01D900AA", oil_in=-1)
+    with sqlite3.connect(db.DB_PATH) as c:   # визит был давно, звонок — вчера
+        c.execute("UPDATE oil_changes SET change_date=? WHERE car_id=?",
+                  ((datetime.now() - timedelta(days=95)).strftime("%Y-%m-%d"), car))
+        c.commit()
+    db.log_call(sid, car, "no_answer")
+    assert car not in [e["car_id"] for e in db.base_due(sid)["groups"]["recall"]]   # сегодняшний — ещё нет
+    _set_call_date(car, 1)
+    assert car in [e["car_id"] for e in db.base_due(sid)["groups"]["recall"]]
+
+
+def test_booking_with_time_shows_in_tab_and_morning(sid):
+    car = _visit(sid, "01D901AA", oil_in=0)
+    today = datetime.now().strftime("%Y-%m-%d")
+    assert not db.log_call(sid, car, "booked", booked_for="завтра")      # кривая дата — нет
+    assert db.log_call(sid, car, "booked", booked_for=today + " 14:30")
+    booked = db.base_due(sid)["groups"]["booked"]
+    row = next(e for e in booked if e["car_id"] == car)
+    assert row["call"]["booked_for"] == today + " 14:30"
+    assert any(b["car_id"] == car and b["booked_for"].endswith("14:30") for b in db.bookings_on(sid, today))
+
+
+def test_long_absent_cars_in_lost(sid):
+    car = _visit(sid, "01D902AA", oil_in=-200)
+    with sqlite3.connect(db.DB_PATH) as c:
+        c.execute("UPDATE oil_changes SET change_date=? WHERE car_id=?",
+                  ((datetime.now() - timedelta(days=300)).strftime("%Y-%m-%d"), car))
+        c.commit()
+    lost = db.base_due(sid)["groups"]["lost"]
+    row = next(e for e in lost if e["car_id"] == car)
+    assert row["days_since"] >= 299 and row["kinds"] == []
+
+
+def test_calls_summary_for_evening(sid):
+    car = _visit(sid, "01D903AA", oil_in=0)
+    db.log_call(sid, car, "called")
+    db.log_call(sid, car, "refused")
+    s = db.calls_summary(sid, datetime.now().strftime("%Y-%m-%d"))
+    assert s["calls"] >= 2 and s["refused"] >= 1

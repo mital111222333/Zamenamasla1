@@ -2336,7 +2336,9 @@ def api_base_call():
     except (TypeError, ValueError):
         return jsonify({"ok": False, "error": "bad car"}), 400
     result = str(data.get("result") or "")
-    if result == "bot" or not db.log_call(g.shop_id, car_id, result, actor=session.get("username")):
+    booked_for = str(data.get("booked_for") or "").strip()[:16] or None   # «Записался» на YYYY-MM-DD HH:MM
+    if result == "bot" or not db.log_call(g.shop_id, car_id, result, actor=session.get("username"),
+                                          booked_for=booked_for):
         return jsonify({"ok": False, "error": "bad request"}), 400
     return jsonify({"ok": True})
 

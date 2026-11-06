@@ -835,7 +835,10 @@ if ('serviceWorker' in navigator) {
   .bd-res { display:flex; flex-wrap:wrap; gap:6px; }
   .bd-r { display:inline-flex; align-items:center; gap:5px; border:1px dashed var(--border); background:transparent; color:var(--hint); border-radius:999px; padding:5px 10px; font:inherit; font-size:12px; cursor:pointer; }
   .bd-r.on { border-style:solid; border-color:var(--blue); color:var(--blue); font-weight:700; }
-  @media (min-width: 900px) { .bd-row { grid-template-columns:minmax(0,1.3fr) auto; align-items:center; } .bd-res { grid-column:1 / -1; } }
+  .bd-book label { display:block; font-size:12.5px; color:var(--hint); margin-bottom:6px; }
+  .bd-book-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .bd-book-row input { width:auto; flex:1 1 140px; }
+  @media (min-width: 900px) { .bd-row { grid-template-columns:minmax(0,1.3fr) auto; align-items:center; } .bd-res, .bd-book { grid-column:1 / -1; } }
   .car-card .cc-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; gap:8px; }
   .car-card .cc-plate {
     font-family:var(--font-mono); font-weight:700; font-size:14.5px; letter-spacing:0.5px; color:var(--blue);
@@ -10767,14 +10770,14 @@ function phoneIntl(phone) {
 // готовым текстом, Telegram по номеру, напомнить в боте, отметить звонок.
 let BASE_DUE = null, BASE_TAB = null;
 const BASE_SHOP_NAME = {{ shop_name|tojson }};
-const BASE_GROUPS = ['today', 'tomorrow', 'week', 'month', 'overdue'];
+const BASE_GROUPS = ['recall', 'booked', 'today', 'tomorrow', 'week', 'month', 'overdue', 'lost'];
 async function loadBaseDue() {
   try {
     const r = await fetch('/api/base/due');
     const d = await r.json();
     if (!d.ok) return;
     BASE_DUE = d;
-    if (!BASE_TAB) BASE_TAB = BASE_GROUPS.find(k => d.counts[k]) || 'today';
+    if (!BASE_TAB) BASE_TAB = ['recall', 'today', 'booked', 'tomorrow', 'week', 'month', 'overdue'].find(k => d.counts[k]) || 'today';
     renderBaseDue();
   } catch (e) { /* «База» работает и без этого блока */ }
 }
@@ -10789,13 +10792,17 @@ function baseMsg(e) {
 }
 function baseDueRow(e) {
   const d = phoneIntl(e.owner_phone);
-  const due = e.kinds.map(k => `${k.kind === 'oil' ? T.base_oil : T.base_atf} · ${baseDay(k.due)}${k.km ? ' · ' + Number(k.km).toLocaleString('ru-RU') + ' ' + T.km_short : ''}`).join('<br>');
+  const due = e.kinds.length
+    ? e.kinds.map(k => `${k.kind === 'oil' ? T.base_oil : T.base_atf} · ${baseDay(k.due)}${k.km ? ' · ' + Number(k.km).toLocaleString('ru-RU') + ' ' + T.km_short : ''}`).join('<br>')
+    : T.base_lost_since.replace('{n}', e.days_since || 0);
   const late = e.days < 0 ? `<span class="bd-late">${T.base_days_over.replace('{n}', -e.days)}</span>` : '';
   const st = e.call ? e.call.result : (e.booked ? 'booked' : '');
-  const btn = (r, ic) => `<button type="button" class="bd-r${st === r ? ' on' : ''}" onclick="baseCall(${e.car_id}, '${r}')"><i class="fa-solid ${ic}"></i>${T['base_r_' + r]}</button>`;
+  const bf = e.call && e.call.result === 'booked' && e.call.booked_for
+    ? ` · ${baseDay(e.call.booked_for)}${e.call.booked_for.length > 10 ? ' ' + e.call.booked_for.slice(11, 16) : ''}` : '';
+  const btn = (r, ic) => `<button type="button" class="bd-r${st === r ? ' on' : ''}" onclick="${r === 'booked' ? `baseBookOpen(${e.car_id})` : `baseCall(${e.car_id}, '${r}')`}"><i class="fa-solid ${ic}"></i>${T['base_r_' + r]}</button>`;
   return `<div class="bd-row">
     <div class="bd-main" onclick="toggleHistory(${escapeHtml(JSON.stringify(e.plate))})">
-      <div class="bd-top"><span class="cc-plate">${escapeHtml(e.plate)}</span>${late}${st ? `<span class="bd-st st-${st}">${T['base_r_' + st]}</span>` : ''}</div>
+      <div class="bd-top"><span class="cc-plate">${escapeHtml(e.plate)}</span>${late}${st ? `<span class="bd-st st-${st}">${T['base_r_' + st]}${escapeHtml(bf)}</span>` : ''}${e.bot_at ? `<span class="bd-st st-bot"><i class="fa-solid fa-robot"></i> ${baseDay(e.bot_at)}</span>` : ''}</div>
       <div class="bd-name">${escapeHtml(e.owner_name || T.kc_no_name)}${e.car ? ' · ' + escapeHtml(e.car) : ''}</div>
       <div class="bd-due">${due}</div>
       <div class="bd-last">${T.base_last} ${baseDay(e.last_date)}${e.last_mileage ? ' · ' + Number(e.last_mileage).toLocaleString('ru-RU') + ' ' + T.km_short : ''}${e.oil_brand ? ' · ' + escapeHtml(e.oil_brand) : ''}</div>
@@ -10807,7 +10814,28 @@ function baseDueRow(e) {
       ${e.telegram ? `<button type="button" class="bd-b bot" onclick="baseRemind(${e.car_id}, this)"><i class="fa-solid fa-robot"></i>${T.base_bot}</button>` : ''}
     </div>
     <div class="bd-res">${btn('called', 'fa-check')}${btn('booked', 'fa-calendar-check')}${btn('no_answer', 'fa-phone-slash')}${btn('refused', 'fa-xmark')}</div>
+    <div class="bd-book" id="bdBook_${e.car_id}" hidden></div>
   </div>`;
+}
+// «Записался» — на какой день и время: по умолчанию день срока (не раньше сегодня), 10:00
+function baseBookOpen(carId) {
+  const box = document.getElementById('bdBook_' + carId);
+  if (!box) return;
+  if (!box.hidden) { box.hidden = true; return; }
+  const e = Object.values(BASE_DUE.groups).flat().find(x => x.car_id === carId) || {};
+  const today = dkToday();
+  const day = e.due && e.due > today ? e.due : today;
+  box.innerHTML = `<label>${T.base_book_when}</label>
+    <div class="bd-book-row"><input type="date" id="bdDate_${carId}" value="${day}" min="${today}">
+    <input type="time" id="bdTime_${carId}" value="10:00" step="900">
+    <button type="button" class="bd-b call" onclick="baseBookSave(${carId})"><i class="fa-solid fa-check"></i>${T.base_book_save}</button></div>`;
+  box.hidden = false;
+}
+function baseBookSave(carId) {
+  const d = (document.getElementById('bdDate_' + carId) || {}).value;
+  const t = (document.getElementById('bdTime_' + carId) || {}).value;
+  if (!d) return;
+  baseCall(carId, 'booked', d + (t ? ' ' + t : ''));
 }
 function renderBaseDue() {
   const box = document.getElementById('baseDue');
@@ -10816,13 +10844,13 @@ function renderBaseDue() {
   const rows = d.groups[BASE_TAB] || [];
   box.innerHTML = `<div class="bd-card">
     <div class="bd-head"><b><i class="fa-solid fa-phone-volume"></i> ${T.base_title_due}</b><span>${T.base_clients} ${d.clients} · ${T.base_cars} ${d.cars}</span></div>
-    <div class="bd-tabs">${BASE_GROUPS.map(k => `<button type="button" class="${k === BASE_TAB ? 'on' : ''}${k === 'overdue' ? ' warn' : ''}" onclick="setBaseTab('${k}')">${T['base_g_' + k]}<em>${d.counts[k] || 0}</em></button>`).join('')}</div>
+    <div class="bd-tabs">${BASE_GROUPS.filter(k => k !== 'recall' || d.counts.recall || BASE_TAB === 'recall').map(k => `<button type="button" class="${k === BASE_TAB ? 'on' : ''}${k === 'overdue' || k === 'recall' ? ' warn' : ''}" onclick="setBaseTab('${k}')">${T['base_g_' + k]}<em>${d.counts[k] || 0}</em></button>`).join('')}</div>
     <div class="bd-list">${rows.length ? rows.map(baseDueRow).join('') : `<div class="hint-text" style="padding:10px 2px;">${T.base_empty}</div>`}</div>
   </div>`;
 }
-async function baseCall(carId, result) {
+async function baseCall(carId, result, bookedFor) {
   try {
-    const r = await fetch('/api/base/call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ car_id: carId, result }) });
+    const r = await fetch('/api/base/call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ car_id: carId, result, booked_for: bookedFor || '' }) });
     const j = await r.json();
     if (!j.ok) { showMsg(T.msg_error + ' ' + (j.error || ''), false); return; }
     await loadBaseDue();

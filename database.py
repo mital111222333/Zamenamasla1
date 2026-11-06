@@ -9907,7 +9907,38 @@ def _migrate_calls(conn):
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_call_log_shop_car ON call_log(shop_id, car_id, id)")
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(call_log)").fetchall()}
+    if "booked_for" not in cols:
+        # «Записался» — на какой день и время (YYYY-MM-DD HH:MM)
+        conn.execute("ALTER TABLE call_log ADD COLUMN booked_for TEXT")
     conn.commit()
+
+
+BASE_LOST_DAYS = 180     # «Давно не были» — последний визит раньше, чем полгода назад
+
+
+def _base_entry(r: dict) -> dict:
+    return {
+        "car_id": r["car_id"], "oc_id": r["oc_id"], "plate": r["plate"],
+        "car": " ".join(x for x in (r["car_brand"], r["car_model"]) if x),
+        "owner_name": r["owner_name"], "owner_phone": r["owner_phone"],
+        "telegram": bool(r["telegram_id"]), "last_date": r["change_date"],
+        "last_mileage": r["mileage"], "oil_brand": r["oil_brand"],
+        "booked": r["status"] == "booked", "kinds": [], "due": None,
+    }
+
+
+def _latest_calls(conn, shop_id: int) -> dict:
+    """Последняя отметка обзвона по каждой машине (кроме «напомнили в боте» —
+    она не меняет результат звонка) и время последнего напоминания в боте."""
+    calls = {r["car_id"]: dict(r) for r in conn.execute("""
+        SELECT car_id, result, created_at, booked_for FROM call_log
+        WHERE id IN (SELECT MAX(id) FROM call_log WHERE shop_id=? AND result != 'bot' GROUP BY car_id)
+    """, (shop_id,)).fetchall()}
+    for r in conn.execute("""SELECT car_id, MAX(created_at) AS at FROM call_log
+                             WHERE shop_id=? AND result='bot' GROUP BY car_id""", (shop_id,)).fetchall():
+        calls.setdefault(r["car_id"], {"result": None, "created_at": "", "booked_for": None})["bot_at"] = r["at"]
+    return calls
 
 
 def base_due(shop_id: int, today=None) -> dict:
@@ -9934,42 +9965,85 @@ def base_due(shop_id: int, today=None) -> dict:
                            "AND COALESCE(oc.atf_reminder_count, 0) < ? "
                            "AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id)",
                            (shop_id, lo, hi, MAX_FOLLOWUP_REMINDERS)).fetchall()
-        calls = {r["car_id"]: dict(r) for r in conn.execute("""
-            SELECT car_id, result, created_at FROM call_log
-            WHERE id IN (SELECT MAX(id) FROM call_log WHERE shop_id=? GROUP BY car_id)
-        """, (shop_id,)).fetchall()}
+        calls = _latest_calls(conn, shop_id)
         totals = conn.execute("""SELECT COUNT(*) AS cars, COUNT(DISTINCT client_id) AS clients
                                  FROM cars WHERE shop_id=?""", (shop_id,)).fetchone()
+        # давно не были: последний визит машины старше полугода
+        lost = conn.execute(base_sql + " AND oc.change_date <= ? "
+                            "AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id) "
+                            "ORDER BY oc.change_date DESC LIMIT 200",
+                            (shop_id, (today - timedelta(days=BASE_LOST_DAYS)).strftime("%Y-%m-%d"))).fetchall()
     cars = {}
     for kind, rows in (("oil", oil), ("atf", atf)):
         for r in rows:
             r = dict(r)
             due = r["next_change_date"] if kind == "oil" else r["atf_next_date"]
             km = r["next_mileage"] if kind == "oil" else r["atf_next_mileage"]
-            e = cars.get(r["car_id"])
-            if not e:
-                e = cars[r["car_id"]] = {
-                    "car_id": r["car_id"], "oc_id": r["oc_id"], "plate": r["plate"],
-                    "car": " ".join(x for x in (r["car_brand"], r["car_model"]) if x),
-                    "owner_name": r["owner_name"], "owner_phone": r["owner_phone"],
-                    "telegram": bool(r["telegram_id"]), "last_date": r["change_date"],
-                    "last_mileage": r["mileage"], "oil_brand": r["oil_brand"],
-                    "booked": r["status"] == "booked", "kinds": [], "due": due,
-                }
+            e = cars.setdefault(r["car_id"], _base_entry(r))
             e["kinds"].append({"kind": kind, "due": due, "km": km})
-            e["due"] = min(e["due"], due)
-    groups = {"overdue": [], "today": [], "tomorrow": [], "week": [], "month": []}
-    for e in sorted(cars.values(), key=lambda x: (x["due"], x["plate"])):
+            e["due"] = min(e["due"] or due, due)
+
+    def with_call(e):
         call = calls.get(e["car_id"])
         # отметка звонка — только из этого цикла (после последнего визита)
-        e["call"] = call if call and call["created_at"][:10] >= (e["last_date"] or "") else None
+        e["call"] = call if call and call.get("result") and call["created_at"][:10] >= (e["last_date"] or "") else None
+        e["bot_at"] = call.get("bot_at") if call and (call.get("bot_at") or "")[:10] >= (e["last_date"] or "") else None
+        return e
+
+    tstr = today.strftime("%Y-%m-%d")
+    groups = {"recall": [], "booked": [], "overdue": [], "today": [], "tomorrow": [], "week": [], "month": [], "lost": []}
+    for e in sorted(cars.values(), key=lambda x: (x["due"], x["plate"])):
+        with_call(e)
         days = (datetime.strptime(e["due"], "%Y-%m-%d").date() - today).days
         e["days"] = days
         key = "overdue" if days < 0 else "today" if days == 0 else "tomorrow" if days == 1 \
             else "week" if days <= 7 else "month"
         groups[key].append(e)
+    for r in lost:
+        if r["car_id"] in cars:
+            continue
+        e = with_call(_base_entry(dict(r)))
+        e["days_since"] = (today - datetime.strptime(e["last_date"], "%Y-%m-%d").date()).days
+        groups["lost"].append(e)
+    everyone = [e for k in ("overdue", "today", "tomorrow", "week", "month", "lost") for e in groups[k]]
+    # «Не берёт» с прошлых дней — перезвонить; «Записался» на сегодня и позже
+    groups["recall"] = [e for e in everyone if e["call"] and e["call"]["result"] == "no_answer"
+                        and e["call"]["created_at"][:10] < tstr]
+    groups["booked"] = sorted([e for e in everyone if e["call"] and e["call"]["result"] == "booked"
+                               and (e["call"].get("booked_for") or tstr)[:10] >= tstr],
+                              key=lambda e: e["call"].get("booked_for") or "9999")
     return {"groups": groups, "counts": {k: len(v) for k, v in groups.items()},
             "cars": totals["cars"] or 0, "clients": totals["clients"] or 0}
+
+
+def bookings_on(shop_id: int, day: str) -> list:
+    """Кто записан на этот день (по отметке «Записался» с датой) и ещё не
+    приезжал после записи — для утренней сводки."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT cl2.car_id, cl2.booked_for, c.plate_number AS plate, k.full_name AS owner_name
+            FROM call_log cl2 JOIN cars c ON c.id = cl2.car_id LEFT JOIN clients k ON k.id = c.client_id
+            WHERE cl2.shop_id=? AND cl2.result='booked' AND substr(cl2.booked_for, 1, 10)=?
+              AND cl2.id = (SELECT MAX(x.id) FROM call_log x WHERE x.car_id = cl2.car_id AND x.result != 'bot')
+              AND NOT EXISTS (SELECT 1 FROM oil_changes oc WHERE oc.car_id = cl2.car_id
+                              AND oc.change_date >= substr(cl2.created_at, 1, 10)
+                              AND oc.id > COALESCE(cl2.oil_change_id, 0))
+            ORDER BY cl2.booked_for
+        """, (shop_id, day)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def calls_summary(shop_id: int, day: str) -> dict:
+    """Обзвон за день: сколько звонков и с каким результатом (для вечерней сводки)."""
+    with get_conn() as conn:
+        rows = conn.execute("""SELECT result, COUNT(*) AS n FROM call_log
+                               WHERE shop_id=? AND substr(created_at, 1, 10)=? GROUP BY result""",
+                            (shop_id, day)).fetchall()
+    out = {r: 0 for r in CALL_RESULTS}
+    for r in rows:
+        out[r["result"]] = r["n"]
+    out["calls"] = sum(out[r] for r in ("called", "booked", "no_answer", "refused"))
+    return out
 
 
 def car_of_shop(shop_id: int, car_id: int):
@@ -9982,12 +10056,24 @@ def car_of_shop(shop_id: int, car_id: int):
 
 
 @_serialized
-def log_call(shop_id: int, car_id: int, result: str, actor: str = None, oil_change_id: int = None) -> bool:
+def log_call(shop_id: int, car_id: int, result: str, actor: str = None, oil_change_id: int = None,
+             booked_for: str = None) -> bool:
     if result not in CALL_RESULTS or not car_of_shop(shop_id, car_id):
         return False
+    if booked_for:
+        try:
+            fmt = "%Y-%m-%d %H:%M" if len(booked_for) > 10 else "%Y-%m-%d"
+            booked_for = datetime.strptime(booked_for[:16], fmt).strftime(fmt)
+        except ValueError:
+            return False
+    if not oil_change_id:
+        # к какому визиту относится отметка — чтобы потом понять, приехал ли клиент
+        last = get_last_service(car_id)
+        oil_change_id = last["id"] if last else None
     with get_conn() as conn:
-        conn.execute("INSERT INTO call_log (shop_id, car_id, oil_change_id, result, actor, created_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?)", (shop_id, car_id, oil_change_id, result, actor, _now_str()))
+        conn.execute("INSERT INTO call_log (shop_id, car_id, oil_change_id, result, actor, created_at, booked_for) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (shop_id, car_id, oil_change_id, result, actor, _now_str(), booked_for if result == "booked" else None))
         conn.commit()
     return True
 

@@ -32,6 +32,9 @@ TEXT = {
         "eve_staff_item": "{name} — {count}",
         "eve_expenses": "Расходы за день: {sum} сум",
         "eve_repaid": "Погасили долгов: {sum} сум",
+        "eve_calls": "📞 Обзвон: звонков {n} · записались {booked} · не взяли {no} · отказались {refused}",
+        "m_booked": "📅 Сегодня записаны: {n} {cars}",
+        "t_no_calls": "Сегодня {n} {cars} ждали замену, а звонков не было. Откройте «База» → «Сегодня» — там кнопки «Позвонить» и WhatsApp.",
         "tips_title": "💡 Советы:",
         "morning_title": "☀️ Доброе утро! {shop} · {wd}, {date}",
         "m_yesterday": "Вчера: замен {count}, выручка {revenue} сум",
@@ -99,6 +102,9 @@ TEXT = {
         "eve_staff_item": "{name} — {count}",
         "eve_expenses": "Kunlik xarajatlar: {sum} so'm",
         "eve_repaid": "Qarz to'landi: {sum} so'm",
+        "eve_calls": "📞 Qo'ng'iroqlar: {n} ta · yozildi {booked} · javob bermadi {no} · rad etdi {refused}",
+        "m_booked": "📅 Bugun yozilganlar: {n} {cars}",
+        "t_no_calls": "Bugun {n} {cars} almashtirishni kutgan edi, lekin qo'ng'iroq qilinmadi. «Baza» → «Bugun»ni oching — u yerda «Qo'ng'iroq» va WhatsApp tugmalari bor.",
         "tips_title": "💡 Maslahatlar:",
         "morning_title": "☀️ Xayrli tong! {shop} · {wd}, {date}",
         "m_yesterday": "Kecha: {count} ta almashtirish, {revenue} so'm",
@@ -193,6 +199,7 @@ def collect_evening(shop: dict, day: date) -> dict:
         "rates_week": db.digest_item_rates(sid, _ymd(day - timedelta(days=6)), d),
         "rates_month": db.digest_item_rates(sid, _ymd(day - timedelta(days=29)), d),
         "wh": db.get_warehouse_overview(sid) if shop.get("warehouse_enabled") else None,
+        "calls": db.calls_summary(sid, d),
     }
 
 
@@ -207,6 +214,7 @@ def collect_morning(shop: dict, day: date) -> dict:
         "due_late": db.digest_due(sid, _ymd(day - timedelta(days=7)), _ymd(day - timedelta(days=1)), limit=50),
         "debts": db.digest_debts(sid, d),
         "wh": db.get_warehouse_overview(sid) if shop.get("warehouse_enabled") else None,
+        "bookings": db.bookings_on(sid, d),
     }
 
 
@@ -218,6 +226,9 @@ def evening_tips(f: dict, lang: str) -> list:
     if not t["count"] and f["due_today"]:
         n = len(f["due_today"])
         tips.append(T["t_no_changes_due"].format(n=n, cars=_plural(lang, n, T["cars"])))
+    elif f["due_today"] and not (f.get("calls") or {}).get("calls"):
+        n = len(f["due_today"])
+        tips.append(T["t_no_calls"].format(n=n, cars=_plural(lang, n, T["cars"])))
     pct = _pct(t["revenue"], prev["revenue"])
     if pct is not None and pct <= -20 and t["count"]:
         tips.append(T["t_drop"].format(pct=-pct, wd=wd))
@@ -275,6 +286,10 @@ def render_evening(shop: dict, f: dict, lang: str) -> str:
         if f["staff"] and (len(f["staff"]) > 1 or f["staff"][0]["name"]):
             items = [T["eve_staff_item"].format(name=s["name"] or T["owner"], count=s["count"]) for s in f["staff"]]
             lines.append(T["eve_staff"].format(list=", ".join(items)))
+    cs = f.get("calls") or {}
+    if cs.get("calls"):
+        lines.append(T["eve_calls"].format(n=cs["calls"], booked=cs.get("booked", 0),
+                                           no=cs.get("no_answer", 0), refused=cs.get("refused", 0)))
     if t["repaid"]:
         lines.append(T["eve_repaid"].format(sum=money(t["repaid"])))
     if t["expenses"]:
@@ -308,6 +323,13 @@ def render_morning(shop: dict, f: dict, lang: str) -> str:
         if n > DUE_SHOW:
             lines.append(T["m_due_more"].format(n=n - DUE_SHOW))
 
+    if f.get("bookings"):
+        b = f["bookings"]
+        lines.extend(["", T["m_booked"].format(n=len(b), cars=_plural(lang, len(b), T["cars"]))])
+        for r in b[:10]:
+            tm = (r.get("booked_for") or "")[11:16]
+            lines.append(f"• {r['plate']}" + (f" — {tm}" if tm else "")
+                         + (f" · {r['owner_name']}" if r.get("owner_name") else ""))
     due_block("m_due", f["due_today"])
     due_block("m_due_late", f["due_late"])
 
