@@ -572,15 +572,24 @@ if ('serviceWorker' in navigator) {
   /* фильтры и работы — плитки-галочки */
   /* ---- «Товары и работа»: плитки категорий + чек ---- */
   .af-legacy { display:none !important; }
-  .cat-tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+  .cat-tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+  /* пробег и срок напоминания внутри окна «Моторное масло» / «АКПП» */
+  #cs_extra:empty { display:none; }
+  #cs_extra { margin-bottom:12px; }
+  #cs_extra .af-sec { background:none; border:0; box-shadow:none; padding:0; margin:0; }
+  #cs_extra .af-h { margin-bottom:8px; }
   @media (min-width:700px) { .cat-tiles { grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); } }
-  .cat-tile { display:flex; align-items:center; gap:9px; min-height:54px; text-align:left; border:1.5px solid var(--border); background:#fff; border-radius:14px; padding:7px 9px; font:inherit; color:var(--text); cursor:pointer; min-width:0; }
+  .cat-tile { display:flex; flex-direction:row; align-items:center; gap:10px; min-height:72px; text-align:left; border:1.5px solid var(--border); background:#fff; border-radius:16px; padding:10px 11px; font:inherit; color:var(--text); cursor:pointer; min-width:0; transition:border-color .12s, transform .08s; }
+  @media (min-width: 640px) { .cat-tile { flex-direction:column; align-items:flex-start; min-height:104px; padding:12px 12px 11px; } }
+  .cat-tile:hover { border-color:var(--blue); }
   .cat-tile:active { transform:scale(.98); }
-  .cat-tile .ci { width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex:none; font-size:16px; background:#EFF6FF; color:var(--blue); }
+  .cat-tile .ci { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex:none; font-size:19px; background:#EFF6FF; color:var(--blue); }
   .cat-tile .ci.g { background:#ECFDF5; color:#047857; } .cat-tile .ci.v { background:#F5F3FF; color:#6D28D9; } .cat-tile .ci.y { background:#FFFBEB; color:#B45309; }
-  .cat-tile div { min-width:0; display:flex; flex-direction:column; }
-  .cat-tile b { font-size:13.5px; font-weight:700; line-height:1.2; }
-  .cat-tile small { font-size:11.5px; color:var(--hint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .cat-tile div { min-width:0; width:100%; display:flex; flex-direction:column; }
+  .cat-tile b { font-size:15px; font-weight:700; line-height:1.25; }
+  .cat-tile small { font-size:12.5px; color:var(--hint); line-height:1.35; margin-top:3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  @media (min-width: 640px) { .cat-tiles { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+  @media (min-width: 1500px) { .cat-tiles { grid-template-columns:repeat(4, minmax(0,1fr)); } }
   .cat-tile.on { border-color:var(--blue); background:#F5F9FF; }
   .cat-tile.on small { color:var(--blue); font-weight:600; }
   .it-rcpt { margin-top:14px; background:#FAFBFC; border:1px solid #E2E8F0; border-radius:16px; padding:12px 14px; position:relative; }
@@ -783,13 +792,6 @@ if ('serviceWorker' in navigator) {
     .af-owner { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:12px; }
     .af-owner > * { grid-column:1 / -1; }
     .af-owner > .field:nth-child(1), .af-owner > .field:nth-child(2) { grid-column:auto; }
-    .af-mil { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr); gap:0 14px; align-items:end; }
-    .af-mil > * { grid-column:1 / -1; }
-    .af-mil > .mil-grid { grid-column:1; grid-row:2; }
-    .af-mil > .mil-daily { grid-column:2; grid-row:2; }
-    .af-mil > .mil-int { grid-column:3; grid-row:2; }
-    .af-mil > .mil-daily .mil-l, .af-mil > .mil-int .mil-l { margin-top:0 !important; }
-    .af-mil > #kmChips { margin-top:10px; }
   }
   .known-client .kc-lv-item {
     display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--text);
@@ -1728,7 +1730,7 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
 
-    <div class="af-sec af-mil">
+    <div class="af-sec af-mil" id="afMil">
       <div class="af-h"><i class="fa-solid fa-gauge-high"></i>{{ T.af_mileage }}</div>
       <div class="mil-grid">
         <div>
@@ -1759,6 +1761,30 @@ if ('serviceWorker' in navigator) {
       </div>
       <div id="dkSuggest"></div>
       <div id="dkHint" class="dk-hint"></div>
+    </div>
+
+    <!-- Пробег и срок напоминания живут внутри окон «Моторное масло» и «АКПП»:
+         блоки переносятся туда при открытии окна и возвращаются сюда (скрыто) -->
+    <div id="csHold" hidden>
+      <div class="af-sec af-atf" id="afAtf">
+        <div class="af-h"><i class="fa-solid fa-gears"></i>{{ T.atf_block_title }}</div>
+        <div class="mil-grid">
+          <div>
+            <div class="mil-l">{{ T.mil_now }}</div>
+            <div class="mil-f"><input id="atf_cur" type="number" inputmode="numeric" placeholder="45000" oninput="atfCurInput()"><span>{{ T.km_short }}</span></div>
+          </div>
+          <div class="mil-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+          <div>
+            <div class="mil-l">{{ T.atf_next_label }}</div>
+            <div class="mil-f accent"><input id="atf_next_mileage" type="number" inputmode="numeric" placeholder="85000" oninput="ATF.manual = true"><span>{{ T.km_short }}</span></div>
+          </div>
+        </div>
+        <div class="mil-l" style="margin-top:12px;">{{ T.atf_interval_label }}</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="atf_interval" type="number" inputmode="numeric" min="1" max="60" value="6" style="flex:1;">
+          <span>{{ T.unit_months }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="af-sec af-items">
@@ -1881,6 +1907,7 @@ if ('serviceWorker' in navigator) {
     <div class="ob-sheet-h"><b id="cs_title"></b><button type="button" class="ob-sheet-x" onclick="closeObSheets()" aria-label="{{ T.close }}">✕</button></div>
     <div class="ob-sheet-body">
       <div class="cs-tabs" id="cs_tabs"></div>
+      <div id="cs_extra"></div>
       <input id="cs_search" class="ps-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="renderCatSheet()">
       <div id="cs_body"></div>
     </div>
@@ -8140,6 +8167,7 @@ function renderCatSheet() {
   const c = CATS.find(x => x.id === CS.cat);
   if (!c) return;
   const key = CS.key;
+  csPlaceExtras(key);
   const tabs = document.getElementById('cs_tabs');
   tabs.innerHTML = c.keys.length > 1 ? c.keys.map(k => `<button type="button" class="${k === key ? 'on' : ''}${rowHasValue(k) ? ' has' : ''}" onclick="csSetKey('${k}')">${escapeHtml(T[k])}</button>`).join('') : '';
   const searchEl = document.getElementById('cs_search');
@@ -8432,8 +8460,38 @@ function closeObSheets() {
   const pay = document.querySelector('#rcPayHost .af-pay');
   const bar = document.querySelector('#view-add .af-bar');
   if (pay && bar) bar.parentNode.insertBefore(pay, bar);
+  if (typeof csPlaceExtras === 'function') csPlaceExtras(null);
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.querySelector('.ob-sheet.open')) closeObSheets(); });
+
+// Пробег и срок напоминания — внутри окна «Моторное масло» (весь блок «Пробег»
+// с +5/+8 тыс. и пробегом в день) и окна «АКПП» (свои срок и пробег). Блоки
+// переносятся в окно и обратно в скрытое хранилище формы: поля, их id и вся
+// прежняя логика остаются теми же. Текущий пробег у машины один на визит.
+var ATF = { manual: false, KM: 40000 };  // var: resetItemInputs может сработать раньше этой строки
+function atfSync() {
+  const mil = document.getElementById('mileage');
+  const cur = document.getElementById('atf_cur'), next = document.getElementById('atf_next_mileage');
+  const m = parseInt(mil.value);
+  if (cur && document.activeElement !== cur) cur.value = mil.value;
+  if (next && !ATF.manual) next.value = m > 0 ? m + ATF.KM : '';
+}
+function atfCurInput() {
+  const mil = document.getElementById('mileage');
+  mil.value = document.getElementById('atf_cur').value;
+  mil.dispatchEvent(new Event('input', { bubbles: true }));
+  atfSync();
+}
+function csPlaceExtras(key) {
+  const box = document.getElementById('cs_extra'), hold = document.getElementById('csHold');
+  if (!box || !hold) return;
+  const mil = document.getElementById('afMil'), atf = document.getElementById('afAtf');
+  const want = key === 'fluid_0' ? mil : (key === 'fluid_1' ? atf : null);
+  [mil, atf].forEach(el => { if (el && el !== want && el.parentNode !== hold) hold.appendChild(el); });
+  if (want && want.parentNode !== box) box.appendChild(want);
+  if (want === atf) atfSync();
+}
+csPlaceExtras(null);
 
 function brandFieldIdFor(key) {
   const fi = FLUID_KEYS.indexOf(key), ti = FILTER_KEYS.indexOf(key);
@@ -9385,6 +9443,10 @@ function resetItemInputs() {
     const fq = document.getElementById(`filter_qty_${i}`);
     if (fq) fq.value = '';
   });
+  ['atf_cur', 'atf_next_mileage'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const atfInt = document.getElementById('atf_interval');
+  if (atfInt) atfInt.value = 6;
+  if (window.ATF) ATF.manual = false;
   document.getElementById('other_name').value = '';
   document.getElementById('other_price').value = '';
   document.getElementById('knownClientPanel').innerHTML = '';
@@ -9693,7 +9755,10 @@ let ADD_DRAFT_READY = false;
 function addDraftFields() {
   const view = document.getElementById('view-add');
   if (!view) return [];
-  return Array.from(view.querySelectorAll('input[id], select[id], textarea[id]')).filter(el =>
+  // блоки пробега, пока открыто окно масла/АКПП, лежат вне формы
+  const extra = ['afMil', 'afAtf'].map(id => document.getElementById(id)).filter(b => b && !view.contains(b));
+  return Array.from(view.querySelectorAll('input[id], select[id], textarea[id]'))
+    .concat(...extra.map(b => Array.from(b.querySelectorAll('input[id], select[id]')))).filter(el =>
     el.type !== 'file' && el.type !== 'hidden' && el.type !== 'button' && !ADD_DRAFT_SKIP.includes(el.id)
     && !/_stock_(product|price|qty)_/.test(el.id) && !/^pick/.test(el.id) && !/^cs_/.test(el.id));
 }
@@ -9814,6 +9879,11 @@ async function submitCar() {
     discount_pct: discountPct(),
     master_id: (document.getElementById('master_id') || {}).value || '',
   };
+  if (items.some(i => i.key === 'fluid_1')) {
+    // масло АКПП — своё напоминание: через сколько месяцев и на каком пробеге
+    payload.atf_interval = document.getElementById('atf_interval').value || '6';
+    payload.atf_next_mileage = document.getElementById('atf_next_mileage').value || '';
+  }
   if (DISC.mode === 'sum' && (DISC.value || 0) > itemsSubtotal(items) && itemsSubtotal(items) > 0) {
     showMsg(T.disc_too_big, false);
     return;
