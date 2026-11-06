@@ -12,8 +12,9 @@ import digest
 @pytest.fixture(scope="module")
 def shop():
     db.init_db()
+    # своя точка: другие тесты пишут замены «сегодня» в общую тестовую точку
+    sid = db.create_shop("digest_test_shop", "secret123", shop_name="Test Oil")["id"]
     with sqlite3.connect(db.DB_PATH) as c:
-        sid = c.execute("SELECT id FROM shops WHERE role='shop' ORDER BY id LIMIT 1").fetchone()[0]
         c.execute("UPDATE shops SET notify_telegram_id='111', shop_name='Test Oil', paid_until=NULL, "
                   "license_type='sub', trial=0 WHERE id=?", (sid,))
         c.commit()
