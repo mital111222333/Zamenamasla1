@@ -3113,7 +3113,7 @@ UZ.update({
     "scn_camera": "Kamera",
     "scn_seeing": "Ko'ryapman:",
     "scn_peek": "Model nimani ko'radi",
-    "scn_nothing": "Ramkada raqam o'qilmayapti — raqamni zichroq o'rang yoki kamerani yaqinroq olib keling",
+    "scn_nothing": "Kadrda raqam topilmadi — mashina raqami to'liq ko'rinadigan qilib turishi kerak",
     "myshop_display_title": "Kirishdagi tablo",
     "myshop_display_hint": "Nuqtaga mashina kelganda televizor salomlashuvni ko'rsatadi. Raqamni kirishdagi telefon yoki veb-kamera aniqlaydi — qimmat kamera kerak emas.",
     "myshop_display_tv": "Smart TV uchun — televizor brauzerida oching:",

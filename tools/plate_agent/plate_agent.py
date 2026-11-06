@@ -22,6 +22,9 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
 MODEL_PATH = os.path.join(HERE, "plate_ocr_uz.onnx")
+DET_PATH = os.path.join(HERE, "plate_det_s256.onnx")   # «искатель» номера во всём кадре
+DET = 256
+DET_MIN = 0.4
 
 # --- распознавание: то же, что в сканере в браузере (webapp.py, plateDecode) ---
 ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
@@ -181,17 +184,55 @@ def save_config(cfg):
 
 # --- модель распознавания: скачиваем один раз с сайта точки ---
 def ensure_model(server):
-    if os.path.exists(MODEL_PATH) and os.path.getsize(MODEL_PATH) > 100_000:
-        return
+    """Две модели, как у сканера в панели: «искатель» находит номер во всём
+    кадре, вторая читает найденный номер."""
     import requests
-    log("Скачиваю модель распознавания…")
-    r = requests.get(server + "/ocr/v1/plate_ocr_uz.onnx", timeout=120)
-    r.raise_for_status()
-    tmp = MODEL_PATH + ".part"
-    with open(tmp, "wb") as f:
-        f.write(r.content)
-    os.replace(tmp, MODEL_PATH)
-    log(f"Модель скачана ({len(r.content) // 1024} КБ)")
+    for path in (MODEL_PATH, DET_PATH):
+        if os.path.exists(path) and os.path.getsize(path) > 100_000:
+            continue
+        name = os.path.basename(path)
+        log(f"Скачиваю модель {name}… / {name} modeli yuklanmoqda…")
+        r = requests.get(server + "/ocr/v1/" + name, timeout=180)
+        r.raise_for_status()
+        tmp = path + ".part"
+        with open(tmp, "wb") as f:
+            f.write(r.content)
+        os.replace(tmp, path)
+        log(f"Готово ({len(r.content) // 1024} КБ) / Tayyor")
+
+
+def detect_plate(det, frame):
+    """«Искатель»: весь кадр вписан в квадрат 256×256 с серыми полями →
+    самый уверенный и крупный номер в пикселях кадра (x1, y1, x2, y2) или None."""
+    import cv2
+    import numpy as np
+    h, w = frame.shape[:2]
+    r = min(DET / w, DET / h)
+    nw, nh = int(round(w * r)), int(round(h * r))
+    dx, dy = (DET - nw) // 2, (DET - nh) // 2
+    canvas = np.full((DET, DET, 3), 114, dtype=np.uint8)
+    canvas[dy:dy + nh, dx:dx + nw] = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    x = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB).astype(np.float32).transpose(2, 0, 1)[None] / 255.0
+    rows = det.run(None, {det.get_inputs()[0].name: x})[0].reshape(-1, 7)
+    best, best_rank = None, 0.0
+    for row in rows:
+        score = float(row[6])
+        if score < DET_MIN:
+            continue
+        x1, y1 = (row[1] - dx) / r, (row[2] - dy) / r
+        x2, y2 = (row[3] - dx) / r, (row[4] - dy) / r
+        if x2 - x1 < 12 or y2 - y1 < 5:
+            continue
+        rank = score + min((x2 - x1) * (y2 - y1) / (w * h) * 4, 0.15)
+        if rank > best_rank:
+            best, best_rank = (x1, y1, x2, y2), rank
+    return best
+
+
+def box_window(box, pad):
+    x1, y1, x2, y2 = box
+    bw, bh = x2 - x1, y2 - y1
+    return (x1 - bw * pad[0], y1 - bh * pad[1], bw * (1 + 2 * pad[0]), bh * (1 + 2 * pad[1]))
 
 
 # --- камера: отдельный поток всегда держит самый свежий кадр ---
@@ -263,60 +304,54 @@ def setup():
     import cv2
     cfg = load_config() or {}
     print()
-    print("=== Настройка камеры для табло OilBook ===")
-    print("1) Откройте панель OilBook → «Моя точка» → «Табло у входа»")
-    print("   и скопируйте ссылку «Для телефона у въезда».")
+    print("=== Настройка камеры для табло OilBook / OilBook tablosi uchun kamerani sozlash ===")
+    print("1) Панель OilBook → «Моя точка» → «Табло у входа»: скопируйте ссылку для телефона (/scanner/…).")
+    print("   OilBook paneli → «Mening nuqtam» → «Kirishdagi tablo»: telefon uchun havolani (/scanner/…) nusxalang.")
     while True:
-        link = ask("Вставьте эту ссылку")
+        link = ask("Вставьте ссылку / Havolani joylang")
         server, token = parse_scanner_link(link)
         if server:
             break
-        print("   Ссылка должна выглядеть так: https://ваш-сайт/scanner/AbC123… — попробуйте ещё раз.")
+        print("   Нужна ссылка вида / Havola shunday bo'lishi kerak: https://oilbook.uz/scanner/AbC123…")
 
     print()
-    print("2) Какая камера?  1 — Hikvision   2 — Dahua   3 — другая (вставлю RTSP-адрес)")
-    kind = ask("Номер варианта", "1")
+    print("2) Какая камера? / Qaysi kamera?   1 — Hikvision   2 — Dahua   3 — другая / boshqa (RTSP)")
+    kind = ask("Номер варианта / Variant raqami", "1")
     if kind in ("1", "2"):
-        ip = ask("IP-адрес камеры (например 192.168.1.64)")
-        user = ask("Логин камеры", "admin")
-        password = ask("Пароль камеры")
+        ip = ask("IP камеры / Kamera IP manzili (192.168.1.64)")
+        user = ask("Логин / Login", "admin")
+        password = ask("Пароль / Parol")
         url = hikvision_rtsp(ip, user, password) if kind == "1" else dahua_rtsp(ip, user, password)
     else:
-        url = ask("RTSP-адрес камеры (rtsp://…)")
+        url = ask("RTSP-адрес / RTSP manzil (rtsp://…)")
 
     print()
-    log("Подключаюсь к камере, это может занять до 20 секунд…")
+    log("Подключаюсь к камере (до 20 с)… / Kameraga ulanmoqda (20 soniyagacha)…")
     frame = grab_one_frame(url)
     if frame is None:
-        print("Не удалось получить кадр с камеры. Проверьте IP, логин, пароль и что компьютер")
-        print("в той же сети, что и камера. Затем запустите setup.bat ещё раз.")
+        print("Не удалось получить кадр с камеры. Проверьте IP, логин, пароль и что компьютер в той же сети.")
+        print("Kameradan kadr olib bo'lmadi. IP, login, parolni va kompyuter shu tarmoqdaligini tekshiring.")
         sys.exit(1)
 
-    print()
-    print("3) Сейчас откроется кадр с камеры. Поставьте машину на место остановки,")
-    print("   обведите мышкой её НОМЕР (плотно, по краям таблички) и нажмите ENTER.")
-    print("   Если машины сейчас нет — обведите место, где обычно оказывается номер.")
-    input("   Нажмите ENTER, чтобы открыть кадр… ")
-    h, w = frame.shape[:2]
-    scale = min(1.0, 1280 / w, 720 / h)
-    view = cv2.resize(frame, (int(w * scale), int(h * scale))) if scale < 1 else frame
-    title = "Draw a box around the plate, then press ENTER"
-    x, y, bw, bh = cv2.selectROI(title, view, showCrosshair=True, fromCenter=False)
-    cv2.destroyAllWindows()
-    if bw < 10 or bh < 5:
-        print("Зона не выбрана. Запустите setup.bat ещё раз.")
-        sys.exit(1)
-    zone = [x / view.shape[1], y / view.shape[0], bw / view.shape[1], bh / view.shape[0]]
-    plate_px = int(bw / scale)
-    if plate_px < 120:
-        print(f"Внимание: номер на кадре всего ~{plate_px} пикселей в ширину — может читаться плохо.")
-        print("Лучше поставить камеру ближе или выбрать основной поток высокого качества.")
-
-    cfg.update({"server": server, "token": token, "rtsp": url, "zone": zone})
+    # рамку больше не рисуем: номер в кадре находит «искатель» сам
+    cfg.update({"server": server, "token": token, "rtsp": url})
+    cfg.pop("zone", None)
     save_config(cfg)
     ensure_model(server)
+    import onnxruntime as ort
+    det = ort.InferenceSession(DET_PATH, providers=["CPUExecutionProvider"])
+    box = detect_plate(det, frame)
     print()
-    print("Готово! Настройки сохранены в config.json. Теперь запустите start.bat.")
+    if box:
+        plate_px = int(box[2] - box[0])
+        print(f"Номер на кадре найден автоматически (~{plate_px} пикс.). / Raqam avtomatik topildi (~{plate_px} piksel).")
+        if plate_px < 120:
+            print("Номер мелкий — лучше поставить камеру ближе. / Raqam kichik — kamerani yaqinroq qo'ying.")
+    else:
+        print("Сейчас номера в кадре нет — это нормально, если машины нет. Рамку рисовать не нужно, номер найдётся сам.")
+        print("Hozir kadrda raqam yo'q — mashina bo'lmasa, bu normal. Ramka chizish shart emas, raqam o'zi topiladi.")
+    print()
+    print("Готово! Теперь запустите start.bat. / Tayyor! Endi start.bat ni ishga tushiring.")
 
 
 # --- работа ---
@@ -366,17 +401,25 @@ def send_plate(cfg, plate):
 
 def run():
     cfg = load_config()
-    if not cfg or not all(cfg.get(k) for k in ("server", "token", "rtsp", "zone")):
-        print("Сначала настройка: запустите setup.bat")
+    if not cfg or not all(cfg.get(k) for k in ("server", "token", "rtsp")):
+        print("Сначала настройка: запустите setup.bat / Avval sozlash: setup.bat ni ishga tushiring")
         sys.exit(1)
     import onnxruntime as ort
     ensure_model(cfg["server"])
     sess = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
     inp, out = sess.get_inputs()[0].name, sess.get_outputs()[0].name
+    det = None
+    try:
+        det = ort.InferenceSession(DET_PATH, providers=["CPUExecutionProvider"])
+    except Exception as e:
+        log(f"«Искатель» номера не загрузился ({e}) — работаю по зоне из настройки")
+        if not cfg.get("zone"):
+            print("Запустите setup.bat ещё раз. / setup.bat ni qayta ishga tushiring.")
+            sys.exit(1)
 
     reader = FrameReader(cfg["rtsp"])
     reader.start()
-    log("Жду машину… (закройте окно, чтобы остановить)")
+    log("Жду машину… / Mashina kutilmoqda… (закройте окно, чтобы остановить)")
     hits, last_hit, last_sent, last_no, tick = {}, 0.0, {}, 0, 0
     lock_idx, lock_miss = 0, 0
     while True:
@@ -386,14 +429,25 @@ def run():
             continue
         last_no = no
         tick += 1
-        wins = search_windows(frame.shape[1], frame.shape[0], cfg["zone"])
-        # за кадр — «удачная» рамка и следующая по очереди; берём лучшее прочтение
-        lock = lock_idx if lock_idx < len(wins) else 0
-        rot = tick % len(wins)
-        if rot == lock:
-            rot = (rot + 1) % len(wins)
-        plate, conf, best_idx = None, 0.0, lock
-        for idx in (lock, rot):
+        plate, conf, best_idx = None, 0.0, 0
+        if det is not None:
+            # «искатель» находит номер во всём кадре — читаем его место
+            # (два варианта запаса вокруг), как сканер в панели
+            box = detect_plate(det, frame)
+            if box is None:
+                time.sleep(FRAME_PAUSE)
+                continue
+            wins = [box_window(box, (0.08, 0.2)), box_window(box, (0.03, 0.1))]
+            candidates = (0, 1)
+        else:
+            wins = search_windows(frame.shape[1], frame.shape[0], cfg["zone"])
+            # за кадр — «удачная» рамка и следующая по очереди; берём лучшее прочтение
+            lock = lock_idx if lock_idx < len(wins) else 0
+            rot = tick % len(wins)
+            if rot == lock:
+                rot = (rot + 1) % len(wins)
+            candidates, best_idx = (lock, rot), lock
+        for idx in candidates:
             tensor = crop_tensor(frame, wins[idx])
             if tensor is None:
                 continue
@@ -421,9 +475,9 @@ def run():
                 try:
                     send_plate(cfg, plate)
                     last_sent[plate] = now
-                    log(f"На табло: {pretty(plate)}  ({round(conf * 100)}%)")
+                    log(f"На табло / Tabloda: {pretty(plate)}  ({round(conf * 100)}%)")
                 except Exception as e:
-                    log(f"Не удалось отправить номер ({e}) — проверьте интернет")
+                    log(f"Не удалось отправить номер ({e}) — проверьте интернет / Internetni tekshiring")
         time.sleep(FRAME_PAUSE)
 
 
