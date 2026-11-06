@@ -651,6 +651,7 @@ if ('serviceWorker' in navigator) {
   .disc-sum { margin-top:10px; padding:10px 12px; background:var(--field-bg); border-radius:12px; font-size:13px; }
   .disc-sum div { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
   .disc-sum .d-minus { color:#B3241C; font-weight:700; }
+  .disc-sum .d-plus { color:#047857; font-weight:700; }
   .disc-sum .d-pay { font-size:16px; font-weight:800; padding-top:6px; margin-top:4px; border-top:1px dashed var(--border); }
   .disc-sum .d-pay b, .disc-sum b { font-family:var(--font-mono); }
   .disc-chip { border:1.5px solid var(--border); background:#fff; border-radius:10px; padding:0 12px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
@@ -1843,6 +1844,14 @@ if ('serviceWorker' in navigator) {
         </div>
       </div>
       <div id="discSummary" class="disc-sum" style="display:none;"></div>
+      <div class="af-h" style="margin-top:14px;"><i class="fa-solid fa-arrow-trend-up"></i>{{ T.markup_title }}</div>
+      <div class="disc-seg" id="mkSeg">
+        <button type="button" data-p="0" class="on" onclick="setMarkup(0)">0%</button>
+        <button type="button" data-p="5" onclick="setMarkup(5)">+5%</button>
+        <button type="button" data-p="10" onclick="setMarkup(10)">+10%</button>
+        <button type="button" data-p="s" onclick="setMarkupSum()">{{ T.markup_sum }}</button>
+      </div>
+      <div id="mkSummary" class="disc-sum" style="display:none;"></div>
       <div class="af-h" style="margin-top:16px;"><i class="fa-solid fa-wallet"></i>{{ T.af_payment }}</div>
       <div class="pay-seg" id="paySeg">
         <button type="button" data-m="cash" class="on" onclick="setPayMode('cash')"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</button>
@@ -6679,6 +6688,8 @@ function renderNetProfitHtml(np) {
     </div>
     ${(np.discounts || 0) > 0 ? `
     <div style="margin-top:10px; font-size:12px; color:var(--hint); text-align:center;"><i class="fa-solid fa-tag"></i> ${T.np_discounts_1} <b>−${(np.discounts).toLocaleString('ru-RU')} ${T.currency}</b> ${T.np_discounts_2}</div>` : ''}
+    ${(np.markups || 0) > 0 ? `
+    <div style="margin-top:6px; font-size:12px; color:var(--hint); text-align:center;"><i class="fa-solid fa-arrow-trend-up"></i> ${T.np_markups_1} <b style="color:#15803D;">+${(np.markups).toLocaleString('ru-RU')} ${T.currency}</b> ${T.np_markups_2}</div>` : ''}
     ${unpriced > 0 ? `
     <div style="margin-top:12px; padding:10px 12px; background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px; font-size:12.5px; color:#92400E;">
       ⚠️ ${T.np_unpriced_1} <b>${unpriced.toLocaleString('ru-RU')} ${T.currency}</b> ${T.np_unpriced_2}
@@ -7346,7 +7357,7 @@ async function applyStatsRange() {
     ${renderStatCard({ label: `${T.stats_range_result} ${from} — ${to}`, d: data, profit: hasProfit ? data.profit : null, profitUsd: hasProfit ? data.profit_usd : null })}
     ${hasProfit ? `
     <div class="stats-card" style="margin-top:10px; background:linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color:#86EFAC;">
-      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, discounts: data.discounts || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit, net_profit_usd: data.net_profit_usd })}
+      ${renderNetProfitHtml({ oil_profit: data.goods_profit || 0, services: data.services || 0, unpriced: data.unpriced || 0, discounts: data.discounts || 0, markups: data.markups || 0, expenses_total: data.expenses || 0, net_profit: data.net_profit, net_profit_usd: data.net_profit_usd })}
     </div>
     ` : ''}
     <div class="stats-card" style="margin-top:10px;">
@@ -8811,7 +8822,7 @@ function collectItems() {
     items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
   items.push(...collectOtherStockItems('other'));
-  return items;
+  return applyMarkup(items);
 }
 
 let paymentSplitTouched = false;
@@ -8841,6 +8852,7 @@ function payTotal(items) {
   return sub - discountFor(sub);
 }
 function syncDiscUi() {
+  if (typeof syncMarkupUi === 'function') syncMarkupUi();
   document.querySelectorAll('#discSeg button').forEach(b => {
     const p = b.dataset.p;
     b.classList.toggle('on', DISC.custom ? p === 'c' : (DISC.mode === 'pct' && String(DISC.pct) === p));
@@ -8872,11 +8884,13 @@ function discChanged() {
 }
 function setDiscount(p) {
   DISC = { mode: 'pct', pct: p, custom: false, value: 0 };
+  if (p > 0) MARKUP = { pct: 0, sum: 0 };
   const v = document.getElementById('disc_value'); if (v) v.value = '';
   discChanged();
 }
 function setDiscountCustom() {
   DISC.custom = true;
+  MARKUP = { pct: 0, sum: 0 };
   if (DISC.mode === 'pct') { DISC.value = DISC.pct || 0; }
   const v = document.getElementById('disc_value');
   if (v) { v.value = DISC.mode === 'sum' ? (DISC.value || '') : (DISC.pct || ''); setTimeout(() => v.focus(), 50); }
@@ -8896,9 +8910,62 @@ function onDiscInput() {
 }
 function resetDiscount() {
   DISC = { mode: 'pct', pct: 0, custom: false, value: 0 };
+  MARKUP = { pct: 0, sum: 0 };
   const v = document.getElementById('disc_value'); if (v) v.value = '';
   syncDiscUi();
   renderDiscSummary(0);
+}
+
+// Наценка на весь чек: +5% / +10% / своя сумма. Поднимает цены позиций
+// пропорционально — как если бы мастер сам поставил цену выше, поэтому сумма,
+// прибыль, касса и долг считаются как обычно, а склад списывает то же
+// количество. Обычная цена остаётся в позиции (list_price) — по ней
+// «Статистика» показывает, сколько заработано наценкой. Со скидкой не совмещается.
+var MARKUP = { pct: 0, sum: 0 };
+function markupActive() { return MARKUP.pct > 0 || MARKUP.sum > 0; }
+function applyMarkup(items) {
+  items.forEach(it => { if (it.list_price == null) it.list_price = it.unit_price; });
+  if (!markupActive()) return items;
+  const priced = items.filter(it => it.total > 0);
+  const sub = priced.reduce((s, it) => s + it.total, 0);
+  if (!(sub > 0)) return items;
+  const add = MARKUP.sum > 0 ? Math.round(MARKUP.sum) : Math.round(sub * MARKUP.pct / 100 / 1000) * 1000;
+  let left = add;
+  priced.forEach((it, idx) => {
+    const share = idx === priced.length - 1 ? left : Math.round(add * it.total / sub);
+    left -= share;
+    it.total += share;
+    it.unit_price = it.qty ? Math.round(it.total / it.qty * 100) / 100 : it.total;
+  });
+  return items;
+}
+function markupAmount(items) {
+  return (items || collectItems()).reduce((s, it) =>
+    s + Math.max(0, Math.round(it.total - (it.list_price || 0) * (it.qty || 1))), 0);
+}
+function syncMarkupUi() {
+  document.querySelectorAll('#mkSeg button').forEach(b => {
+    const p = b.dataset.p;
+    b.classList.toggle('on', p === 's' ? MARKUP.sum > 0 : (!MARKUP.sum && String(MARKUP.pct) === p));
+  });
+  const el = document.getElementById('mkSummary');
+  if (!el) return;
+  const m = markupActive() ? markupAmount() : 0;
+  el.style.display = m ? 'block' : 'none';
+  el.innerHTML = m ? `<div class="d-plus"><span>${T.markup_title}</span><b>+${Math.round(m).toLocaleString('ru-RU')} ${T.currency}</b></div>` : '';
+}
+function setMarkup(p) {
+  MARKUP = { pct: p, sum: 0 };
+  if (p > 0) { DISC = { mode: 'pct', pct: 0, custom: false, value: 0 }; const v = document.getElementById('disc_value'); if (v) v.value = ''; }
+  discChanged();
+}
+function setMarkupSum() {
+  const raw = prompt(T.markup_prompt, MARKUP.sum || '');
+  if (raw === null) return;
+  const v = parseInt(String(raw).replace(/\\D/g, '')) || 0;
+  MARKUP = { pct: 0, sum: Math.max(0, v) };
+  if (v > 0) { DISC = { mode: 'pct', pct: 0, custom: false, value: 0 }; const d = document.getElementById('disc_value'); if (d) d.value = ''; }
+  discChanged();
 }
 
 // Чек справа (на компьютере): те же позиции, что уйдут в запись

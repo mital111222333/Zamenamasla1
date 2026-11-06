@@ -874,7 +874,9 @@ def normalize_plate(plate: str) -> str:
 
 
 _ITEM_STR_LIMITS = {"key": 40, "name": 120, "brand": 80, "unit": 20}
-_ITEM_NUM_LIMITS = {"qty": 100000, "unit_price": 10 ** 10, "total": 10 ** 12}
+# list_price — обычная цена позиции (для товара со склада сервер ставит её сам
+# по цене продажи на складе); разница с unit_price — наценка в «Статистике»
+_ITEM_NUM_LIMITS = {"qty": 100000, "unit_price": 10 ** 10, "total": 10 ** 12, "list_price": 10 ** 10}
 
 
 def sanitize_items(items):
@@ -2219,6 +2221,9 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
                 if product:
                     # цена закупки — всегда со склада на момент продажи, не из запроса
                     item["cost_price"] = product.get("purchase_price")
+                    # обычная цена — со склада; продали дороже — это наценка
+                    if product.get("sell_price"):
+                        item["list_price"] = product["sell_price"]
                     stock_moves.append((pid, item.get("qty") or 0))
                 else:
                     item["product_id"] = None  # товар не принадлежит этой точке — не связываем со складом
@@ -2365,6 +2370,11 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
                 product = get_product(pid, shop_id, active_only=pid not in old_pids)
                 if product:
                     item["cost_price"] = old_cost[pid] if pid in old_cost else product.get("purchase_price")
+                    # обычная цена — та, что была при продаже (или текущая на складе)
+                    old_list = next((o.get("list_price") for o in old_items
+                                     if o.get("product_id") == pid and o.get("list_price") is not None), None)
+                    if old_list is not None or product.get("sell_price"):
+                        item["list_price"] = old_list if old_list is not None else product["sell_price"]
                     new_moves.append(item)
                 else:
                     item["product_id"] = None
@@ -3251,6 +3261,7 @@ def get_net_profit_30d(shop_id: int) -> dict:
         "services": br["services"],
         "unpriced": br["unpriced"],
         "discounts": br["discounts"],
+        "markups": br["markups"],
         "expenses_total": expenses["total"],
         "net_profit": br["profit"] - expenses["total"],
         "net_profit_usd": usd["net_usd"],
@@ -3719,7 +3730,7 @@ def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchall()
-    goods = services = unpriced = discounts = disc_profit = 0
+    goods = services = unpriced = discounts = disc_profit = markups = 0
     for row in rows:
         items = None
         if row["items_json"]:
@@ -3730,6 +3741,10 @@ def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
         if not items:
             unpriced += row["cost"] or 0
             continue
+        # наценка — сколько продали дороже обычной цены (list_price): она уже
+        # внутри цены продажи и прибыли, здесь только показываем её отдельно
+        markups += sum(max(0, (i.get("total") or 0) - i["list_price"] * (i.get("qty") or 1))
+                       for i in items if isinstance(i, dict) and i.get("list_price") is not None)
         r_goods, r_services, r_unpriced, r_disc = _row_profit_parts(items, row["discount"])
         goods += r_goods
         services += r_services - r_disc
@@ -3741,7 +3756,7 @@ def get_profit_breakdown(shop_id: int, date_from: str, date_to: str) -> dict:
     # посчитанные продажи); discounts — сколько всего скидок дали за период
     return {"goods_profit": goods, "services": services, "unpriced": unpriced,
             "profit": goods + services,
-            "discounts": round(discounts), "discount_profit": disc_profit}
+            "discounts": round(discounts), "discount_profit": disc_profit, "markups": round(markups)}
 
 
 def _compute_profit_for_range(shop_id: int, date_from: str, date_to: str) -> int:
@@ -4080,7 +4095,8 @@ def get_network_overview(shop_ids) -> dict:
             sum(c[p]["previous"] for c in cmp_parts), sum(c[p]["paid_previous"] for c in cmp_parts))
     profit = {p: sum(x[p] for x in prof) for p in periods}
 
-    net = {"oil_profit": 0, "services": 0, "unpriced": 0, "discounts": 0, "expenses_total": 0, "net_profit": 0}
+    net = {"oil_profit": 0, "services": 0, "unpriced": 0, "discounts": 0, "markups": 0, "expenses_total": 0,
+           "net_profit": 0}
     net_usd = []
     for sid in shop_ids:
         n = get_net_profit_30d(sid)

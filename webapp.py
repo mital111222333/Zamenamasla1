@@ -3195,6 +3195,7 @@ def api_stats_range():
         result["services"] = pb["services"]
         result["unpriced"] = pb["unpriced"]
         result["discounts"] = pb["discounts"]
+        result["markups"] = pb["markups"]
         result["expenses"] = expenses
         result["net_profit"] = pb["profit"] - expenses
         usd = db.profit_usd_range(g.shop_id, date_from, date_to)
