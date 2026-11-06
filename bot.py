@@ -305,8 +305,10 @@ async def shop_info_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reminder_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    action, oil_change_id = query.data.split(":")
-    oil_change_id = int(oil_change_id)
+    # changed:<id>[:o|a|oa] — о чём было напоминание (у старых кнопок — моторное масло)
+    parts = query.data.split(":")
+    action, oil_change_id = parts[0], int(parts[1])
+    kinds = parts[2] if len(parts) > 2 and parts[2] in ("o", "a", "oa") else "o"
 
     ctx = db.get_oil_change_with_context(oil_change_id)
     lang = (ctx.get("language") if ctx else None) or "ru"
@@ -315,11 +317,15 @@ async def reminder_button_callback(update: Update, context: ContextTypes.DEFAULT
     if not ctx or str(ctx.get("client_telegram_id") or "") != str(query.from_user.id):
         return
 
+    if action in ("changed", "book") and "a" in kinds:
+        db.close_atf_reminder(oil_change_id)  # моторное масло это не трогает
     if action == "changed":
-        db.mark_already_changed_elsewhere(oil_change_id)
+        if "o" in kinds:
+            db.mark_already_changed_elsewhere(oil_change_id)
         await query.edit_message_text(i18n.t("bot_thanks_changed", lang))
     elif action == "book":
-        db.mark_booked(oil_change_id)
+        if "o" in kinds:
+            db.mark_booked(oil_change_id)
         shop_name_for_msg = ctx["shop_name"] if ctx else SHOP_NAME
         await query.edit_message_text(i18n.t("bot_booked_confirm", lang, shop=shop_name_for_msg))
         if ctx and ctx.get("notify_telegram_id"):
@@ -701,34 +707,47 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     sms_creds = {}  # пароль Eskiz хранится зашифрованным — расшифровываем один раз на точку
     for item in due:
         await asyncio.sleep(0.05)  # не упираться в лимиты Telegram
-        is_followup = item["reminder_count"] > 0
+        due_oil, due_atf = item.get("due_oil", True), item.get("due_atf", False)
+        # о чём напоминаем: моторное масло, масло АКПП или оба — одним сообщением
+        kinds = ("o" if due_oil else "") + ("a" if due_atf else "")
+        is_followup = (item["reminder_count"] > 0) if due_oil else ((item.get("atf_reminder_count") or 0) > 0)
         lang = item.get("language") or "ru"
         shop_name = item.get('shop_name') or SHOP_NAME
+        what = i18n.t({"o": "rem_what_oil", "a": "rem_what_atf", "oa": "rem_what_both"}[kinds], lang)
+
+        def mark(item=item, due_oil=due_oil, due_atf=due_atf):
+            db.mark_reminder_sent(item["id"], oil=due_oil, atf=due_atf)
 
         if item.get("telegram_id"):
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}"),
-                    InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}"),
+                    InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}:{kinds}"),
+                    InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}:{kinds}"),
                 ]
             ])
-            if is_followup:
+            if kinds != "o":
+                key = "bot_reminder_any_followup" if is_followup else "bot_reminder_any_first"
+                text = i18n.t(key, lang, plate=item['plate_number'], what=what, shop=shop_name)
+            elif is_followup:
                 text = i18n.t("bot_reminder_followup", lang, plate=item['plate_number'], shop=shop_name)
             else:
                 service = item.get('service_type') or i18n.t("history_service_fallback", lang)
                 text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
             try:
                 await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
-                db.mark_reminder_sent(item["id"])
+                mark()
             except Forbidden:
                 # клиент остановил бота — отмечаем, иначе попытка повторялась каждый час
-                db.mark_reminder_sent(item["id"])
+                mark()
             except Exception as e:
                 logger.error(f"Не удалось отправить напоминание {item['id']}: {e}")
 
         elif item.get("sms_enabled") and item.get("owner_phone"):
-            key = "sms_reminder_followup" if is_followup else "sms_reminder_first"
-            text = i18n.t(key, lang, plate=item['plate_number'], shop=shop_name)
+            if kinds != "o":
+                text = i18n.t("sms_reminder_any", lang, plate=item['plate_number'], what=what, shop=shop_name)
+            else:
+                key = "sms_reminder_followup" if is_followup else "sms_reminder_first"
+                text = i18n.t(key, lang, plate=item['plate_number'], shop=shop_name)
             if item["shop_id"] not in sms_creds:
                 sms_creds[item["shop_id"]] = db.get_shop_eskiz_credentials(item["shop_id"])
             eskiz_email, eskiz_password = sms_creds[item["shop_id"]]
@@ -738,7 +757,7 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
                 sms.send_sms, item["shop_id"], eskiz_email, eskiz_password, item["owner_phone"], text
             )
             if ok:
-                db.mark_reminder_sent(item["id"])
+                mark()
             else:
                 logger.warning(f"Не удалось отправить SMS-напоминание {item['id']}: {err}")
         # иначе — ни Telegram, ни SMS недоступны для этого клиента, пропускаем

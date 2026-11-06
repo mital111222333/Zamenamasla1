@@ -2597,7 +2597,13 @@ def api_add():
         # проверяем позиции ДО того, как создадим клиента/машину — иначе при
         # ошибке в позициях остались бы пустые записи
         items = db.sanitize_items(data.get("items") or [])
-        interval_value = int(data["interval_value"])
+        # срок моторного масла (если его в этом визите нет — сервер сохранит
+        # прежнее напоминание) и масла АКПП — у каждого свой
+        interval_value = int(data.get("interval_value") or 0)
+        atf = None
+        if data.get("atf_interval") not in (None, "") or data.get("atf_next_mileage") not in (None, ""):
+            atf = {"interval_value": max(1, min(60, int(data.get("atf_interval") or db.ATF_DEFAULT_MONTHS))),
+                   "next_mileage": int(data["atf_next_mileage"]) if data.get("atf_next_mileage") not in (None, "") else None}
         interval_unit = data.get("interval_unit") or "months"
         if interval_unit not in ("days", "months"):
             interval_unit = "months"
@@ -2654,7 +2660,7 @@ def api_add():
                 car_id, mileage, None, None, False, None, interval_value, interval_unit, notes,
                 next_mileage=next_mileage, items=items, cash_amount=cash_amount, card_amount=card_amount,
                 allow_debt=debt_amount > 0, discount=discount, discount_pct=discount_pct,
-                employee_id=g.employee_id, master_id=_master_arg(data.get("master_id"))
+                employee_id=g.employee_id, master_id=_master_arg(data.get("master_id")), atf=atf
             )
             _saved_rec = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
             saved_discount = _saved_rec.get("discount_amount") or 0

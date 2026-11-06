@@ -70,6 +70,11 @@ def _decrypt_password(token: str):
 
 MAX_FOLLOWUP_REMINDERS = 6
 FOLLOWUP_INTERVAL_DAYS = 14
+# масло АКПП/КПП: срок следующей замены по умолчанию (мастер может поменять)
+ATF_DEFAULT_MONTHS = 6
+ATF_DEFAULT_KM = 40000
+ATF_FIELDS = ("atf_next_date", "atf_next_mileage", "atf_interval_months", "atf_reminder_count",
+              "atf_last_reminder_date")
 
 # Аккаунт-бутстрап при самом первом запуске (создаётся один раз, если таблица
 # shops ещё пуста) — чтобы не потерять уже работавшую точку при обновлении.
@@ -601,6 +606,14 @@ def _migrate(conn):
         # если скидку давали процентом (иначе NULL — «своя сумма»)
         "discount_amount": "INTEGER DEFAULT 0",
         "discount_pct": "REAL",
+        # своё напоминание о масле АКПП/КПП (fluid_1): дата и пробег следующей
+        # замены, счётчик напоминаний. Хранится в последней записи машины, как
+        # и напоминание о моторном масле (next_change_date / next_mileage)
+        "atf_next_date": "TEXT",
+        "atf_next_mileage": "INTEGER",
+        "atf_interval_months": "INTEGER",
+        "atf_reminder_count": "INTEGER DEFAULT 0",
+        "atf_last_reminder_date": "TEXT",
     }
     for col, ddl in to_add.items():
         if col not in cols:
@@ -2164,8 +2177,13 @@ def normalize_discount(subtotal, discount, discount_pct=None):
 def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filter_changed: bool,
                     cost, interval_value: int, interval_unit: str = "months", notes: str = "",
                     next_mileage=None, items=None, cash_amount=None, card_amount=None,
-                    allow_debt=False, discount=0, discount_pct=None, employee_id=None, master_id=None):
-    """master_id — кто из сотрудников ДЕЛАЛ замену (для зарплаты и рейтинга);
+                    allow_debt=False, discount=0, discount_pct=None, employee_id=None, master_id=None,
+                    atf=None):
+    """atf — напоминание о масле АКПП, если оно в этом визите:
+    {"interval_value": месяцев, "next_mileage": км}. Напоминания хранятся в
+    последней записи машины: если в визите нет моторного масла (или масла
+    АКПП), его напоминание переносится с прошлой записи, а не пропадает.
+    master_id — кто из сотрудников ДЕЛАЛ замену (для зарплаты и рейтинга);
     если не указан — тот, кто внёс (employee_id).
     employee_id — кто из сотрудников внёс запись (None — владелец/бот):
     наличные этой записи попадают в «кассу» сотрудника до сдачи владельцу.
@@ -2239,16 +2257,44 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
                 if pid and any(pid == m[0] for m in stock_moves):
                     item["store_qty"] = _sale_take(conn, pid, item.get("qty") or 0)
             items_json = json.dumps(items, ensure_ascii=False)
+        keys = {i.get("key") for i in items} if items else {"fluid_0"}  # без позиций (бот) — замена масла
+        prev = conn.execute("SELECT * FROM oil_changes WHERE car_id=? ORDER BY id DESC LIMIT 1",
+                            (car_id,)).fetchone()
+        prev = dict(prev) if prev else {}
+        rem_count, rem_last = 0, None
+        if "fluid_0" not in keys:
+            # моторное масло не меняли — его напоминание остаётся прежним
+            # (если оно ещё действовало, а не закрыто «уже поменял»/«записался»)
+            live = prev.get("status") == "active"
+            next_date = prev.get("next_change_date") if live else None
+            next_mileage = prev.get("next_mileage") if live else None
+            interval_value = prev.get("interval_months") if live else None
+            interval_unit = (prev.get("interval_unit") if live else None) or interval_unit
+            rem_count, rem_last = (prev.get("reminder_count") or 0, prev.get("last_reminder_date")) if live else (0, None)
+        if "fluid_1" in keys:
+            months = int((atf or {}).get("interval_value") or ATF_DEFAULT_MONTHS)
+            atf_row = {
+                "atf_next_date": (datetime.now() + relativedelta(months=months)).strftime("%Y-%m-%d"),
+                "atf_next_mileage": (atf or {}).get("next_mileage")
+                or (int(mileage) + ATF_DEFAULT_KM if str(mileage or "").isdigit() else None),
+                "atf_interval_months": months, "atf_reminder_count": 0, "atf_last_reminder_date": None,
+            }
+        else:
+            atf_row = {k: prev.get(k) for k in ATF_FIELDS}
+            atf_row["atf_reminder_count"] = atf_row["atf_reminder_count"] or 0
         conn.execute("UPDATE oil_changes SET status='done' WHERE car_id=? AND status='active'", (car_id,))
         cur = conn.execute("""
             INSERT INTO oil_changes
                 (car_id, change_date, mileage, service_type, oil_brand, filter_changed, cost,
                  cash_amount, card_amount, interval_months, interval_unit, next_change_date,
-                 next_mileage, items_json, notes, status, discount_amount, discount_pct, employee_id, master_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+                 next_mileage, items_json, notes, status, discount_amount, discount_pct, employee_id, master_id,
+                 reminder_count, last_reminder_date, atf_next_date, atf_next_mileage, atf_interval_months,
+                 atf_reminder_count, atf_last_reminder_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (car_id, change_date, mileage, service_type, oil_brand, int(bool(filter_changed)), cost,
               cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes,
-              discount, discount_pct, employee_id, master_id))
+              discount, discount_pct, employee_id, master_id, rem_count, rem_last,
+              *[atf_row[k] for k in ATF_FIELDS]))
         conn.commit()
         return cur.lastrowid, next_date
 
@@ -3219,8 +3265,7 @@ def get_due_reminders():
     решает вызывающий код в боте."""
     today = datetime.now().strftime("%Y-%m-%d")
     followup_cutoff = (datetime.now() - timedelta(days=FOLLOWUP_INTERVAL_DAYS)).strftime("%Y-%m-%d")
-    with get_conn() as conn:
-        rows = conn.execute("""
+    base = """
             SELECT oc.*, c.plate_number, c.shop_id, cl.full_name as owner_name, cl.telegram_id,
                    cl.phone as owner_phone, s.shop_name, s.notify_telegram_id, s.language,
                    s.sms_enabled, s.eskiz_email, s.eskiz_password
@@ -3228,23 +3273,52 @@ def get_due_reminders():
             JOIN cars c ON c.id = oc.car_id
             JOIN clients cl ON cl.id = c.client_id
             JOIN shops s ON s.id = c.shop_id
+    """
+    with get_conn() as conn:
+        oil = conn.execute(base + """
             WHERE oc.status='active' AND oc.next_change_date IS NOT NULL AND (
                 (oc.reminder_count = 0 AND oc.next_change_date <= ?)
                 OR
                 (oc.reminder_count > 0 AND oc.reminder_count < ? AND oc.last_reminder_date <= ?)
             )
         """, (today, MAX_FOLLOWUP_REMINDERS, followup_cutoff)).fetchall()
-        return [dict(r) for r in rows]
+        # масло АКПП — по последней записи машины, каким бы ни был её статус
+        # («уже поменял»/«записался» по моторному маслу его не отменяют)
+        atf = conn.execute(base + """
+            WHERE oc.atf_next_date IS NOT NULL
+              AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id)
+              AND ((COALESCE(oc.atf_reminder_count, 0) = 0 AND oc.atf_next_date <= ?)
+                   OR (oc.atf_reminder_count > 0 AND oc.atf_reminder_count < ? AND oc.atf_last_reminder_date <= ?))
+        """, (today, MAX_FOLLOWUP_REMINDERS, followup_cutoff)).fetchall()
+    out = {}
+    for r in oil:
+        out[r["id"]] = dict(r, due_oil=True, due_atf=False)
+    for r in atf:
+        out.setdefault(r["id"], dict(r, due_oil=False))["due_atf"] = True
+    return list(out.values())
 
 
 @_serialized
-def mark_reminder_sent(oil_change_id: int):
+def mark_reminder_sent(oil_change_id: int, oil: bool = True, atf: bool = False):
+    """Напоминание отправлено: счётчик того, о чём напомнили (масло и/или АКПП)."""
     today = datetime.now().strftime("%Y-%m-%d")
     with get_conn() as conn:
-        conn.execute(
-            "UPDATE oil_changes SET reminder_count = reminder_count + 1, last_reminder_date=? WHERE id=?",
-            (today, oil_change_id)
-        )
+        if oil:
+            conn.execute("UPDATE oil_changes SET reminder_count = reminder_count + 1, last_reminder_date=? "
+                         "WHERE id=?", (today, oil_change_id))
+        if atf:
+            conn.execute("UPDATE oil_changes SET atf_reminder_count = COALESCE(atf_reminder_count, 0) + 1, "
+                         "atf_last_reminder_date=? WHERE id=?", (today, oil_change_id))
+        conn.commit()
+
+
+@_serialized
+def close_atf_reminder(oil_change_id: int):
+    """Клиент ответил на напоминание об АКПП («уже поменял» или «записался») —
+    больше о нём не напоминаем; моторное масло не трогаем."""
+    with get_conn() as conn:
+        conn.execute("UPDATE oil_changes SET atf_reminder_count=? WHERE id=?",
+                     (MAX_FOLLOWUP_REMINDERS, oil_change_id))
         conn.commit()
 
 
