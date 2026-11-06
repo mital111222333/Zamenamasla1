@@ -651,7 +651,10 @@ if ('serviceWorker' in navigator) {
   .disc-sum { margin-top:10px; padding:10px 12px; background:var(--field-bg); border-radius:12px; font-size:13px; }
   .disc-sum div { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
   .disc-sum .d-minus { color:#B3241C; font-weight:700; }
-  .disc-sum .d-plus { color:#047857; font-weight:700; }
+  /* сумма позиции в чеке — нажимается, чтобы вписать свою цену */
+  .rc-sum { border:0; background:none; padding:2px 0; font:inherit; font-family:var(--font-mono); font-size:15px; font-weight:600; color:inherit; cursor:pointer; white-space:nowrap; border-bottom:1px dashed var(--hint); text-align:right; }
+  .rc-sum:hover { color:var(--blue); border-bottom-color:var(--blue); }
+  .rc-up { display:block; font-size:11px; font-weight:700; color:#16A34A; border:0; }
   .disc-sum .d-pay { font-size:16px; font-weight:800; padding-top:6px; margin-top:4px; border-top:1px dashed var(--border); }
   .disc-sum .d-pay b, .disc-sum b { font-family:var(--font-mono); }
   .disc-chip { border:1.5px solid var(--border); background:#fff; border-radius:10px; padding:0 12px; font:inherit; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
@@ -762,12 +765,17 @@ if ('serviceWorker' in navigator) {
     .af-title { grid-column:1 / -1; }
     .af-keys { display:inline; margin-left:auto; font-family:var(--font-body); font-style:normal; text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:500; color:var(--hint); }
     .af-main, .af-side { display:block; min-width:0; }
-    .af-side { position:sticky; top:14px; display:flex; flex-direction:column; gap:12px; }
+    /* колонка чека не выше экрана: длинный список товаров и блок оплаты
+       прокручиваются внутри, а «Итого» и «Сохранить» всегда видны внизу */
+    .af-side { position:sticky; top:14px; display:flex; flex-direction:column; gap:12px; max-height:calc(100vh - 84px); }
+    .af-side .af-rcpt { flex:0 1 auto; min-height:150px; display:flex; flex-direction:column; overflow:hidden; }
+    .af-side .af-pay { flex:0 3 auto; min-height:120px; overflow-y:auto; }
+    .af-side .af-bar { flex:none; }
     .af-side .af-sec { margin-bottom:0; }
     .af-rcpt { display:block; background:#fff; border:1px solid #E2E8F0; border-radius:18px; padding:16px 18px; box-shadow:0 4px 14px -6px rgba(15,82,186,.10); }
     .af-rcpt-h { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; font-size:15px; font-weight:800; color:#0F172A; }
     .af-rcpt-h b { font-family:var(--font-mono); font-size:14px; font-weight:600; letter-spacing:.06em; color:#475569; }
-    #rcptLines { max-height:calc(100vh - 470px); min-height:60px; overflow-y:auto; }
+    #rcptLines { flex:1 1 auto; min-height:60px; overflow-y:auto; }
     .rcpt-line { display:flex; gap:10px; align-items:baseline; padding:9px 0; border-bottom:1px dashed #E2E8F0; }
     .rcpt-line:last-child { border-bottom:0; }
     .rcpt-line div { flex:1; min-width:0; display:flex; flex-direction:column; }
@@ -1873,14 +1881,6 @@ if ('serviceWorker' in navigator) {
         </div>
       </div>
       <div id="discSummary" class="disc-sum" style="display:none;"></div>
-      <div class="af-h" style="margin-top:14px;"><i class="fa-solid fa-arrow-trend-up"></i>{{ T.markup_title }}</div>
-      <div class="disc-seg" id="mkSeg">
-        <button type="button" data-p="0" class="on" onclick="setMarkup(0)">0%</button>
-        <button type="button" data-p="5" onclick="setMarkup(5)">+5%</button>
-        <button type="button" data-p="10" onclick="setMarkup(10)">+10%</button>
-        <button type="button" data-p="s" onclick="setMarkupSum()">{{ T.markup_sum }}</button>
-      </div>
-      <div id="mkSummary" class="disc-sum" style="display:none;"></div>
       <div class="af-h" style="margin-top:16px;"><i class="fa-solid fa-wallet"></i>{{ T.af_payment }}</div>
       <div class="pay-seg" id="paySeg">
         <button type="button" data-m="cash" class="on" onclick="setPayMode('cash')"><i class="fa-solid fa-money-bill"></i> {{ T.payment_cash }}</button>
@@ -8129,7 +8129,7 @@ function renderItRcpt(items, subtotal) {
     const qtyTxt = (it.qty && it.qty !== 1) || fluid ? csQty(it.qty) + (fluid ? ' ' + T.unit_l : '') + ' × ' + csMoney(it.unit_price) : '';
     const step = fluid || it.key === 'other_stock' || FILTER_KEYS.indexOf(it.key) >= 0
       ? `<span class="ir-step"><button type="button" onclick="irStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="irStep(${i}, 1)" aria-label="+">+</button></span>` : '';
-    return `<div class="ir-line"><div class="ir-main" onclick="openCatSheet('${c ? c.id : ''}', '${it.key}')"><b>${escapeHtml(title || '')}</b><span>${escapeHtml(catName)}${qtyTxt ? ' · ' + qtyTxt : ''}</span></div>${step}<span class="ir-sum">${csMoney(it.total)}</span><button type="button" class="ir-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button></div>`;
+    return `<div class="ir-line"><div class="ir-main" onclick="openCatSheet('${c ? c.id : ''}', '${it.key}')"><b>${escapeHtml(title || '')}</b><span>${escapeHtml(catName)}${qtyTxt ? ' · ' + qtyTxt : ''}</span></div>${step}<button type="button" class="ir-sum rc-sum" onclick="rcTotal(${i})" title="${T.rc_total_hint}">${csMoney(it.total)}${rcExtraHtml(it)}</button><button type="button" class="ir-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button></div>`;
   }).join('');
   const d = discountFor(subtotal);
   const disc = d ? `<div class="ir-line ir-disc"><div class="ir-main"><b>${T.disc_title}</b></div><span class="ir-sum">−${csMoney(d)}</span></div>` : '';
@@ -8637,7 +8637,7 @@ function renderReceiptSheet() {
     const canEdit = it.key !== 'other_stock';
     const step = FILTER_KEYS.indexOf(it.key) >= 0
       ? `<span class="ir-step"><button type="button" onclick="rcStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="rcStep(${i}, 1)" aria-label="+">+</button></span>` : '';
-    return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div>${step}<em>${money(it.total)}</em>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
+    return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div>${step}<button type="button" class="rc-sum" onclick="rcTotal(${i})" title="${T.rc_total_hint}">${money(it.total)}${rcExtraHtml(it)}</button>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
   }).join('') + (() => {
     const d = discountFor(itemsSubtotal(items));
     return d ? `<div class="rc-line rc-disc"><div><b>${T.disc_title}</b></div><em>−${money(d)}</em></div>` : '';
@@ -8852,7 +8852,7 @@ function collectItems() {
     items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
   items.push(...collectOtherStockItems('other'));
-  return applyMarkup(items);
+  return withListPrice(items);
 }
 
 let paymentSplitTouched = false;
@@ -8882,7 +8882,6 @@ function payTotal(items) {
   return sub - discountFor(sub);
 }
 function syncDiscUi() {
-  if (typeof syncMarkupUi === 'function') syncMarkupUi();
   document.querySelectorAll('#discSeg button').forEach(b => {
     const p = b.dataset.p;
     b.classList.toggle('on', DISC.custom ? p === 'c' : (DISC.mode === 'pct' && String(DISC.pct) === p));
@@ -8914,13 +8913,11 @@ function discChanged() {
 }
 function setDiscount(p) {
   DISC = { mode: 'pct', pct: p, custom: false, value: 0 };
-  if (p > 0) MARKUP = { pct: 0, sum: 0 };
   const v = document.getElementById('disc_value'); if (v) v.value = '';
   discChanged();
 }
 function setDiscountCustom() {
   DISC.custom = true;
-  MARKUP = { pct: 0, sum: 0 };
   if (DISC.mode === 'pct') { DISC.value = DISC.pct || 0; }
   const v = document.getElementById('disc_value');
   if (v) { v.value = DISC.mode === 'sum' ? (DISC.value || '') : (DISC.pct || ''); setTimeout(() => v.focus(), 50); }
@@ -8940,62 +8937,49 @@ function onDiscInput() {
 }
 function resetDiscount() {
   DISC = { mode: 'pct', pct: 0, custom: false, value: 0 };
-  MARKUP = { pct: 0, sum: 0 };
   const v = document.getElementById('disc_value'); if (v) v.value = '';
   syncDiscUi();
   renderDiscSummary(0);
 }
 
-// Наценка на весь чек: +5% / +10% / своя сумма. Поднимает цены позиций
-// пропорционально — как если бы мастер сам поставил цену выше, поэтому сумма,
-// прибыль, касса и долг считаются как обычно, а склад списывает то же
-// количество. Обычная цена остаётся в позиции (list_price) — по ней
-// «Статистика» показывает, сколько заработано наценкой. Со скидкой не совмещается.
-var MARKUP = { pct: 0, sum: 0 };
-function markupActive() { return MARKUP.pct > 0 || MARKUP.sum > 0; }
-function applyMarkup(items) {
-  items.forEach(it => { if (it.list_price == null) it.list_price = it.unit_price; });
-  if (!markupActive()) return items;
-  const priced = items.filter(it => it.total > 0);
-  const sub = priced.reduce((s, it) => s + it.total, 0);
-  if (!(sub > 0)) return items;
-  const add = MARKUP.sum > 0 ? Math.round(MARKUP.sum) : Math.round(sub * MARKUP.pct / 100 / 1000) * 1000;
-  let left = add;
-  priced.forEach((it, idx) => {
-    const share = idx === priced.length - 1 ? left : Math.round(add * it.total / sub);
-    left -= share;
-    it.total += share;
-    it.unit_price = it.qty ? Math.round(it.total / it.qty * 100) / 100 : it.total;
+// Обычная цена позиции (list_price): у товара со склада — цена продажи на
+// складе, у вписанного вручную — та, что вписали. Если мастер поменял сумму
+// позиции в чеке (rcTotal), разница с обычной ценой — наценка: её видно в
+// чеке и в «Статистике» (сервер для товаров со склада ставит цену сам).
+function withListPrice(items) {
+  items.forEach(it => {
+    if (it.list_price != null) return;
+    const p = it.product_id ? productsCache.find(x => x.id === it.product_id) : null;
+    it.list_price = p && p.sell_price ? Number(p.sell_price) : it.unit_price;
   });
   return items;
 }
-function markupAmount(items) {
-  return (items || collectItems()).reduce((s, it) =>
-    s + Math.max(0, Math.round(it.total - (it.list_price || 0) * (it.qty || 1))), 0);
+function itemExtra(it) {
+  return Math.round((it.total || 0) - (it.list_price || 0) * (it.qty || 1));
 }
-function syncMarkupUi() {
-  document.querySelectorAll('#mkSeg button').forEach(b => {
-    const p = b.dataset.p;
-    b.classList.toggle('on', p === 's' ? MARKUP.sum > 0 : (!MARKUP.sum && String(MARKUP.pct) === p));
-  });
-  const el = document.getElementById('mkSummary');
-  if (!el) return;
-  const m = markupActive() ? markupAmount() : 0;
-  el.style.display = m ? 'block' : 'none';
-  el.innerHTML = m ? `<div class="d-plus"><span>${T.markup_title}</span><b>+${Math.round(m).toLocaleString('ru-RU')} ${T.currency}</b></div>` : '';
-}
-function setMarkup(p) {
-  MARKUP = { pct: p, sum: 0 };
-  if (p > 0) { DISC = { mode: 'pct', pct: 0, custom: false, value: 0 }; const v = document.getElementById('disc_value'); if (v) v.value = ''; }
-  discChanged();
-}
-function setMarkupSum() {
-  const raw = prompt(T.markup_prompt, MARKUP.sum || '');
+// Нажали на сумму позиции в чеке — вписать свою (например 440 000 → 500 000):
+// цена за литр/штуку пересчитывается, количество и склад — те же
+function rcTotal(i) {
+  const it = collectItems()[i];
+  if (!it) return;
+  const raw = prompt(`${T.rc_total_prompt} ${it.brand || it.name}`, Math.round(it.total));
   if (raw === null) return;
-  const v = parseInt(String(raw).replace(/\\D/g, '')) || 0;
-  MARKUP = { pct: 0, sum: Math.max(0, v) };
-  if (v > 0) { DISC = { mode: 'pct', pct: 0, custom: false, value: 0 }; const d = document.getElementById('disc_value'); if (d) d.value = ''; }
-  discChanged();
+  const total = parseInt(String(raw).replace(/\\D/g, ''));
+  if (!(total >= 0)) return;
+  const unit = it.qty ? Math.round(total / it.qty * 100) / 100 : total;
+  let el = null;
+  if (it.key === 'other_stock' && it._row) el = document.getElementById(`other_stock_price_${it._row}`);
+  else if (it.key === 'other') el = document.getElementById('other_price');
+  else el = rcPriceField(it);
+  if (!el) return;
+  el.value = it.key === 'other' ? total : unit;
+  paymentSplitTouched = false;
+  updateTotal();
+  if (document.getElementById('rcSheet') && document.getElementById('rcSheet').classList.contains('open')) renderReceiptSheet();
+}
+function rcExtraHtml(it) {
+  const x = itemExtra(it);
+  return x > 0 ? ` <span class="rc-up">+${x.toLocaleString('ru-RU')}</span>` : '';
 }
 
 // Чек справа (на компьютере): те же позиции, что уйдут в запись
@@ -9012,7 +8996,7 @@ function renderReceipt(items) {
     // фильтр — сколько штук (−/+), как в чеке на телефоне
     const step = FILTER_KEYS.indexOf(it.key) >= 0
       ? `<span class="ir-step"><button type="button" onclick="irStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="irStep(${i}, 1)" aria-label="+">+</button></span>` : '';
-    return `<div class="rcpt-line"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div>${step}<em>${money(it.total)}</em></div>`;
+    return `<div class="rcpt-line"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div>${step}<button type="button" class="rc-sum" onclick="rcTotal(${i})" title="${T.rc_total_hint}">${money(it.total)}${rcExtraHtml(it)}</button></div>`;
   }).join('') + (() => {
     const d = discountFor(itemsSubtotal(items));
     return d ? `<div class="rcpt-line rcpt-disc"><div><b>${T.disc_title}</b></div><em>−${money(d)}</em></div>` : '';
