@@ -2319,6 +2319,67 @@ def api_cars():
     return resp
 
 
+@app.route("/api/base/due")
+@login_required
+def api_base_due():
+    """«База»: кому пора на замену — сегодня, завтра, неделя, месяц, просрочили."""
+    return jsonify({"ok": True, **db.base_due(g.shop_id)})
+
+
+@app.route("/api/base/call", methods=["POST"])
+@login_required
+def api_base_call():
+    """Отметка обзвона: дозвонился / записался / не берёт / отказался."""
+    data = request.get_json(silent=True) or {}
+    try:
+        car_id = int(data.get("car_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad car"}), 400
+    result = str(data.get("result") or "")
+    if result == "bot" or not db.log_call(g.shop_id, car_id, result, actor=session.get("username")):
+        return jsonify({"ok": False, "error": "bad request"}), 400
+    return jsonify({"ok": True})
+
+
+@app.route("/api/base/remind", methods=["POST"])
+@login_required
+def api_base_remind():
+    """Напомнить клиенту в боте прямо сейчас (не чаще раза в день на машину) —
+    с теми же кнопками «Уже поменял» / «Записаться», что и обычное напоминание."""
+    data = request.get_json(silent=True) or {}
+    try:
+        car_id = int(data.get("car_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad car"}), 400
+    car = db.car_of_shop(g.shop_id, car_id)
+    if not car:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    tg = car.get("client_telegram_id")
+    if not tg:
+        return jsonify({"ok": False, "error": g.T["base_no_bot"]}), 400
+    if db.bot_reminded_today(g.shop_id, car_id):
+        return jsonify({"ok": False, "error": g.T["base_bot_already"]}), 429
+    entry = next((e for grp in db.base_due(g.shop_id)["groups"].values() for e in grp if e["car_id"] == car_id), None)
+    kinds_list = [k["kind"] for k in entry["kinds"]] if entry else ["oil"]
+    kinds = ("o" if "oil" in kinds_list else "") + ("a" if "atf" in kinds_list else "")
+    oc_id = entry["oc_id"] if entry else (db.get_last_service(car_id) or {}).get("id")
+    if not oc_id:
+        return jsonify({"ok": False, "error": "no service"}), 400
+    shop = db.get_shop(g.shop_id) or {}
+    lang = db.client_lang_by_telegram(tg) or shop.get("language") or "ru"
+    what = i18n.t({"o": "rem_what_oil", "a": "rem_what_atf", "oa": "rem_what_both"}[kinds], lang)
+    text = i18n.t("bot_reminder_any_first", lang, plate=car["plate_number"], what=what,
+                  shop=shop.get("shop_name") or shop.get("username") or "")
+    markup = {"inline_keyboard": [[
+        {"text": i18n.t("btn_changed", lang), "callback_data": f"changed:{oc_id}:{kinds}"},
+        {"text": i18n.t("btn_book", lang), "callback_data": f"book:{oc_id}:{kinds}"},
+    ]]}
+    if not _tg_api("sendMessage", {"chat_id": tg, "text": text, "reply_markup": json.dumps(markup)}):
+        return jsonify({"ok": False, "error": g.T["base_bot_failed"]}), 502
+    db.log_call(g.shop_id, car_id, "bot", actor=session.get("username"), oil_change_id=oc_id)
+    return jsonify({"ok": True})
+
+
 def _strip_cost_price(history):
     """Убирает cost_price (цена закупки, снятая со склада на момент продажи) из
     items_json перед отправкой сотруднику — иначе цена закупки была бы видна

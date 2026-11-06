@@ -810,6 +810,32 @@ if ('serviceWorker' in navigator) {
     margin-bottom:10px; cursor:pointer; transition:border-color .12s, box-shadow .12s;
   }
   .car-card:active { border-color:var(--blue); box-shadow:0 2px 10px rgba(15,82,186,.1); }
+  /* «База»: кому пора на замену и обзвон */
+  .bd-card { background:var(--card); border:1.5px solid var(--border); border-radius:16px; padding:14px; margin-bottom:14px; }
+  .bd-head { display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .bd-head b { font-size:15px; } .bd-head span { font-size:12.5px; color:var(--hint); }
+  .bd-tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:6px; }
+  .bd-tabs button { flex:none; display:flex; align-items:center; gap:6px; border:1.5px solid var(--border); background:transparent; color:var(--text); border-radius:999px; padding:7px 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  .bd-tabs button em { font-style:normal; font-family:var(--font-mono); font-size:12px; background:var(--field-bg); border-radius:999px; padding:1px 7px; }
+  .bd-tabs button.on { border-color:var(--blue); color:var(--blue); }
+  .bd-tabs button.warn em { color:#B3241C; }
+  .bd-row { border-top:1px dashed var(--border); padding:12px 0; display:grid; gap:8px; }
+  .bd-main { cursor:pointer; min-width:0; }
+  .bd-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .bd-late { font-size:11.5px; font-weight:700; color:#B3241C; }
+  .bd-st { font-size:11.5px; font-weight:700; border-radius:999px; padding:2px 8px; background:var(--field-bg); color:var(--hint); }
+  .bd-st.st-booked, .bd-st.st-called { color:#047857; } .bd-st.st-refused { color:#B3241C; } .bd-st.st-bot { color:var(--blue); }
+  .bd-name { font-size:14.5px; font-weight:700; margin-top:5px; overflow-wrap:anywhere; }
+  .bd-due { font-size:13px; color:var(--blue); font-weight:600; margin-top:3px; }
+  .bd-last { font-size:12px; color:var(--hint); margin-top:2px; }
+  .bd-act { display:flex; flex-wrap:wrap; gap:6px; }
+  .bd-b { display:inline-flex; align-items:center; gap:6px; border:1.5px solid var(--border); background:transparent; color:var(--text); border-radius:10px; padding:8px 11px; font:inherit; font-size:13px; font-weight:600; text-decoration:none; cursor:pointer; }
+  .bd-b.call { border-color:#16A34A; color:#16A34A; } .bd-b.wa { color:#16A34A; } .bd-b.tg { color:#0EA5E9; } .bd-b.bot { color:var(--blue); }
+  .bd-nophone { font-size:12.5px; color:var(--hint); }
+  .bd-res { display:flex; flex-wrap:wrap; gap:6px; }
+  .bd-r { display:inline-flex; align-items:center; gap:5px; border:1px dashed var(--border); background:transparent; color:var(--hint); border-radius:999px; padding:5px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .bd-r.on { border-style:solid; border-color:var(--blue); color:var(--blue); font-weight:700; }
+  @media (min-width: 900px) { .bd-row { grid-template-columns:minmax(0,1.3fr) auto; align-items:center; } .bd-res { grid-column:1 / -1; } }
   .car-card .cc-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; gap:8px; }
   .car-card .cc-plate {
     font-family:var(--font-mono); font-weight:700; font-size:14.5px; letter-spacing:0.5px; color:var(--blue);
@@ -1962,6 +1988,7 @@ if ('serviceWorker' in navigator) {
   </div>
 
   <div id="view-table" style="display:none;">
+    <div id="baseDue"></div>
     <div id="baseClientCount" style="font-size:13px; color:var(--hint); margin-bottom:8px;"></div>
     <div style="position:relative;">
       <input class="search" id="search" type="search" name="oilbook_base_q" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="{{ T.search_ph }}" oninput="onBaseSearch(); toggleSearchClearBtn();" style="padding-right:40px;">
@@ -3049,7 +3076,7 @@ function showTab(t, keepScroll) {
   const expTab = document.getElementById('tab-expenses');
   if (expView) expView.style.display = t === 'expenses' ? 'block' : 'none';
   if (expTab) expTab.classList.toggle('active', t === 'expenses');
-  if (t === 'table') loadCars();
+  if (t === 'table') { loadCars(); loadBaseDue(); }
   if (t === 'debts') loadDebts();
   if (t === 'expenses') loadExpensesTab();
   const rateView = document.getElementById('view-rate');
@@ -10721,8 +10748,95 @@ function kcMetaHtml(phone, carLine) {
       ? `<a class="kc-call" href="tel:${escapeHtml(digits)}" onclick="event.stopPropagation()"><i class="fa-solid fa-phone"></i> ${escapeHtml(ph)}</a>`
       : escapeHtml(ph));
   }
+  const d = phoneIntl(ph);
+  if (d) parts.push(`<a class="kc-call" href="https://wa.me/${d}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>`
+    + ` <a class="kc-call" href="https://t.me/+${d}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="fa-brands fa-telegram"></i> Telegram</a>`);
   if (carLine) parts.push(escapeHtml(carLine));
   return parts.join(' · ');
+}
+
+// номер для ссылок WhatsApp / Telegram: только цифры, с кодом страны (998…)
+function phoneIntl(phone) {
+  let d = String(phone || '').replace(/\\D/g, '');
+  if (d.length === 9) d = '998' + d;
+  return d.length >= 11 ? d : '';
+}
+
+// ---- «База»: кому пора на замену и обзвон ----
+// Сегодня / завтра / неделя / месяц / просрочили: позвонить, WhatsApp с
+// готовым текстом, Telegram по номеру, напомнить в боте, отметить звонок.
+let BASE_DUE = null, BASE_TAB = null;
+const BASE_SHOP_NAME = {{ shop_name|tojson }};
+const BASE_GROUPS = ['today', 'tomorrow', 'week', 'month', 'overdue'];
+async function loadBaseDue() {
+  try {
+    const r = await fetch('/api/base/due');
+    const d = await r.json();
+    if (!d.ok) return;
+    BASE_DUE = d;
+    if (!BASE_TAB) BASE_TAB = BASE_GROUPS.find(k => d.counts[k]) || 'today';
+    renderBaseDue();
+  } catch (e) { /* «База» работает и без этого блока */ }
+}
+function setBaseTab(k) { BASE_TAB = k; renderBaseDue(); }
+function baseDay(s) { const p = String(s || '').slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}` : '—'; }
+function baseWhat(e) {
+  return e.kinds.map(k => k.kind === 'oil' ? T.base_oil : T.base_atf).join(T.base_and);
+}
+function baseMsg(e) {
+  return T.base_msg_tpl.replace('{name}', e.owner_name ? ', ' + e.owner_name : '').replace('{car}', e.car || '')
+    .replace('{plate}', e.plate).replace('{what}', baseWhat(e)).replace('{shop}', BASE_SHOP_NAME);
+}
+function baseDueRow(e) {
+  const d = phoneIntl(e.owner_phone);
+  const due = e.kinds.map(k => `${k.kind === 'oil' ? T.base_oil : T.base_atf} · ${baseDay(k.due)}${k.km ? ' · ' + Number(k.km).toLocaleString('ru-RU') + ' ' + T.km_short : ''}`).join('<br>');
+  const late = e.days < 0 ? `<span class="bd-late">${T.base_days_over.replace('{n}', -e.days)}</span>` : '';
+  const st = e.call ? e.call.result : (e.booked ? 'booked' : '');
+  const btn = (r, ic) => `<button type="button" class="bd-r${st === r ? ' on' : ''}" onclick="baseCall(${e.car_id}, '${r}')"><i class="fa-solid ${ic}"></i>${T['base_r_' + r]}</button>`;
+  return `<div class="bd-row">
+    <div class="bd-main" onclick="toggleHistory(${escapeHtml(JSON.stringify(e.plate))})">
+      <div class="bd-top"><span class="cc-plate">${escapeHtml(e.plate)}</span>${late}${st ? `<span class="bd-st st-${st}">${T['base_r_' + st]}</span>` : ''}</div>
+      <div class="bd-name">${escapeHtml(e.owner_name || T.kc_no_name)}${e.car ? ' · ' + escapeHtml(e.car) : ''}</div>
+      <div class="bd-due">${due}</div>
+      <div class="bd-last">${T.base_last} ${baseDay(e.last_date)}${e.last_mileage ? ' · ' + Number(e.last_mileage).toLocaleString('ru-RU') + ' ' + T.km_short : ''}${e.oil_brand ? ' · ' + escapeHtml(e.oil_brand) : ''}</div>
+    </div>
+    <div class="bd-act">
+      ${d ? `<a class="bd-b call" href="tel:+${d}"><i class="fa-solid fa-phone"></i>${T.base_call}</a>
+      <a class="bd-b wa" href="https://wa.me/${d}?text=${encodeURIComponent(baseMsg(e))}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i>WhatsApp</a>
+      <a class="bd-b tg" href="https://t.me/+${d}" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i>Telegram</a>` : `<span class="bd-nophone">${T.base_no_phone}</span>`}
+      ${e.telegram ? `<button type="button" class="bd-b bot" onclick="baseRemind(${e.car_id}, this)"><i class="fa-solid fa-robot"></i>${T.base_bot}</button>` : ''}
+    </div>
+    <div class="bd-res">${btn('called', 'fa-check')}${btn('booked', 'fa-calendar-check')}${btn('no_answer', 'fa-phone-slash')}${btn('refused', 'fa-xmark')}</div>
+  </div>`;
+}
+function renderBaseDue() {
+  const box = document.getElementById('baseDue');
+  const d = BASE_DUE;
+  if (!box || !d) return;
+  const rows = d.groups[BASE_TAB] || [];
+  box.innerHTML = `<div class="bd-card">
+    <div class="bd-head"><b><i class="fa-solid fa-phone-volume"></i> ${T.base_title_due}</b><span>${T.base_clients} ${d.clients} · ${T.base_cars} ${d.cars}</span></div>
+    <div class="bd-tabs">${BASE_GROUPS.map(k => `<button type="button" class="${k === BASE_TAB ? 'on' : ''}${k === 'overdue' ? ' warn' : ''}" onclick="setBaseTab('${k}')">${T['base_g_' + k]}<em>${d.counts[k] || 0}</em></button>`).join('')}</div>
+    <div class="bd-list">${rows.length ? rows.map(baseDueRow).join('') : `<div class="hint-text" style="padding:10px 2px;">${T.base_empty}</div>`}</div>
+  </div>`;
+}
+async function baseCall(carId, result) {
+  try {
+    const r = await fetch('/api/base/call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ car_id: carId, result }) });
+    const j = await r.json();
+    if (!j.ok) { showMsg(T.msg_error + ' ' + (j.error || ''), false); return; }
+    await loadBaseDue();
+  } catch (e) { showMsg(T.msg_error, false); }
+}
+async function baseRemind(carId, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/base/remind', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ car_id: carId }) });
+    const j = await r.json();
+    showMsg(j.ok ? T.base_bot_sent : (j.error || T.msg_error), !!j.ok);
+    if (j.ok) await loadBaseDue();
+  } catch (e) { showMsg(T.msg_error, false); }
+  if (btn) btn.disabled = false;
 }
 
 function escapeHtml(str) {

@@ -314,6 +314,7 @@ def init_db():
         _migrate_team(conn)
         _migrate_action_log(conn)
         _migrate_digest(conn)
+        _migrate_calls(conn)
         _bootstrap_accounts(conn)
 
 
@@ -9881,3 +9882,118 @@ def digest_item_rates(shop_id: int, date_from: str, date_to: str) -> dict:
             if k in keys:
                 out[k] += 1
     return out
+
+
+# ======================================================================
+# «База»: кому пора на замену (сегодня / завтра / неделя / месяц /
+# просрочили) и отметки обзвона
+# ======================================================================
+
+CALL_RESULTS = ("called", "booked", "no_answer", "refused", "bot")
+BASE_OVERDUE_DAYS = 30   # «просрочили» — не приехали за последние 30 дней
+BASE_AHEAD_DAYS = 30     # «скоро» — на месяц вперёд
+
+
+def _migrate_calls(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS call_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            car_id INTEGER NOT NULL,
+            oil_change_id INTEGER,
+            result TEXT NOT NULL,
+            actor TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_call_log_shop_car ON call_log(shop_id, car_id, id)")
+    conn.commit()
+
+
+def base_due(shop_id: int, today=None) -> dict:
+    """Машины, которым пора на замену моторного масла и/или масла АКПП, —
+    по сроку следующей замены из последней записи машины. Для каждой —
+    контакты, что менять, когда были и последняя отметка обзвона в этом
+    цикле (после последнего визита). Группы: overdue / today / tomorrow /
+    week (2–7 дней) / month (8–30 дней)."""
+    today = today or datetime.now().date()
+    lo = (today - timedelta(days=BASE_OVERDUE_DAYS)).strftime("%Y-%m-%d")
+    hi = (today + timedelta(days=BASE_AHEAD_DAYS)).strftime("%Y-%m-%d")
+    base_sql = """
+        SELECT oc.id AS oc_id, oc.car_id, oc.status, oc.change_date, oc.mileage, oc.oil_brand,
+               oc.next_change_date, oc.next_mileage, oc.atf_next_date, oc.atf_next_mileage,
+               c.plate_number AS plate, c.car_brand, c.car_model,
+               cl.full_name AS owner_name, cl.phone AS owner_phone, cl.telegram_id
+        FROM oil_changes oc JOIN cars c ON c.id = oc.car_id LEFT JOIN clients cl ON cl.id = c.client_id
+        WHERE c.shop_id=?
+    """
+    with get_conn() as conn:
+        oil = conn.execute(base_sql + " AND oc.status IN ('active', 'booked') "
+                           "AND oc.next_change_date >= ? AND oc.next_change_date <= ?", (shop_id, lo, hi)).fetchall()
+        atf = conn.execute(base_sql + " AND oc.atf_next_date >= ? AND oc.atf_next_date <= ? "
+                           "AND COALESCE(oc.atf_reminder_count, 0) < ? "
+                           "AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id)",
+                           (shop_id, lo, hi, MAX_FOLLOWUP_REMINDERS)).fetchall()
+        calls = {r["car_id"]: dict(r) for r in conn.execute("""
+            SELECT car_id, result, created_at FROM call_log
+            WHERE id IN (SELECT MAX(id) FROM call_log WHERE shop_id=? GROUP BY car_id)
+        """, (shop_id,)).fetchall()}
+        totals = conn.execute("""SELECT COUNT(*) AS cars, COUNT(DISTINCT client_id) AS clients
+                                 FROM cars WHERE shop_id=?""", (shop_id,)).fetchone()
+    cars = {}
+    for kind, rows in (("oil", oil), ("atf", atf)):
+        for r in rows:
+            r = dict(r)
+            due = r["next_change_date"] if kind == "oil" else r["atf_next_date"]
+            km = r["next_mileage"] if kind == "oil" else r["atf_next_mileage"]
+            e = cars.get(r["car_id"])
+            if not e:
+                e = cars[r["car_id"]] = {
+                    "car_id": r["car_id"], "oc_id": r["oc_id"], "plate": r["plate"],
+                    "car": " ".join(x for x in (r["car_brand"], r["car_model"]) if x),
+                    "owner_name": r["owner_name"], "owner_phone": r["owner_phone"],
+                    "telegram": bool(r["telegram_id"]), "last_date": r["change_date"],
+                    "last_mileage": r["mileage"], "oil_brand": r["oil_brand"],
+                    "booked": r["status"] == "booked", "kinds": [], "due": due,
+                }
+            e["kinds"].append({"kind": kind, "due": due, "km": km})
+            e["due"] = min(e["due"], due)
+    groups = {"overdue": [], "today": [], "tomorrow": [], "week": [], "month": []}
+    for e in sorted(cars.values(), key=lambda x: (x["due"], x["plate"])):
+        call = calls.get(e["car_id"])
+        # отметка звонка — только из этого цикла (после последнего визита)
+        e["call"] = call if call and call["created_at"][:10] >= (e["last_date"] or "") else None
+        days = (datetime.strptime(e["due"], "%Y-%m-%d").date() - today).days
+        e["days"] = days
+        key = "overdue" if days < 0 else "today" if days == 0 else "tomorrow" if days == 1 \
+            else "week" if days <= 7 else "month"
+        groups[key].append(e)
+    return {"groups": groups, "counts": {k: len(v) for k, v in groups.items()},
+            "cars": totals["cars"] or 0, "clients": totals["clients"] or 0}
+
+
+def car_of_shop(shop_id: int, car_id: int):
+    with get_conn() as conn:
+        row = conn.execute("""SELECT c.*, cl.full_name AS owner_name, cl.phone AS owner_phone,
+                                     cl.telegram_id AS client_telegram_id
+                              FROM cars c LEFT JOIN clients cl ON cl.id = c.client_id
+                              WHERE c.id=? AND c.shop_id=?""", (car_id, shop_id)).fetchone()
+    return dict(row) if row else None
+
+
+@_serialized
+def log_call(shop_id: int, car_id: int, result: str, actor: str = None, oil_change_id: int = None) -> bool:
+    if result not in CALL_RESULTS or not car_of_shop(shop_id, car_id):
+        return False
+    with get_conn() as conn:
+        conn.execute("INSERT INTO call_log (shop_id, car_id, oil_change_id, result, actor, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?)", (shop_id, car_id, oil_change_id, result, actor, _now_str()))
+        conn.commit()
+    return True
+
+
+def bot_reminded_today(shop_id: int, car_id: int) -> bool:
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        return conn.execute("SELECT 1 FROM call_log WHERE shop_id=? AND car_id=? AND result='bot' "
+                            "AND created_at >= ?", (shop_id, car_id, today)).fetchone() is not None
