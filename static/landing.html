@@ -100,7 +100,9 @@ input:focus{box-shadow:0 0 0 3px rgba(31,107,255,.35)}
 .shot img{width:100%;display:block;border-radius:26px;border:5px solid rgba(255,255,255,.14);box-shadow:var(--sh);background:#0b1020}
 .shot figcaption{text-align:center;font-size:13px;font-weight:700;color:var(--muted);margin-top:10px}
 @media(min-width:900px){.shots{justify-content:center;flex-wrap:wrap;overflow:visible}}
-.video{max-width:300px!important;aspect-ratio:9/16!important}
+.video{max-width:230px!important;aspect-ratio:9/16!important;background-size:cover;background-position:center}
+.video.cov::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 40%,rgba(0,0,0,.6));z-index:0}
+.video .play,.video .vt{z-index:1}
 .video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .ytl{display:inline-block;margin-top:12px;font-size:13px;color:var(--muted)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -138,9 +140,9 @@ footer{text-align:center;color:var(--muted);font-size:13px;padding:44px 0 110px}
       
       <svg class="drop" viewBox="0 0 24 24"><path fill="#fff" d="M12 2s7 7.6 7 12.5A7 7 0 0 1 5 14.5C5 9.6 12 2 12 2z"/></svg>
       <div class="play"><svg viewBox="0 0 24 24" fill="#fff"><path d="M6 4l14 8-14 8z"/></svg></div>
-      <div class="vt" id="vt">60 soniyada OilBook<br><span style="opacity:.8;font-weight:600">Videoni koʻring ▸</span></div>
+      <div class="vt" id="vt">OilBook 60 soniyada<br><span style="opacity:.8;font-weight:600">Videoni koʻring ▸</span></div>
     </div>
-    <a class="ytl" href="https://youtube.com/shorts/UZKFkT8qb_M" target="_blank" rel="noopener">YouTube’da ochish ↗</a>
+    <a class="ytl" href="https://youtube.com/shorts/LOy-4Uj1pH8" target="_blank" rel="noopener">YouTube’da ochish ↗</a>
     <div class="cta">
       <a class="btn" href="#register">Roʻyxatdan oʻtish</a>
       <div style="margin-top:12px"><a class="btn ghost sm" href="https://t.me/Saidbonur405" target="_blank" rel="noopener">✈️ Telegramda yozish · @Saidbonur405</a></div><div class="hint">Bepul sinab koʻring · karta shart emas · 2 daqiqada ulanasiz</div>
@@ -255,9 +257,13 @@ footer{text-align:center;color:var(--muted);font-size:13px;padding:44px 0 110px}
   window.addEventListener('scroll',upd,{passive:true});upd();
   // видео (YouTube Shorts)
   var vd=document.getElementById('video');
+  (function(){var id='LOy-4Uj1pH8',L=['maxresdefault','hq720','hqdefault'],i=0;
+    (function tryN(){if(i>=L.length)return;var im=new Image(),u='https://i.ytimg.com/vi/'+id+'/'+L[i++]+'.jpg';
+      im.onload=function(){if(im.naturalWidth>200){vd.style.backgroundImage='url('+u+')';vd.classList.add('cov')}else tryN()};
+      im.onerror=tryN;im.src=u})()})();
   vd.onclick=function(){if(vd.querySelector('iframe'))return;var f=document.createElement('iframe');
-    f.src='https://www.youtube-nocookie.com/embed/UZKFkT8qb_M?autoplay=1&playsinline=1&rel=0&modestbranding=1';
-    f.allow='autoplay; encrypted-media; picture-in-picture';f.allowFullscreen=true;f.title='OilBook';
+    f.src='https://www.youtube-nocookie.com/embed/LOy-4Uj1pH8?autoplay=1&playsinline=1&rel=0&modestbranding=1';
+    f.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';f.allowFullscreen=true;f.title='OilBook';
     vd.appendChild(f);vd.querySelector('.play').style.display='none';document.getElementById('vt').style.display='none'};
   // регистрация: реальный /api/register работает на oilbook.uz; в превью — демо
   var LIVE=/(^|\.)(oilbook\.uz|moybook\.onrender\.com|localhost|127\.0\.0\.1)$/.test(location.hostname);
