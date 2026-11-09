@@ -218,7 +218,6 @@ footer{text-align:center;color:var(--muted);font-size:13px;padding:44px 0 110px}
     <p class="sub">2 daqiqada punktingizni ulang — 3 kun bepul. Arizani Telegram orqali tasdiqlaysiz, men esa ulanishga yordam beraman.</p>
     <div class="box glass">
       <form id="f" novalidate>
-        <input class="hp" type="text" id="w" tabindex="-1" autocomplete="off" aria-hidden="true">
         <label>Ismingiz</label><input type="text" id="n" autocomplete="name" placeholder="Masalan: Aziz">
         <label>Punkt nomi</label><input type="text" id="p" placeholder="Masalan: Castrol Moy Almashtirish">
         <label>Telefon raqam</label><input type="tel" id="t" inputmode="tel" autocomplete="tel" placeholder="+998 90 123 45 67">
@@ -277,7 +276,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;padding:44px 0 110px}
   f.onsubmit=function(e){
     e.preventDefault();err.textContent='';if(sb.disabled)return;
     var ref=q.get('ref')||'';
-    var d={lang:'uz',shop_name:p.value,owner_name:n.value,city:c.value,phone:t.value,address:a.value,username:u.value.trim(),password:pw.value,password2:pw2.value,website:w.value,ref:ref};
+    var d={lang:'uz',shop_name:p.value,owner_name:n.value,city:c.value,phone:t.value,address:a.value,username:u.value.trim(),password:pw.value,password2:pw2.value,website:'',ref:ref};
     if(!LIVE){sb.disabled=true;setTimeout(function(){show('s2');document.getElementById('tgs').textContent='Demo rejim: haqiqiy roʻyxatdan oʻtish oilbook.uz da ishlaydi'},400);return}
     sb.disabled=true;
     fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
