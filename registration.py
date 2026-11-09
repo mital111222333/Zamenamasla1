@@ -529,6 +529,14 @@ def _reg_lang():
     return lang if lang in ("ru", "uz") else "ru"
 
 
+@app.route("/welcome")
+def landing_page():
+    """Рекламная страница OilBook (ссылка для Instagram): static/landing.html."""
+    import os
+    from flask import send_from_directory
+    return send_from_directory(os.path.join(app.root_path, "static"), "landing.html", max_age=0)
+
+
 @app.route("/register")
 def register_page():
     lang = _reg_lang()
