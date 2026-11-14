@@ -5785,6 +5785,7 @@ def run_webapp_in_thread():
 # всё, что они берут отсюда, уже определено.
 import display  # noqa: E402,F401
 import registration  # noqa: E402,F401
+import oferta  # noqa: E402,F401  (соглашение /oferta и согласие перед оплатой)
 from registration import reg_decide, reg_notify_admin  # noqa: E402,F401  (их вызывает bot.py)
 import subscription  # noqa: E402,F401
 from subscription import (  # noqa: E402,F401  (нужны остальной программе и bot.py)

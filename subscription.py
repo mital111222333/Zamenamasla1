@@ -14,11 +14,12 @@ import time
 from datetime import datetime
 
 import requests
-from flask import Response, g, jsonify, render_template_string, request
+from flask import Response, g, jsonify, render_template_string, request, session
 
 import database as db
 import i18n
 import security
+import oferta
 from webapp import (
     ADMIN_TELEGRAM_ID, BOT_TOKEN, PUBLIC_URL, _client_ip, _fmt_day, _fmt_sum, _is_sub_owner,
     _send_telegram_message, _tg_api, admin_required, app, logger, login_required,
@@ -174,6 +175,8 @@ def notify_sub_decision(p: dict):
             text = i18n.t("sub_bot_lifetime", lang)
         else:
             text = i18n.t("sub_bot_confirmed", lang, date=_fmt_day(p.get("new_until")))
+        # после оплаты — обещание из соглашения (раздел 5 и 11)
+        text += "\n\n" + i18n.t("sub_oferta_promise", lang)
     else:
         contact = db.get_platform_settings().get("support_contact") or ""
         text = i18n.t("sub_bot_rejected", lang, link=_sub_owner_link())
@@ -353,6 +356,8 @@ def api_subscription_pay():
         return jsonify({"ok": False, "error": "lifetime"}), 400
     if not q["settings"].get("card_number"):
         return jsonify({"ok": False, "error": T["sub_no_card"]}), 400
+    if not oferta.agreed(request.form):
+        return jsonify({"ok": False, "error": T["sub_oferta_need"], "oferta": True}), 400
     choice = (request.form.get("choice") or "").strip()
     pending_ids = [b["id"] for b in q["pending_branches"]]
     if choice == "lifetime":
@@ -402,6 +407,7 @@ def api_subscription_pay():
         db.sub_payment_failed(pid)  # чек не дошёл — человек просто отправит ещё раз
         return jsonify({"ok": False, "error": T["sub_err"]}), 502
     db.sub_payment_sent(pid, sent[0], sent[1], mime)
+    oferta.record_acceptance(g.shop_id, session.get("username"), pid)
     return jsonify({"ok": True, "id": pid})
 
 
@@ -603,6 +609,8 @@ def api_subscription_auto():
     if q["state"]["lifetime"]:
         return jsonify({"ok": False, "error": "lifetime"}), 400
     data = request.get_json(silent=True) or request.form
+    if not oferta.agreed(data):
+        return jsonify({"ok": False, "error": T["sub_oferta_need"], "oferta": True}), 400
     picked = _sub_pick(q, str(data.get("choice") or "").strip())
     if not picked:
         return jsonify({"ok": False, "error": "выберите срок"}), 400
@@ -618,6 +626,7 @@ def api_subscription_auto():
         db.cancel_auto_payment(pid, f"hamyon: {card}"[:200])
         return jsonify({"ok": False, "error": T["sub_auto_err"]}), 502
     db.auto_payment_started(pid, ext_id, real)
+    oferta.record_acceptance(g.shop_id, session.get("username"), pid)
     card = card or (q["settings"].get("card_number") or "")
     return jsonify({"ok": True, "id": pid, "amount": real, "amount_txt": _fmt_sum(real),
                     "card": card, "holder": q["settings"].get("card_holder") or "", "ttl": _AUTO_TTL})
@@ -1302,6 +1311,10 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 @keyframes spin { to { transform:rotate(360deg); } }
 .timer { margin-left:auto; font-family:var(--mono); font-size:16px; }
 .linkbtn { background:none; border:0; color:var(--blue); font:700 15px 'Plus Jakarta Sans', system-ui, sans-serif; padding:12px; cursor:pointer; width:100%; }
+.oferta-chk { display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.45; color:#3E4F68; margin:4px 0 10px; cursor:pointer; text-align:left; }
+.oferta-chk input { width:20px; height:20px; flex:none; margin:1px 0 0; accent-color:var(--blue); }
+.oferta-chk a { color:var(--blue); font-weight:700; }
+.oferta-promise { font-size:14px; background:#ECFDF3; border:1px solid #A7E8C3; border-radius:12px; padding:10px 12px; color:#14532D; }
 </style>
 </head>
 <body>
@@ -1434,6 +1447,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
   {% if not st.lifetime %}
   <div class="foot" id="foot1">
     <div class="row muted"><span>{{ T.sub_new_date }}</span><span id="newDate" style="font-family:var(--mono); color:var(--text); font-weight:600;"></span></div>
+    <label class="oferta-chk" id="ofertaBox"><input type="checkbox" id="ofertaChk"><span>{{ T.sub_oferta_agree|safe }}</span></label>
     <button class="btn" id="payBtn" type="button" onclick="{% if auto %}startAuto(){% else %}showStep(2){% endif %}"></button>
     {% if auto %}<div class="note" style="text-align:center;">{{ T.sub_auto_how }}</div>{% endif %}
   </div>
@@ -1468,6 +1482,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     <div class="ico green"><i class="fa-solid fa-check"></i></div>
     <h1>{{ T.sub_auto_ok_title }}</h1>
     <p class="p" id="okText"></p>
+    <p class="p oferta-promise">{{ T.sub_oferta_promise }}</p>
   </div>
   <div class="foot hidden" id="footOK"><a class="btn" href="/">{{ T.sub_auto_open }}</a></div>
   {% endif %}
@@ -1529,7 +1544,8 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     const r = current();
     document.querySelectorAll('[data-opt]').forEach(l => l.classList.toggle('sel', !!r && l.contains(r)));
     if (!r) { $('payBtn').disabled = true; $('payBtn').textContent = PAY_TPL.replace('{sum}', '—'); return; }
-    $('payBtn').disabled = false;
+    // без согласия с соглашением оплатить нельзя (сервер тоже проверяет)
+    $('payBtn').disabled = !($('ofertaChk') && $('ofertaChk').checked);
     const giftOn = {{ 'true' if gift else 'false' }};
     const giftTerm = r.value === '12' || r.value === 'lifetime';
     $('payBtn').textContent = PAY_TPL.replace('{sum}', r.dataset.amount) + (giftOn && giftTerm ? ' · ' + {{ T.sub_pay_gift|tojson }} : '');
@@ -1543,11 +1559,13 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     }
   }
   document.querySelectorAll('input[name=term]').forEach(i => i.addEventListener('change', refresh));
+  if ($('ofertaChk')) $('ofertaChk').addEventListener('change', refresh);
+  const OFERTA = { agree: '1', oferta_version: {{ oferta_version|tojson }} };
   refresh();
 
   window.showStep = function (n) {
     const r = current();
-    if (n === 2 && !r) return;
+    if (n === 2 && (!r || !($('ofertaChk') && $('ofertaChk').checked))) return;
     ['stepA', 'footA', 'stepOK', 'footOK'].forEach(id => { if ($(id)) $(id).classList.add('hidden'); });
     $('step1').classList.toggle('hidden', n !== 1);
     $('foot1').classList.toggle('hidden', n !== 1);
@@ -1615,7 +1633,7 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     if ($('aRetry')) { $('aRetry').disabled = true; }
     try {
       const res = await fetch('/api/subscription/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choice: r.value }) });
+        body: JSON.stringify(Object.assign({ choice: r.value }, OFERTA)) });
       let d = {};
       try { d = await res.json(); } catch (e) {}
       if (res.status === 401) { location.href = '/login'; return; }
@@ -1688,6 +1706,8 @@ h1 { margin:0; font-size:26px; font-weight:800; }
     const fd = new FormData();
     fd.append('choice', r.value);
     fd.append('receipt', f);
+    fd.append('agree', OFERTA.agree);
+    fd.append('oferta_version', OFERTA.oferta_version);
     try {
       const res = await fetch('/api/subscription/pay', { method: 'POST', body: fd });
       let data = {};

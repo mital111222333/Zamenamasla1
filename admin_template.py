@@ -733,17 +733,6 @@ if ('serviceWorker' in navigator) {
   <div id="admMap" style="display:none;">
     <div class="map-kpis" id="mapKpis"></div>
     <div class="map-bar">
-      <div class="map-seg" id="mapDaysSeg">
-        <button data-d="7" onclick="setMapDays(7)">7 дн</button>
-        <button class="on" data-d="30" onclick="setMapDays(30)">30 дн</button>
-        <button data-d="90" onclick="setMapDays(90)">3 мес</button>
-      </div>
-      <div class="map-seg" id="mapMetricSeg">
-        <button class="on" data-m="count" onclick="setMapMetric('count')">Замены</button>
-        <button data-m="total" onclick="setMapMetric('total')">Выручка</button>
-      </div>
-    </div>
-    <div class="map-bar">
       <div class="map-seg" id="mapSubSeg">
         <button class="on" data-s="all" onclick="setMapSub('all')">Все</button>
         <button data-s="paid" onclick="setMapSub('paid')">Оплачено</button>
@@ -773,7 +762,7 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
     <div class="map-legend">
-      <span><i class="dot" style="background:#16A34A"></i>замена за последние 3 дня</span>
+      <span><i class="dot" style="background:#16A34A"></i>активность за последние 3 дня</span>
       <span><i class="dot" style="background:#EAB308"></i>4–14 дней назад</span>
       <span><i class="dot" style="background:#DC2626"></i>больше 14 дней / не было</span>
       <span><i class="dot" style="background:#94A3B8"></i>выключена</span>
@@ -791,25 +780,11 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
     <div id="anaFilters">
-    <div class="ana-sel">
-      <select id="anaGroup" onchange="anaGroup=this.value; anaShop=0; renderAna();"></select>
-      <select id="anaShopSel" onchange="anaShop=Number(this.value)||0; renderAna();"></select>
-    </div>
     <div class="ana-chips" id="anaCats"></div>
     </div>
     <div id="anaBody"><div class="hint-text">Загружаю…</div></div>
   </div>
 </div>
-<div class="snap-ov" id="snapOv" onclick="if (event.target === this) closeSnapshot()">
-  <div class="snap-box">
-    <div class="snap-head">
-      <div><div class="sh-name" id="snapName">—</div><div class="sh-sub" id="snapSub"></div></div>
-      <button class="sh-x" onclick="closeSnapshot()" aria-label="Закрыть">✕</button>
-    </div>
-    <div class="snap-body" id="snapBody"></div>
-  </div>
-</div>
-
 <script>
 function showMsg(text, ok) {
   const el = document.getElementById('msg');
@@ -1769,11 +1744,10 @@ async function loadShops() {
 
   const st = document.getElementById('admStats');
   const active = allShopsCache.filter(s => s.is_active).length;
-  const clients = allShopsCache.reduce((a, s) => a + (s.client_count || 0), 0);
   st.innerHTML = `
     <div class="adm-stat"><b>${allShopsCache.length}</b><span>точек</span></div>
     <div class="adm-stat"><b>${active}</b><span>активных</span></div>
-    <div class="adm-stat"><b>${clients.toLocaleString('ru-RU')}</b><span>клиентов</span></div>`;
+    <div class="adm-stat"><b>${allShopsCache.filter(s => (s.sub || {}).expired).length}</b><span>не оплачено</span></div>`;
   filterShops();
 }
 
@@ -1835,7 +1809,6 @@ function renderShopsTable(shops) {
       </div>
 
       <div class="sc-meta">
-        <span><i class="fa-solid fa-users"></i> ${s.client_count} клиентов</span>
         ${s.phone ? `<span><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone)}</span>` : ''}
         ${s.notify_telegram_id ? '<span class="ok"><i class="fa-brands fa-telegram"></i> Telegram</span>' : '<span class="no"><i class="fa-brands fa-telegram"></i> нет Telegram</span>'}
       </div>
@@ -1978,7 +1951,7 @@ async function loadBranches(shopId) {
   const list = branches.length ? branches.map(b => `
     <div style="padding:8px 0; border-bottom:1px dashed var(--border); font-size:13px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <span>${escapeHtml(b.shop_name || b.username)} <span class="hint-text">(${b.username}, клиентов: ${b.client_count})</span></span>
+        <span>${escapeHtml(b.shop_name || b.username)} <span class="hint-text">(${b.username})</span></span>
         <span style="display:flex; align-items:center; gap:8px;">
           <span class="hint-text">🔒 скрыт</span>
           <button class="badge" style="background:var(--border);color:var(--hint);" onclick="resetPassword(${b.id}, ${escapeHtml(JSON.stringify(b.username))})">сбросить</button>
@@ -2443,10 +2416,10 @@ function mapStatus(p) {
 }
 function mapIdleText(p) {
   if (!p.is_active) return 'Точка выключена';
-  if (!p.last_date) return 'Замен ещё не было';
-  if (p.days_idle === 0) return `Сегодня замен: ${p.today}`;
-  if (p.days_idle === 1) return 'Последняя замена вчера';
-  return `Последняя замена ${p.days_idle} дн. назад`;
+  if (!p.last_date) return 'Записей ещё не было';
+  if (p.days_idle === 0) return 'Работала сегодня';
+  if (p.days_idle === 1) return 'Последняя активность вчера';
+  return `Последняя активность ${p.days_idle} дн. назад`;
 }
 function mapKindText(p) {
   if (p.kind === 'branch') return 'Филиал · ' + escapeHtml(p.parent_name || p.parent_username || '');
@@ -2516,14 +2489,12 @@ function renderMap() {
   const withXY = pts.filter(p => p.lat !== null && p.lon !== null);
   const noXY = pts.filter(p => p.lat === null || p.lon === null);
   const all = MAPDATA.points;
-  const sum = (arr, k) => arr.reduce((a, p) => a + (Number(p[k]) || 0), 0);
-  const per = MAPDATA.days === 7 ? '7 дней' : MAPDATA.days === 90 ? '3 месяца' : '30 дней';
 
   document.getElementById('mapKpis').innerHTML = `
     <div class="map-kpi"><b>${withXY.length} <small style="font-size:13px;color:#94A3B8">из ${all.length}</small></b><span>на карте</span></div>
-    <div class="map-kpi"><b style="color:#16A34A">${all.filter(p => p.is_active && p.today > 0).length}</b><span>работали сегодня</span></div>
+    <div class="map-kpi"><b style="color:#16A34A">${all.filter(p => p.is_active && p.days_idle === 0).length}</b><span>работали сегодня</span></div>
     <div class="map-kpi"><b style="color:#DC2626">${all.filter(p => mapStatus(p) === 'red').length}</b><span>молчат больше 14 дней</span></div>
-    <div class="map-kpi"><b>${fmtShort(sum(pts, 'total'))}</b><span>${sum(pts, 'count').toLocaleString('ru-RU')} замен · ${per}</span></div>`;
+    <div class="map-kpi"><b style="color:#DC2626">${all.filter(p => p.sub_status === 'blocked').length}</b><span>не оплачено</span></div>`;
   const subCnt = k => all.filter(p => p.sub_status === k).length;
   [['all', 'Все', all.length], ['paid', 'Оплачено', subCnt('paid')], ['soon', 'Скоро истекает', subCnt('soon')],
    ['blocked', 'Заблокировано', subCnt('blocked')]].forEach(([k, t, n]) => {
@@ -2543,7 +2514,7 @@ function renderMap() {
       }
     });
   }
-  withXY.slice().sort((a, b) => (Number(b[mapMetric]) || 0) - (Number(a[mapMetric]) || 0)).forEach(p => {
+  withXY.forEach(p => {
     const st = mapStatus(p);
     const r = 9;  // одинаковый размер у всех точек, цвет — по активности
     const m = L.circleMarker([p.lat, p.lon], {
@@ -2573,53 +2544,37 @@ function renderMap() {
     nc.style.display = 'none';
   }
 
-  const ranked = pts.slice().sort((a, b) => (Number(b[mapMetric]) || 0) - (Number(a[mapMetric]) || 0));
-  document.getElementById('mapRating').innerHTML = `<h3><i class="fa-solid fa-ranking-star" style="color:#EAB308"></i> Рейтинг за ${per} — по ${mapMetric === 'total' ? 'выручке' : 'заменам'}</h3>` +
+  // по активности: давно молчащие — вверху (им нужна помощь). Выручку и
+  // замены точек админ не видит — это данные точки.
+  const idle = p => (p.days_idle === null || p.days_idle === undefined) ? 1e9 : p.days_idle;
+  const ranked = pts.slice().sort((a, b) => idle(b) - idle(a));
+  document.getElementById('mapRating').innerHTML = `<h3><i class="fa-solid fa-store" style="color:var(--blue)"></i> Точки — по активности</h3>` +
     (ranked.length ? ranked.map((p, i) => `<div class="map-row" onclick="mapFocus(${p.id})">
         <span class="mr-n">${i + 1}</span>
         <span class="mr-dot" style="background:${MAP_COLORS[mapStatus(p)]}"></span>
         <span class="mr-name">${escapeHtml(p.shop_name || p.username)}<small>${mapKindText(p)} · ${mapIdleText(p)}</small></span>
-        <span class="mr-val">${mapMetric === 'total' ? fmtShort(p.total) : p.count + ' зам.'}<small>${mapPctHtml(p.pct)}</small></span>
+        <span class="mr-val" style="color:${MAP_SUB_COLORS[p.sub_status] || '#94A3B8'};font-size:12px">${p.sub_status === 'blocked' ? 'не оплачено' : p.sub_status === 'soon' ? 'скоро срок' : p.sub_status === 'unset' ? 'без даты' : 'оплачено'}</span>
       </div>`).join('') : '<div class="hint-text" style="padding:12px 14px">Нет точек под этот фильтр.</div>');
 }
 
 function mapPopupHtml(p) {
   const st = mapStatus(p);
   const addr = [p.address, p.hours].filter(Boolean).map(escapeHtml).join(' · ');
-  const per = MAPDATA.days === 7 ? '7 дн' : MAPDATA.days === 90 ? '3 мес' : '30 дн';
   return `<div class="map-pop">
     <div class="mp-name">${escapeHtml(p.shop_name || p.username)}</div>
     <div class="mp-kind">${mapKindText(p)}${p.client_group ? ' · ' + escapeHtml(p.client_group) : ''}</div>
     <div class="mp-st" style="color:${MAP_COLORS[st]}">● ${mapIdleText(p)}</div>
     <div class="mp-st" style="color:${MAP_SUB_COLORS[p.sub_status] || '#94A3B8'}"><i class="fa-solid fa-credit-card"></i> ${mapSubText(p)}</div>
-    <div class="mp-grid">
-      <div><b>${p.count}</b>замен · ${per}</div>
-      <div><b>${fmtShort(p.total)}</b>выручка ${mapPctHtml(p.pct)}</div>
-      <div><b>${fmtShort(p.avg)}</b>средний чек</div>
-      <div><b>${p.clients}</b>клиентов · всего ${p.client_count}</div>
-    </div>
     ${addr ? `<div class="mp-addr"><i class="fa-solid fa-location-dot"></i> ${addr}</div>` : ''}
     ${p.phone ? `<div class="mp-addr"><i class="fa-solid fa-phone"></i> <a href="tel:${escapeHtml(p.phone)}">${escapeHtml(p.phone)}</a></div>` : ''}
-    <button class="mp-snap" onclick="openSnapshot(${p.id})"><i class="fa-solid fa-oil-can"></i> Статистика, склад и поставщики</button>
     <div class="mp-act">
       <button class="b2" onclick="mapOpenCard(${p.id})">Карточка</button>
       <a class="b2" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}">Маршрут</a>
-      <button class="b2" onclick="anaOpenFromMap(${p.id})">Аналитика</button>
       <button class="b2" onclick="mapStartPick(${p.id})">Переместить</button>
     </div>
   </div>`;
 }
 
-function setMapDays(d) {
-  mapDays = d;
-  document.querySelectorAll('#mapDaysSeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.d) === d));
-  loadMap();
-}
-function setMapMetric(m) {
-  mapMetric = m;
-  document.querySelectorAll('#mapMetricSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
-  renderMap();
-}
 function setMapSub(s) {
   mapSub = s;
   document.querySelectorAll('#mapSubSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
@@ -2696,10 +2651,10 @@ async function mapSaveLocation(id, lat, lon) {
     mapSaving = false;
   }
 }
-// ---------- Аналитика продаж: бренды, доля MITAL, цены, возможности ----------
+// ---------- Общая аналитика платформы: без точек, денег и цен ----------
 let ANA_CATLIST = [];
-let anaView = 'main', NAMES = null, nmTab = 'review', nmEdit = null, nmSearch = '', PRICEPROB = null, ppShop = 0;
-let ANA = null, anaDays = 30, anaGroup = '', anaShop = 0, anaCat = 'all', anaProduct = '', anaLoading = false;
+let anaView = 'main', NAMES = null, nmTab = 'review', nmEdit = null, nmSearch = '';
+let ANA = null, anaDays = 30, anaCat = 'all', anaLoading = false;
 const ANA_CATS = [
   ['all', 'Все товары'], ['fluid_0', 'Моторное'], ['fluid_1', 'АКПП/МКПП'], ['fluid_2', 'Антифриз'],
   ['fluid_3', 'Тормозная'], ['fluid_4', 'Редуктор'], ['filters', 'Фильтры'], ['other', 'Прочие товары']
@@ -2723,31 +2678,9 @@ async function loadAna() {
 function setAnaDays(d) {
   anaDays = d;
   document.querySelectorAll('#anaDaysSeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.d) === d));
-  if (anaView === 'prices') { PRICEPROB = null; renderPriceProblems(); loadPriceProblems(); }
   loadAna();
 }
-function setAnaCat(c) { anaCat = c; anaProduct = ''; renderAna(); }
-function anaPickShop(id) {
-  anaShop = id || 0;
-  renderAna();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-function anaOpenFromMap(id) {
-  anaView = 'main';
-  document.getElementById('anaFilters').style.display = '';
-  document.getElementById('anaDaysBar').style.display = '';
-  admTab('analytics');
-  anaShop = id;
-  if (ANA) renderAna();
-}
-function anaPickProduct(key) {
-  anaProduct = key;
-  renderAna();
-  const el = document.getElementById('anaPrices');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function anaKey(k) { return encodeURIComponent(k).replace(/'/g, '%27'); }
+function setAnaCat(c) { anaCat = c; renderAna(); }
 function anaCatOk(c) {
   return anaCat === 'all' || c === anaCat || (anaCat === 'filters' && String(c).indexOf('filter_') === 0);
 }
@@ -2756,256 +2689,60 @@ function anaCatLabel(c) {
   const f = (ANA.categories || []).find(x => x.key === c);
   return f ? f.label : c;
 }
-function anaPoint(id) { return ANA.points.find(p => p.id === id); }
-function anaPointName(p) { return p ? (p.shop_name || p.username) : '—'; }
-function anaPointSub(p) {
-  if (!p) return '';
-  if (p.kind === 'branch') return 'филиал · ' + escapeHtml(p.parent_name || '');
-  if (p.kind === 'main') return 'главная точка';
-  return 'самостоятельная';
-}
-// точки в рамках выбранной сети (без учёта выбранной точки)
-function anaGroupIds() {
-  const ids = new Set();
-  ANA.points.forEach(p => { if (!anaGroup || (p.client_group || '') === anaGroup) ids.add(p.id); });
-  return ids;
-}
-function anaRows(withShop) {
-  const ids = anaGroupIds();
-  return ANA.rows.filter(r => ids.has(r.s) && anaCatOk(r.c) && (!withShop || !anaShop || r.s === anaShop));
-}
-function anaTotals(rows) {
-  const t = { t: 0, m: 0, cs: 0, ct: 0, bad: 0, q: 0, ut: 0 };
-  rows.forEach(r => { t.t += r.t; t.q += r.q; t.cs += r.cs; t.ct += r.ct; t.bad += r.bad; t.ut += r.ut || 0; if (r.m) t.m += r.t; });
-  t.share = t.t ? Math.round(t.m / t.t * 100) : null;
-  t.markup = t.cs ? Math.round((t.ct - t.cs) / t.cs * 100) : null;
-  return t;
-}
-function anaQuality(ids) {
-  let lines = 0, stock = 0, cost = 0;
-  ANA.points.forEach(p => { if (ids.has(p.id)) { lines += p.quality.lines; stock += p.quality.stock; cost += p.quality.cost; } });
-  return { lines, stock, cost, stockPct: lines ? Math.round(stock / lines * 100) : null, costPct: lines ? Math.round(cost / lines * 100) : null };
-}
-function anaPct(v) { return v === null || v === undefined ? '—' : v + '%'; }
-function anaMoney(v) { return v === null || v === undefined || isNaN(v) ? '—' : Math.round(v).toLocaleString('ru-RU'); }
 function anaQty(q, unit) {
   const n = Math.round(q * 10) / 10;
   return n.toLocaleString('ru-RU') + ' ' + unit;
 }
-// бренды: сумма, количество (если единица одна), доля
-function anaBrands(rows) {
-  const by = {};
-  rows.forEach(r => {
-    const k = r.b || '—';
-    const b = by[k] = by[k] || { name: k === '—' ? 'без марки' : k, t: 0, q: 0, units: new Set(), m: r.m };
-    b.t += r.t; b.q += r.q; b.units.add(anaUnit(r.c));
-  });
-  return Object.values(by).sort((a, b) => b.t - a.t);
-}
-// товары: агрегируем по категории + названию
-function anaProducts(rows) {
-  const by = {};
-  rows.forEach(r => {
-    const k = r.c + '|' + r.k;
-    const p = by[k] = by[k] || { key: k, name: r.p || 'без названия', c: r.c, m: r.m, t: 0, q: 0, pt: 0, pq: 0, cs: 0, cq: 0, ct: 0, bad: 0, shops: new Set() };
-    p.t += r.t; p.q += r.q; p.pt += r.pt; p.pq += r.pq; p.cs += r.cs; p.cq += r.cq; p.ct += r.ct; p.bad += r.bad; p.shops.add(r.s);
-  });
-  return Object.values(by).sort((a, b) => b.t - a.t);
-}
-function anaMarkupHtml(ct, cs) {
-  if (!cs) return '<span class="ana-mute">—</span>';
-  const v = Math.round((ct - cs) / cs * 100);
-  return `<span class="${v < 10 ? 'ana-bad' : ''}">${v}%</span>`;
-}
 
+// Общая картина по всей платформе. Данные каждой точки — её собственность:
+// без названий точек, без денег, цен и закупок, только товары, которые
+// продают не меньше ANA.min_shops точек (соглашение с клиентами, раздел 5).
 function renderAna() {
   if (anaView === 'names') { renderNames(); return; }
-  if (anaView === 'prices') { renderPriceProblems(); return; }
   if (!ANA) return;
   document.getElementById('anaFilters').style.display = '';
-  // фильтры: сеть, точка, категория
-  const groups = [...new Set(ANA.points.map(p => p.client_group).filter(Boolean))].sort();
-  const gSel = document.getElementById('anaGroup');
-  gSel.innerHTML = '<option value="">Все сети</option>' + groups.map(g =>
-    `<option value="${escapeHtml(g)}"${g === anaGroup ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('');
-  gSel.style.display = groups.length ? '' : 'none';
-  const ids = anaGroupIds();
-  if (anaShop && !ids.has(anaShop)) anaShop = 0;
-  const sSel = document.getElementById('anaShopSel');
-  sSel.innerHTML = `<option value="0">Все точки (${ids.size})</option>` + ANA.points.filter(p => ids.has(p.id)).map(p =>
-    `<option value="${p.id}"${p.id === anaShop ? ' selected' : ''}>${escapeHtml(anaPointName(p))}${p.kind === 'branch' ? ' (филиал)' : ''}</option>`).join('');
   document.getElementById('anaCats').innerHTML = ANA_CATS.map(([k, l]) =>
     `<button class="${k === anaCat ? 'on' : ''}" onclick="setAnaCat('${k}')">${l}</button>`).join('');
-
-  const rows = anaRows(true);
-  const netRows = anaRows(false);
-  const tot = anaTotals(rows);
-  const netTot = anaTotals(netRows);
-  const scopeIds = anaShop ? new Set([anaShop]) : ids;
-  const ql = anaQuality(scopeIds);
-  const netQl = anaQuality(ids);
+  const rows = ANA.rows.filter(r => anaCatOk(r.c));
   const per = anaDays === 365 ? 'год' : anaDays === 90 ? '3 месяца' : '30 дней';
-  const vsNet = (v, n) => anaShop ? `<small style="display:block;font-size:11px;color:#94A3B8;font-weight:500">сеть: ${n}</small>` : '';
-  let h = '';
-
-  // ---- 1. ключевые цифры ----
+  let h = `<div class="ana-note" style="margin-bottom:10px"><i class="fa-solid fa-user-shield"></i> Данные каждой точки принадлежат ей. Здесь только общая картина по всей платформе: без названий точек, без денег, цен и закупок — и только товары, которые продают не меньше ${ANA.min_shops} точек.</div>`;
   h += `<div class="map-kpis">
-    <div class="map-kpi"><b>${fmtShort(tot.t)}</b><span>продажи товаров · ${per}</span></div>
-    <div class="map-kpi"><b style="color:#B45309">${anaPct(tot.share)}</b><span>доля MITAL по сумме</span>${vsNet(tot.share, anaPct(netTot.share))}</div>
-    <div class="map-kpi"><b>${anaPct(tot.markup)}</b><span>средняя наценка</span>${vsNet(tot.markup, anaPct(netTot.markup))}</div>
-    <div class="map-kpi"><b style="color:${ql.stockPct !== null && ql.stockPct < 50 ? '#DC2626' : '#16A34A'}">${anaPct(ql.stockPct)}</b><span>позиций со склада</span>${vsNet(ql.stockPct, anaPct(netQl.stockPct))}</div>
+    <div class="map-kpi"><b>${ANA.shop_count}</b><span>точек на платформе</span></div>
+    <div class="map-kpi"><b>${rows.length}</b><span>товаров в общей картине · ${per}</span></div>
+    <div class="map-kpi"><b class="${ANA.unresolved_pct >= 5 ? 'ana-bad' : ''}">${ANA.unresolved_pct}%</b><span>названий не распознано</span></div>
   </div>`;
+  h += `<div class="ana-dq"><div class="dq-txt"><b>Точность названий</b><br>Чем меньше нераспознанных названий, тем точнее каждая точка видит свою собственную статистику брендов.</div>
+    <div class="dq-act"><button class="ana-btn" onclick="anaOpenView('names')"><i class="fa-solid fa-spell-check"></i> Сопоставление</button></div></div>`;
   if (!rows.length) {
-    h += '<div class="ana-card"><div class="hint-text" style="padding:14px">За этот период и фильтр продаж товаров нет.</div></div>';
+    h += `<div class="ana-card"><div class="hint-text" style="padding:14px">Пока нет товаров, которые продают ${ANA.min_shops}+ точек, — общая картина появится, когда точек станет больше.</div></div>`;
     document.getElementById('anaBody').innerHTML = h;
     return;
   }
-  const utPct = tot.t ? Math.round(tot.ut / tot.t * 1000) / 10 : 0;
-  h += `<div class="ana-dq">
-    <div class="dq-txt"><b>Точность данных</b><br>
-      ${utPct > 0 ? `<span class="${utPct >= 5 ? 'ana-bad' : ''}">Не распознано: ${utPct}% продаж (${fmtShort(tot.ut)})</span>` : '<span class="ana-good">Все названия распознаны ✓</span>'}
-      · ${tot.bad ? `<span class="ana-bad">подозрительных цен: ${tot.bad}</span> — не входят в цены и наценку` : '<span class="ana-good">подозрительных цен нет</span>'}</div>
-    <div class="dq-act"><button class="ana-btn" onclick="anaOpenView('names')"><i class="fa-solid fa-spell-check"></i> Сопоставление</button>
-      <button class="ana-btn" onclick="anaOpenView('prices')"><i class="fa-solid fa-triangle-exclamation"></i> Проблемные цены</button></div>
-  </div>`;
-
-  // ---- 3. карточка выбранной точки ----
-  if (anaShop) {
-    const p = anaPoint(anaShop);
-    const oilRows = ANA.rows.filter(r => r.s === anaShop && r.c === 'fluid_0');
-    const netOil = ANA.rows.filter(r => ids.has(r.s) && r.c === 'fluid_0');
-    const lp = rs => { const q = rs.reduce((a, r) => a + r.pq, 0); return q ? rs.reduce((a, r) => a + r.pt, 0) / q : null; };
-    const cp = rs => { const q = rs.reduce((a, r) => a + r.cq, 0); return q ? rs.reduce((a, r) => a + r.cs, 0) / q : null; };
-    h += `<div class="ana-card"><h3><i class="fa-solid fa-store" style="color:var(--blue)"></i> ${escapeHtml(anaPointName(p))}<small>${anaPointSub(p)}</small></h3>
-      <div class="ana-cmp">
-        <div><b>${anaMoney(lp(oilRows))}</b>моторное масло, сум/л · сеть ${anaMoney(lp(netOil))}</div>
-        <div><b>${anaMoney(cp(oilRows))}</b>закупка масла, сум/л · сеть ${anaMoney(cp(netOil))}</div>
-        <div><b>${anaPct(ql.costPct)}</b>позиций с ценой закупки · сеть ${anaPct(netQl.costPct)}</div>
-        <div><b>${ql.lines}</b>проданных позиций за ${per}</div>
-      </div>
-      <div class="ana-note">${ql.stockPct !== null && ql.stockPct < 50 ? '⚠️ Больше половины масла и фильтров точка вписывает вручную, не со склада — наценка и закупка по ним неизвестны. Цифры точки пока неполные.' : 'Данные точки достаточно полные: большая часть товаров выбирается со склада.'}</div>
-      <div style="padding:10px 14px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="ana-btn" onclick="anaPickShop(0)"><i class="fa-solid fa-arrow-left"></i> Вся сеть</button>
-        <button class="ana-btn" onclick="openSnapshot(${anaShop})"><i class="fa-solid fa-oil-can"></i> Статистика и склад точки</button>
-        <button class="ana-btn" onclick="admTab('map'); setTimeout(() => { if (MAPDATA) mapFocus(${anaShop}); }, 600);"><i class="fa-solid fa-map-location-dot"></i> На карте</button>
-      </div></div>`;
-  }
-
-  // ---- 1. бренды ----
-  const brands = anaBrands(rows);
-  const top = brands.slice(0, 12);
-  const rest = brands.slice(12);
-  h += `<div class="ana-card"><h3><i class="fa-solid fa-tags" style="color:#EAB308"></i> Бренды — что продаётся<small>по сумме</small></h3>` +
-    top.map(b => {
-      const share = tot.t ? Math.round(b.t / tot.t * 1000) / 10 : 0;
-      const qty = b.units.size === 1 ? anaQty(b.q, [...b.units][0]) : '';
-      return `<div class="ana-row"><div class="ar-main">
-        <div class="ar-name">${escapeHtml(b.name)}${b.m ? '<span class="mital-tag">MITAL</span>' : ''}</div>
-        <div class="ar-bar"><i class="${b.m ? 'mital' : ''}" style="width:${Math.max(2, Math.min(100, share))}%"></i></div>
-      </div><div class="ar-val">${fmtShort(b.t)}<small>${share}%${qty ? ' · ' + qty : ''}</small></div></div>`;
-    }).join('') +
-    (rest.length ? `<div class="ana-row"><div class="ar-main"><div class="ar-name ana-mute">Остальные (${rest.length})</div></div><div class="ar-val">${fmtShort(rest.reduce((a, b) => a + b.t, 0))}</div></div>` : '') +
-    '</div>';
-
-  // ---- 1. топ товаров ----
-  const prods = anaProducts(rows);
-  h += `<div class="ana-card"><h3><i class="fa-solid fa-ranking-star" style="color:var(--blue)"></i> Топ товаров<small>нажми — цены по точкам</small></h3>
-    <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Товар</th><th>Цена</th><th>Закупка</th><th>Нац.</th></tr>` +
-    prods.slice(0, 15).map(p => `<tr class="click" onclick="anaPickProduct('${anaKey(p.key)}')">
-      <td>${escapeHtml(p.name)}${p.m ? '<span class="mital-tag">MITAL</span>' : ''}${p.bad ? ' ⚠️' : ''}<div class="ar-sub">${escapeHtml(anaCatLabel(p.c))} · ${anaQty(p.q, anaUnit(p.c))} · ${fmtShort(p.t)} сум</div></td>
-      <td>${anaMoney(p.pq ? p.pt / p.pq : null)}</td>
-      <td>${p.cq ? anaMoney(p.cs / p.cq) : '<span class="ana-mute">—</span>'}</td>
-      <td>${anaMarkupHtml(p.ct, p.cs)}</td></tr>`).join('') +
-    '</table></div></div>';
-
-  // ---- 2. цены по точкам ----
-  const netProds = anaProducts(netRows).filter(p => p.shops.size >= 1);
-  if (!anaProduct || !netProds.find(p => anaKey(p.key) === anaProduct)) {
-    const first = netProds.find(p => p.shops.size > 1) || netProds[0];
-    anaProduct = first ? anaKey(first.key) : '';
-  }
-  const cur = netProds.find(p => anaKey(p.key) === anaProduct);
-  if (cur) {
-    const unit = anaUnit(cur.c);
-    const pr = netRows.filter(r => r.c + '|' + r.k === cur.key).sort((a, b) => (b.pq ? b.pt / b.pq : 0) - (a.pq ? a.pt / a.pq : 0));
-    const sales = pr.filter(r => r.pq > 0).map(r => r.pt / r.pq);
-    const costs = pr.filter(r => r.cq > 0).map(r => r.cs / r.cq);
-    const mn = a => a.length ? Math.min(...a) : null, mx = a => a.length ? Math.max(...a) : null;
-    const minS = mn(sales), maxS = mx(sales), minC = mn(costs), maxC = mx(costs);
-    const multi = pr.length > 1;
-    h += `<div class="ana-card" id="anaPrices"><h3><i class="fa-solid fa-scale-balanced" style="color:#16A34A"></i> Цены по точкам</h3>
-      <div style="padding:10px 14px 4px"><select style="width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:13px;font-family:inherit;background:#fff" onchange="anaPickProduct(this.value)">` +
-      netProds.slice(0, 200).map(p => `<option value="${anaKey(p.key)}"${anaKey(p.key) === anaProduct ? ' selected' : ''}>${escapeHtml(p.name)} — ${p.shops.size} точ.</option>`).join('') +
-      `</select></div>
-      <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Точка</th><th>Цена/${unit}</th><th>Закупка</th><th>Нац.</th></tr>` +
-      pr.map(r => {
-        const sp = r.pq ? r.pt / r.pq : null, cp = r.cq ? r.cs / r.cq : null;
-        const p = anaPoint(r.s);
-        const sCls = multi && sp === maxS ? 'ana-bad' : multi && sp === minS ? 'ana-good' : '';
-        const cCls = multi && cp !== null && costs.length > 1 && cp === minC ? 'ana-good' : multi && cp !== null && costs.length > 1 && cp === maxC ? 'ana-bad' : '';
-        return `<tr class="click${r.s === anaShop ? ' sum' : ''}" onclick="anaPickShop(${r.s})"><td>${escapeHtml(anaPointName(p))}${r.bad ? ' ⚠️' : ''}<div class="ar-sub">${anaPointSub(p)} · ${anaQty(r.q, unit)}</div></td>
-          <td class="${sCls}">${anaMoney(sp)}</td>
-          <td class="${cCls}">${cp === null ? '<span class="ana-mute">—</span>' : anaMoney(cp)}</td><td>${anaMarkupHtml(r.ct, r.cs)}</td></tr>`;
-      }).join('') +
-      ''+
-      `</table></div>` +
-      (multi ? `<div class="ana-range">Продажа за ${unit}: мин <b>${anaMoney(minS)}</b> · средн. <b>${anaMoney(cur.pq ? cur.pt / cur.pq : null)}</b> · макс <b>${anaMoney(maxS)}</b>` +
-        (costs.length ? `<br>Закупка за ${unit}: мин <b>${anaMoney(minC)}</b> · средн. <b>${anaMoney(cur.cs / cur.cq)}</b> · макс <b>${anaMoney(maxC)}</b>` : '') +
-        `<br>Всего продано: <b>${anaQty(cur.q, unit)}</b> · наценка по сети ${anaMarkupHtml(cur.ct, cur.cs)}</div>` : '') +
-      `<div class="ana-note">Зелёный — самая низкая цена, красный — самая высокая. Нажми на точку, чтобы открыть её аналитику.</div></div>`;
-  }
-
-  // ---- 3. сравнение точек (только для всей сети) ----
-  if (!anaShop) {
-    const per_shop = {};
-    netRows.forEach(r => { (per_shop[r.s] = per_shop[r.s] || []).push(r); });
-    const list = ANA.points.filter(p => ids.has(p.id)).map(p => ({ p, t: anaTotals(per_shop[p.id] || []), q: p.quality }))
-      .sort((a, b) => b.t.t - a.t.t);
-    h += `<div class="ana-card"><h3><i class="fa-solid fa-store" style="color:var(--blue)"></i> Точки<small>нажми — аналитика точки</small></h3>
-      <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Точка</th><th>Продажи</th><th>MITAL</th><th>Нац.</th><th>Склад</th></tr>` +
-      list.map(x => {
-        const sp = x.q.lines ? Math.round(x.q.stock / x.q.lines * 100) : null;
-        return `<tr class="click" onclick="anaPickShop(${x.p.id})"><td>${escapeHtml(anaPointName(x.p))}<div class="ar-sub">${anaPointSub(x.p)}</div></td>
-        <td>${fmtShort(x.t.t)}</td><td style="color:#B45309">${anaPct(x.t.share)}</td><td>${anaPct(x.t.markup)}</td>
-        <td class="${sp !== null && sp < 50 ? 'ana-bad' : ''}">${anaPct(sp)}</td></tr>`;
-      }).join('') + '</table></div><div class="ana-note">Нац. — средняя наценка. Склад — какая доля масла и фильтров выбрана со склада: чем выше, тем точнее цифры точки.</div></div>';
-  }
-
-  // ---- 4. возможности для продаж ----
-  const opp = {};
-  netRows.forEach(r => {
-    if (anaShop && r.s !== anaShop) return;
-    const o = opp[r.s] = opp[r.s] || { s: r.s, other: 0, mital: 0, brands: {} };
-    if (r.m) o.mital += r.t; else o.other += r.t;
-    const b = o.brands[r.b || 'без марки'] = o.brands[r.b || 'без марки'] || { name: r.b || 'без марки', t: 0, q: 0, units: new Set(), m: r.m };
-    b.t += r.t; b.q += r.q; b.units.add(anaUnit(r.c));
+  const by = {};
+  rows.forEach(r => {
+    const k = r.b || 'без марки';
+    const b = by[k] = by[k] || { name: k, q: 0, units: new Set() };
+    b.q += r.q; b.units.add(anaUnit(r.c));
   });
-  const oppList = Object.values(opp).filter(o => o.other > 0).sort((a, b) => b.other - a.other);
-  h += `<div class="ana-card"><h3><i class="fa-solid fa-bullseye" style="color:#DC2626"></i> Возможности для продаж<small>что точки берут у других</small></h3>
-    <div class="ana-note">Сколько точка продала товаров других брендов — это объём, который можно предложить заменить. Жёлтым — бренды MITAL.</div>` +
-    (oppList.length ? oppList.slice(0, 30).map(o => {
-      const p = anaPoint(o.s);
-      const all = o.other + o.mital;
-      const share = all ? Math.round(o.mital / all * 100) : 0;
-      const bs = Object.values(o.brands).sort((a, b) => b.t - a.t).slice(0, 6);
-      return `<div class="ana-row click" onclick="anaPickShop(${o.s})"><div class="ar-main">
-        <div class="ar-name">${escapeHtml(anaPointName(p))} <span class="ar-sub" style="display:inline">${anaPointSub(p)}</span></div>
-        <div class="ana-brands">${bs.map(b => `<span class="${b.m ? 'm' : ''}">${escapeHtml(b.name)} ${b.units.size === 1 ? anaQty(b.q, [...b.units][0]) : fmtShort(b.t)}</span>`).join('')}</div>
-        <div class="ar-bar"><i class="mital" style="width:${Math.max(share ? 2 : 0, share)}%"></i></div>
-      </div><div class="ar-val ana-bad">${fmtShort(o.other)}<small>MITAL ${share}%</small></div></div>`;
-    }).join('') : '<div class="hint-text" style="padding:12px 14px">Здесь все продажи — бренды MITAL. 👍</div>') +
-    '</div>';
-
+  const brands = Object.values(by).sort((a, b) => b.q - a.q).slice(0, 15);
+  const maxQ = brands.length ? brands[0].q : 0;
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-tags" style="color:#EAB308"></i> Бренды на платформе<small>по количеству</small></h3>` +
+    brands.map(b => `<div class="ana-row"><div class="ar-main"><div class="ar-name">${escapeHtml(b.name)}</div>
+      <div class="ar-bar"><i style="width:${maxQ ? Math.max(2, Math.round(b.q / maxQ * 100)) : 0}%"></i></div></div>
+      <div class="ar-val">${b.units.size === 1 ? anaQty(b.q, [...b.units][0]) : '—'}</div></div>`).join('') + '</div>';
+  h += `<div class="ana-card"><h3><i class="fa-solid fa-ranking-star" style="color:var(--blue)"></i> Популярные товары</h3>
+    <div class="ana-tbl-wrap"><table class="ana-tbl"><tr><th>Товар</th><th>Продано</th><th>Точек</th></tr>` +
+    rows.slice(0, 20).map(p => `<tr><td>${escapeHtml(p.p || 'без названия')}<div class="ar-sub">${escapeHtml(anaCatLabel(p.c))}</div></td>
+      <td>${anaQty(p.q, anaUnit(p.c))}</td><td>${p.shops}</td></tr>`).join('') + '</table></div></div>';
   document.getElementById('anaBody').innerHTML = h;
 }
-// ---------- Сопоставление названий и проблемные цены ----------
+// ---------- Сопоставление названий ----------
 function anaOpenView(v) {
   anaView = v;
   nmEdit = null;
   document.getElementById('anaFilters').style.display = v === 'main' ? '' : 'none';
   document.getElementById('anaDaysBar').style.display = v === 'names' ? 'none' : '';
   if (v === 'names') { renderNames(); loadNames(); }
-  else if (v === 'prices') { renderPriceProblems(); loadPriceProblems(); }
   else { if (ANA) renderAna(); loadAna(); }
   window.scrollTo(0, 0);
 }
@@ -3034,7 +2771,6 @@ function renderNames() {
     <div class="ana-note">Точки вписывают названия по-разному («Митанол», «Mitonol 5-30»). Здесь ты один раз указываешь, что это за товар, — и аналитика всей сети, включая прошлое, сразу считается правильно. Данные самих точек не меняются.</div>
     <div class="ana-cmp">
       <div><b class="${N.unresolved_pct >= 5 ? 'ana-bad' : ''}">${N.unresolved_pct}%</b>продаж не распознано</div>
-      <div><b>${fmtShort(N.unresolved_sum)}</b>сумма нераспознанных</div>
       <div><b>${N.review.length}</b>названий проверить</div>
       <div><b>${N.auto.length}</b>исправлено автоматически</div>
     </div></div>`;
@@ -3077,7 +2813,7 @@ function renderNamesList() {
 
 function nmCard(g, i) {
   const spell = (g.spellings && g.spellings.length) ? g.spellings : [g.raw];
-  const meta = g.lines ? `${g.shops} точ. · ${g.lines} продаж · ${fmtShort(g.sum)} сум${g.cats.length ? ' · ' + escapeHtml(nmCats(g.cats)) : ''}` : 'в продажах за год не встречалось';
+  const meta = g.lines ? `${g.shops} точ. · ${g.lines} продаж${g.cats.length ? ' · ' + escapeHtml(nmCats(g.cats)) : ''}` : 'в продажах за год не встречалось';
   let body = `<div class="nm-spell">${escapeHtml(spell[0])}${spell.length > 1 ? `<small>также: ${spell.slice(1).map(escapeHtml).join(' · ')}</small>` : ''}</div>
     <div class="ar-sub">${meta}</div>`;
   if (nmEdit === nmTab + i) {
@@ -3172,229 +2908,6 @@ async function nmUndo(i) {
   }
 }
 
-async function loadPriceProblems() {
-  try {
-    const res = await fetch(`/api/admin/price_problems?days=${anaDays}`);
-    const data = await res.json();
-    if (Array.isArray(data)) PRICEPROB = data;
-  } catch (e) {
-    if (!PRICEPROB) document.getElementById('anaBody').innerHTML = '<div class="msg err">Не удалось загрузить — проверь интернет.</div>';
-    return;
-  }
-  if (!ANA) await loadAna();
-  if (anaView === 'prices') renderPriceProblems();
-}
-function renderPriceProblems() {
-  const box = document.getElementById('anaBody');
-  if (!PRICEPROB || !ANA) { box.innerHTML = nmBack() + '<div class="hint-text">Загружаю…</div>'; return; }
-  const per = anaDays === 365 ? 'год' : anaDays === 90 ? '3 месяца' : '30 дней';
-  const shops = [...new Set(PRICEPROB.map(x => x.s))];
-  const list = PRICEPROB.filter(x => !ppShop || x.s === ppShop);
-  let h = nmBack();
-  h += `<div class="ana-card"><h3><i class="fa-solid fa-triangle-exclamation" style="color:#DC2626"></i> Проблемные цены<small>${per}</small></h3>
-    <div class="ana-note">Цена продажи или закупки сильно отличается от обычной цены этого товара по сети (в 2 раза и больше), или закупка дороже продажи — чаще всего это цена за коробку/канистру вместо литра или штуки. Такие позиции не входят в средние цены и наценку. Исправить может только сама точка — в «Базе» или на складе (✏️).</div>
-    <div style="padding:10px 14px"><select style="width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:13px;font-family:inherit;background:#fff" onchange="ppShop=Number(this.value)||0; renderPriceProblems()">
-      <option value="0">Все точки (${PRICEPROB.length})</option>
-      ${shops.map(id => `<option value="${id}"${id === ppShop ? ' selected' : ''}>${escapeHtml(anaPointName(anaPoint(id)))} (${PRICEPROB.filter(x => x.s === id).length})</option>`).join('')}
-    </select></div></div>`;
-  if (!list.length) {
-    h += '<div class="ana-card"><div class="hint-text" style="padding:14px">Подозрительных цен нет 👍</div></div>';
-  } else {
-    h += '<div class="ana-card">' + list.map(x => {
-      const unit = anaUnit(x.c);
-      const p = anaPoint(x.s);
-      const what = x.kind === 'sale'
-        ? `Продажа <b class="ana-bad">${anaMoney(x.unit)}</b> за ${unit}${x.med_sale ? ` — обычно ${anaMoney(x.med_sale)}` : ''}`
-        : `Закупка <b class="ana-bad">${anaMoney(x.cost)}</b> за ${unit}${x.med_cost ? ` — обычно ${anaMoney(x.med_cost)}` : ` при продаже ${anaMoney(x.unit)}`}`;
-      return `<div class="ana-row"><div class="ar-main">
-        <div class="ar-name" style="white-space:normal">${escapeHtml(anaPointName(p))} · <span style="font-weight:600">${escapeHtml(x.label || x.product)}</span></div>
-        <div class="ar-sub">${fmtDay(x.date)} · ${anaQty(x.qty, unit)} за ${anaMoney(x.total)} сум</div>
-        <div style="font-size:12.5px;margin-top:3px">${what}</div>
-      </div>${x.dev ? `<div class="ar-val ana-bad">×${x.dev >= 1 ? String(Math.round(x.dev * 10) / 10).replace('.', ',') : String(Math.round(1 / x.dev * 10) / 10).replace('.', ',') + '↓'}</div>` : ''}</div>`;
-    }).join('') + '</div>';
-  }
-  box.innerHTML = h;
-}
-// ---------- Копия статистики брендов и склада одной точки ----------
-let SNAP = null, snapId = 0, snapDays = 30, snapWh = 'oil', snapSeq = 0;
-const SNAP_UNIT = { l: 'л', pc: 'шт', '': '' };
-
-function openSnapshot(id) {
-  snapId = id;
-  SNAP = null;
-  snapWh = 'oil';
-  if (MAP) MAP.closePopup();
-  const p = (MAPDATA && MAPDATA.points.find(x => x.id === id)) || (ANA && anaPoint(id));
-  document.getElementById('snapName').textContent = p ? (p.shop_name || p.username) : '…';
-  document.getElementById('snapSub').textContent = '';
-  document.getElementById('snapOv').style.display = 'block';
-  document.body.style.overflow = 'hidden';
-  renderSnapshot();
-  loadSnapshot();
-}
-function closeSnapshot() {
-  document.getElementById('snapOv').style.display = 'none';
-  document.body.style.overflow = '';
-  snapSeq++;
-}
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('snapOv').style.display === 'block') closeSnapshot(); });
-
-async function loadSnapshot() {
-  const seq = ++snapSeq;
-  try {
-    const res = await fetch(`/api/admin/shops/${snapId}/snapshot?days=${snapDays}`);
-    const data = await res.json();
-    if (seq !== snapSeq) return;
-    if (!data || !data.shop) {
-      document.getElementById('snapBody').innerHTML = `<div class="msg err">${escapeHtml((data && data.error) || 'Не удалось загрузить.')}</div>`;
-      return;
-    }
-    SNAP = data;
-  } catch (e) {
-    if (seq === snapSeq) document.getElementById('snapBody').innerHTML = '<div class="msg err">Не удалось загрузить — проверь интернет.</div>';
-    return;
-  }
-  renderSnapshot();
-}
-function setSnapDays(d) { snapDays = d; renderSnapshot(); loadSnapshot(); }
-function setSnapWh(w) { snapWh = w; renderSnapshot(); }
-
-function renderSnapshot() {
-  const body = document.getElementById('snapBody');
-  const seg = `<div class="map-seg" style="margin-bottom:10px">
-    ${[[30, '30 дней'], [90, '3 месяца'], [365, 'Год']].map(([d, l]) => `<button class="${d === snapDays ? 'on' : ''}" onclick="setSnapDays(${d})">${l}</button>`).join('')}
-  </div>`;
-  if (!SNAP) { body.innerHTML = seg + '<div class="hint-text">Загружаю…</div>'; return; }
-  const S = SNAP;
-  document.getElementById('snapName').textContent = S.shop.name;
-  document.getElementById('snapSub').textContent = (S.shop.role === 'branch' ? 'Филиал' + (S.shop.parent_name ? ' · ' + S.shop.parent_name : '') : 'Точка') +
-    (S.shop.address ? ' · ' + S.shop.address : '');
-  const rv = S.revenue || {};
-  let h = seg;
-  h += `<div class="map-kpis">
-    <div class="map-kpi"><b>${fmtShort(rv.total || 0)}</b><span>выручка</span></div>
-    <div class="map-kpi"><b>${rv.count || 0}</b><span>замен и услуг</span></div>
-    <div class="map-kpi"><b>${fmtShort(rv.avg || 0)}</b><span>средний чек</span></div>
-    <div class="map-kpi"><b>${(rv.clients && rv.clients.total) || 0}</b><span>клиентов</span></div>
-  </div>`;
-
-  // --- бренды: копия экрана точки ---
-  h += '<div class="snap-sec"><i class="fa-solid fa-oil-can" style="color:#EAB308"></i> Бренды: что продаётся</div>';
-  if (!S.brands.length) {
-    h += '<div class="ana-card"><div class="hint-text" style="padding:14px">За этот период продаж с указанием масла и фильтров нет.</div></div>';
-  }
-  S.brands.forEach(c => {
-    const unit = SNAP_UNIT[c.unit] !== undefined ? SNAP_UNIT[c.unit] : '';
-    const bySum = c.metric === 'sum';
-    h += `<div class="ana-card"><h3>${escapeHtml(c.label)}<small>${bySum ? fmtShort(c.total_sum) + ' сум' : anaQty(c.total_qty, unit) + ' · ' + fmtShort(c.total_sum) + ' сум'}</small></h3>` +
-      c.top.map(b => `<div class="ana-row"><div class="ar-main">
-          <div class="ar-name">${b.no_brand ? '<span class="ana-mute">без марки</span>' : escapeHtml(b.name)}</div>
-          <div class="ar-bar"><i style="width:${Math.max(2, Math.min(100, b.share))}%"></i></div>
-        </div><div class="ar-val">${bySum ? fmtShort(b.sum) : anaQty(b.qty, unit)}<small>${b.share}% · ${b.visits} раз${bySum ? '' : ' · ' + fmtShort(b.sum)}</small></div></div>`).join('') +
-      (c.others ? `<div class="ana-row"><div class="ar-main"><div class="ar-name ana-mute">Остальные (${c.others.count})</div></div>
-        <div class="ar-val">${bySum ? fmtShort(c.others.sum) : anaQty(c.others.qty, unit)}<small>${c.others.share}%</small></div></div>` : '') +
-      '</div>';
-  });
-
-  // --- склад: копия склада точки ---
-  const all = S.warehouse.products || [];
-  h += '<div class="snap-sec"><i class="fa-solid fa-warehouse" style="color:var(--blue)"></i> Склад</div>';
-  if (!all.length) {
-    h += `<div class="ana-card"><div class="hint-text" style="padding:14px">${S.shop.warehouse_enabled ? 'На складе точки пока нет товаров.' : 'Склад у этой точки выключен — товары не ведутся.'}</div></div>`;
-    body.innerHTML = h + snapSuppliersHtml(S);
-    return;
-  }
-  const isOil = p => String(p.category).indexOf('fluid_') === 0;
-  const isFil = p => String(p.category).indexOf('filter_') === 0;
-  const prods = all.filter(p => snapWh === 'all' || (snapWh === 'oil' && isOil(p)) || (snapWh === 'filter' && isFil(p)) || (snapWh === 'other' && !isOil(p) && !isFil(p)));
-  h += `<div class="ana-chips">
-    <button class="${snapWh === 'oil' ? 'on' : ''}" onclick="setSnapWh('oil')">Масла (${all.filter(isOil).length})</button>
-    <button class="${snapWh === 'filter' ? 'on' : ''}" onclick="setSnapWh('filter')">Фильтры (${all.filter(isFil).length})</button>
-    <button class="${snapWh === 'other' ? 'on' : ''}" onclick="setSnapWh('other')">Прочее (${all.filter(p => !isOil(p) && !isFil(p)).length})</button>
-    <button class="${snapWh === 'all' ? 'on' : ''}" onclick="setSnapWh('all')">Всё (${all.length})</button>
-  </div>`;
-  let buyV = 0, sellV = 0, noBuy = 0;
-  prods.forEach(p => {
-    const st = Math.max(0, Number(p.stock) || 0);
-    if (p.buy !== null && p.buy !== undefined) buyV += st * p.buy; else noBuy++;
-    if (p.sell) sellV += st * p.sell;
-  });
-  h += `<div class="ana-cmp" style="padding:0 0 10px">
-    <div><b>${fmtShort(buyV)}</b>остаток по закупке</div>
-    <div><b>${fmtShort(sellV)}</b>если продать всё</div>
-    <div><b>${fmtShort(sellV - buyV)}</b>возможная наценка</div>
-    <div><b class="${noBuy ? 'ana-bad' : ''}">${noBuy}</b>без цены закупки</div>
-  </div>`;
-  const sorted = prods.slice().sort((a, b) => String(a.category).localeCompare(String(b.category)) || String(a.name).localeCompare(String(b.name)));
-  h += '<div class="ana-card">' + (sorted.length ? sorted.map(p => {
-    const unit = SNAP_UNIT[p.unit] !== undefined ? SNAP_UNIT[p.unit] : p.unit;
-    const stCls = p.status === 'out' ? 'ana-bad' : p.status === 'low' ? 'ana-bad' : '';
-    const m = p.margin_pct;
-    const mHtml = m === null || m === undefined ? '<span class="sw-m none">наценка —</span>'
-      : `<span class="sw-m ${m < 10 ? 'low' : ''}">+${m}%</span>`;
-    return `<div class="snap-wh-row"><div class="sw-main">
-        <div class="sw-name">${escapeHtml(p.name)}</div>
-        <div class="sw-sub">${escapeHtml(p.category_label)} · <span class="${stCls}">остаток ${anaQty(Number(p.stock) || 0, unit)}</span>${p.sold_30d ? ` · продано за 30 дн ${anaQty(p.sold_30d, unit)}` : ''}</div>
-      </div><div class="sw-price">${p.buy !== null && p.buy !== undefined ? anaMoney(p.buy) : '<span class="ana-bad">—</span>'} → ${p.sell ? anaMoney(p.sell) : '—'}
-        <small>закупка → продажа, за ${unit}</small>${mHtml}</div></div>`;
-  }).join('') : '<div class="hint-text" style="padding:14px">В этой группе товаров нет.</div>') + '</div>';
-  body.innerHTML = h + snapSuppliersHtml(S);
-}
-function snapSuppliersHtml(S) {
-  const SP = S.suppliers || { list: [] };
-  const per = snapDays === 365 ? 'год' : snapDays === 90 ? '3 мес' : '30 дн';
-  let h = '<div class="snap-sec"><i class="fa-solid fa-truck-field" style="color:#16A34A"></i> Поставщики</div>';
-  if (!SP.list.length) {
-    return h + `<div class="ana-card"><div class="hint-text" style="padding:14px">Точка не ведёт поставщиков в OilBook.${SP.no_supplier_products ? ` Товаров на складе без поставщика: ${SP.no_supplier_products}.` : ''}</div></div>`;
-  }
-  h += `<div class="ana-cmp" style="padding:0 0 10px">
-    <div><b>${fmtShort(SP.owe)}</b>долг поставщикам</div>
-    <div><b class="${SP.overdue ? 'ana-bad' : ''}">${fmtShort(SP.overdue)}</b>просрочено</div>
-    <div><b>${fmtShort(SP.bought_period)}</b>взято товара · ${per}</div>
-    <div><b>${SP.list.length}</b>поставщиков${SP.no_supplier_products ? ` · ${SP.no_supplier_products} товар. без поставщика` : ''}</div>
-  </div>`;
-  SP.list.forEach(s => {
-    const bal = s.balance > 0
-      ? `<span class="${s.overdue ? 'ana-bad' : ''}">${fmtShort(s.balance)}</span><small>${s.overdue ? 'просрочено ' + fmtShort(s.overdue) : 'долг'}</small>`
-      : s.balance < 0 ? `<span class="ana-good">${fmtShort(-s.balance)}</span><small>переплата</small>` : `<span class="ana-mute">0</span><small>долга нет</small>`;
-    const terms = [s.pay_days !== null && s.pay_days !== undefined ? `оплата через ${s.pay_days} дн` : '', s.delivery_days ? 'привоз: ' + escapeHtml(s.delivery_days) : '']
-      .filter(Boolean).join(' · ');
-    const contacts = [
-      s.contact ? `<span><i class="fa-solid fa-user"></i> ${escapeHtml(s.contact)}</span>` : '',
-      s.phone ? `<a href="tel:${escapeHtml(s.phone)}"><i class="fa-solid fa-phone"></i> ${escapeHtml(s.phone)}</a>` : '',
-      s.telegram ? `<a target="_blank" rel="noopener" href="https://t.me/${encodeURIComponent(s.telegram)}"><i class="fa-brands fa-telegram"></i> @${escapeHtml(s.telegram)}</a>` : ''
-    ].filter(Boolean).join('');
-    const prices = (s.prices || []).map(p => {
-      const unit = SNAP_UNIT[p.unit] !== undefined ? SNAP_UNIT[p.unit] : p.unit;
-      const ch = p.change_pct === null || p.change_pct === undefined ? ''
-        : `<small class="${p.change_pct > 0 ? 'ana-bad' : 'ana-good'}">${p.change_pct > 0 ? '▲' : '▼'} ${Math.abs(p.change_pct)}%</small>`;
-      return `<div class="ana-row"><div class="ar-main"><div class="ar-name">${escapeHtml(p.name)}</div>
-        <div class="ar-sub">последняя закупка ${fmtDay(p.last_date)} · закупок: ${p.times}</div></div>
-        <div class="ar-val">${anaMoney(p.last)} <span style="font-size:11px;color:#64748B">/${unit}</span>${ch}</div></div>`;
-    }).join('');
-    const noHist = (s.products || []).filter(n => !(s.prices || []).some(p => p.name === n));
-    h += `<details class="ana-card sup-card"><summary>
-        <div class="ar-main"><div class="ar-name">${escapeHtml(s.name)}</div><div class="ar-sub">${terms || 'условия не указаны'}</div></div>
-        <div class="ar-val">${bal}</div><i class="fa-solid fa-chevron-down sup-chev"></i>
-      </summary>
-      ${contacts ? `<div class="sup-contacts">${contacts}</div>` : ''}
-      <div class="ana-cmp">
-        <div><b>${fmtShort(s.bought_period)}</b>взято · ${per}</div>
-        <div><b>${fmtShort(s.paid_period)}</b>оплачено · ${per}</div>
-        <div><b>${fmtShort(s.bought_all)}</b>взято за всё время · ${s.order_count} заказ.</div>
-        <div><b>${fmtShort(s.paid_all)}</b>оплачено за всё время</div>
-      </div>
-      <div class="ana-note">Последний заказ: ${fmtDay(s.last_order)} · последняя оплата: ${fmtDay(s.last_payment)}${s.next_due ? ` · следующий платёж до ${fmtDay(s.next_due.date)} — ${fmtShort(s.next_due.amount)}` : ''}${s.oldest_overdue ? ` · <span class="ana-bad">просрочка с ${fmtDay(s.oldest_overdue)}</span>` : ''}</div>
-      ${prices ? '<div class="sup-h">Цены закупки у этого поставщика</div>' + prices : ''}
-      ${noHist.length ? `<div class="sup-h">Товары поставщика без принятых заказов</div><div class="ana-brands" style="padding:0 14px 12px">${noHist.map(n => `<span>${escapeHtml(n)}</span>`).join('')}</div>` : ''}
-      ${s.note ? `<div class="ana-note">📝 ${escapeHtml(s.note)}</div>` : ''}
-    </details>`;
-  });
-  return h;
-}
-if (location.hash.indexOf('#income') === 0) { const m = location.hash.split('-')[1]; if (m && ['shops', 'pays', 'set'].indexOf(m) >= 0) IX.tab = m; admTab('income'); }
-if (location.hash === '#analytics') admTab('analytics');
-if (location.hash === '#map') admTab('map');
 </script>
 </body>
 </html>
