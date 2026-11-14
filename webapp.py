@@ -29,10 +29,60 @@ import backup_store
 import i18n
 import help_content
 import glass_theme
+import security
 
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.config.setdefault("RATELIMIT_ENABLED", True)
+
+# Платформенная админка — самый ценный вход: её сессия живёт не дольше
+# 12 часов (у точек — как раньше, до 31 дня, чтобы мастерам не вводить
+# пароль каждый день).
+ADMIN_SESSION_MAX_SEC = 12 * 60 * 60
+
+
+@app.before_request
+def _force_https():
+    """Если сайт настроен на https (PUBLIC_URL), обычные страницы, открытые по
+    http, перенаправляем на https — иначе пароль ушёл бы открытым текстом.
+    POST и адреса камер не трогаем: камера может уметь только http, а
+    перенаправление POST браузеры выполняют небезопасно."""
+    if not os.environ.get("PUBLIC_URL", "").startswith("https://") or request.is_secure:
+        return None
+    host = (request.host or "").split(":")[0]
+    if host in ("localhost", "127.0.0.1", "::1") or request.method not in ("GET", "HEAD"):
+        return None
+    if request.path.startswith(("/api/anpr/", "/api/display_state/", "/api/hamyon/")):
+        return None
+    return redirect("https://" + request.host + request.full_path.rstrip("?"), code=301)
+
+
+@app.before_request
+def _rate_limit():
+    """Ограничение частоты запросов с одного адреса: защищает от подбора
+    паролей/токенов и от «заваливания» сервера (один процесс обслуживает и
+    сайт, и бота)."""
+    if not app.config.get("RATELIMIT_ENABLED", True):
+        return None
+    ip = _client_ip()
+    path = request.path or "/"
+    rule = security.rate_rule_for(path)
+    over = None
+    if rule and security.rate_hit(rule[0], ip, rule[1], rule[2]):
+        over = rule[0]
+    elif security.rate_hit("global", ip, *security.GLOBAL_RATE):
+        over = "global"
+    if not over:
+        return None
+    # в журнал — один раз за окно, а не каждый лишний запрос
+    if not security.rate_hit("rl_log", (ip, over), 1, 300):
+        security.log_event("rate_limited", security.HIGH if over in ("login", "forgot", "anpr", "hamyon") else
+                           security.MEDIUM, ip=ip, path=path, bucket=over)
+    resp = jsonify({"ok": False, "error": "слишком много запросов — подождите минуту"})
+    resp.status_code = 429
+    resp.headers["Retry-After"] = "60"
+    return resp
 
 
 _GZIP_TYPES = ("text/html", "application/json", "text/css", "application/javascript",
@@ -107,6 +157,10 @@ def _security_headers(resp):
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     # ссылки паспорта и табло содержат токен — не отдаём полный адрес чужим сайтам
     resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    # камера нужна сканеру номеров, место — карте; микрофон и прочее — никому
+    resp.headers.setdefault("Permissions-Policy",
+                            "camera=(self), geolocation=(self), microphone=(), payment=(), usb=(), interest-cohort=()")
+    resp.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
     if request.is_secure:
         resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
     return resp
@@ -154,6 +208,8 @@ def _csrf_origin_check():
     if source_host and source_host in allowed:
         return None
     logger.warning(f"CSRF: отклонён {request.method} {request.path} с источника {source_host or source!r}")
+    security.log_event("csrf_blocked", security.MEDIUM, ip=_client_ip(), username=session.get("username"),
+                       path=request.path, source=(source_host or str(source))[:120])
     return jsonify({"ok": False, "error": "запрос с чужого сайта отклонён"}), 403
 
 # ---------- Защита от дублей при плохом интернете ----------
@@ -671,6 +727,14 @@ def admin_required(view):
         if not admin or admin.get("role") != "admin" or not _session_password_ok(_pw_fingerprint(admin.get("password_hash"))):
             session.clear()
             return _auth_fail()
+        # вход в админку действует не дольше ADMIN_SESSION_MAX_SEC — украденная
+        # cookie перестаёт работать сама (старые входы без отметки — тоже)
+        login_at = session.get("login_at") or 0
+        if time.time() - login_at > ADMIN_SESSION_MAX_SEC:
+            security.log_event("admin_session_expired", security.LOW, ip=_client_ip(),
+                               username=session.get("username"), path=request.path)
+            session.clear()
+            return _auth_fail()
         return view(*args, **kwargs)
     return wrapped
 
@@ -1161,6 +1225,9 @@ def login_page():
         password = request.form.get("password", "")
         fail_key = (_client_ip(), username.lower())
         if _login_blocked(fail_key):
+            if not security.rate_hit("lock_log", fail_key, 1, LOGIN_WINDOW_SEC):
+                security.log_event("login_locked", security.HIGH, ip=fail_key[0], username=username[:64],
+                                   path="/login")
             T = i18n.get_texts(lang)
             return render_template_string(LOGIN_PAGE, error=i18n.t("login_too_many", lang), T=T, lang=lang,
                                           other_lang="uz" if lang == "ru" else "ru"), 429
@@ -1173,7 +1240,13 @@ def login_page():
             session["shop_name"] = shop.get("shop_name") or shop["username"]
             session["is_employee"] = False
             session["pwf"] = _pw_fingerprint(shop.get("password_hash"))
+            session["login_at"] = int(time.time())
             session.permanent = True
+            if shop["role"] == "admin":
+                # каждый вход в админку — сообщение владельцу платформы: если
+                # пароль украли, это сразу станет видно
+                security.log_event("admin_login", security.HIGH, ip=fail_key[0], username=shop["username"],
+                                   path="/login", user_agent=(request.headers.get("User-Agent") or "")[:120])
             return redirect(url_for("admin_page") if shop["role"] == "admin" else url_for("index"))
         employee = db.authenticate_shop_employee(username, password)
         if employee:
@@ -1185,9 +1258,11 @@ def login_page():
             session["shop_name"] = (parent_shop.get("shop_name") or "") if parent_shop else ""
             session["is_employee"] = True
             session["pwf"] = _pw_fingerprint(employee.get("password_hash"))
+            session["login_at"] = int(time.time())
             session.permanent = True
             return redirect(url_for("index"))
         _login_failed(fail_key)
+        security.log_event("login_failed", security.LOW, ip=fail_key[0], username=username[:64], path="/login")
         error = i18n.t("login_error", lang)
     T = i18n.get_texts(lang)
     return render_template_string(LOGIN_PAGE, error=error, T=T, lang=lang, other_lang="uz" if lang == "ru" else "ru")
@@ -1248,16 +1323,35 @@ def api_forgot_password_request():
 @app.route("/api/forgot_password/confirm", methods=["POST"])
 def api_forgot_password_confirm():
     """Второй шаг — проверяет код и, если верный, задаёт новый пароль."""
-    data = request.get_json(force=True)
-    username = (data.get("username") or "").strip()
-    code = (data.get("code") or "").strip()
-    new_password = data.get("new_password") or ""
-    if not username or not code or len(new_password) < 6:
-        return jsonify({"ok": False, "error": "заполните все поля (пароль — минимум 6 символов)"}), 400
+    data = request.get_json(force=True, silent=True) or {}
+    username = str(data.get("username") or "").strip()[:64]
+    code = str(data.get("code") or "").strip()[:12]
+    new_password = str(data.get("new_password") or "")
+    if not username or not code:
+        return jsonify({"ok": False, "error": "заполните все поля"}), 400
+    problem = security.password_problem(new_password, username)
+    if problem:
+        return jsonify({"ok": False, "error": _PASSWORD_ERRORS.get(problem)}), 400
+    ip = _client_ip()
     ok = db.reset_password_with_code(username, code, new_password)
     if not ok:
+        # 6+ неверных кодов к одному логину за 10 минут — похоже на подбор
+        brute = security.rate_hit("reset_fail", username.lower(), 5, RESET_REQ_WINDOW_SEC)
+        security.log_event("reset_code_bruteforce" if brute else "reset_code_failed",
+                           security.HIGH if brute else security.LOW, ip=ip, username=username,
+                           path=request.path)
         return jsonify({"ok": False, "error": "неверный или просроченный код"}), 400
+    security.log_event("password_reset", security.MEDIUM, ip=ip, username=username, path=request.path)
     return jsonify({"ok": True})
+
+
+# Тексты ошибок к security.password_problem() — для форм, где нет перевода
+_PASSWORD_ERRORS = {
+    "short": f"пароль — минимум {security.PASSWORD_MIN} символов",
+    "long": f"пароль — не длиннее {security.PASSWORD_MAX} символов",
+    "common": "этот пароль слишком простой и часто встречается — придумайте другой",
+    "same_as_login": "пароль не должен совпадать с логином",
+}
 
 
 @app.route("/logout")
@@ -4648,7 +4742,7 @@ def api_staff_create():
         return jsonify({"ok": False, "field": "full_name", "error": T["staff_err_name"]}), 400
     if not _STAFF_LOGIN_RE.match(username):
         return jsonify({"ok": False, "field": "username", "error": T["staff_err_login"]}), 400
-    if password and (len(password) < 6 or len(password) > 100):
+    if password and security.password_problem(password, username):
         return jsonify({"ok": False, "field": "password", "error": T["staff_err_password"]}), 400
     result = db.create_shop_employee(g.shop_id, username, password=password or None, full_name=full_name)
     if not result:
@@ -5649,9 +5743,22 @@ load();
 """
 
 
+def _security_notify(text):
+    if ADMIN_TELEGRAM_ID:
+        _send_telegram_message(ADMIN_TELEGRAM_ID, text)
+
+
+security.set_notifier(_security_notify)
+
+
 def run_webapp():
     port = int(os.environ.get("PORT", 8000))
     db.init_db()
+    # проверка переменных окружения — итог в логах сервера при каждом запуске
+    problems = security.log_env_report()
+    crit = [m for lvl, m in problems if lvl == "critical"]
+    if crit and ADMIN_TELEGRAM_ID:
+        _send_telegram_message(ADMIN_TELEGRAM_ID, "⚠️ OilBook: проблемы настройки сервера\n• " + "\n• ".join(crit))
     try:
         # waitress — надёжный сервер для работы в интернете (встроенный
         # сервер Flask рассчитан только на разработку)

@@ -26,6 +26,22 @@ def admin_page():
     return render_template_string(ADMIN_PAGE, T=i18n.get_texts("ru"))
 
 
+@app.route("/api/admin/security_events")
+@admin_required
+def api_admin_security_events():
+    """Журнал подозрительной активности (неверные пароли, подбор кодов,
+    частые запросы, подозрительные файлы, поддельные оплаты, входы в админку)."""
+    import security
+    sev = request.args.get("severity")
+    sev = sev if sev in ("low", "medium", "high") else None
+    try:
+        limit = int(request.args.get("limit") or 200)
+    except ValueError:
+        limit = 200
+    return jsonify({"ok": True, "events": security.recent_events(limit, sev),
+                    "env": [{"level": lvl, "message": m} for lvl, m in security.check_env()]})
+
+
 ADMIN_HELP_PAGE = """<!DOCTYPE html>
 <html lang="ru">
 <head>

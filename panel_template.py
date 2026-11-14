@@ -3553,7 +3553,7 @@ async function createStaff() {
   };
   if (body.full_name.length < 2) return staffErr('full_name', T.staff_err_name);
   if (!/^[A-Za-z0-9_]{3,30}$/.test(body.username)) return staffErr('username', T.staff_err_login);
-  if (body.password && body.password.length < 6) return staffErr('password', T.staff_err_password);
+  if (body.password && body.password.length < 8) return staffErr('password', T.staff_err_password);
   const res = await fetch('/api/staff', { method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
   const d = await res.json();

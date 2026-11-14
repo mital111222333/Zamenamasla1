@@ -13,6 +13,7 @@ from flask import g, jsonify, make_response, redirect, render_template_string, r
 
 import database as db
 import i18n
+import security
 from webapp import (
     ADMIN_TELEGRAM_ID, BOT_TOKEN, BOT_USERNAME, PUBLIC_URL, _client_ip, _client_link,
     _fmt_day, _fmt_sum, _is_sub_owner, _send_telegram_message, _tg_api, admin_required,
@@ -218,7 +219,7 @@ function checkForm() {
   if (val('address').length < 3) bad.address = TX.e_address;
   if (!/^[A-Za-z0-9_]{3,30}$/.test(val('username'))) bad.username = TX.e_username;
   const pw = document.getElementById('f_password').value;
-  if (pw.length < 6) bad.password = TX.e_password;
+  if (pw.length < 8) bad.password = TX.e_password;
   else if (pw !== document.getElementById('f_password2').value) bad.password2 = TX.e_password2;
   FIELDS.forEach(f => setErr(f, bad[f]));
   const first = FIELDS.find(f => bad[f]);
@@ -596,7 +597,7 @@ def api_register():
         return bad("address", "reg_err_address")
     if not _REG_USERNAME_RE.match(username):
         return bad("username", "reg_err_username")
-    if len(password) < 6 or len(password) > 100:
+    if security.password_problem(password, username):
         return bad("password", "reg_err_password")
     if password != password2:
         return bad("password2", "reg_err_password2")
