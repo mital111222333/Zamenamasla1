@@ -6891,16 +6891,15 @@ def income_telegram_targets(ids: list) -> list:
 
 def get_map_points(days: int = 30) -> dict:
     """Все точки и филиалы платформы для карты в админке: координаты,
-    статус и короткая аналитика — за последние `days` дней (замены,
-    выручка, средний чек, разные клиенты), изменение выручки к таким же
-    предыдущим `days` дням, дата последней замены и замены сегодня.
-    Один запрос на все точки — карта открывается быстро даже при сотнях точек."""
-    days = max(1, min(int(days or 30), 365))
+    статус подписки и дата последней активности (последней записи в
+    программе) — и больше НИЧЕГО.
+
+    Выручку, число замен, клиентов, средний чек и т.п. по точкам админ
+    платформы не получает: это данные точки (см. соглашение
+    docs/foydalanish_shartlari_uz.md, раздел 5.2). Параметр days оставлен
+    для совместимости со старым интерфейсом."""
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-    cur_from = (now - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-    prev_from = (now - timedelta(days=2 * days - 1)).strftime("%Y-%m-%d")
-    prev_to = (now - timedelta(days=days)).strftime("%Y-%m-%d")
     with get_conn() as conn:
         shops = conn.execute("""
             SELECT s.id, s.shop_name, s.username, s.role, s.parent_shop_id, s.client_group,
@@ -6908,31 +6907,20 @@ def get_map_points(days: int = 30) -> dict:
                    s.paid_until AS own_paid_until, s.license_type AS own_license,
                    p.paid_until AS par_paid_until, p.license_type AS par_license,
                    p.shop_name AS parent_name, p.username AS parent_username,
-                   (SELECT COUNT(*) FROM shops b WHERE b.parent_shop_id = s.id AND b.role='branch') AS branch_count,
-                   (SELECT COUNT(*) FROM clients WHERE shop_id = s.id) AS client_count
+                   (SELECT COUNT(*) FROM shops b WHERE b.parent_shop_id = s.id AND b.role='branch') AS branch_count
             FROM shops s LEFT JOIN shops p ON p.id = s.parent_shop_id
             WHERE s.role IN ('shop', 'branch')
         """).fetchall()
         stats = conn.execute("""
-            SELECT c.shop_id,
-                   SUM(CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t THEN 1 ELSE 0 END) AS cnt,
-                   SUM(CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t THEN COALESCE(oc.cost, 0) ELSE 0 END) AS total,
-                   SUM(CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t AND oc.cost > 0 THEN 1 ELSE 0 END) AS paid_cnt,
-                   COUNT(DISTINCT CASE WHEN oc.change_date >= :cf AND oc.change_date <= :t THEN c.client_id END) AS clients,
-                   SUM(CASE WHEN oc.change_date >= :pf AND oc.change_date <= :pt THEN COALESCE(oc.cost, 0) ELSE 0 END) AS prev_total,
-                   SUM(CASE WHEN oc.change_date = :t THEN 1 ELSE 0 END) AS today_cnt,
-                   MAX(CASE WHEN oc.change_date <= :t THEN oc.change_date END) AS last_date
+            SELECT c.shop_id, MAX(CASE WHEN oc.change_date <= :t THEN oc.change_date END) AS last_date
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             GROUP BY c.shop_id
-        """, {"cf": cur_from, "t": today, "pf": prev_from, "pt": prev_to}).fetchall()
+        """, {"t": today}).fetchall()
     by_shop = {r["shop_id"]: dict(r) for r in stats}
     points = []
     for s in shops:
         d = dict(s)
         st = by_shop.get(d["id"], {})
-        total = st.get("total") or 0
-        paid = st.get("paid_cnt") or 0
-        prev = st.get("prev_total") or 0
         last = st.get("last_date")
         days_idle = None
         if last:
@@ -6972,17 +6960,11 @@ def get_map_points(days: int = 30) -> dict:
             "sub_left": sub_left,
             "kind": kind,
             "is_active": bool(d["is_active"]),
-            "count": st.get("cnt") or 0,
-            "total": total,
-            "avg": round(total / paid) if paid else 0,
-            "clients": st.get("clients") or 0,
-            "pct": round((total - prev) / prev * 100, 1) if prev else None,
-            "today": st.get("today_cnt") or 0,
             "last_date": last,
             "days_idle": days_idle,
         })
         points.append(d)
-    return {"days": days, "date_from": cur_from, "date_to": today, "points": points}
+    return {"days": days, "date_to": today, "points": points}
 
 
 @_serialized
@@ -7337,75 +7319,52 @@ def _period_from(days: int):
 
 
 def get_admin_analytics(days: int = 30) -> dict:
-    """Что продают точки: по точке, категории и товару — количество, сумма,
-    цена и закупка за единицу (без подозрительных цен), сколько продаж ещё
-    не распознано (нужно «Сопоставление») и качество данных точки."""
+    """Общая картина по ВСЕЙ платформе — без названий точек, без цен
+    продажи и закупки, без денег по точкам.
+
+    Что получает админ: по категории и товару — сколько продано (литры/шт)
+    и у скольких точек он встречается, но только если товар продают не
+    меньше ADMIN_MIN_SHOPS разных точек (иначе по цифре можно узнать
+    конкретную точку). Плюс общий процент нераспознанных названий — для
+    «Сопоставления». Так записано в соглашении с клиентами
+    (docs/foydalanish_shartlari_uz.md, разделы 5.2–5.3)."""
     days = max(1, min(int(days or 30), 730))
     date_from, today = _period_from(days)
     with get_conn() as conn:
-        shops = conn.execute("""
-            SELECT s.id, s.shop_name, s.username, s.role, s.parent_shop_id, s.client_group, s.is_active,
-                   p.shop_name AS parent_name,
-                   (SELECT COUNT(*) FROM shops b WHERE b.parent_shop_id = s.id AND b.role='branch') AS branch_count
-            FROM shops s LEFT JOIN shops p ON p.id = s.parent_shop_id
-            WHERE s.role IN ('shop', 'branch')
-            ORDER BY s.shop_name
-        """).fetchall()
+        shop_count = conn.execute("SELECT COUNT(*) FROM shops WHERE role IN ('shop', 'branch')").fetchone()[0]
     lines = _scan_lines(date_from, today)
-    _price_check(lines)
-    agg, quality = {}, {}
+    agg = {}
+    total_lines = unresolved_lines = 0
     for ln in lines:
         res = ln["res"]
-        q = quality.setdefault(ln["s"], {"lines": 0, "stock": 0, "cost": 0})
-        q["lines"] += 1
-        if ln["stock"]:
-            q["stock"] += 1
-        if ln["cp"]:
-            q["cost"] += 1
-        a = agg.setdefault((ln["s"], ln["c"], res["pkey"]), {
-            "q": 0.0, "t": 0.0, "pq": 0.0, "pt": 0.0, "cq": 0.0, "cs": 0.0, "ct": 0.0,
-            "n": 0, "bad": 0, "ut": 0.0, "sp": {}, "brand": res["brand"]})
-        a["q"] += ln["qty"]
-        a["t"] += ln["total"]
-        a["n"] += 1
-        a["sp"][res["product"]] = a["sp"].get(res["product"], 0) + 1
+        total_lines += 1
         if res["status"] in ("suggest", "unknown"):
-            a["ut"] += ln["total"]
-        if ln["sale_bad"]:
-            a["bad"] += 1
-        else:
-            a["pq"] += ln["qty"]
-            a["pt"] += ln["total"]
-            if ln["cp"] and not ln["cost_bad"]:
-                a["cq"] += ln["qty"]
-                a["cs"] += ln["qty"] * ln["cp"]
-                a["ct"] += ln["total"]
-        if ln["cp"] and ln["cost_bad"] and not ln["sale_bad"]:
-            a["bad"] += 1
-    out_rows = []
-    for (sid, cat, pkey), a in agg.items():
+            unresolved_lines += 1
+        a = agg.setdefault((ln["c"], res["pkey"]), {"q": 0.0, "n": 0, "sp": {}, "brand": res["brand"], "shops": set()})
+        a["q"] += ln["qty"]
+        a["n"] += 1
+        a["shops"].add(ln["s"])
+        a["sp"][res["product"]] = a["sp"].get(res["product"], 0) + 1
+    out_rows, hidden = [], 0
+    for (cat, pkey), a in agg.items():
+        if len(a["shops"]) < ADMIN_MIN_SHOPS:
+            hidden += 1
+            continue
         display = max(a["sp"].items(), key=lambda kv: kv[1])[0] if a["sp"] else ""
-        brand = a["brand"]
-        out_rows.append({
-            "s": sid, "c": cat, "k": pkey, "p": display, "b": brand,
-            "m": 1 if brand in MITAL_BRANDS else 0,
-            "q": round(a["q"], 2), "t": round(a["t"]), "pq": round(a["pq"], 2), "pt": round(a["pt"]),
-            "cq": round(a["cq"], 2), "cs": round(a["cs"]), "ct": round(a["ct"]),
-            "n": a["n"], "bad": a["bad"], "ut": round(a["ut"]),
-        })
-    points = []
-    for s in shops:
-        d = dict(s)
-        d["kind"] = "branch" if d["role"] == "branch" else ("main" if d["branch_count"] else "single")
-        d["is_active"] = bool(d["is_active"])
-        d["quality"] = quality.get(d["id"], {"lines": 0, "stock": 0, "cost": 0})
-        points.append(d)
+        out_rows.append({"c": cat, "k": pkey, "p": display, "b": a["brand"],
+                         "q": round(a["q"], 2), "n": a["n"], "shops": len(a["shops"])})
+    out_rows.sort(key=lambda r: -r["q"])
     import i18n
     ru = i18n.TEXTS.get("ru", {})
     cats = [{"key": k, "label": ru.get(k, k), "unit": "л" if k in _FLUID_KEYS else "шт"} for k in BRAND_CATEGORY_ORDER]
-    return {"days": days, "date_from": date_from, "date_to": today,
-            "points": points, "categories": cats, "rows": out_rows,
-            "mital_brands": sorted(MITAL_BRANDS)}
+    return {"days": days, "date_from": date_from, "date_to": today, "shop_count": shop_count,
+            "min_shops": ADMIN_MIN_SHOPS, "hidden_products": hidden, "categories": cats, "rows": out_rows,
+            "unresolved_pct": round(unresolved_lines / total_lines * 100, 1) if total_lines else 0}
+
+
+# Товар показывается в общей аналитике админа, только если его продают не
+# меньше стольких разных точек — иначе по цифре можно узнать конкретную точку.
+ADMIN_MIN_SHOPS = 5
 
 
 def get_name_review(days: int = 365) -> dict:
@@ -7534,82 +7493,6 @@ def get_name_review_summary() -> dict:
     return {"count": len(r["review"]), "new": r["new_this_week"], "sum": r["unresolved_sum"],
             "pct": r["unresolved_pct"], "price_problems": prob}
 
-
-def get_admin_shop_snapshot(shop_id: int, days: int = 30):
-    """Копия того, что видит сама точка: статистика брендов (масла, фильтры…)
-    за период и её склад с ценами закупки и продажи. Для окна на карте в админке."""
-    import i18n
-    shop = get_shop(shop_id)
-    if not shop or shop.get("role") not in ("shop", "branch"):
-        return None
-    days = max(1, min(int(days or 30), 730))
-    date_from, today = _period_from(days)
-    ru = i18n.TEXTS.get("ru", {})
-    brands = get_brand_breakdown(shop_id, date_from, today, limit=10)
-    for c in brands["categories"]:
-        c["label"] = ru.get(c["key"], c["key"])
-    wh = get_warehouse_overview(shop_id)
-    products = []
-    for p in wh["products"]:
-        products.append({
-            "id": p["id"], "name": p["name"], "category": p["category"],
-            "category_label": ru.get(p["category"], "Прочее") if p["category"] != "other" else "Прочее",
-            "unit": p["unit"], "stock": p["stock_qty"], "buy": p.get("purchase_price"),
-            "sell": p.get("sell_price"), "margin_pct": p.get("margin_pct"), "sold_30d": p.get("sold_30d"),
-            "status": p.get("status"), "last_sale": p.get("last_sale"),
-        })
-    parent = get_shop(shop["parent_shop_id"]) if shop.get("parent_shop_id") else None
-    return {
-        "shop": {"id": shop["id"], "name": shop.get("shop_name") or shop["username"], "username": shop["username"],
-                 "role": shop["role"], "parent_name": (parent or {}).get("shop_name"),
-                 "warehouse_enabled": bool(shop.get("warehouse_enabled")), "address": shop.get("address")},
-        "days": days, "date_from": date_from, "date_to": today,
-        "revenue": get_revenue_range(shop_id, date_from, today),
-        "brands": brands["categories"],
-        "warehouse": {"products": products, "summary": wh["summary"]},
-        "suppliers": _admin_suppliers_snapshot(shop_id, date_from, today),
-    }
-
-
-def _admin_suppliers_snapshot(shop_id: int, date_from: str, date_to: str) -> dict:
-    """Поставщики точки для окна на карте: контакты, долг и просрочка, сколько
-    взяли товара за период и всего, последние цены закупки по товарам."""
-    sups = list_suppliers(shop_id)
-    out = []
-    with get_conn() as conn:
-        for s in sups:
-            entries = _live(_supplier_charges(conn, shop_id, s["id"]))
-            in_period = [e for e in entries if date_from <= (e.get("date") or "") <= date_to]
-            per = _period_totals(in_period)
-            allt = _period_totals(entries)
-            last_order = max((e["date"] for e in entries if e["type"] == "order" and e.get("date")), default=None)
-            last_pay = max((e["date"] for e in entries if e["type"] == "payment" and e.get("date")), default=None)
-            prods = [r["name"] for r in conn.execute(
-                "SELECT name FROM products WHERE shop_id=? AND supplier_id=? AND is_active=1 ORDER BY name COLLATE NOCASE",
-                (shop_id, s["id"])).fetchall()]
-            prices = []
-            for p in supplier_price_history(shop_id, s["id"])[:40]:
-                prices.append({"name": p["name"], "unit": p["unit"], "last": p["last"], "last_date": p["last_date"],
-                               "change_pct": p["change_pct"], "since_first_pct": p["since_first_pct"],
-                               "times": len(p["history"])})
-            out.append({
-                "id": s["id"], "name": s["name"], "phone": s.get("phone"), "telegram": s.get("telegram"),
-                "contact": s.get("contact"), "delivery_days": s.get("delivery_days"), "pay_days": s.get("pay_days"),
-                "note": s.get("note"), "balance": s["balance"], "overdue": s["overdue"],
-                "next_due": s.get("next_due"), "oldest_overdue": s.get("oldest_overdue"),
-                "bought_period": per["bought"], "paid_period": per["paid"],
-                "bought_all": allt["bought"], "paid_all": allt["paid"],
-                "last_order": last_order, "last_payment": last_pay,
-                "order_count": sum(1 for e in entries if e["type"] == "order"),
-                "products": prods, "prices": prices,
-            })
-        no_sup = conn.execute(
-            "SELECT COUNT(*) FROM products WHERE shop_id=? AND is_active=1 AND supplier_id IS NULL", (shop_id,)).fetchone()[0]
-    out.sort(key=lambda x: (-x["bought_period"], -x["bought_all"], x["name"].lower()))
-    return {"list": out, "no_supplier_products": no_sup,
-            "owe": sum(x["balance"] for x in out if x["balance"] > 0),
-            "overdue": sum(x["overdue"] for x in out),
-            "bought_period": sum(x["bought_period"] for x in out)}
 
 
 # ---------- Средний пробег в день (для расчёта следующей замены) ----------

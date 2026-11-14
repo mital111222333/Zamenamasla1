@@ -88,17 +88,26 @@ def admin_help_page():
 @app.route("/api/admin/shops")
 @admin_required
 def api_admin_shops():
-    shops = db.list_shops()
+    shops = [_admin_shop_view(s) for s in db.list_shops()]
     for s in shops:
         s["owner_link"] = _client_link(f"owner_{s['owner_link_token']}") if s.get("owner_link_token") else None
         s["sub"] = _admin_sub_summary(s)
     return jsonify(shops)
 
 
+# Поля точки, которые админ платформы не получает: размер клиентской базы и
+# доступ к SMS-аккаунту точки (это её собственный договор с Eskiz).
+_ADMIN_HIDDEN_SHOP_FIELDS = ("client_count", "eskiz_email", "eskiz_password", "password_hash", "password_plain")
+
+
+def _admin_shop_view(shop: dict) -> dict:
+    return {k: v for k, v in shop.items() if k not in _ADMIN_HIDDEN_SHOP_FIELDS}
+
+
 @app.route("/api/admin/map")
 @admin_required
 def api_admin_map():
-    """Карта точек: координаты, статус и аналитика за период (по умолчанию 30 дней)."""
+    """Карта точек: координаты, статус подписки и дата последней активности."""
     try:
         days = int(request.args.get("days") or 30)
     except ValueError:
@@ -109,7 +118,7 @@ def api_admin_map():
 @app.route("/api/admin/analytics")
 @admin_required
 def api_admin_analytics():
-    """Аналитика продаж всех точек: товары, бренды, цены продажи и закупки."""
+    """Общая аналитика по всей платформе: без точек, цен и закупок (см. db.get_admin_analytics)."""
     try:
         days = int(request.args.get("days") or 30)
     except ValueError:
@@ -127,8 +136,17 @@ def _int_arg(name, default):
 @app.route("/api/admin/names")
 @admin_required
 def api_admin_names():
-    """«Сопоставление»: нераспознанные, исправленные автоматически и подтверждённые названия."""
-    return jsonify(db.get_name_review(_int_arg("days", 365)))
+    """«Сопоставление»: нераспознанные, исправленные автоматически и подтверждённые названия.
+    Только сами названия, у скольких точек и сколько раз встречались — без
+    сумм продаж (их админ не видит, см. соглашение, раздел 5.2)."""
+    data = db.get_name_review(_int_arg("days", 365))
+    data.pop("total_sum", None)
+    data.pop("unresolved_sum", None)
+    data.pop("mital_brands", None)
+    for key in ("review", "auto", "mapped"):
+        for g in data.get(key) or []:
+            g.pop("sum", None)
+    return jsonify(data)
 
 
 @app.route("/api/admin/names", methods=["POST"])
@@ -150,21 +168,11 @@ def api_admin_names_delete():
     return jsonify({"ok": ok})
 
 
-@app.route("/api/admin/price_problems")
-@admin_required
-def api_admin_price_problems():
-    """Подозрительные цены продажи/закупки за период."""
-    return jsonify(db.get_price_problems(_int_arg("days", 90)))
-
-
-@app.route("/api/admin/shops/<int:shop_id>/snapshot")
-@admin_required
-def api_admin_shop_snapshot(shop_id):
-    """Копия статистики брендов и склада одной точки — для окна на карте."""
-    data = db.get_admin_shop_snapshot(shop_id, _int_arg("days", 30))
-    if not data:
-        return jsonify({"ok": False, "error": "точка не найдена"}), 404
-    return jsonify(data)
+# Раньше здесь были «Проблемные цены» (цены продажи и закупки каждой точки) и
+# «окно точки» (её выручка, бренды, склад с закупкой, поставщики и долги).
+# Удалены: это коммерческие данные точек, админ платформы их не видит —
+# так обещано клиентам в соглашении (docs/foydalanish_shartlari_uz.md, 5.2).
+# Тест tests/test_privacy_admin.py следит, чтобы они не вернулись.
 
 
 @app.route("/api/admin/shops/<int:shop_id>/location", methods=["POST"])
@@ -376,7 +384,7 @@ def api_admin_create_employee(shop_id):
 @app.route("/api/admin/shops/<int:shop_id>/branches")
 @admin_required
 def api_admin_list_branches(shop_id):
-    return jsonify(db.get_branches(shop_id))
+    return jsonify([_admin_shop_view(b) for b in db.get_branches(shop_id)])
 
 
 @app.route("/api/admin/shops/<int:shop_id>/branches", methods=["POST"])

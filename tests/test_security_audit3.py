@@ -64,7 +64,7 @@ PUBLIC = {
     "/api/display_state/<anpr_token>", "/api/anpr/<anpr_token>", "/api/hamyon/complete",
     "/api/hamyon/prepare", "/api/register", "/api/register/status", "/api/forgot_password/request",
     "/api/forgot_password/confirm", "/download/plate-agent.zip", "/course/<int:n>", "/tg",
-    "/subscription", "/api/arrival", "/api/car_specs", "/api/vin/decode",
+    "/subscription", "/api/arrival", "/api/car_specs", "/api/vin/decode", "/oferta",
 }
 
 

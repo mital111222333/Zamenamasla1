@@ -3990,3 +3990,18 @@ UZ.update({
     "team_removed": "xarajat o'chirilgan",
     "team_l_top_shared": "1-o'rin uchun mukofot (bo'lingan)",
 })
+# ---------- Соглашение (оферта) перед оплатой подписки ----------
+RU.update({
+    "sub_oferta_agree": "Я прочитал(а) и принимаю <a href=\"/oferta\" target=\"_blank\" rel=\"noopener\">Соглашение OilBook</a>. Мои данные принадлежат мне: OilBook их не продаёт, никому не передаёт и не использует против меня.",
+    "sub_oferta_need": "Поставьте галочку: без согласия с Соглашением оплата невозможна",
+    "sub_oferta_promise": "🤝 Ваши данные — база клиентов, продажи, цены, склад и прибыль — принадлежат только вам. OilBook не продаёт их, никому не передаёт и не использует против вас. За это мы отвечаем по закону Республики Узбекистан и, как за омонат, перед Аллахом.",
+    "oferta_title": "Соглашение OilBook",
+    "oferta_ru_note": "Официальный текст Соглашения — на узбекском языке (ниже). Коротко: ваши данные принадлежат вам, OilBook их не продаёт, никому не передаёт, не использует против вас и не просматривает.",
+})
+UZ.update({
+    "sub_oferta_agree": "<a href=\"/oferta\" target=\"_blank\" rel=\"noopener\">OilBook shartnomasi</a> bilan tanishdim va roziman. Ma'lumotlarim menga tegishli: OilBook ularni sotmaydi, hech kimga bermaydi va menga qarshi ishlatmaydi.",
+    "sub_oferta_need": "Belgini qo'ying: shartnomaga rozilik bermasdan to'lov qilib bo'lmaydi",
+    "sub_oferta_promise": "🤝 Ma'lumotlaringiz — mijozlar bazasi, savdo, narxlar, ombor va foyda — faqat Sizga tegishli. OilBook ularni sotmaydi, hech kimga bermaydi va Sizga qarshi ishlatmaydi. Buning uchun O'zbekiston Respublikasi qonuni oldida ham, omonat sifatida Alloh oldida ham javob beramiz.",
+    "oferta_title": "OilBook shartnomasi",
+    "oferta_ru_note": "",
+})

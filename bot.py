@@ -1091,14 +1091,12 @@ async def send_weekly_data_check(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Не удалось посчитать проверку названий: {e}")
         return
-    if not info["count"] and not info["price_problems"]:
+    # только названия товаров: цены точек админ платформы не видит (соглашение, 5.2)
+    if not info["count"]:
         return
     lines = ["🔎 Проверка данных OilBook за неделю"]
-    if info["count"]:
-        new = f" (новых за неделю: {info['new']})" if info["new"] else ""
-        lines.append(f"• Нераспознанных названий: {info['count']}{new} — {info['pct']}% продаж")
-    if info["price_problems"]:
-        lines.append(f"• Подозрительных цен за 30 дней: {info['price_problems']}")
+    new = f" (новых за неделю: {info['new']})" if info["new"] else ""
+    lines.append(f"• Нераспознанных названий: {info['count']}{new} — {info['pct']}% продаж")
     if webapp.PUBLIC_URL:
         lines.append(f"\nОткрыть: {webapp.PUBLIC_URL.rstrip('/')}/admin#analytics → «Сопоставление»")
     try:
