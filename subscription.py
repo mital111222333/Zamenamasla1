@@ -18,8 +18,9 @@ from flask import Response, g, jsonify, render_template_string, request
 
 import database as db
 import i18n
+import security
 from webapp import (
-    ADMIN_TELEGRAM_ID, BOT_TOKEN, PUBLIC_URL, _fmt_day, _fmt_sum, _is_sub_owner,
+    ADMIN_TELEGRAM_ID, BOT_TOKEN, PUBLIC_URL, _client_ip, _fmt_day, _fmt_sum, _is_sub_owner,
     _send_telegram_message, _tg_api, admin_required, app, logger, login_required,
     sub_exempt,
 )
@@ -372,17 +373,21 @@ def api_subscription_pay():
     f = request.files.get("receipt")
     if not f or not f.filename:
         return jsonify({"ok": False, "error": T["sub_file_needed"]}), 400
-    ext = os.path.splitext(f.filename)[1].lower()
-    mime = _SUB_ALLOWED_EXT.get(ext)
-    if not mime and (f.mimetype or "").startswith("image/"):
-        mime, ext = f.mimetype, ".jpg" if f.mimetype == "image/jpeg" else ".img"
-    if not mime:
-        return jsonify({"ok": False, "error": T["sub_file_type"]}), 400
     data = f.read(_SUB_MAX_FILE + 1)
     if len(data) > _SUB_MAX_FILE:
         return jsonify({"ok": False, "error": T["sub_file_big"]}), 400
     if not data:
         return jsonify({"ok": False, "error": T["sub_file_needed"]}), 400
+    # Тип определяем по СОДЕРЖИМОМУ файла, а не по имени и не по типу,
+    # который прислал браузер (их можно подделать). Раньше пропускался любой
+    # «image/*» — в том числе SVG со встроенным скриптом, который выполнился
+    # бы у администратора платформы при просмотре чека (захват админки).
+    mime, ext = security.sniff_upload(data)
+    if not mime:
+        security.log_event("upload_rejected", security.HIGH if b"<script" in data[:20000].lower() else security.MEDIUM,
+                           ip=_client_ip(), username=g.get("shop_id"), path=request.path,
+                           filename=(f.filename or "")[:80], claimed=(f.mimetype or "")[:60])
+        return jsonify({"ok": False, "error": T["sub_file_type"]}), 400
     if not ADMIN_TELEGRAM_ID or not BOT_TOKEN:
         logger.error("Чек не принят: на сервере не заданы ADMIN_TELEGRAM_ID / BOT_TOKEN")
         return jsonify({"ok": False, "error": T["sub_err"]}), 503
@@ -715,10 +720,14 @@ def api_hamyon_callback():
                 amount = None  # сумма в запросе не подписана — берём ожидаемую из нашей записи
         if not verified:
             logger.warning(f"Hamyon: подпись не сошлась, оплату {p['id']} не засчитываем ({data})")
+            security.log_event("payment_bad_sign", security.HIGH, ip=_client_ip(), path=request.path,
+                               payment=p["id"], status=status, amount=amount)
             return jsonify({"ok": False, "error": "sign"})
         try:
             if amount is not None and int(float(amount)) < int(p.get("amount") or 0):
                 logger.warning(f"Hamyon: сумма {amount} меньше ожидаемой {p.get('amount')} (оплата {p['id']})")
+                security.log_event("payment_amount_low", security.MEDIUM, ip=_client_ip(), path=request.path,
+                                   payment=p["id"], amount=amount, expected=p.get("amount"))
                 if ADMIN_TELEGRAM_ID:
                     _send_telegram_message(ADMIN_TELEGRAM_ID, f"⚠️ Автооплата №{p['id']}: пришло {amount}, "
                                            f"ожидалось {_fmt_sum(p.get('amount'))} — проверьте вручную.")
@@ -1097,10 +1106,18 @@ def api_admin_sub_receipt(payment_id):
         return "Не удалось получить чек из Telegram — откройте его в чате с ботом", 502
     if not resp.ok:
         return "Не удалось получить чек из Telegram — откройте его в чате с ботом", 502
-    mime = p.get("receipt_mime") or resp.headers.get("Content-Type") or "application/octet-stream"
-    if info["file_path"].endswith(".jpg"):
-        mime = "image/jpeg"  # Telegram пересжимает фото в JPEG
-    return Response(resp.content, mimetype=mime, headers={"Cache-Control": "private, max-age=3600"})
+    # Показываем в браузере только то, что точно картинка или PDF (по самому
+    # содержимому). Всё остальное — только скачать: иначе старый чек-«SVG»
+    # со скриптом выполнился бы на нашем сайте в сессии администратора.
+    mime, _ext = security.sniff_upload(resp.content)
+    headers = {"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"}
+    if mime in security.SAFE_INLINE_MIME:
+        if mime != "application/pdf":
+            headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+        return Response(resp.content, mimetype=mime, headers=headers)
+    headers["Content-Disposition"] = f'attachment; filename="receipt_{payment_id}.bin"'
+    headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return Response(resp.content, mimetype="application/octet-stream", headers=headers)
 
 
 @app.route("/api/admin/shops/<int:shop_id>/sub", methods=["POST"])
