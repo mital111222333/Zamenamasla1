@@ -3424,6 +3424,20 @@ def api_stats_directions():
     return jsonify({"ok": True, "dirs": db.get_direction_range(g.shop_id, date_from, date_to)})
 
 
+@app.route("/api/stats/dir")
+@login_required
+@employee_blocked
+def api_stats_dir():
+    """Вкладки «Шиномонтаж» и «Запчасти» в «Статистике». Прибыль и стоимость
+    склада — только главной/одиночной точке со складом (не филиалу)."""
+    dr = request.args.get("dir", "")
+    shop = db.get_shop(g.shop_id) or {}
+    if dr not in ("tire", "part") or not db.shop_dirs(shop).get(dr):
+        return jsonify({"ok": False, "error": "not enabled"}), 400
+    with_profit = bool(shop.get("warehouse_enabled")) and not g.is_branch
+    return jsonify({"ok": True, **db.dir_analytics(g.shop_id, dr, with_profit=with_profit)})
+
+
 @app.route("/api/sms_settings", methods=["POST"])
 @login_required
 @employee_blocked

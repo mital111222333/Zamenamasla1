@@ -668,6 +668,46 @@ if ('serviceWorker' in navigator) {
   .add-ch-o i { font-size:24px; color:var(--blue); width:28px; text-align:center; }
   .add-ch-o b { display:block; font-size:15.5px; }
   .add-ch-o small { font-size:12.5px; color:var(--hint); }
+  .sd-tabs { display:flex; gap:6px; padding:4px; margin:0 0 14px; border-radius:14px; background:#E9EEF5; overflow-x:auto; scrollbar-width:none; }
+  .sd-tabs::-webkit-scrollbar { display:none; }
+  .sd-tabs button { flex:1 0 auto; min-height:42px; padding:0 14px; border:0; border-radius:11px; background:transparent; color:var(--hint); font:inherit; font-size:14px; font-weight:700; white-space:nowrap; cursor:pointer; transition:background .25s, color .25s, box-shadow .25s; }
+  .sd-tabs button.on { background:#fff; color:var(--text); box-shadow:0 1px 4px rgba(15,23,42,.12); }
+  .sd-tabs button[data-k="tire"].on i { color:#0F9F6E; }
+  .sd-tabs button[data-k="part"].on i { color:#C2410C; }
+  .sd-tabs button[data-k="all"].on i { color:#2563EB; }
+  .sd-hero { color:#fff; border:0 !important; }
+  .sd-hero .an-h b, .sd-hero .an-h span { color:rgba(255,255,255,.88); }
+  .sd-hero-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .sd-hero .an-big { font-size:28px; color:#fff; }
+  .sd-hero .sd-pct { display:inline-block; margin-top:6px; padding:3px 10px; border-radius:999px; background:rgba(255,255,255,.2); font-size:13px; font-weight:700; }
+  .sd-kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-top:14px; }
+  .sd-kpis div { background:rgba(255,255,255,.14); border-radius:12px; padding:8px 10px; }
+  .sd-kpis span { display:block; font-size:11.5px; opacity:.85; }
+  .sd-kpis b { font-family:var(--font-mono); font-size:15px; white-space:nowrap; }
+  .sd-ring { position:relative; width:70px; height:70px; flex:none; }
+  .sd-ring-v { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px; font-weight:800; }
+  .sd-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+  .sd-tile { border:1px solid var(--border); border-radius:14px; padding:10px 12px; }
+  .sd-tile span { display:block; font-size:12px; color:var(--hint); }
+  .sd-tile b { display:block; font-family:var(--font-mono); font-size:17px; margin:2px 0; }
+  .sd-tile small { display:block; font-size:12px; color:var(--hint); }
+  .sd-up { color:#15803D; font-weight:700; }
+  .sd-down { color:#B3241C; font-weight:700; }
+  .sd-cols { display:flex; align-items:flex-end; gap:3px; height:120px; margin-top:6px; }
+  .sd-col { flex:1; position:relative; height:100%; display:flex; align-items:flex-end; }
+  .sd-col i { display:block; width:100%; height:0; border-radius:4px 4px 0 0; transition:height 1.1s cubic-bezier(.2,.8,.2,1); }
+  .sd-col u { position:absolute; left:0; right:0; border-top:2px dashed #94A3B8; height:0; }
+  .sd-axis { display:flex; justify-content:space-between; font-size:11px; color:var(--hint); margin-top:4px; }
+  .sd-split { display:flex; height:12px; border-radius:6px; overflow:hidden; background:#E2E8F0; margin:8px 0 6px; }
+  .sd-split i { display:block; height:100%; width:0; transition:width 1.2s cubic-bezier(.2,.8,.2,1); }
+  .sd-legend { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12.5px; color:var(--hint); }
+  .sd-legend b { color:var(--text); font-family:var(--font-mono); }
+  .sd-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 0; border-top:1px solid var(--border); font-size:14px; }
+  .sd-row b { font-family:var(--font-mono); white-space:nowrap; }
+  .sd-row span { color:var(--hint); font-size:12.5px; }
+  .sd-week { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:end; height:110px; }
+  .sd-week div { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; font-size:11.5px; color:var(--hint); }
+  .sd-week i { display:block; width:100%; height:0; border-radius:6px; transition:height 1.1s cubic-bezier(.2,.8,.2,1); }
   .dir-bar { display:flex; height:12px; border-radius:6px; overflow:hidden; margin:4px 0 12px; background:#E2E8F0; }
   .dir-bar span { display:block; height:100%; }
   .dir-total { display:flex; justify-content:flex-end; margin-top:10px; }
@@ -2530,6 +2570,15 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="statsOwnView">
+      {% if dirs.tire or dirs.part %}
+      <div class="sd-tabs" id="sdTabs" role="tablist">
+        <button type="button" class="on" data-k="all" onclick="sdTab('all')"><i class="fa-solid fa-oil-can"></i> {{ T.sd_tab_all }}</button>
+        {% if dirs.tire %}<button type="button" data-k="tire" onclick="sdTab('tire')"><i class="fa-solid fa-circle-dot"></i> {{ T.dir_tire }}</button>{% endif %}
+        {% if dirs.part %}<button type="button" data-k="part" onclick="sdTab('part')"><i class="fa-solid fa-gears"></i> {{ T.dir_part }}</button>{% endif %}
+      </div>
+      <div id="sdPane" class="an-box" style="display:none;"></div>
+      {% endif %}
+      <div id="stMainPane">
       <div id="statsGrid">{{ T.stats_loading }}</div>
       {% if not is_employee %}<div id="anBox" class="an-box"></div>{% endif %}
       {% if dirs.tire or dirs.part %}
@@ -2599,6 +2648,7 @@ if ('serviceWorker' in navigator) {
         </div>
         <button class="submit" onclick="applyStatsRange()">{{ T.stats_apply }}</button>
         <div id="statsRangeResult" style="margin-top:14px;"></div>
+      </div>
       </div>
     </div>
 
@@ -7607,7 +7657,12 @@ function renderAnalytics() {
       ${d.viscosity.length ? d.viscosity.map((v, i) => `<div class="an-bar"><span class="t">${escapeHtml(v.name)}</span><span class="b"><i style="background:${vCol[i]}" data-w="${(v.liters / vMax * 100).toFixed(1)}"></i></span><span class="v">${String(v.liters).replace('.', ',')}</span></div>`).join('') : `<div class="an-sub">${T.an_in_none}</div>`}</div>
     <div class="an-card"><div class="an-h"><b>${T.an_load_title}</b><span>${T.an_load_hours}</span></div>
       ${heat || `<div class="an-sub">${T.an_load_hours_soon}</div>`}</div>`;
-  if (AN.io) AN.io.disconnect();
+  AN.io = anAnimate(box, AN.io);
+}
+// Карточки .an-card плавно выезжают, когда до них доходит экран; полосы,
+// столбики, кольца и тепловая карта заполняются с анимацией.
+function anAnimate(box, io) {
+  if (io) io.disconnect();
   const reveal = c => {
     c.classList.add('in');
     setTimeout(() => {
@@ -7616,13 +7671,17 @@ function renderAnalytics() {
       c.querySelectorAll('circle.p').forEach(x => { x.style.strokeDashoffset = x.dataset.o; });
       c.querySelectorAll('.an-heat i').forEach((x, i) => setTimeout(() => { x.style.opacity = x.dataset.o; }, i * 6));
       c.querySelectorAll('.an-ins').forEach((x, i) => { x.style.transitionDelay = (i * 0.09) + 's'; });
+      c.querySelectorAll('.sd-col i, .sd-week i').forEach((x, i) => { x.style.transitionDelay = (i * 0.018) + 's'; });
     }, 80);
   };
   const cards = box.querySelectorAll('.an-card');
   if ('IntersectionObserver' in window) {
-    AN.io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { reveal(e.target); AN.io.unobserve(e.target); } }), { threshold: 0.12 });
-    cards.forEach(c => AN.io.observe(c));
-  } else cards.forEach(reveal);
+    const o = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { reveal(e.target); o.unobserve(e.target); } }), { threshold: 0.12 });
+    cards.forEach(c => o.observe(c));
+    return o;
+  }
+  cards.forEach(reveal);
+  return null;
 }
 // «К прошлым 30 дням ▲/▼ %» — прямо в карточке «Выручка за 30 дней»
 // (раньше это был отдельный второй график с теми же деньгами).
@@ -7675,7 +7734,126 @@ async function loadDirStats(period) {
     }).join('');
 }
 
+// ---- Вкладки «Шиномонтаж» / «Запчасти»: та же аналитика по направлению ----
+const SD = { k: 'all', seq: 0, io: null, data: {} };
+const SD_GRAD = { tire: 'linear-gradient(135deg,#0B7A55,#12B886)', part: 'linear-gradient(135deg,#9A3412,#EA580C)' };
+function sdTab(k) {
+  SD.k = k;
+  document.querySelectorAll('#sdTabs button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  const main = document.getElementById('stMainPane'), pane = document.getElementById('sdPane');
+  if (!main || !pane) return;
+  main.style.display = k === 'all' ? '' : 'none';
+  pane.style.display = k === 'all' ? 'none' : '';
+  if (k !== 'all') loadSdTab(k);
+}
+async function loadSdTab(k) {
+  const pane = document.getElementById('sdPane');
+  if (!pane) return;
+  if (!SD.data[k]) pane.innerHTML = `<div class="an-sub">${T.stats_loading}</div>`;
+  else renderSdTab(k);
+  const seq = ++SD.seq;
+  let d = null;
+  try { d = await (await fetch('/api/stats/dir?dir=' + k, { credentials: 'same-origin', cache: 'no-store' })).json(); } catch (e) { d = null; }
+  if (seq !== SD.seq || SD.k !== k) return;
+  if (!d || !d.ok) { if (!SD.data[k]) pane.innerHTML = `<div class="an-sub">${T.dash_no_data}</div>`; return; }
+  SD.data[k] = d;
+  renderSdTab(k);
+}
+function sdPctHtml(p, note) {
+  if (p === null || p === undefined) return '';
+  return `<span class="${p >= 0 ? 'sd-up' : 'sd-down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(p))}%</span>${note ? ' ' + escapeHtml(note) : ''}`;
+}
+function sdInsights(k, d) {
+  const out = [], dn = k === 'tire' ? T.dir_tire : T.dir_part;
+  const c = d.clients, m = d.periods.month;
+  if (c.oil_visits >= 5 && c.cross / c.oil_visits < 0.3)
+    out.push(['fa-hand-holding-dollar', '#7C3AED', T.sd_in_cross.replace('{n}', c.cross).replace('{all}', c.oil_visits).replace('{dir}', dn.toLowerCase())]);
+  if (m.pct !== null && m.prev >= 100000 && Math.abs(m.pct) >= 10)
+    out.push(m.pct > 0 ? ['fa-arrow-trend-up', '#15803D', T.sd_in_up.replace('{dir}', dn).replace('{p}', Math.round(m.pct))]
+                       : ['fa-arrow-trend-down', '#B3241C', T.sd_in_down.replace('{dir}', dn).replace('{p}', Math.abs(Math.round(m.pct)))]);
+  if (k === 'tire' && [3, 4].indexOf(d.month_no) >= 0) out.push(['fa-sun', '#B45309', T.sd_in_season_s]);
+  if (k === 'tire' && [10, 11].indexOf(d.month_no) >= 0) out.push(['fa-snowflake', '#2563EB', T.sd_in_season_w]);
+  if (k === 'tire' && d.periods.month.visits >= 3 && !d.day_svc.week_days) out.push(['fa-pen-to-square', '#B45309', T.sd_in_daysvc]);
+  const st = d.stock;
+  if (st && st.low_count) out.push(['fa-box-open', '#B3241C', T.sd_in_low.replace('{n}', st.low_count)]);
+  if (st && st.idle_count) out.push(['fa-hourglass-half', '#64748B', T.sd_in_idle.replace('{n}', st.idle_count)
+    .replace('{sum}', st.idle_value ? T.sd_in_idle_sum.replace('{sum}', fmtShort(st.idle_value) + ' ' + T.currency) : '')]);
+  if (d.top.length >= 2 && d.sum30 > 0) {
+    const p = Math.round(d.top[0].total / d.sum30 * 100);
+    if (p >= 25) out.push(['fa-star', '#EAB308', T.sd_in_top.replace('{name}', d.top[0].name).replace('{p}', p)]);
+  }
+  return out.slice(0, 5);
+}
+function renderSdTab(k) {
+  const d = SD.data[k], pane = document.getElementById('sdPane');
+  if (!d || !pane) return;
+  const dn = k === 'tire' ? T.dir_tire : T.dir_part, col = DIR_COLORS[k];
+  const m = d.periods.month, money = v => fmtShort(v) + ' ' + T.currency;
+  const C = 2 * Math.PI * 26, share = Math.min(100, d.share_month || 0);
+  const ring = `<div class="sd-ring"><svg width="70" height="70" viewBox="0 0 70 70" aria-hidden="true"><circle cx="35" cy="35" r="26" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="8"/><circle class="p" cx="35" cy="35" r="26" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" data-o="${(C * (1 - share / 100)).toFixed(1)}" transform="rotate(-90 35 35)"/></svg><b class="sd-ring-v">${share}%</b></div>`;
+  const hero = `<div class="an-card sd-hero" style="background:${SD_GRAD[k]};">
+    <div class="an-h"><b>${escapeHtml(T.sd_month_of.replace('{dir}', dn))}</b><span>${T.sd_share}</span></div>
+    <div class="sd-hero-top"><div><div class="an-big">${fmtNum(m.total)} ${T.currency}</div>
+      ${m.pct !== null && m.pct !== undefined ? `<span class="sd-pct">${m.pct >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(m.pct))}% ${T.sd_vs_prev}</span>` : ''}</div>${ring}</div>
+    <div class="sd-kpis">
+      <div><span>${T.sd_visits}</span><b>${m.visits}</b></div>
+      <div><span>${T.sd_avg}</span><b>${fmtShort(m.avg)}</b></div>
+      ${d.with_profit ? `<div><span>${T.sd_profit}</span><b>${fmtShort(m.profit)}</b></div>` : `<div><span>${T.sd_cars}</span><b>${d.clients.cars}</b></div>`}
+    </div>
+    ${d.with_profit && m.unpriced > 0 ? `<div class="an-sub" style="color:rgba(255,255,255,.85); margin-top:8px;">⚠️ ${escapeHtml(T.sd_unpriced.replace('{sum}', money(m.unpriced)))}</div>` : ''}</div>`;
+  if (!d.sum30 && !d.periods.year.total) {
+    pane.innerHTML = hero + `<div class="an-card"><div class="an-sub">${T.sd_none}</div></div>`;
+    SD.io = anAnimate(pane, SD.io);
+    return;
+  }
+  const per = [['today', T.stats_today, T.sd_yday], ['week', T.stats_week, ''], ['month', T.stats_month, ''], ['year', T.stats_year, '']];
+  const tiles = `<div class="an-card"><div class="an-h"><b>${T.sd_periods}</b></div><div class="sd-grid">${per.map(([pk, label, note]) => {
+    const x = d.periods[pk];
+    return `<div class="sd-tile"><span>${escapeHtml(label)}</span><b>${fmtShort(x.total)}</b>
+      <small>${x.visits} ${T.st_dirs_visits}${x.visits ? ' · ' + fmtShort(x.avg) : ''}</small>
+      ${d.with_profit ? `<small>${T.sd_profit}: <b style="display:inline; font-size:12.5px;">${fmtShort(x.profit)}</b></small>` : ''}
+      <small>${sdPctHtml(x.pct, note)}</small></div>`;
+  }).join('')}</div></div>`;
+  const ins = sdInsights(k, d);
+  const insCard = `<div class="an-card"><div class="an-h"><b><i class="fa-solid fa-wand-magic-sparkles" style="color:#7C3AED"></i> ${T.an_noticed}</b></div>
+    ${ins.length ? ins.map(x => `<div class="an-ins"><i class="fa-solid ${x[0]}" style="color:${x[1]}"></i><span>${escapeHtml(x[2])}</span></div>`).join('') : `<div class="an-sub">${T.sd_in_none}</div>`}</div>`;
+  const dMax = Math.max(1, ...d.daily.map(x => Math.max(x.total, x.prev)));
+  const sp = anPct(d.sum30, d.sum_prev30);
+  const fd = s => s.slice(8, 10) + '.' + s.slice(5, 7);
+  const chart = `<div class="an-card"><div class="an-h"><b>${T.sd_30_title}</b><span>${T.sd_30_sub}</span></div>
+    <div class="an-big">${fmtNum(d.sum30)} ${T.currency}</div>${sp !== null ? `<div class="an-sub">${sdPctHtml(sp, T.an_rv_cmp)}</div>` : ''}
+    <div class="sd-cols">${d.daily.map(x => `<div class="sd-col" title="${fd(x.date)}: ${fmtNum(x.total)}"><i style="background:${col};" data-h="${(x.total / dMax * 100).toFixed(1)}"></i>${x.prev ? `<u style="bottom:${(x.prev / dMax * 100).toFixed(1)}%"></u>` : ''}</div>`).join('')}</div>
+    <div class="sd-axis"><span>${fd(d.daily[0].date)}</span><span>${fd(d.daily[14].date)}</span><span>${fd(d.daily[29].date)}</span></div></div>`;
+  const tMax = Math.max(1, ...d.top.map(x => x.total));
+  const top = `<div class="an-card"><div class="an-h"><b>${k === 'tire' ? T.sd_top_tire : T.sd_top_part}</b><span>${T.sd_top_sub}</span></div>
+    ${d.top.length ? d.top.map((x, i) => `<div class="an-bar"><span class="t" style="width:auto; flex:0 1 42%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</span><span class="b"><i style="background:${col}; opacity:${(1 - i * 0.09).toFixed(2)};" data-w="${(x.total / tMax * 100).toFixed(1)}"></i></span><span class="v" style="width:auto; min-width:52px;">${fmtShort(x.total)}</span></div>`).join('') : `<div class="an-sub">${T.sd_none}</div>`}</div>`;
+  const c = d.clients, cAll = Math.max(1, c.cars);
+  let cl = `<div class="an-card"><div class="an-h"><b>${T.sd_clients}</b></div>
+    <div class="an-big">${c.cars} <span class="an-sub" style="font-family:var(--font-body); font-weight:400;">${T.sd_cars}</span></div>
+    <div class="sd-split"><i style="background:${col};" data-w="${(c.new / cAll * 100).toFixed(1)}"></i><i style="background:#94A3B8;" data-w="${(c.returning / cAll * 100).toFixed(1)}"></i></div>
+    <div class="sd-legend"><span><b>${c.new}</b> ${T.sd_new}</span><span><b>${c.returning}</b> ${T.sd_ret}</span></div>`;
+  if (c.oil_visits) cl += `<div class="sd-row"><span>${escapeHtml(T.sd_cross.replace('{dir}', dn.toLowerCase()))}</span><b>${c.cross} / ${c.oil_visits}</b></div>`;
+  if (d.walkin.count || (k === 'part' && WAREHOUSE_ENABLED)) cl += `<div class="sd-row"><span>${T.sd_walkin}</span><b>${d.walkin.count} · ${money(d.walkin.total)}</b></div>`;
+  if (k === 'tire') cl += `<div class="sd-row"><span>${T.sd_day_svc}</span><b>${d.day_svc.days} ${T.sd_days} · ${money(d.day_svc.total)}</b></div>`;
+  cl += '</div>';
+  const wd = String(T.an_weekdays || '').split('|'), wMax = Math.max(1, ...d.week);
+  const best = d.week.indexOf(Math.max(...d.week));
+  const week = d.week.some(x => x) ? `<div class="an-card"><div class="an-h"><b>${T.sd_load}</b><span>${T.sd_load_sub}</span></div>
+    <div class="sd-week">${d.week.map((v, i) => `<div><b style="color:var(--text); font-size:12px;">${v || ''}</b><i style="background:${i === best ? col : '#CBD5E1'};" data-h="${(v / wMax * 100).toFixed(1)}"></i><span>${escapeHtml(wd[i] || '')}</span></div>`).join('')}</div></div>` : '';
+  let stock = '';
+  const st = d.stock;
+  if (st) {
+    stock = `<div class="an-card"><div class="an-h"><b>${T.sd_stock}</b></div>
+      <div class="sd-legend" style="font-size:14px;"><span><b>${st.items}</b> ${T.sd_stock_items}</span>${st.value !== undefined ? `<span>${T.sd_stock_value} <b>${money(st.value)}</b></span>` : ''}</div>
+      ${st.low.length ? `<div class="an-sub" style="margin-top:10px; font-weight:700; color:#B3241C;">${T.sd_stock_low}</div>` + st.low.map(p => `<div class="sd-row"><span style="color:var(--text); font-size:14px;">${escapeHtml(p.name)}<br><span>${T.sd_stock_sold}: ${String(p.sold90).replace('.', ',')}</span></span><b>${T.sd_stock_left} ${String(p.qty).replace('.', ',')}</b></div>`).join('') : ''}
+      ${WAREHOUSE_ENABLED ? `<button type="button" class="an-link" onclick="showTab('warehouse')"><i class="fa-solid fa-warehouse"></i> ${T.tab_warehouse || ''}</button>` : ''}</div>`;
+  }
+  pane.innerHTML = hero + insCard + tiles + chart + top + cl + week + stock;
+  SD.io = anAnimate(pane, SD.io);
+}
+
 async function loadStats() {
+  if (SD.k !== 'all' && document.getElementById('sdPane')) loadSdTab(SD.k);
   loadDashboard();
   loadAnalytics();
   if (DIRS_ON) loadDirStats();
