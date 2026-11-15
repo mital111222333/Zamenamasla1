@@ -3546,7 +3546,7 @@ def get_due_reminders():
     today = datetime.now().strftime("%Y-%m-%d")
     followup_cutoff = (datetime.now() - timedelta(days=FOLLOWUP_INTERVAL_DAYS)).strftime("%Y-%m-%d")
     base = """
-            SELECT oc.*, c.plate_number, c.shop_id, cl.full_name as owner_name, cl.telegram_id,
+            SELECT oc.*, c.plate_number, c.shop_id, c.car_brand, c.car_model, cl.full_name as owner_name, cl.telegram_id,
                    cl.phone as owner_phone, s.shop_name, s.notify_telegram_id, s.language,
                    s.sms_enabled, s.eskiz_email, s.eskiz_password
             FROM oil_changes oc
@@ -9045,8 +9045,8 @@ def miniapp_garage(telegram_id: int) -> dict:
             km_left = last["next_mileage"] - health["est_km"]
         book = []
         for h in history:
-            items = [{"name": i.get("name"), "brand": i.get("brand"), "qty": i.get("qty"), "unit": i.get("unit")}
-                     for i in _service_items(h)]
+            items = [{"key": i.get("key"), "name": i.get("name"), "brand": i.get("brand"), "qty": i.get("qty"),
+                      "unit": i.get("unit")} for i in _service_items(h)]
             shop_row = shops.get(h["_shop_id"])
             book.append({
                 "date": h.get("change_date"), "shop": shop_row["shop_name"] if shop_row else "",
@@ -9071,6 +9071,133 @@ def miniapp_garage(telegram_id: int) -> dict:
     newest = max(clients, key=lambda c: c["id"])
     main_shop = result_cars[0]["shop"] if result_cars else _public_shop(shops.get(newest["shop_id"]))
     return {"name": newest["full_name"], "cars": result_cars, "shop": main_shop}
+
+
+def miniapp_book(telegram_id: int, plate: str):
+    """Клиент нажал «Записаться» в мини-приложении: последняя запись его
+    машины (только его — по Telegram ID) помечается «записался». Возвращает
+    данные для уведомления точки или None, если машина не его."""
+    plate = normalize_plate(plate or "")
+    if not plate:
+        return None
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT oc.id FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            JOIN clients cl ON cl.id = c.client_id
+            JOIN shops s ON s.id = c.shop_id
+            WHERE cl.telegram_id=? AND c.plate_number=? AND s.is_active=1
+            ORDER BY oc.change_date DESC, oc.id DESC LIMIT 1
+        """, (telegram_id, plate)).fetchone()
+    if not row:
+        return None
+    mark_booked(row["id"])
+    return get_oil_change_with_context(row["id"])
+
+
+@_serialized
+def snooze_reminder(oil_change_id: int, kinds: str = "o", days: int = 7):
+    """«Напомнить через неделю»: счётчик напоминаний не растёт, а дата
+    прошлого напоминания сдвигается так, чтобы повтор пришёл через days дней
+    (обычный повтор — раз в FOLLOWUP_INTERVAL_DAYS)."""
+    shift = (datetime.now() - timedelta(days=max(0, FOLLOWUP_INTERVAL_DAYS - days))).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        if "o" in kinds:
+            conn.execute("UPDATE oil_changes SET last_reminder_date=?, reminder_count=MAX(COALESCE(reminder_count, 0), 1), "
+                         "status=CASE WHEN status='booked' THEN 'active' ELSE status END WHERE id=?",
+                         (shift, oil_change_id))
+        if "a" in kinds:
+            conn.execute("UPDATE oil_changes SET atf_last_reminder_date=?, "
+                         "atf_reminder_count=MAX(COALESCE(atf_reminder_count, 0), 1) WHERE id=?",
+                         (shift, oil_change_id))
+        conn.commit()
+
+
+def reminder_card(item: dict, today=None) -> dict:
+    """Данные для «живой» карточки напоминания: доля срока (0..1+), сколько
+    км примерно осталось, прошлая замена и что заливали."""
+    today = today or datetime.now().date()
+    last_day = _day(item.get("change_date"))
+    next_day = _day(item.get("next_change_date"))
+    ratio = None
+    if last_day and next_day and next_day > last_day:
+        ratio = (today - last_day).days / (next_day - last_day).days
+    est_km = km_left = None
+    if item.get("mileage") and item.get("daily_km") and last_day:
+        est_km = item["mileage"] + item["daily_km"] * max(0, (today - last_day).days)
+        if item.get("next_mileage") and item["next_mileage"] > item["mileage"]:
+            km_left = item["next_mileage"] - est_km
+            r2 = (est_km - item["mileage"]) / (item["next_mileage"] - item["mileage"])
+            ratio = r2 if ratio is None else max(ratio, r2)
+    oil = next((i for i in _service_items(item) if i.get("key") == "fluid_0"), None)
+    oil_text = None
+    if oil:
+        qty = oil.get("qty")
+        oil_text = (oil.get("brand") or oil.get("name") or "").strip()
+        if qty:
+            oil_text += f" · {str(qty).replace('.', ',')} л"
+    elif item.get("oil_brand"):
+        oil_text = item["oil_brand"]
+    return {"ratio": ratio, "est_km": est_km, "km_left": km_left, "oil": oil_text or None,
+            "last_date": item.get("change_date"), "last_mileage": item.get("mileage")}
+
+
+def passport_full(token: str):
+    """Сервисный паспорт по ссылке: машина + вся её история по госномеру во
+    ВСЕХ точках OilBook (владелец сам решил показать её покупателю — поэтому
+    видны и суммы, которые он платил; закупочные цены точек — никогда).
+    Плюс итоги: сколько замен, сколько вовремя, не уменьшался ли пробег."""
+    car, own = get_car_by_passport_token(token)
+    if not car:
+        return None, [], {}
+    plate = normalize_plate(car["plate_number"] or "")
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date, oc.mileage, oc.service_type, oc.cost, oc.items_json, oc.oil_brand,
+                   oc.filter_changed, oc.next_change_date, oc.next_mileage,
+                   COALESCE(oc.discount_amount, 0) AS discount_amount, s.shop_name, s.address AS shop_address
+            FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            JOIN shops s ON s.id = c.shop_id
+            WHERE c.plate_number=? AND s.is_active=1
+            ORDER BY oc.change_date DESC, oc.id DESC
+        """, (plate,)).fetchall()
+        brand_row = conn.execute("""SELECT car_brand, car_model FROM cars WHERE plate_number=?
+                                    AND COALESCE(car_brand, '') <> '' ORDER BY id DESC LIMIT 1""", (plate,)).fetchone()
+    if brand_row and not car.get("car_brand"):
+        car["car_brand"], car["car_model"] = brand_row["car_brand"], brand_row["car_model"]
+    history = []
+    for r in rows:
+        h = dict(r)
+        h["lines"] = [{"name": i.get("name"), "brand": i.get("brand"), "qty": i.get("qty"),
+                       "unit": i.get("unit") or ("l" if str(i.get("key") or "").startswith("fluid") else None),
+                       "total": i.get("total")}
+                      for i in _service_items(h) if i.get("name")]
+        h.pop("items_json", None)
+        dd = str(h.get("change_date") or "")[:10].split("-")
+        h["date_fmt"] = f"{dd[2]}.{dd[1]}.{dd[0]}" if len(dd) == 3 else (h.get("change_date") or "")
+        history.append(h)
+    # вовремя: следующая замена пришла не позже срока прошлой (+7 дней)
+    # или не позже её пробега (+500 км)
+    checked = on_time = 0
+    chron = list(reversed(history))
+    for prev, cur in zip(chron, chron[1:]):
+        nd, cd = _day(prev.get("next_change_date")), _day(cur.get("change_date"))
+        by_date = bool(nd and cd) and cd <= nd + timedelta(days=7)
+        by_km = bool(prev.get("next_mileage") and cur.get("mileage")) and cur["mileage"] <= prev["next_mileage"] + 500
+        if (nd and cd) or (prev.get("next_mileage") and cur.get("mileage")):
+            checked += 1
+            on_time += 1 if (by_date or by_km) else 0
+    kms = [h["mileage"] for h in chron if h.get("mileage")]
+    stats = {
+        "count": len(history),
+        "on_time": round(on_time * 100 / checked) if checked else None,
+        "last_km": kms[-1] if kms else None,
+        "km_ok": all(b >= a for a, b in zip(kms, kms[1:])) if len(kms) >= 2 else None,
+        "since": chron[0]["date_fmt"] if chron else None,
+        "shops": len({h["shop_name"] for h in history}),
+    }
+    return car, history, stats
 
 
 def _clean_doc(kind, title, plate, expires_on):

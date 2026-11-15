@@ -23,6 +23,7 @@
 LEGACY_ADMIN_SHOP_ID = 1
 
 import os
+import urllib.parse
 import re
 import sqlite3
 import asyncio
@@ -283,6 +284,12 @@ async def shop_info_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(i18n.t("bot_shop_not_found", lang))
         return
 
+    await send_shop_info(update.message, shop, lang)
+
+
+async def send_shop_info(message, shop, lang):
+    """Адрес, телефон, часы и точка на карте — по кнопке «О пункте» и по
+    кнопке «📍 Точка» под напоминанием."""
     lines = [f"ℹ️ {shop['shop_name'] or SHOP_NAME}"]
     if shop.get("address"):
         lines.append(f"{i18n.t('bot_shop_address_label', lang)} {shop['address']}")
@@ -294,10 +301,10 @@ async def shop_info_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # раньше клиент видел одно название и думал, что бот сломался
         lines.append("")
         lines.append(i18n.t("bot_shop_info_missing", lang))
-    await update.message.reply_text("\n".join(lines))
+    await message.reply_text("\n".join(lines))
     if shop.get("lat") and shop.get("lon"):
         try:
-            await update.message.reply_location(latitude=float(shop["lat"]), longitude=float(shop["lon"]))
+            await message.reply_location(latitude=float(shop["lat"]), longitude=float(shop["lon"]))
         except ValueError:
             pass
 
@@ -315,6 +322,17 @@ async def reminder_button_callback(update: Update, context: ContextTypes.DEFAULT
     # кнопку может нажать только сам клиент этой записи — иначе подделанным
     # нажатием можно было бы «закрыть» напоминания чужих клиентов
     if not ctx or str(ctx.get("client_telegram_id") or "") != str(query.from_user.id):
+        return
+
+    if action == "snooze":
+        db.snooze_reminder(oil_change_id, kinds, days=7)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(i18n.t("bot_snoozed", lang))
+        return
+    if action == "shop":
+        shop = db.get_shop(ctx["shop_id"])
+        if shop:
+            await send_shop_info(query.message, shop, lang)
         return
 
     if action in ("changed", "book") and "a" in kinds:
@@ -726,12 +744,22 @@ async def _send_one_reminder(context, item, sms_creds):
         db.mark_reminder_sent(item["id"], oil=due_oil, atf=due_atf)
 
     if item.get("telegram_id"):
-        keyboard = InlineKeyboardMarkup([
+        rows = [
             [
-                InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}:{kinds}"),
                 InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}:{kinds}"),
-            ]
-        ])
+                InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}:{kinds}"),
+            ],
+            [
+                InlineKeyboardButton(i18n.t("btn_snooze", lang), callback_data=f"snooze:{item['id']}:{kinds}"),
+                InlineKeyboardButton(i18n.t("btn_shop", lang), callback_data=f"shop:{item['id']}:{kinds}"),
+            ],
+        ]
+        garage = miniapp_url()
+        if garage:
+            # кнопка открывает «Мой гараж» сразу на этой машине
+            rows.append([InlineKeyboardButton(i18n.t("btn_open_garage", lang), web_app=WebAppInfo(
+                url=f"{garage}?car={urllib.parse.quote(db.normalize_plate(item['plate_number'] or ''))}"))])
+        keyboard = InlineKeyboardMarkup(rows)
         if kinds != "o":
             key = "bot_reminder_any_followup" if is_followup else "bot_reminder_any_first"
             text = i18n.t(key, lang, plate=item['plate_number'], what=what, shop=shop_name)
@@ -740,6 +768,7 @@ async def _send_one_reminder(context, item, sms_creds):
         else:
             service = item.get('service_type') or i18n.t("history_service_fallback", lang)
             text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
+        text += reminder_card_text(item, lang)
         try:
             await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
             mark()
@@ -769,6 +798,34 @@ async def _send_one_reminder(context, item, sms_creds):
             logger.warning(f"Не удалось отправить SMS-напоминание {item['id']}: {err}")
     # иначе — ни Telegram, ни SMS недоступны для этого клиента, пропускаем
     # (не отмечаем как отправленное — вдруг клиент привяжет Telegram позже)
+
+
+def _fmt_km(n):
+    return f"{int(n):,}".replace(",", " ")
+
+
+def reminder_card_text(item, lang):
+    """Карточка под текстом напоминания: машина, полоса срока, прошлая
+    замена, что заливали и примерный пробег сейчас."""
+    card = db.reminder_card(item)
+    km = i18n.t("km_unit", lang)
+    car = " ".join(x for x in (item.get("car_brand"), item.get("car_model")) if x)
+    lines = ["", "━━━━━━━━━━━━", f"🚗 {car + ' · ' if car else ''}{item.get('plate_number') or ''}"]
+    if card["ratio"] is not None:
+        r = max(0.0, card["ratio"])
+        filled = min(10, max(1, round(r * 10)))
+        lines.append("▰" * filled + "▱" * (10 - filled) + f"  {min(100, round(r * 100))}%")
+    if card["last_date"]:
+        y, m, d = (str(card["last_date"])[:10].split("-") + ["", ""])[:3]
+        last = f"{d}.{m}.{y}" if d else str(card["last_date"])
+        if card["last_mileage"]:
+            last += f" · {_fmt_km(card['last_mileage'])} {km}"
+        lines.append(f"🛢 {i18n.t('rem_card_last', lang)}: {last}")
+    if card["oil"]:
+        lines.append(f"🧴 {i18n.t('rem_card_oil', lang)}: {card['oil']}")
+    if card["est_km"]:
+        lines.append(f"📍 {i18n.t('rem_card_now', lang)}: ≈ {_fmt_km(card['est_km'])} {km}")
+    return "\n".join(lines)
 
 
 async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYPE):

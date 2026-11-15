@@ -895,90 +895,125 @@ if ('serviceWorker' in navigator) {
 
 PASSPORT_PAGE = """
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ lang }}">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Сервисный паспорт — {{ car.plate_number }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ T.pp_title }} — {{ car.plate_number }}</title>
+<meta property="og:title" content="{{ T.pp_title }} · {{ car.plate_number }}">
+<meta property="og:description" content="{{ (car.car_brand or '') ~ ' ' ~ (car.car_model or '') }} · {{ stats.count }} {{ T.pp_changes }}">
+<meta name="theme-color" content="#0B1B3A">
 <style>
   * { box-sizing:border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#F1F4F9; color:#1A1D24; }
-  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 40px; }
-  .stripe { height:6px; background:linear-gradient(90deg, #1D4ED8 33%, #E10600 33%, #E10600 66%, #38BDF8 66%); }
-  .head { text-align:center; padding:24px 0 18px; }
-  .head .badge { display:inline-block; background:#1D4ED8; color:#fff; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:4px 12px; border-radius:20px; margin-bottom:10px; }
-  .head h1 { font-size:26px; margin:6px 0 2px; font-family:'Courier New',monospace; letter-spacing:1px; }
-  .head .sub { color:#6B7280; font-size:14px; }
-  .card { background:#fff; border:1px solid #E5E9F0; border-radius:16px; padding:18px; margin-bottom:14px; }
-  .card .label { font-size:11px; color:#8A93A6; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
-  .card .value { font-size:16px; font-weight:600; }
-  .owner-row { display:flex; justify-content:space-between; gap:12px; }
-  .owner-row > div { flex:1; }
-  .hist-title { font-size:15px; font-weight:700; margin:22px 0 10px; }
-  .entry { background:#fff; border:1px solid #E5E9F0; border-radius:14px; padding:14px; margin-bottom:10px; }
-  .entry .top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-  .entry .date { font-weight:700; font-size:14.5px; }
-  .entry .mileage { color:#6B7280; font-size:12.5px; margin-top:2px; }
-  .entry .cost { font-weight:700; color:#1D4ED8; font-family:'Courier New',monospace; white-space:nowrap; }
-  .entry .items { margin-top:8px; padding-top:8px; border-top:1px dashed #E5E9F0; font-size:13px; color:#4B5563; }
-  .entry .items div { display:flex; justify-content:space-between; padding:2px 0; }
-  .empty { text-align:center; color:#8A93A6; padding:30px 0; }
-  .footer { text-align:center; color:#9AA3B2; font-size:12px; margin-top:26px; line-height:1.6; }
-  .footer b { color:#4B5563; }
+  html, body { margin:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif; color:#fff; min-height:100vh;
+    background:#0B1B3A linear-gradient(170deg,#0B1B3A 0%,#13306B 55%,#1D4FB0 100%); }
+  .wrap { max-width:560px; margin:0 auto; padding:calc(18px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom)); }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+  .wm { font-weight:800; font-size:18px; letter-spacing:-.3px; }
+  .wm span { color:#7DB3FF; }
+  .lang { color:#fff; text-decoration:none; font-size:12px; font-weight:700; border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:5px 11px; }
+  .muted { color:#A9BDE6; }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .head h1 { font-size:26px; margin:2px 0 4px; letter-spacing:-.4px; }
+  .plate { display:inline-flex; align-items:center; border:2px solid #fff; border-radius:7px; font-weight:800; font-size:16px; letter-spacing:.6px; padding:2px 9px; margin-top:6px; }
+  .seal { width:62px; height:62px; flex:none; border-radius:50%; border:2px solid #4ADE80; color:#4ADE80; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; font-size:10px; font-weight:800; line-height:1.15; text-align:center; }
+  .seal b { font-size:18px; }
+  .g { background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16); border-radius:18px;
+    -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:18px 0 10px; }
+  .stats .g { padding:12px 6px; text-align:center; }
+  .stats b { display:block; font-size:21px; letter-spacing:-.4px; }
+  .stats span { font-size:11.5px; }
+  .ok { color:#4ADE80; }
+  .info { padding:12px 14px; font-size:13.5px; display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; }
+  .info b { text-align:right; }
+  h2 { font-size:16px; margin:20px 2px 10px; }
+  .e { padding:13px 14px; margin-bottom:9px; }
+  .e-h { display:flex; justify-content:space-between; gap:10px; font-weight:700; font-size:14.5px; }
+  .e-s { font-size:12.5px; margin-top:3px; }
+  .e-i { margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,.18); font-size:13px; }
+  .e-i div { display:flex; justify-content:space-between; gap:10px; padding:2px 0; }
+  .e-i div span:last-child { white-space:nowrap; color:#DCE7FF; }
+  .cost { white-space:nowrap; color:#7DB3FF; }
+  .chk { display:inline-block; font-size:11px; font-weight:800; color:#4ADE80; background:rgba(74,222,128,.14); border-radius:999px; padding:2px 8px; margin-left:6px; vertical-align:middle; }
+  .empty { text-align:center; padding:30px 10px; }
+  .btns { display:flex; gap:9px; margin-top:18px; }
+  .btn { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:48px; border-radius:15px; border:none; cursor:pointer;
+    font:700 15px inherit; font-family:inherit; text-decoration:none; color:#fff; background:linear-gradient(135deg,#2F7BFF,#1450D6); box-shadow:0 10px 22px rgba(20,80,214,.35); }
+  .btn.ghost { background:rgba(255,255,255,.1); box-shadow:none; border:1px solid rgba(255,255,255,.22); }
+  .foot { text-align:center; font-size:12px; line-height:1.6; margin-top:22px; }
+  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#fff; color:#0B1B3A; font-weight:700; font-size:14px;
+    padding:10px 16px; border-radius:12px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.on { opacity:1; }
 </style>
 </head>
 <body>
-  <div class="stripe"></div>
-  <div class="wrap">
-    <div class="head">
-      <span class="badge">✓ Сервисный паспорт</span>
-      <h1>{{ car.plate_number }}</h1>
-      <div class="sub">{{ car.car_brand or '' }} {{ car.car_model or '' }}</div>
-    </div>
+<div class="wrap">
+  <div class="top"><div class="wm"><span>Oil</span>Book</div>
+    <a class="lang" href="?lang={{ 'ru' if lang == 'uz' else 'uz' }}">{{ 'RU' if lang == 'uz' else 'UZ' }}</a></div>
 
-    <div class="card">
-      <div class="owner-row">
-        <div>
-          <div class="label">Владелец</div>
-          <div class="value">{{ car.owner_name or '—' }}</div>
-        </div>
-        <div>
-          <div class="label">Обслуживается в</div>
-          <div class="value">{{ car.shop_name or '—' }}</div>
-        </div>
-      </div>
+  <div class="head">
+    <div>
+      <div class="muted" style="font-size:13px;">{{ T.pp_title }}</div>
+      <h1>{{ ((car.car_brand or '') ~ ' ' ~ (car.car_model or '')).strip() or T.pp_car }}</h1>
+      <div class="plate">{{ car.plate_number }}</div>
     </div>
-
-    <div class="hist-title">История обслуживания ({{ history|length }})</div>
-    {% if history %}
-      {% for h in history %}
-      <div class="entry">
-        <div class="top">
-          <div>
-            <div class="date">{{ h.service_type or 'Замена масла' }}</div>
-            <div class="mileage">{{ h.change_date }}{% if h.mileage %} · {{ "{:,}".format(h.mileage).replace(',', ' ') }} км{% endif %}</div>
-          </div>
-          {% if h.cost %}<div class="cost">{{ "{:,}".format(h.cost).replace(',', ' ') }} сум</div>{% endif %}
-        </div>
-        {% if h.items_list %}
-        <div class="items">
-          {% for it in h.items_list %}
-          <div><span>{{ it.name }}{% if it.brand %} ({{ it.brand }}){% endif %}{% if it.qty and it.qty != 1 %} — {{ it.qty }} л{% endif %}</span><span>{{ "{:,}".format(it.total|int).replace(',', ' ') }}</span></div>
-          {% endfor %}
-          {% if h.discount_amount %}<div style="color:#B3241C;"><span>Скидка</span><span>−{{ "{:,}".format(h.discount_amount|int).replace(',', ' ') }}</span></div>{% endif %}
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    {% else %}
-      <div class="empty">Записей пока нет.</div>
-    {% endif %}
-
-    <div class="footer">
-      Подтверждённая история обслуживания.<br>
-      Данные предоставлены точкой <b>{{ car.shop_name or '' }}</b> через платформу учёта замены масла.
-    </div>
+    <div class="seal"><b>✓</b>OilBook</div>
   </div>
+
+  <div class="stats">
+    <div class="g"><b>{{ stats.count }}</b><span class="muted">{{ T.pp_changes }}</span></div>
+    <div class="g"><b class="{{ 'ok' if stats.on_time is not none and stats.on_time >= 80 else '' }}">{{ (stats.on_time ~ '%') if stats.on_time is not none else '—' }}</b><span class="muted">{{ T.pp_on_time }}</span></div>
+    <div class="g"><b>{{ ("{:,}".format(stats.last_km).replace(',', ' ')) if stats.last_km else '—' }}</b><span class="muted">{{ T.pp_km }}</span></div>
+  </div>
+
+  {% if car.owner_name %}<div class="g info"><span class="muted">{{ T.pp_owner }}</span><b>{{ car.owner_name }}</b></div>{% endif %}
+  {% if stats.since %}<div class="g info"><span class="muted">{{ T.pp_since }}</span><b>{{ stats.since }}</b></div>{% endif %}
+  {% if stats.km_ok %}<div class="g info"><span class="muted">{{ T.pp_km_check }}</span><b class="ok">✓ {{ T.pp_km_ok }}</b></div>{% endif %}
+
+  <h2>{{ T.pp_history }} ({{ history|length }})</h2>
+  {% if history %}
+    {% for h in history %}
+    <div class="g e">
+      <div class="e-h"><span>{{ h.date_fmt }}{% if h.mileage %} · {{ "{:,}".format(h.mileage).replace(',', ' ') }} {{ T.pp_km_unit }}{% endif %}<span class="chk">✓</span></span>
+        {% if h.cost %}<span class="cost">{{ "{:,}".format(h.cost|int).replace(',', ' ') }} {{ T.pp_sum }}</span>{% endif %}</div>
+      <div class="e-s muted">{{ h.shop_name or '' }}{% if h.shop_address %} · {{ h.shop_address }}{% endif %}</div>
+      {% if h.lines %}
+      <div class="e-i">
+        {% for it in h.lines %}
+        <div><span>{{ it.name }}{% if it.brand and it.brand != it.name %} — {{ it.brand }}{% endif %}{% if it.qty and it.qty != 1 %} ×&nbsp;{{ (it.qty|string).replace('.', ',') }}{% if it.unit == 'l' %}&nbsp;{{ T.pp_l }}{% endif %}{% endif %}</span>
+          <span>{% if it.total %}{{ "{:,}".format(it.total|int).replace(',', ' ') }}{% endif %}</span></div>
+        {% endfor %}
+        {% if h.discount_amount %}<div><span>{{ T.pp_discount }}</span><span>−{{ "{:,}".format(h.discount_amount|int).replace(',', ' ') }}</span></div>{% endif %}
+      </div>
+      {% else %}
+      <div class="e-s">{{ h.service_type or '' }}{% if h.oil_brand %} — {{ h.oil_brand }}{% endif %}{% if h.filter_changed %}, {{ T.pp_filter }}{% endif %}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="g empty muted">{{ T.pp_empty }}</div>
+  {% endif %}
+
+  <div class="btns">
+    <button class="btn" onclick="share()">↗ {{ T.pp_share }}</button>
+    <a class="btn ghost" href="{{ request.path }}/pdf">PDF</a>
+  </div>
+  <div class="foot muted">{{ T.pp_footer }}<br><b style="color:#fff;">oilbook.uz</b></div>
+</div>
+<div class="toast" id="toast">{{ T.pp_copied }}</div>
+<script>
+function share() {
+  var url = location.origin + location.pathname;
+  var title = {{ (T.pp_title ~ ' · ' ~ car.plate_number)|tojson }};
+  if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () {}); return; }
+  var done = function () { var t = document.getElementById('toast'); t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1800); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function () { prompt('', url); });
+  else prompt('', url);
+}
+</script>
 </body>
 </html>
 """
@@ -987,19 +1022,17 @@ PASSPORT_PAGE = """
 @app.route("/passport/<token>")
 def public_passport(token):
     """Публичная страница сервисного паспорта машины — без входа в систему.
-    Можно показать покупателю при продаже авто как подтверждение истории
-    обслуживания."""
-    car, history = db.get_car_by_passport_token(token)
+    Владелец пересылает её покупателю при продаже авто: вся история по
+    госномеру во всех точках OilBook, с суммами, которые он платил."""
+    car, history, stats = db.passport_full(token)
     if not car:
         return "Паспорт не найден", 404
-    for h in history:
-        h["items_list"] = None
-        if h.get("items_json"):
-            try:
-                h["items_list"] = json.loads(h["items_json"])
-            except (TypeError, ValueError):
-                pass
-    return render_template_string(PASSPORT_PAGE, car=car, history=history)
+    lang = request.args.get("lang")
+    if lang not in ("ru", "uz"):
+        shop = db.get_shop(car["shop_id"]) if car.get("shop_id") else None
+        lang = ((shop or {}).get("language") or "ru")
+    texts = {k: v for k, v in i18n.get_texts(lang).items() if k.startswith("pp_")}
+    return render_template_string(PASSPORT_PAGE, car=car, history=history, stats=stats, lang=lang, T=texts)
 
 
 def _register_pdf_fonts():
@@ -5673,6 +5706,25 @@ def api_miniapp_garage():
     return jsonify(garage)
 
 
+@app.route("/api/m/book", methods=["POST"])
+@tg_client_required
+def api_miniapp_book():
+    """«Записаться» в мини-приложении — как кнопка под напоминанием:
+    запись помечается «записался», точке приходит уведомление в Telegram."""
+    data = request.get_json(force=True, silent=True) or {}
+    plate = str((data.get("plate") if isinstance(data, dict) else "") or "")[:20]
+    ctx = db.miniapp_book(g.tg_id, plate)
+    if not ctx:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    lang = ctx.get("language") or "ru"
+    if ctx.get("notify_telegram_id"):
+        text = i18n.t("bot_booked_notify", lang, plate=ctx["plate_number"], owner=ctx.get("owner_name") or "—")
+        if ctx.get("owner_phone"):
+            text += f"\n{i18n.t('bot_shop_phone_label', lang)} {ctx['owner_phone']}"
+        _send_telegram_message(ctx["notify_telegram_id"], text + "\n" + i18n.t("ma_booked_via_app", lang))
+    return jsonify({"ok": True, "shop": ctx.get("shop_name") or ""})
+
+
 @app.route("/api/m/documents", methods=["POST"])
 @app.route("/api/m/documents/<int:doc_id>", methods=["PUT"])
 @tg_client_required
@@ -5704,108 +5756,152 @@ MINIAPP_PAGE = """<!DOCTYPE html>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
-    --bg: var(--tg-theme-secondary-bg-color, #F1F5F9);
-    --card: var(--tg-theme-bg-color, #FFFFFF);
-    --text: var(--tg-theme-text-color, #0F172A);
-    --hint: var(--tg-theme-hint-color, #64748B);
-    --accent: var(--tg-theme-button-color, #0EA5E9);
-    --accent-text: var(--tg-theme-button-text-color, #FFFFFF);
-    --line: rgba(100, 116, 139, .18);
-    --ok: #16A34A; --warn: #D97706; --bad: #DC2626;
+    --bg1: #F4F8FF; --bg2: #DCE8FB; --text: #0B1B3A; --hint: #5B6B86;
+    --glass: rgba(255,255,255,.66); --gline: rgba(255,255,255,.85); --line: rgba(11,27,58,.10);
+    --accent: #1F66F2; --ok: #16A34A; --warn: #D97706; --bad: #DC2626;
   }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; }
-  body { padding: 0 0 calc(76px + env(safe-area-inset-bottom)); min-height: 100vh; }
-  .wrap { max-width: 560px; margin: 0 auto; padding: 14px 16px; }
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .drop { width: 38px; height: 38px; border-radius: 12px; background: #0B1B3A; display: flex;
-    align-items: center; justify-content: center; flex: none; }
-  .wm { font-weight: 800; font-size: 20px; letter-spacing: -.4px; line-height: 1.1; }
-  .wm .o { color: #38BDF8; }
-  .shopline { font-size: 12.5px; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lang { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
-    padding: 5px 11px; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
-  h2 { font-size: 17px; margin: 4px 0 10px; }
+  body.dark { --bg1: #0B1220; --bg2: #13213F; --text: #EEF3FF; --hint: #93A3C4;
+    --glass: rgba(255,255,255,.07); --gline: rgba(255,255,255,.12); --line: rgba(255,255,255,.12); --accent: #5B9BFF; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; color: var(--text); font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif; font-size: 15px; }
+  body { min-height: 100vh; background: linear-gradient(165deg, var(--bg1), var(--bg2)) fixed;
+    padding: 0 0 calc(90px + env(safe-area-inset-bottom)); }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 12px 16px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .hi { color: var(--hint); font-size: 13.5px; min-height: 18px; }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: -.6px; margin: 2px 0 14px; }
+  h2 { font-size: 17px; margin: 18px 2px 10px; letter-spacing: -.2px; }
+  .lang { border: 1px solid var(--line); background: var(--glass); color: var(--text); border-radius: 999px;
+    padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
   .hint { color: var(--hint); font-size: 13px; line-height: 1.45; }
-  .card { background: var(--card); border-radius: 16px; padding: 14px; margin-bottom: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
-  .car { cursor: pointer; }
-  .car-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .plate { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; font-size: 18px;
-    letter-spacing: .5px; border: 2px solid var(--text); border-radius: 7px; padding: 1px 8px; }
-  .model { color: var(--hint); font-size: 13.5px; text-align: right; }
-  .bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 14px 0 8px; }
-  .bar i { display: block; height: 100%; border-radius: 999px; }
-  .left { font-weight: 700; font-size: 15px; }
-  .left.ok { color: var(--ok); } .left.warn { color: var(--warn); } .left.bad { color: var(--bad); }
-  .meta { display: flex; justify-content: space-between; gap: 8px; color: var(--hint); font-size: 12.5px; margin-top: 4px; }
-  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .btn { flex: 1 1 140px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    border: none; border-radius: 12px; padding: 11px 12px; font-size: 14px; font-weight: 700; cursor: pointer;
-    background: var(--accent); color: var(--accent-text); text-decoration: none; }
-  .btn.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
-  .btn.danger { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); }
-  .back { background: none; border: none; color: var(--accent); font-size: 15px; font-weight: 600;
-    padding: 0 0 10px; cursor: pointer; }
-  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
-  .kv:last-child { border-bottom: none; }
+  .g { background: var(--glass); border: 1px solid var(--gline); border-radius: 20px;
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 6px 22px rgba(30,70,150,.08); }
+  .p { padding: 14px; }
+  .mt { margin-top: 10px; }
+  /* кошелёк */
+  .wallet { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; margin: -10px -16px -18px; padding: 10px 16px 26px;
+    scrollbar-width: none; }
+  .wallet::-webkit-scrollbar { display: none; }
+  .slot { flex: 0 0 100%; scroll-snap-align: center; }
+  .wallet.many .slot { flex-basis: 88%; }
+  .card { position: relative; overflow: hidden; border-radius: 24px; padding: 18px; color: #fff; min-height: 196px;
+    box-shadow: 0 16px 34px rgba(11,47,138,.32); cursor: pointer; }
+  .card:after { content: ""; position: absolute; right: -50px; top: -60px; width: 190px; height: 190px; border-radius: 50%;
+    background: rgba(255,255,255,.12); }
+  .card:before { content: ""; position: absolute; left: -40px; bottom: -80px; width: 170px; height: 170px; border-radius: 50%;
+    background: rgba(255,255,255,.06); }
+  .card > * { position: relative; z-index: 1; }
+  .c0 { background: linear-gradient(140deg, #2A6CF5, #0B2F8A); }
+  .c1 { background: linear-gradient(140deg, #6D4AFF, #2B1B8C); box-shadow: 0 16px 34px rgba(60,30,160,.3); }
+  .c2 { background: linear-gradient(140deg, #0EA5A4, #075E6B); box-shadow: 0 16px 34px rgba(7,94,107,.3); }
+  .c3 { background: linear-gradient(140deg, #334155, #0F172A); box-shadow: 0 16px 34px rgba(15,23,42,.35); }
+  .card .row1 { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .card .mdl { font-size: 12.5px; opacity: .85; }
+  .card .pl { font-size: 22px; font-weight: 800; letter-spacing: .6px; margin-top: 3px; }
+  .card .wm { font-weight: 800; font-size: 14px; flex: none; }
+  .card .wm span { opacity: .65; }
+  .card .lbl { display: flex; justify-content: space-between; font-size: 12.5px; margin: 30px 0 7px; opacity: .95; }
+  .card .lbl b { font-size: 14px; }
+  .bar { height: 9px; border-radius: 9px; background: rgba(255,255,255,.22); overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 9px; background: linear-gradient(90deg, #4ADE80, #FACC15 70%, #FB923C); }
+  .bar i.bad { background: linear-gradient(90deg, #FB923C, #F43F5E); }
+  .card .ends { display: flex; justify-content: space-between; font-size: 11.5px; opacity: .75; margin-top: 6px; }
+  .stack1, .stack2 { border-radius: 0 0 20px 20px; opacity: .55; }
+  .stack1 { height: 12px; margin: 0 14px; }
+  .stack2 { height: 9px; margin: 0 28px; opacity: .35; }
+  .s0 { background: #5C8FF5; } .s1 { background: #8E74FF; } .s2 { background: #3CC1BF; } .s3 { background: #64748B; }
+  .dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+  .dots i.on { background: var(--accent); width: 16px; border-radius: 6px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 5px 11px; }
+  .pill.ok { background: rgba(22,163,74,.12); color: var(--ok); }
+  .pill.warn { background: rgba(217,119,6,.13); color: var(--warn); }
+  .pill.bad { background: rgba(220,38,38,.12); color: var(--bad); }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; }
   .kv span { color: var(--hint); }
-  .visit { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 12px 0; }
-  .visit-h { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 14px; }
-  .visit ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
-  .visit .hint { font-size: 12.5px; }
-  .doc { display: flex; align-items: center; gap: 12px; cursor: pointer; }
-  .doc-ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-    font-size: 20px; flex: none; background: var(--bg); }
+  .kv b { text-align: right; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 7px; height: 48px; border: none; border-radius: 15px;
+    font: 700 15px inherit; font-family: inherit; cursor: pointer; text-decoration: none; color: #fff;
+    background: linear-gradient(135deg, #2F7BFF, #1450D6); box-shadow: 0 10px 22px rgba(20,80,214,.28); width: 100%; }
+  .btn:active { transform: scale(.98); }
+  .btn.ghost { background: var(--glass); color: var(--accent); box-shadow: none; border: 1px solid var(--line); }
+  .btn.done { background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 10px 22px rgba(21,128,61,.25); }
+  .btn.danger { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); box-shadow: none; }
+  .btn[disabled] { opacity: .6; }
+  .two { display: flex; gap: 9px; }
+  .two > * { flex: 1; }
+  .ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 19px; flex: none;
+    background: rgba(31,102,242,.1); }
+  .line { display: flex; align-items: center; gap: 12px; }
+  .line .b { flex: 1; min-width: 0; }
+  .line .t { font-weight: 700; font-size: 14.5px; }
+  /* история */
+  .tl { position: relative; padding-left: 20px; }
+  .tl:before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+  .v { position: relative; margin-bottom: 10px; }
+  .v:before { content: ""; position: absolute; left: -19px; top: 17px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg1); }
+  .v-h { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 14px; }
+  .v ul { margin: 7px 0 0; padding-left: 18px; font-size: 13.5px; }
+  .v li { margin: 2px 0; }
+  .carsel { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 10px; scrollbar-width: none; }
+  .carsel button { flex: none; border: 1px solid var(--line); background: var(--glass); color: var(--text); border-radius: 999px;
+    padding: 7px 13px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .carsel button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  /* документы */
+  .doc { display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 9px; }
   .doc-b { flex: 1; min-width: 0; }
   .doc-t { font-weight: 700; font-size: 14.5px; }
   .doc-s { font-size: 12.5px; font-weight: 700; flex: none; text-align: right; }
   .doc-s.ok { color: var(--ok); } .doc-s.warn { color: var(--warn); } .doc-s.bad { color: var(--bad); }
   label.f { display: block; font-size: 12.5px; color: var(--hint); margin: 12px 0 6px; font-weight: 600; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { border: 1.5px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
-    padding: 7px 12px; font-size: 13px; cursor: pointer; }
-  .chip.on { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 700; }
-  input, select { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line);
-    background: var(--card); color: var(--text); font-size: 15px; font-family: inherit; }
+  .chip { border: 1.5px solid var(--line); background: var(--glass); color: var(--text); border-radius: 999px;
+    padding: 7px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .chip.on { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 700; }
+  input, select { width: 100%; padding: 12px; border-radius: 13px; border: 1.5px solid var(--line);
+    background: var(--glass); color: var(--text); font-size: 15px; font-family: inherit; }
   .err { color: var(--bad); font-size: 13px; margin-top: 10px; min-height: 1em; }
-  .empty { text-align: center; padding: 28px 18px; }
-  .empty .big { font-size: 44px; }
-  .nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card);
-    border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); z-index: 5; }
-  .nav button { flex: 1; background: none; border: none; color: var(--hint); font-size: 11.5px; font-weight: 600;
-    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; cursor: pointer; }
+  .empty { text-align: center; padding: 30px 18px; }
+  .empty .big { font-size: 46px; }
+  .back { background: none; border: none; color: var(--accent); font-size: 15px; font-weight: 600; padding: 0 0 10px; cursor: pointer; font-family: inherit; }
+  .nav { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: 536px; margin: 0 auto;
+    display: flex; height: 62px; border-radius: 22px; z-index: 5; }
+  .nav button { flex: 1; background: none; border: none; color: var(--hint); font-size: 11px; font-weight: 600; font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; }
   .nav button b { font-size: 20px; line-height: 1; }
   .nav button.on { color: var(--accent); }
+  .toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(10px);
+    background: #0B1B3A; color: #fff; font-weight: 700; font-size: 14px; padding: 11px 16px; border-radius: 14px; opacity: 0;
+    transition: all .22s; pointer-events: none; z-index: 9; max-width: 90%; text-align: center; }
+  .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
-    <div class="brand">
-      <div class="drop"><svg width="18" height="21" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1C13 1 2 13.5 2 19.5A11 11 0 0 0 24 19.5C24 13.5 13 1 13 1Z" fill="#0EA5E9"/></svg></div>
-      <div style="min-width:0;">
-        <div class="wm"><span class="o">Oil</span>Book</div>
-        <div class="shopline" id="shopLine"></div>
-      </div>
-    </div>
-    <button class="lang" id="langBtn" onclick="toggleLang()">UZ</button>
-  </div>
+  <div class="top"><div class="hi" id="hi"></div><button class="lang" id="langBtn" onclick="toggleLang()">UZ</button></div>
   <div id="view"></div>
 </div>
-<nav class="nav">
+<nav class="nav g">
   <button id="nav-garage" class="on" onclick="go('garage')"><b>🚗</b><span id="navGarage"></span></button>
+  <button id="nav-history" onclick="go('history')"><b>🕘</b><span id="navHistory"></span></button>
   <button id="nav-docs" onclick="go('docs')"><b>📄</b><span id="navDocs"></span></button>
 </nav>
+<div class="toast" id="toast"></div>
 <script>
 const TX = {{ ma_json|safe }};
 const tg = window.Telegram && window.Telegram.WebApp;
 const INIT = (tg && tg.initData) || new URLSearchParams(location.hash.slice(1)).get('tgWebAppData') || '';
-const S = { tab: 'garage', data: null, car: null, doc: null, lang: 'ru' };
+const S = { tab: 'garage', data: null, idx: 0, doc: null, lang: 'ru', booked: {} };
 const KINDS = [['insurance', '🛡️'], ['inspection', '🔧'], ['gas', '🔥'], ['tint', '🕶️'], ['proxy', '📝'], ['other', '📄']];
 const KIND_IC = Object.fromEntries(KINDS);
+const WANT = (function () {
+  const q = new URLSearchParams(location.search);
+  let p = q.get('car') || '';
+  const sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+  if (!p && sp && sp.indexOf('car_') === 0) p = sp.slice(4);
+  return { car: p.toUpperCase(), tab: q.get('tab') || '' };
+})();
 
 function savedLang() { try { return localStorage.getItem('ma_lang'); } catch (e) { return null; } }
 (function initLang() {
@@ -5815,6 +5911,7 @@ function savedLang() { try { return localStorage.getItem('ma_lang'); } catch (e)
     l = u && /^uz/.test(u.language_code || '') ? 'uz' : 'ru';
   }
   S.lang = l === 'uz' ? 'uz' : 'ru';
+  if (tg && tg.colorScheme === 'dark') document.body.classList.add('dark');
 })();
 function T(k) { return (TX[S.lang] && TX[S.lang][k]) || TX.ru[k] || k; }
 function toggleLang() {
@@ -5828,7 +5925,17 @@ function esc(s) {
 }
 function num(n) { return Number(n || 0).toLocaleString('ru-RU'); }
 function dt(s) { if (!s) return '—'; const p = String(s).slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : s; }
-function haptic() { try { tg && tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch (e) {} }
+function haptic(kind) {
+  try {
+    if (!tg || !tg.HapticFeedback) return;
+    if (kind) tg.HapticFeedback.notificationOccurred(kind); else tg.HapticFeedback.selectionChanged();
+  } catch (e) {}
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2200);
+}
 
 async function api(path, opts) {
   opts = opts || {};
@@ -5848,125 +5955,196 @@ async function load() {
     if (!d.ok) throw new Error('load');
     S.data = d; S.error = null;
     if (d.lang && !savedLang()) S.lang = d.lang;
+    if (WANT.car) {
+      const i = d.cars.findIndex(c => c.plate === WANT.car);
+      if (i >= 0) S.idx = i;
+    }
+    if (['history', 'docs'].indexOf(WANT.tab) >= 0) S.tab = WANT.tab;
   } catch (e) { S.error = e.message === 'auth' ? 'auth' : 'load'; }
   render();
 }
 
-function go(tab) { haptic(); S.tab = tab; S.car = null; S.doc = null; render(); window.scrollTo(0, 0); }
-
+function go(tab) { haptic(); S.tab = tab; S.doc = null; render(); window.scrollTo(0, 0); }
 function setBack(on) {
   if (!tg || !tg.BackButton) return;
   if (on) tg.BackButton.show(); else tg.BackButton.hide();
 }
+function car() { return S.data && S.data.cars[S.idx]; }
 
 function render() {
   document.getElementById('langBtn').textContent = S.lang === 'ru' ? 'UZ' : 'RU';
   document.getElementById('navGarage').textContent = T('tab_garage');
+  document.getElementById('navHistory').textContent = T('tab_history');
   document.getElementById('navDocs').textContent = T('tab_docs');
-  document.getElementById('nav-garage').classList.toggle('on', S.tab === 'garage');
-  document.getElementById('nav-docs').classList.toggle('on', S.tab === 'docs');
-  const shop = S.data && S.data.shop;
-  document.getElementById('shopLine').textContent = shop && shop.name ? `${T('your_shop')}: ${shop.name}` : '';
+  ['garage', 'history', 'docs'].forEach(t => document.getElementById('nav-' + t).classList.toggle('on', S.tab === t));
+  const d = S.data;
+  document.getElementById('hi').textContent = d && d.name ? `${T('hello')}, ${d.name} 👋` : '';
   const v = document.getElementById('view');
   if (S.error) {
-    v.innerHTML = `<div class="card empty"><div class="big">🔒</div><p class="hint">${S.error === 'auth' ? T('open_from_bot') : T('load_error')}</p>
+    v.innerHTML = `<h1>${T('garage_title')}</h1><div class="g p empty"><div class="big">🔒</div><p class="hint">${S.error === 'auth' ? T('open_from_bot') : T('load_error')}</p>
       ${S.error === 'auth' ? '' : `<button class="btn" onclick="load()">${T('retry')}</button>`}</div>`;
     setBack(false);
     return;
   }
-  if (!S.data) return;
-  if (S.tab === 'garage') v.innerHTML = S.car ? carView(S.car) : garageView();
+  if (!d) return;
+  if (S.tab === 'garage') { v.innerHTML = garageView(); bindWallet(); }
+  else if (S.tab === 'history') v.innerHTML = historyView();
   else v.innerHTML = S.doc ? docForm(S.doc) : docsView();
-  setBack(!!(S.car || S.doc));
+  setBack(!!S.doc);
 }
 
 function forecast(c) {
   const r = c.oil_ratio;
   const due = (r != null && r >= 1) || (c.days_left != null && c.days_left <= 0) || (c.km_left != null && c.km_left <= 0);
-  if (due) return { cls: 'bad', text: T('change_now'), pct: 100, color: 'var(--bad)' };
+  const pct = r != null ? Math.max(4, Math.min(100, Math.round(r * 100))) : 0;
+  if (due) return { cls: 'bad', big: T('change_now'), pill: '⚠️ ' + T('change_now'), pct: 100 };
+  let big = '—';
+  if (c.km_left != null) big = `${num(c.km_left)} ${T('km')}`;
+  else if (c.days_left != null) big = `${c.days_left} ${T('days')}`;
   const parts = [];
   if (c.km_left != null) parts.push(`≈ ${num(c.km_left)} ${T('km')}`);
   if (c.days_left != null) parts.push(`${c.days_left} ${T('days')}`);
-  if (!parts.length) return { cls: '', text: T('no_forecast'), pct: 0, color: 'var(--line)' };
-  const pct = Math.max(4, Math.min(100, Math.round((r || 0) * 100)));
+  if (!parts.length) return { cls: '', big: '—', pill: T('no_forecast'), pct: 0 };
   const cls = (r || 0) >= 0.8 ? 'warn' : 'ok';
-  return { cls, text: `${parts.join(' · ')} ${T('until_change')}`, pct, color: cls === 'warn' ? 'var(--warn)' : 'var(--ok)' };
+  return { cls, big, pill: (cls === 'ok' ? '✓ ' : '⏳ ') + parts.join(' · ') + ' ' + T('until_change'), pct };
+}
+
+function walletCard(c, i) {
+  const f = forecast(c);
+  const k = i % 4;
+  const from = c.est_km || c.last_mileage;
+  return `<div class="slot"><div class="card c${k}" onclick="openPassport(${i})">
+      <div class="row1"><div><div class="mdl">${esc([c.brand, c.model].filter(Boolean).join(' ') || T('car'))}</div>
+        <div class="pl">${esc(c.plate)}</div></div><div class="wm">Oil<span>Book</span></div></div>
+      <div class="lbl"><span>${T('until_oil')}</span><b>${f.big}</b></div>
+      <div class="bar"><i class="${f.cls === 'bad' ? 'bad' : ''}" style="width:${f.pct}%"></i></div>
+      <div class="ends"><span>${from ? num(from) + ' ' + T('km') : dt(c.last_date)}</span>
+        <span>${c.next_mileage ? num(c.next_mileage) + ' ' + T('km') : dt(c.next_date)}</span></div>
+    </div><div class="stack1 s${k}"></div><div class="stack2 s${k}"></div></div>`;
+}
+
+function itemsText(h) {
+  const items = (h.items || []).filter(i => i.name);
+  if (items.length) return items.map(i => {
+    const nm = i.brand && i.brand !== i.name ? i.brand : i.name;
+    const u = i.unit || (String(i.key || '').indexOf('fluid') === 0 ? 'l' : '');
+    return esc(nm) + (i.qty && i.qty !== 1 ? ` ${String(i.qty).replace('.', ',')}${unitText(u)}` : '');
+  }).join(' · ');
+  return esc([h.service, h.oil].filter(Boolean).join(' — ')) + (h.filter ? ', ' + T('filter') : '');
 }
 
 function garageView() {
   const d = S.data;
   if (!d.cars.length) {
-    return `<div class="card empty"><div class="big">🚗</div><h2>${T('garage_empty_title')}</h2>
+    return `<h1>${T('garage_title')}</h1><div class="g p empty"><div class="big">🚗</div><h2>${T('garage_empty_title')}</h2>
       <p class="hint">${T('garage_empty')}</p></div>
-      <div class="card"><h2>📄 ${T('docs_title')}</h2><p class="hint">${T('docs_hint')}</p>
-      <div class="btns"><button class="btn" onclick="go('docs')">${T('add_doc')}</button></div></div>`;
+      <div class="g p mt"><div class="line"><div class="ic">📄</div><div class="b"><div class="t">${T('docs_title')}</div>
+      <div class="hint">${T('docs_hint')}</div></div></div>
+      <div class="mt"><button class="btn ghost" onclick="go('docs')">${T('add_doc')}</button></div></div>`;
   }
-  const hello = d.name ? `<p class="hint" style="margin:0 0 10px;">${T('hello')}, ${esc(d.name)}!</p>` : '';
-  return hello + d.cars.map((c, i) => {
-    const f = forecast(c);
-    return `<div class="card car" onclick="openCar(${i})">
-      <div class="car-h"><span class="plate">${esc(c.plate)}</span><span class="model">${esc([c.brand, c.model].filter(Boolean).join(' '))}</span></div>
-      <div class="bar"><i style="width:${f.pct}%; background:${f.color};"></i></div>
-      <div class="left ${f.cls}">${f.text}</div>
-      <div class="meta"><span>${T('last_visit')}: ${dt(c.last_date)}</span><span>${esc((c.shop || {}).name || '')}</span></div>
-    </div>`;
-  }).join('');
-}
-
-function openCar(i) { haptic(); S.car = S.data.cars[i]; render(); window.scrollTo(0, 0); }
-
-function unitText(u) { return u === 'l' ? ' ' + T('l') : (u === 'pc' ? ' ' + T('pc') : ''); }
-
-function carView(c) {
+  const many = d.cars.length > 1;
+  const c = car();
   const f = forecast(c);
   const shop = c.shop || {};
   const phone = (shop.phone || '').replace(/[^0-9+]/g, '');
-  const rows = [
-    [T('next_change'), c.next_date ? dt(c.next_date) : '—'],
-    c.next_mileage ? [T('mileage'), `${num(c.next_mileage)} ${T('km')}`] : null,
-    c.est_km ? [T('est_mileage'), `${num(c.est_km)} ${T('km')}`] : null,
-    [T('last_visit'), `${dt(c.last_date)}${c.last_mileage ? ' · ' + num(c.last_mileage) + ' ' + T('km') : ''}`],
-  ].filter(Boolean);
-  const visits = c.history.length ? c.history.map(h => {
-    const items = (h.items || []).filter(i => i.name).map(i => {
-      const qty = i.qty ? ` × ${String(i.qty).replace('.', ',')}${unitText(i.unit)}` : '';
-      return `<li>${esc(i.name)}${i.brand && i.brand !== i.name ? ' — ' + esc(i.brand) : ''}${qty}</li>`;
-    }).join('');
-    return `<div class="visit">
-      <div class="visit-h"><span>${dt(h.date)}</span><span>${h.cost ? num(h.cost) + ' ' + T('sum') : ''}</span></div>
-      <div class="hint">${esc(h.shop || '')}${h.mileage ? ' · ' + num(h.mileage) + ' ' + T('km') : ''}</div>
-      ${items ? `<ul>${items}</ul>` : `<div class="hint">${esc(h.service || '')}${h.oil ? ' — ' + esc(h.oil) : ''}${h.filter ? ', ' + T('filter') : ''}</div>`}
-    </div>`;
-  }).join('') : `<p class="hint">${T('no_history')}</p>`;
-  return `<button class="back" onclick="closeView()">‹ ${T('back')}</button>
-    <div class="card">
-      <div class="car-h"><span class="plate">${esc(c.plate)}</span><span class="model">${esc([c.brand, c.model].filter(Boolean).join(' '))}</span></div>
-      <div class="bar"><i style="width:${f.pct}%; background:${f.color};"></i></div>
-      <div class="left ${f.cls}">${f.text}</div>
-      <div style="margin-top:10px;">${rows.map(r => `<div class="kv"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}</div>
-      <div class="btns">
-        ${c.passport ? `<button class="btn" onclick="sharePassport()">📤 ${T('share_passport')}</button>` : ''}
-        ${c.passport ? `<button class="btn ghost" onclick="openPassport()">${T('open_passport')}</button>` : ''}
-      </div>
-    </div>
-    ${shop.name ? `<div class="card">
-      <div class="kv"><span>${T('your_shop')}</span><b>${esc(shop.name)}</b></div>
-      ${shop.address ? `<div class="kv"><span>📍</span><b style="text-align:right;">${esc(shop.address)}</b></div>` : ''}
-      ${shop.hours ? `<div class="kv"><span>🕘</span><b>${esc(shop.hours)}</b></div>` : ''}
-      <div class="btns">
-        ${phone ? `<a class="btn" href="tel:${esc(phone)}">📞 ${T('call_shop')}</a>` : ''}
-        ${shop.lat && shop.lon ? `<button class="btn ghost" onclick="openRoute(${Number(shop.lat)}, ${Number(shop.lon)})">🧭 ${T('route')}</button>` : ''}
-      </div>
+  const last = (c.history || [])[0];
+  const booked = S.booked[c.plate];
+  const soon = (d.docs || []).filter(x => x.days_left <= 30);
+  return `<h1>${T('garage_title')}</h1>
+    <div class="wallet ${many ? 'many' : ''}" id="wallet">${d.cars.map(walletCard).join('')}</div>
+    ${many ? `<div class="dots">${d.cars.map((_, i) => `<i class="${i === S.idx ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+    <div style="margin-top:12px;"><span class="pill ${f.cls}">${f.pill}</span></div>
+    ${last ? `<div class="g p mt">
+      <div class="kv" style="padding-top:0;"><b style="text-align:left;">${T('last_visit')}</b><span>${dt(last.date)}</span></div>
+      <div class="hint">${itemsText(last)}</div>
+      <div class="hint" style="margin-top:3px;">${esc(last.shop || '')}${last.mileage ? ' · ' + num(last.mileage) + ' ' + T('km') : ''}</div>
     </div>` : ''}
-    <div class="card"><h2>📘 ${T('service_book')}</h2>${visits}</div>`;
+    <div class="mt"><button class="btn ${booked ? 'done' : ''}" id="bookBtn" onclick="book()" ${booked ? 'disabled' : ''}>
+      ${booked ? '✓ ' + T('booked') : '📅 ' + T('book')}</button></div>
+    <div class="two mt">
+      ${c.passport ? `<button class="btn ghost" onclick="openPassport(${S.idx})">📘 ${T('open_passport')}</button>
+      <button class="btn ghost" onclick="sharePassport()">↗ ${T('share_passport')}</button>` : ''}
+    </div>
+    ${shop.name ? `<h2>${T('your_shop')}</h2><div class="g p">
+      <div class="line"><div class="ic">📍</div><div class="b"><div class="t">${esc(shop.name)}</div>
+        <div class="hint">${esc([shop.address, shop.hours].filter(Boolean).join(' · '))}</div></div></div>
+      <div class="two mt">
+        ${phone ? `<a class="btn ghost" href="tel:${esc(phone)}">📞 ${T('call_shop')}</a>` : ''}
+        ${shop.lat && shop.lon ? `<button class="btn ghost" onclick="openRoute(${Number(shop.lat)}, ${Number(shop.lon)})">🧭 ${T('route')}</button>` : ''}
+      </div></div>` : ''}
+    <div class="g p mt line" onclick="go('docs')" style="cursor:pointer;"><div class="ic">📄</div><div class="b">
+      <div class="t">${T('docs_title')}</div>
+      <div class="hint">${soon.length ? T('docs_soon').replace('{n}', soon.length) : T('docs_hint_short')}</div></div><b style="color:var(--hint);">›</b></div>`;
 }
 
-function passportUrl() { return `${location.origin}/passport/${encodeURIComponent(S.car.passport)}`; }
+function bindWallet() {
+  const w = document.getElementById('wallet');
+  if (!w || S.data.cars.length < 2) return;
+  const slot = w.children[S.idx];
+  if (slot) w.scrollLeft = slot.offsetLeft - 16;
+  let t;
+  w.addEventListener('scroll', () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      let best = 0, dist = 1e9;
+      [...w.children].forEach((el, i) => {
+        const dd = Math.abs(el.offsetLeft - 16 - w.scrollLeft);
+        if (dd < dist) { dist = dd; best = i; }
+      });
+      if (best !== S.idx) { S.idx = best; haptic(); render(); }
+    }, 120);
+  }, { passive: true });
+}
+
+async function book() {
+  const c = car();
+  const btn = document.getElementById('bookBtn');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/m/book', { method: 'POST', body: JSON.stringify({ plate: c.plate }) });
+    if (!r.ok) throw new Error('x');
+    S.booked[c.plate] = true;
+    haptic('success');
+    toast(T('booked_toast').replace('{shop}', r.shop || ''));
+    render();
+  } catch (e) { btn.disabled = false; toast(e.message === 'auth' ? T('open_from_bot') : T('err_save')); }
+}
+
+function unitText(u) { return u === 'l' ? ' ' + T('l') : (u === 'pc' ? ' ' + T('pc') : ''); }
+
+function historyView() {
+  const d = S.data;
+  if (!d.cars.length) return `<h1>${T('tab_history')}</h1><div class="g p empty"><div class="big">🕘</div><p class="hint">${T('no_history')}</p></div>`;
+  const c = car();
+  const sel = d.cars.length > 1 ? `<div class="carsel">${d.cars.map((x, i) =>
+    `<button class="${i === S.idx ? 'on' : ''}" onclick="S.idx=${i};haptic();render();">${esc(x.plate)}</button>`).join('')}</div>` : '';
+  const total = (c.history || []).reduce((a, h) => a + (Number(h.cost) || 0), 0);
+  const visits = c.history.length ? `<div class="tl">${c.history.map(h => {
+    const items = (h.items || []).filter(i => i.name).map(i => {
+      const u = i.unit || (String(i.key || '').indexOf('fluid') === 0 ? 'l' : '');
+      const qty = i.qty ? ` × ${String(i.qty).replace('.', ',')}${unitText(u)}` : '';
+      return `<li>${esc(i.name)}${i.brand && i.brand !== i.name ? ' — ' + esc(i.brand) : ''}${qty}</li>`;
+    }).join('');
+    return `<div class="v g p">
+      <div class="v-h"><span>${dt(h.date)}${h.mileage ? ' · ' + num(h.mileage) + ' ' + T('km') : ''}</span><span>${h.cost ? num(h.cost) + ' ' + T('sum') : ''}</span></div>
+      <div class="hint">${esc(h.shop || '')}</div>
+      ${items ? `<ul>${items}</ul>` : `<div class="hint">${itemsText(h)}</div>`}
+    </div>`;
+  }).join('')}</div>` : `<div class="g p empty"><p class="hint">${T('no_history')}</p></div>`;
+  return `<h1>${T('tab_history')}</h1>${sel}
+    <div class="g p"><div class="kv" style="padding:0;"><span>${esc([c.brand, c.model].filter(Boolean).join(' '))} · ${esc(c.plate)}</span>
+      <b>${T('visits')}: ${c.history.length}</b></div>
+      ${total ? `<div class="kv" style="padding:6px 0 0;"><span>${T('spent_total')}</span><b>${num(total)} ${T('sum')}</b></div>` : ''}</div>
+    <h2>${T('service_book')}</h2>${visits}`;
+}
+
+function passportUrl(i) { const c = S.data.cars[i == null ? S.idx : i]; return `${location.origin}/passport/${encodeURIComponent(c.passport)}?lang=${S.lang}`; }
 function openLink(url) { if (tg && tg.openLink) tg.openLink(url); else window.open(url, '_blank'); }
-function openPassport() { openLink(passportUrl()); }
+function openPassport(i) { haptic(); if (S.data.cars[i].passport) openLink(passportUrl(i)); }
 function openRoute(lat, lon) { openLink(`https://yandex.uz/maps/?rtext=~${lat},${lon}&rtt=auto`); }
 function sharePassport() {
-  const url = `https://t.me/share/url?url=${encodeURIComponent(passportUrl())}&text=${encodeURIComponent(T('share_text').replace('{plate}', S.car.plate))}`;
+  const c = car();
+  const url = `https://t.me/share/url?url=${encodeURIComponent(passportUrl())}&text=${encodeURIComponent(T('share_text').replace('{plate}', c.plate))}`;
   if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
 }
 
@@ -5982,15 +6160,15 @@ function docsView() {
   const docs = S.data.docs || [];
   const list = docs.length ? docs.map((d, i) => {
     const st = docStatus(d);
-    return `<div class="card doc" onclick="editDoc(${i})">
-      <div class="doc-ic">${KIND_IC[d.kind] || '📄'}</div>
+    return `<div class="g p doc" onclick="editDoc(${i})">
+      <div class="ic">${KIND_IC[d.kind] || '📄'}</div>
       <div class="doc-b"><div class="doc-t">${esc(docName(d))}</div>
         <div class="hint">${d.plate ? esc(d.plate) + ' · ' : ''}${dt(d.expires_on)}</div></div>
       <div class="doc-s ${st.cls}">${st.text}</div>
     </div>`;
-  }).join('') : `<div class="card empty"><div class="big">📄</div><p class="hint">${T('docs_empty')}</p></div>`;
-  return `<h2>${T('docs_title')}</h2><p class="hint" style="margin-top:0;">${T('docs_hint')}</p>${list}
-    <div class="btns"><button class="btn" onclick="editDoc(-1)">＋ ${T('add_doc')}</button></div>`;
+  }).join('') : `<div class="g p empty"><div class="big">📄</div><p class="hint">${T('docs_empty')}</p></div>`;
+  return `<h1>${T('docs_title')}</h1><p class="hint" style="margin-top:-6px;">${T('docs_hint')}</p>${list}
+    <div class="mt"><button class="btn" onclick="editDoc(-1)">＋ ${T('add_doc')}</button></div>`;
 }
 
 function editDoc(i) {
@@ -5999,7 +6177,7 @@ function editDoc(i) {
   S.doc = i >= 0 ? Object.assign({}, S.data.docs[i]) : { kind: 'insurance', title: '', plate: plates.length === 1 ? plates[0] : '', expires_on: '' };
   render(); window.scrollTo(0, 0);
 }
-function closeView() { S.car = null; S.doc = null; render(); window.scrollTo(0, 0); }
+function closeView() { S.doc = null; render(); window.scrollTo(0, 0); }
 function keepForm() {
   const t = document.getElementById('docTitle'), p = document.getElementById('docPlate'), d = document.getElementById('docDate');
   if (t) S.doc.title = t.value;
@@ -6012,8 +6190,8 @@ function docForm(d) {
   const plates = (S.data.cars || []).map(c => c.plate);
   if (d.plate && plates.indexOf(d.plate) < 0) plates.push(d.plate);
   return `<button class="back" onclick="closeView()">‹ ${T('back')}</button>
-    <div class="card">
-      <h2>${d.id ? esc(docName(d)) : T('add_doc')}</h2>
+    <div class="g p">
+      <h2 style="margin-top:0;">${d.id ? esc(docName(d)) : T('add_doc')}</h2>
       <label class="f">${T('doc_kind')}</label>
       <div class="chips">${KINDS.map(([k, ic]) => `<button class="chip ${d.kind === k ? 'on' : ''}" onclick="setKind('${k}')">${ic} ${T('doc_' + k)}</button>`).join('')}</div>
       ${d.kind === 'other' ? `<label class="f">${T('doc_title')}</label><input id="docTitle" maxlength="60" placeholder="${T('doc_title_ph')}" value="${esc(d.title || '')}">` : ''}
@@ -6022,7 +6200,7 @@ function docForm(d) {
       <label class="f">${T('doc_date')}</label>
       <input id="docDate" type="date" value="${esc(d.expires_on || '')}">
       <div class="err" id="docErr"></div>
-      <div class="btns">
+      <div class="two">
         <button class="btn" id="docSave" onclick="saveDoc()">${T('save')}</button>
         ${d.id ? `<button class="btn danger" onclick="deleteDoc()">${T('delete')}</button>` : `<button class="btn ghost" onclick="closeView()">${T('cancel')}</button>`}
       </div>
@@ -6042,7 +6220,7 @@ async function saveDoc() {
     const r = await api(d.id ? `/api/m/documents/${d.id}` : '/api/m/documents', { method: d.id ? 'PUT' : 'POST', body: JSON.stringify(body) });
     if (!r.ok) { err.textContent = r.error === 'too_many' ? T('err_too_many') : (r.error === 'bad_date' ? T('err_date') : T('err_save')); btn.disabled = false; return; }
     S.data.docs = r.docs; S.doc = null;
-    try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) {}
+    haptic('success');
     render();
   } catch (e) { err.textContent = e.message === 'auth' ? T('open_from_bot') : T('err_save'); btn.disabled = false; }
 }
