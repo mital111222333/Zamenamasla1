@@ -70,6 +70,8 @@ def _decrypt_password(token: str):
 
 MAX_FOLLOWUP_REMINDERS = 6
 FOLLOWUP_INTERVAL_DAYS = 14
+# долг по рассрочке: напоминание в день платежа, потом раз в N дней, пока не оплатят
+DEBT_REPEAT_DAYS = 3
 # масло АКПП/КПП: срок следующей замены по умолчанию (мастер может поменять)
 ATF_DEFAULT_MONTHS = 6
 ATF_DEFAULT_KM = 40000
@@ -2657,6 +2659,17 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
         fields["interval_months"] = final_value
         fields["interval_unit"] = final_unit
         fields["next_change_date"] = next_date
+        if next_date != existing.get("next_change_date"):
+            # срок исправили — напоминания по этой записи начинаем заново
+            # (раньше повтор мог прийти раньше нового срока, а если все 6
+            # напоминаний уже ушли — не приходило ничего)
+            fields["reminder_count"] = 0
+            fields["last_reminder_date"] = None
+            if existing.get("status") in ("booked", "changed_elsewhere"):
+                with get_conn() as _c:
+                    if _c.execute("SELECT MAX(id) FROM oil_changes WHERE car_id=?",
+                                  (existing["car_id"],)).fetchone()[0] == oc_id:
+                        fields["status"] = "active"
 
     if not fields:
         return True
@@ -3275,17 +3288,23 @@ def get_due_installment_reminders():
     Возвращает данные клиента/владельца точки, нужные для отправки
     напоминания в Telegram."""
     today = datetime.now().strftime("%Y-%m-%d")
+    # первый раз — в день платежа; пока не заплатил — раз в DEBT_REPEAT_DAYS дня
+    # (раньше — каждый день без конца: клиенты блокировали бота, и после этого
+    # им переставали приходить вообще все напоминания, в том числе о масле)
+    repeat_cutoff = (datetime.now() - timedelta(days=DEBT_REPEAT_DAYS)).strftime("%Y-%m-%d")
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT ip.*, c.plate_number, cl.full_name as owner_name, cl.telegram_id,
+            SELECT ip.*, c.plate_number, cl.full_name as owner_name, cl.phone as owner_phone, cl.telegram_id,
                    s.notify_telegram_id, s.shop_name, s.language
             FROM installment_plans ip
             JOIN cars c ON c.id = ip.car_id
             JOIN clients cl ON cl.id = c.client_id
             JOIN shops s ON s.id = ip.shop_id
             WHERE ip.status='active' AND ip.next_due_date <= ?
-              AND (ip.last_reminder_date IS NULL OR ip.last_reminder_date != ?)
-        """, (today, today)).fetchall()
+              AND (ip.last_reminder_date IS NULL
+                   OR ip.last_reminder_date < ip.next_due_date
+                   OR ip.last_reminder_date <= ?)
+        """, (today, repeat_cutoff)).fetchall()
         result = []
         for r in rows:
             d = dict(r)
@@ -3523,20 +3542,27 @@ def get_due_reminders():
     """
     with get_conn() as conn:
         oil = conn.execute(base + """
-            WHERE oc.status='active' AND oc.next_change_date IS NOT NULL AND (
-                (oc.reminder_count = 0 AND oc.next_change_date <= ?)
+            WHERE c.plate_number <> '#SALE' AND oc.next_change_date IS NOT NULL
+              AND oc.next_change_date <= ? AND (
+                (oc.status='active' AND COALESCE(oc.reminder_count, 0) = 0)
                 OR
-                (oc.reminder_count > 0 AND oc.reminder_count < ? AND oc.last_reminder_date <= ?)
+                -- повторы раз в 14 дней; «записался», но так и не приехал
+                -- (новой записи нет) — тоже напоминаем снова, а не молчим навсегда
+                (oc.status IN ('active', 'booked') AND oc.reminder_count > 0 AND oc.reminder_count < ?
+                 AND COALESCE(oc.last_reminder_date, '') <= ?
+                 AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id))
             )
         """, (today, MAX_FOLLOWUP_REMINDERS, followup_cutoff)).fetchall()
         # масло АКПП — по последней записи машины, каким бы ни был её статус
         # («уже поменял»/«записался» по моторному маслу его не отменяют)
         atf = conn.execute(base + """
-            WHERE oc.atf_next_date IS NOT NULL
+            WHERE c.plate_number <> '#SALE' AND oc.atf_next_date IS NOT NULL
+              AND oc.atf_next_date <= ?
               AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id)
               AND ((COALESCE(oc.atf_reminder_count, 0) = 0 AND oc.atf_next_date <= ?)
-                   OR (oc.atf_reminder_count > 0 AND oc.atf_reminder_count < ? AND oc.atf_last_reminder_date <= ?))
-        """, (today, MAX_FOLLOWUP_REMINDERS, followup_cutoff)).fetchall()
+                   OR (oc.atf_reminder_count > 0 AND oc.atf_reminder_count < ?
+                       AND COALESCE(oc.atf_last_reminder_date, '') <= ?))
+        """, (today, today, MAX_FOLLOWUP_REMINDERS, followup_cutoff)).fetchall()
     out = {}
     for r in oil:
         out[r["id"]] = dict(r, due_oil=True, due_atf=False)
@@ -3578,8 +3604,28 @@ def mark_booked(oil_change_id: int):
 
 @_serialized
 def mark_already_changed_elsewhere(oil_change_id: int):
+    """Клиент нажал «уже поменял». Раньше напоминания по машине после этого
+    прекращались навсегда (до нового визита в эту точку). Теперь срок
+    переносится: следующее напоминание — через тот же интервал от сегодня."""
     with get_conn() as conn:
-        conn.execute("UPDATE oil_changes SET status='changed_elsewhere' WHERE id=?", (oil_change_id,))
+        row = conn.execute("SELECT car_id, interval_months, interval_unit FROM oil_changes WHERE id=?",
+                           (oil_change_id,)).fetchone()
+        latest = row and conn.execute("SELECT MAX(id) FROM oil_changes WHERE car_id=?",
+                                      (row["car_id"],)).fetchone()[0] == oil_change_id
+        if not latest:
+            # кнопка под старым сообщением — у машины уже есть новая запись
+            conn.execute("UPDATE oil_changes SET status='changed_elsewhere' WHERE id=? AND status='active'",
+                         (oil_change_id,))
+            conn.commit()
+            return
+        value = (row["interval_months"] if row else None) or 3
+        now = datetime.now()
+        if row and row["interval_unit"] == "days":
+            nxt = now + timedelta(days=value)
+        else:
+            nxt = now + relativedelta(months=value)
+        conn.execute("UPDATE oil_changes SET status='active', next_change_date=?, reminder_count=0, "
+                     "last_reminder_date=NULL WHERE id=?", (nxt.strftime("%Y-%m-%d"), oil_change_id))
         conn.commit()
 
 
