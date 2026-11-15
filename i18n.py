@@ -4005,3 +4005,31 @@ UZ.update({
     "oferta_title": "OilBook shartnomasi",
     "oferta_ru_note": "",
 })
+
+
+# --- Карточка постоянного клиента: моторное масло и масло коробки отдельно ---
+RU.update({
+    "kc_st_last_visit": "Прошлый визит:",
+    "kc_st_due_km": "менять на",
+    "kc_st_due_date": "до",
+    "kc_st_done": "Меняли:",
+    "kc_st_left": "осталось",
+    "kc_st_over": "перепробег",
+    "kc_st_date_over": "срок прошёл",
+    "kc_st_no_plan": "плановый пробег не указан",
+    "kc_st_never": "у нас не меняли",
+})
+UZ.update({
+    "kc_st_last_visit": "Oldingi tashrif:",
+    "kc_st_due_km": "almashtirish:",
+    "kc_st_due_date": "muddat:",
+    "kc_st_done": "Almashtirilgan:",
+    "kc_st_left": "qoldi",
+    "kc_st_over": "oshib ketdi",
+    "kc_st_date_over": "muddati o'tgan",
+    "kc_st_no_plan": "rejadagi probeg ko'rsatilmagan",
+    "kc_st_never": "bizda almashtirilmagan",
+})
+
+RU.update({"bot_booked_notify": "📅 Клиент записался на замену масла!\n\nАвто: {plate}\nВладелец: {owner}"})
+UZ.update({"bot_booked_notify": "📅 Mijoz moy almashtirishga yozildi!\n\nAvto: {plate}\nEgasi: {owner}"})

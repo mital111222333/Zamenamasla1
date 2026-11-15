@@ -332,11 +332,10 @@ async def reminder_button_callback(update: Update, context: ContextTypes.DEFAULT
             try:
                 await context.bot.send_message(
                     chat_id=int(ctx["notify_telegram_id"]),
+                    # точке — на её языке (раньше всегда приходило по-русски)
                     text=(
-                        f"📅 Клиент записался на замену масла!\n\n"
-                        f"Авто: {ctx['plate_number']}\n"
-                        f"Владелец: {ctx['owner_name']}"
-                        + (f"\nТелефон: {ctx['owner_phone']}" if ctx['owner_phone'] else "")
+                        i18n.t("bot_booked_notify", lang, plate=ctx['plate_number'], owner=ctx['owner_name'] or "—")
+                        + (f"\n{i18n.t('bot_shop_phone_label', lang)} {ctx['owner_phone']}" if ctx['owner_phone'] else "")
                     ),
                 )
             except Exception as e:
