@@ -51,7 +51,7 @@ def test_texts_exist_in_both_languages():
     import panel_template
     src = open(panel_template.__file__, encoding="utf-8").read()
     keys = set(re.findall(r"\bT\.(an_[a-z_]+)\b", src))
-    assert len(keys) > 30
+    assert len(keys) > 20
     missing = [k for k in keys if not i18n.RU.get(k) or not i18n.UZ.get(k)]
     assert not missing, missing
 
@@ -94,3 +94,20 @@ def test_new_visits_get_time(env):
     oc_id, _ = db.add_oil_change(car, None, None, None, False, 1000, 0)
     with db.get_conn() as conn:
         assert conn.execute("SELECT created_at FROM oil_changes WHERE id=?", (oc_id,)).fetchone()[0]
+
+
+def test_no_duplicate_cards_in_analytics():
+    """Повторы убраны: второго графика выручки, карточки «Клиенты» и столбиков
+    по дням недели в «Анализе» нет — всё это уже есть в старых карточках."""
+    import panel_template
+    src = open(panel_template.__file__, encoding="utf-8").read()
+    for gone in ("anCmp", "an_cmp_title", "an_clients_title", "an-week", "an_in_busy", "an_in_up", "an_in_visc", "an_in_regular"):
+        assert gone not in src, gone
+    assert "anRvCmp()" in src
+
+
+def test_add_form_buttons_grouped():
+    """«Цена» и «Очередь» в одной группе, которая переносится, а не обрезается."""
+    import panel_template
+    src = open(panel_template.__file__, encoding="utf-8").read()
+    assert '<span class="af-acts">' in src and ".af-title { flex-wrap:wrap;" in src

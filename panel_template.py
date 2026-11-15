@@ -576,6 +576,16 @@ if ('serviceWorker' in navigator) {
   .add-form { max-width:760px; }
   .af-title { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:18px; text-transform:uppercase; letter-spacing:.3px; color:var(--darkblue, #0A2540); margin:2px 4px 10px; }
   .af-price.af-queue { margin-left:8px; }
+  /* «Цена» и «Очередь» — одной группой: если длинный заголовок (узбекский) не
+     помещается рядом, группа сама переносится на строку ниже, а не обрезается */
+  .af-title { flex-wrap:wrap; row-gap:8px; }
+  .af-t { flex:1 1 0; }
+  .af-acts { display:flex; gap:8px; margin-left:auto; flex:none; }
+  .af-acts .af-price, .af-acts .af-price.af-queue { margin-left:0; white-space:nowrap; }
+  @media (max-width:480px) {
+    .af-title { font-size:16px; gap:8px; }
+    .af-acts .af-price { padding:0 11px; gap:6px; font-size:13.5px; }
+  }
   .af-queue b { min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--btn); color:#fff; font-size:12px; line-height:20px; text-align:center; }
   .af-queue b:empty { display:none; }
   .q-add { background:#fff; border:1px solid var(--border); border-radius:16px; padding:12px; margin-bottom:14px; }
@@ -621,11 +631,7 @@ if ('serviceWorker' in navigator) {
   .an-bar .b { flex:1; height:22px; border-radius:7px; background:#F1F5F9; overflow:hidden; }
   .an-bar .b i { display:block; height:100%; width:0; border-radius:7px; transition:width 1.3s cubic-bezier(.2,.8,.2,1); }
   .an-bar .v { width:52px; flex:none; text-align:right; font-family:var(--font-mono); font-weight:700; }
-  .an-week { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:end; height:120px; }
-  .an-week div { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; font-size:12px; color:var(--hint); }
-  .an-week i { width:100%; height:0; border-radius:6px 6px 3px 3px; background:#85B7EB; transition:height 1.2s cubic-bezier(.2,.8,.2,1); }
-  .an-week i.top { background:#E24B4A; }
-  .an-heat { display:grid; grid-template-columns:26px repeat(12, minmax(0,1fr)); gap:3px; font-size:10.5px; color:var(--hint); margin-top:12px; }
+  .an-heat { display:grid; grid-template-columns:26px repeat(12, minmax(0,1fr)); gap:3px; font-size:10.5px; color:var(--hint); }
   .an-heat i { aspect-ratio:1; border-radius:3px; background:#378ADD; opacity:0; transition:opacity .6s; }
   .ds-card { border:1.5px solid #86EFAC; }
   .ds-h { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
@@ -1957,7 +1963,7 @@ if ('serviceWorker' in navigator) {
     };
     </script>
     {% endif %}
-    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<button type="button" class="af-price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></button><button type="button" class="af-price af-queue" onclick="showTab('queue')"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b id="afQueueN"></b></button><span class="af-keys">{{ T.rcpt_keys }}</span></div>
+    <div class="af-title"><span class="dot"></span><span class="af-t">{{ T.tab_add }}</span><span class="af-acts"><button type="button" class="af-price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></button><button type="button" class="af-price af-queue" onclick="showTab('queue')"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b id="afQueueN"></b></button></span><span class="af-keys">{{ T.rcpt_keys }}</span></div>
 
     <div class="af-main">
     <div class="af-sec">
@@ -6873,6 +6879,7 @@ let revenueChartInstance = null;
 
 function renderRevenueChart(dailyData) {
   revenueChartInstance = drawRevenueBars('revenueChart', 'revenueSummary', dailyData, revenueChartInstance);
+  anRvCmp();
 }
 
 function rvDateLabel(iso, withWeekday) {
@@ -7528,7 +7535,7 @@ async function loadNetworkCompare() {
 // ===== «Анализ бизнеса»: новый уровень статистики (масло) =====
 // Всё, что было в «Статистике», остаётся; эти карточки добавляются ниже
 // карточек периодов и появляются с анимацией, когда до них доходит экран.
-const AN = { data: null, seq: 0, chart: null, io: null };
+const AN = { data: null, seq: 0, io: null };
 async function loadAnalytics() {
   const box = document.getElementById('anBox');
   if (!box) return;
@@ -7541,19 +7548,15 @@ async function loadAnalytics() {
 }
 function anPct(a, b) { return b > 0 ? Math.round((a - b) / b * 100) : null; }
 function anInsights(d) {
+  // Только то, чего нет в других карточках: рост к прошлому месяцу уже есть
+  // в «Этот месяц», загруженный день — в «Выручке за 30 дней», вязкость и
+  // постоянные клиенты — в своих карточках. Здесь — то, что надо сделать.
   const out = [];
-  const wd = String(T.an_weekdays || '').split('|');
-  const p = anPct(d.month, d.prev_month_same);
-  if (p != null && Math.abs(p) >= 3) out.push(p > 0 ? ['fa-arrow-trend-up', '#15803D', T.an_in_up.replace('{pct}', p)] : ['fa-arrow-trend-down', '#B3241C', T.an_in_down.replace('{pct}', Math.abs(p))]);
   const f = d.filter;
   if (f.oil_visits >= 5 && f.no_filter / f.oil_visits >= 0.15) out.push(['fa-filter', '#B45309', T.an_in_filter.replace('{n}', f.no_filter).replace('{all}', f.oil_visits).replace('{sum}', fmtShort(f.no_filter * (f.avg_price || 0)) + ' ' + T.currency)]);
   if (d.clients.due > 0) out.push(['fa-bell', '#2563EB', T.an_in_due.replace('{n}', d.clients.due)]);
   if (d.clients.lost > 0) out.push(['fa-phone', '#B3241C', T.an_in_lost.replace('{n}', d.clients.lost)]);
-  const wsum = d.week.reduce((a, b) => a + b, 0);
-  if (wsum >= 14) { const i = d.week.indexOf(Math.max(...d.week)); out.push(['fa-calendar-day', '#7C3AED', T.an_in_busy.replace('{day}', wd[i] || '')]); }
-  if (d.viscosity.length && d.viscosity[0].name !== '—') out.push(['fa-oil-can', '#0F9F6E', T.an_in_visc.replace('{v}', d.viscosity[0].name)]);
-  if (d.clients.unique >= 10) out.push(['fa-heart', '#D4537E', T.an_in_regular.replace('{pct}', Math.round(d.clients.returning / d.clients.unique * 100))]);
-  return out.slice(0, 5);
+  return out;
 }
 function anPlanHtml(d) {
   const pl = d.plan;
@@ -7581,11 +7584,8 @@ function renderAnalytics() {
   if (!d || !box) return;
   const ins = anInsights(d);
   const wd = String(T.an_weekdays || '').split('|');
-  const cl = d.clients, clMax = Math.max(1, cl.unique, cl.due, cl.lost);
-  const clRows = [[T.an_cl_unique, cl.unique, '#378ADD'], [T.an_cl_returning, cl.returning, '#1D9E75'], [T.an_cl_new, cl.new, '#7F77DD'], [T.an_cl_due, cl.due, '#EF9F27'], [T.an_cl_lost, cl.lost, '#E24B4A']];
   const vMax = Math.max(1, ...d.viscosity.map(v => v.liters));
   const vCol = ['#378ADD', '#85B7EB', '#85B7EB', '#B5D4F4', '#B5D4F4', '#B5D4F4'];
-  const wMax = Math.max(1, ...d.week);
   const hasHours = Object.values(d.hours).reduce((a, b) => a + b, 0) >= 20;
   let heat = '';
   if (hasHours) {
@@ -7597,21 +7597,16 @@ function renderAnalytics() {
     }
     heat += '</div>';
   }
-  const sp = anPct(d.sum30, d.sum_prev30);
+  anRvCmp();
   box.innerHTML = `
     <div class="an-card"><div class="an-h"><b><i class="fa-solid fa-wand-magic-sparkles" style="color:#7C3AED"></i> ${T.an_noticed}</b></div>
-      ${ins.length ? ins.map(x => `<div class="an-ins"><i class="fa-solid ${x[0]}" style="color:${x[1]}"></i><span>${escapeHtml(x[2])}</span></div>`).join('') : `<div class="an-sub">${T.an_in_none}</div>`}</div>
+      ${ins.length ? ins.map(x => `<div class="an-ins"><i class="fa-solid ${x[0]}" style="color:${x[1]}"></i><span>${escapeHtml(x[2])}</span></div>`).join('') : `<div class="an-sub">${T.an_in_none}</div>`}
+      ${d.clients.due + d.clients.lost > 0 ? `<button type="button" class="an-link" onclick="showTab('table')"><i class="fa-solid fa-car"></i> ${T.an_cl_call}</button>` : ''}</div>
     <div class="an-card"><div class="an-h"><b><i class="fa-solid fa-bullseye" style="color:#1D9E75"></i> ${T.an_plan}</b></div>${anPlanHtml(d)}</div>
-    <div class="an-card"><div class="an-h"><b>${T.an_cmp_title}</b>${sp != null ? `<span style="color:${sp >= 0 ? '#15803D' : '#B3241C'}; font-weight:700;">${sp >= 0 ? '▲' : '▼'} ${Math.abs(sp)}%</span>` : ''}</div>
-      <div style="position:relative; height:170px;"><canvas id="anCmp"></canvas></div><div class="an-sub">${T.an_cmp_legend}</div></div>
-    <div class="an-card"><div class="an-h"><b>${T.an_visc_title}</b><span>${escapeHtml(T.an_visc_sub.replace('{l}', String(d.liters).replace('.', ',')))}</span></div>
+    <div class="an-card"><div class="an-h"><b>${T.an_visc_title}</b><span>${T.an_visc_sub}</span></div>
       ${d.viscosity.length ? d.viscosity.map((v, i) => `<div class="an-bar"><span class="t">${escapeHtml(v.name)}</span><span class="b"><i style="background:${vCol[i]}" data-w="${(v.liters / vMax * 100).toFixed(1)}"></i></span><span class="v">${String(v.liters).replace('.', ',')}</span></div>`).join('') : `<div class="an-sub">${T.an_in_none}</div>`}</div>
-    <div class="an-card"><div class="an-h"><b>${T.an_clients_title}</b></div>
-      ${clRows.map(r => `<div class="an-bar"><span class="t">${escapeHtml(r[0])}</span><span class="b"><i style="background:${r[2]}" data-w="${(r[1] / clMax * 100).toFixed(1)}"></i></span><span class="v">${r[1]}</span></div>`).join('')}
-      <button type="button" class="an-link" onclick="showTab('table')"><i class="fa-solid fa-car"></i> ${T.an_cl_call}</button></div>
-    <div class="an-card"><div class="an-h"><b>${T.an_load_title}</b><span>${hasHours ? T.an_load_hours : T.an_load_week}</span></div>
-      <div class="an-week">${d.week.map((v, i) => `<div><i class="${v === wMax && v > 0 ? 'top' : ''}" data-h="${(v / wMax * 100).toFixed(1)}"></i><span>${escapeHtml(wd[i] || '')}</span></div>`).join('')}</div>
-      ${heat || `<div class="an-sub" style="margin-top:8px;">${T.an_load_hours_soon}</div>`}</div>`;
+    <div class="an-card"><div class="an-h"><b>${T.an_load_title}</b><span>${T.an_load_hours}</span></div>
+      ${heat || `<div class="an-sub">${T.an_load_hours_soon}</div>`}</div>`;
   if (AN.io) AN.io.disconnect();
   const reveal = c => {
     c.classList.add('in');
@@ -7628,26 +7623,15 @@ function renderAnalytics() {
     AN.io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { reveal(e.target); AN.io.unobserve(e.target); } }), { threshold: 0.12 });
     cards.forEach(c => AN.io.observe(c));
   } else cards.forEach(reveal);
-  anDrawCmp(d);
 }
-function anDrawCmp(d) {
-  const el = document.getElementById('anCmp');
-  if (!el || typeof Chart === 'undefined') return;
-  if (AN.chart) { try { AN.chart.destroy(); } catch (e) {} }
-  const col = c => (window.glColor ? glColor(c) : c);
-  AN.chart = new Chart(el, {
-    type: 'line',
-    data: { labels: d.daily.map(x => x.date.slice(8, 10) + '.' + x.date.slice(5, 7)),
-      datasets: [
-        { data: d.daily.map(x => x.total), borderColor: col('#0F52BA'), backgroundColor: 'rgba(55,138,221,.16)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
-        { data: d.daily.map(x => x.prev), borderColor: col('#94A3B8'), borderDash: [5, 5], fill: false, tension: 0.4, pointRadius: 0, borderWidth: 1.5 },
-      ] },
-    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-      animation: { duration: 1800, easing: 'easeOutQuart' },
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + Math.round(c.raw).toLocaleString('ru-RU') + ' ' + T.currency } } },
-      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, color: col('#64748B'), font: { size: 11 } } },
-                y: { grid: { color: col('#F1F5F9') }, ticks: { color: col('#64748B'), font: { size: 11 }, callback: v => fmtShort(v) } } } },
-  });
+// «К прошлым 30 дням ▲/▼ %» — прямо в карточке «Выручка за 30 дней»
+// (раньше это был отдельный второй график с теми же деньгами).
+function anRvCmp() {
+  const d = AN.data, box = document.querySelector('#revenueSummary .rv-box');
+  if (!d || !box || box.querySelector('.rv-cmp')) return;
+  const sp = anPct(d.sum30, d.sum_prev30);
+  if (sp == null) return;
+  box.insertAdjacentHTML('beforeend', `<span class="rv-cmp" style="display:block; margin-top:3px; color:${sp >= 0 ? '#15803D' : '#B3241C'}; font-weight:700;">${sp >= 0 ? '▲' : '▼'} ${Math.abs(sp)}% ${T.an_rv_cmp}</span>`);
 }
 
 // ---- Доход по направлениям: масло / шиномонтаж / запчасти ----
