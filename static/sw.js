@@ -1,8 +1,13 @@
 // Service worker OilBook.
 //
-// ДАННЫЕ НЕ КЭШИРУЮТСЯ: страницы приложения и ответы /api (клиенты, склад,
-// долги, статистика) всегда берутся с сервера — иначе владелец мог бы
-// увидеть устаревшие цифры. Без интернета вместо страницы показывается
+// ДАННЫЕ БЕРУТСЯ С СЕРВЕРА: страницы приложения и ответы /api (клиенты, склад,
+// долги, статистика) при интернете всегда свежие.
+//
+// Работа без интернета: копия панели (страница «/») хранится в телефоне и
+// открывается, ТОЛЬКО когда сети нет, — чтобы мастер мог внести замену
+// (она ждёт в очереди телефона и уходит на сервер сама). Копия обновляется
+// при каждом открытии панели с интернетом и удаляется при выходе из аккаунта
+// и когда сервер отправляет на вход. Остальные страницы без интернета —
 // заглушка «нет соединения».
 //
 // Кэшируются только неизменяемые файлы оформления: иконки, библиотека
@@ -10,10 +15,12 @@
 // содержат данных, а на слабом интернете именно они долго грузились при
 // каждом открытии приложения.
 
-const OFFLINE_CACHE = 'oilbook-offline-v4';
+const OFFLINE_CACHE = 'oilbook-offline-v5';
 const ASSET_CACHE = 'oilbook-assets-v2';
 const OFFLINE_URL = '/static/offline.html';
-const KEEP = [OFFLINE_CACHE, ASSET_CACHE];
+const PANEL_CACHE = 'oilbook-panel-v1';
+const PANEL_KEY = '/__panel';
+const KEEP = [OFFLINE_CACHE, ASSET_CACHE, PANEL_CACHE];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(OFFLINE_CACHE).then((cache) => cache.add(OFFLINE_URL)));
@@ -65,10 +72,40 @@ async function staleWhileRevalidate(event) {
   return update;
 }
 
+// панель: «/» и вход из Telegram/ярлыка «/tg»
+function isPanelPath(p) { return p === '/' || p === '/tg'; }
+
+async function navigate(req) {
+  const url = new URL(req.url);
+  if (url.origin === self.location.origin && url.pathname === '/logout') {
+    await caches.delete(PANEL_CACHE);
+    return fetch(req);
+  }
+  const panel = url.origin === self.location.origin && isPanelPath(url.pathname);
+  let res;
+  try {
+    res = await fetch(req);
+  } catch (e) {
+    if (panel) {
+      const copy = await (await caches.open(PANEL_CACHE)).match(PANEL_KEY);
+      if (copy) return copy;
+    }
+    return (await caches.match(OFFLINE_URL)) || Response.error();
+  }
+  if (panel) {
+    try {
+      const cache = await caches.open(PANEL_CACHE);
+      if (res.ok && res.headers.get('X-OB-Panel')) await cache.put(PANEL_KEY, res.clone());
+      else if (res.ok) await cache.delete(PANEL_KEY);  // отправили на вход/приветствие — копия больше не наша
+    } catch (e) { /* место в телефоне закончилось — просто без копии */ }
+  }
+  return res;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL)));
+    event.respondWith(navigate(req));
     return;
   }
   if (req.method !== 'GET') return;

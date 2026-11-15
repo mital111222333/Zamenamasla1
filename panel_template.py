@@ -292,6 +292,19 @@ if ('serviceWorker' in navigator) {
   .dc-hist { padding:2px 14px; }
   .dc-hist .dc-row span:first-child { color:#0F172A; font-weight:600; }
   .dc-err { color:#B42318; font-size:13px; font-weight:600; margin-top:4px; }
+  .ob-pill { display:none; width:100%; align-items:center; justify-content:center; gap:8px; min-height:44px; margin:0 0 10px; padding:0 14px; border-radius:12px; border:0; background:#B45309; color:#fff; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .ob-pill.err { background:#B42318; }
+  .ob-pill.show { display:flex; }
+  .ob-row { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; padding:10px 0; border-top:1px solid var(--border); font-size:14px; text-align:left; }
+  .ob-row:first-child { border-top:0; }
+  .ob-row b { font-family:var(--font-mono); }
+  .ob-row small { display:block; font-size:12px; color:var(--hint); margin-top:2px; }
+  .ob-row .ob-st { font-size:12px; font-weight:700; color:#B45309; }
+  .ob-row .ob-st.err { color:#B42318; }
+  .ob-acts { display:flex; flex-direction:column; gap:6px; flex:none; }
+  .ob-acts button { min-height:34px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font:inherit; font-size:13px; font-weight:600; padding:0 10px; cursor:pointer; margin:0; }
+  .ob-go { width:100%; min-height:48px; border:0; border-radius:12px; background:var(--blue); color:#fff; font:inherit; font-size:15px; font-weight:700; cursor:pointer; margin-top:12px; }
+  .ob-warn { background:#FFFBEB; border:1px solid #FCD34D; color:#92400E; border-radius:14px; padding:12px 14px; font-size:14px; font-weight:600; margin-bottom:10px; line-height:1.4; }
   .uo-hero { background:#EFF6FF; border:1px solid #BFDBFE; border-radius:16px; padding:14px; margin-bottom:10px; }
   .uo-hero .dc-lbl { color:#1D4ED8; }
   .uo-hero .dc-big { color:#1E3A8A; margin-bottom:2px; }
@@ -2024,6 +2037,7 @@ if ('serviceWorker' in navigator) {
   </div>
 
   {% if sub_banner %}{% if sub_banner.link %}<a class="sub-banner{% if sub_banner.ro %} ro{% endif %}" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ sub_banner.text }}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<div class="sub-banner{% if sub_banner.ro %} ro{% endif %}"><i class="fa-solid fa-circle-info"></i><span>{{ sub_banner.text }}</span></div>{% endif %}{% endif %}
+  <button type="button" class="ob-pill" id="obPill" onclick="obOpen()"></button>
   <div id="msg"></div>
 
   <div id="view-add" class="add-form{% if sub_ro %} ro-mode{% endif %}">
@@ -3299,6 +3313,16 @@ MODAL_AND_SCRIPT = """
   </div>
 </div>
 
+<div class="modal-overlay" id="obModal" onclick="if (event.target === this) obClose()">
+  <div class="modal modal-wide" style="text-align:left;">
+    <h3 style="text-align:center; margin-top:0;"><i class="fa-solid fa-mobile-screen-button"></i> {{ T.off_title }}</h3>
+    <div class="hint-text" style="margin:0 0 8px;">{{ T.off_hint }}</div>
+    <div id="obList"></div>
+    <button type="button" class="ob-go" id="obSendBtn" onclick="obSync(true)">{{ T.off_send_now }}</button>
+    <button type="button" class="close-btn" onclick="obClose()">{{ T.modal_close }}</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editModal">
   <div class="modal modal-wide" style="text-align:left;">
     <h3 style="text-align:center;" id="svcModalTitle">{{ T.entry_edit_title }}</h3>
@@ -3415,6 +3439,148 @@ const IS_BRANCH = {{ is_branch|tojson }};
 const IS_EMP_TEAM = {{ is_employee|tojson }};
 const MY_EMP_ID = {{ my_employee_id|tojson }};
 const IS_EMPLOYEE = {{ is_employee|tojson }};
+
+// ===== Работа без интернета =====
+// 1) Данные для формы замены (товары, мастера, база машин…) при каждом
+//    удачном ответе сохраняются в телефоне; без интернета форма берёт их отсюда.
+// 2) Замена, которую не удалось отправить (нет сети / оборвалась), ложится в
+//    очередь телефона со своим номером отправки и временем внесения и уходит
+//    на сервер сама, как только появится связь. Сервер по номеру не создаёт
+//    дубль, а дату ставит ту, когда замену внесли. Очередь — своя у каждого
+//    аккаунта (точка + логин): в чужой аккаунт замена не уйдёт.
+const OB_OWNER = {{ draft_owner|tojson }};
+const OB_KEY = 'ob_outbox_' + OB_OWNER;
+const OB_GC = 'ob_gc_' + OB_OWNER + '_';
+const OBS = { busy: false, timer: null };
+const OB_CACHE_GET = ['/api/products', '/api/frequent_items', '/api/team/masters', '/api/cars',
+                      '/api/top_models', '/api/entry_presets', '/api/expenses/categories'];
+(function () {
+  const netFetch = window.fetch;
+  window.fetch = async function (input, init) {
+    const url = typeof input === 'string' ? input : ((input && input.url) || '');
+    const method = ((init && init.method) || 'GET').toUpperCase();
+    let path = '', key = '';
+    try { const u = new URL(url, location.origin); path = u.pathname; key = path + (path === '/api/cars' ? '' : u.search); } catch (e) {}
+    if (method !== 'GET' || OB_CACHE_GET.indexOf(path) < 0) return netFetch(input, init);
+    try {
+      const res = await netFetch(input, init);
+      if (res.ok && res.status === 200) {
+        res.clone().text().then(t => {
+          if (t.length < 2500000) { try { localStorage.setItem(OB_GC + key, t); } catch (e) {} }
+        }).catch(() => {});
+      }
+      return res;
+    } catch (e) {
+      let t = null;
+      try { t = localStorage.getItem(OB_GC + key); } catch (x) {}
+      if (t == null) throw e;
+      return new Response(t, { status: 200, headers: { 'Content-Type': 'application/json', 'X-OB-Cached': '1' } });
+    }
+  };
+})();
+function obList() { try { const v = JSON.parse(localStorage.getItem(OB_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function obStore(list) { try { localStorage.setItem(OB_KEY, JSON.stringify(list)); return true; } catch (e) { return false; } }
+function obNow() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function obQueue(payload, total) {
+  const list = obList().filter(x => x.token !== payload.token);
+  list.push({ token: payload.token, payload: payload, at: obNow(), status: 'wait', error: '',
+              plate: payload.plate, owner: payload.owner_name, total: Math.round(Number(total) || 0) });
+  if (!obStore(list)) return false;
+  obRender();
+  obSchedule();
+  return true;
+}
+function obSchedule() {
+  clearTimeout(OBS.timer);
+  if (obList().some(x => x.status === 'wait')) OBS.timer = setTimeout(() => obSync(false), 20000);
+}
+function obUpdate(token, fn) {
+  const list = obList();
+  const i = list.findIndex(x => x.token === token);
+  if (i < 0) return;
+  const r = fn(list[i]);
+  if (r === null) list.splice(i, 1); else list[i] = r;
+  obStore(list);
+}
+async function obSync(manual) {
+  if (OBS.busy) return;
+  // другая вкладка уже отправляет — не мешаем (номер отправки всё равно защищает от дубля)
+  try {
+    const lk = Number(localStorage.getItem(OB_KEY + '_lock') || 0);
+    if (Date.now() - lk < 30000 && !manual) return;
+    localStorage.setItem(OB_KEY + '_lock', String(Date.now()));
+  } catch (e) {}
+  const todo = obList().filter(x => x.status === 'wait' || (manual && x.status === 'error'));
+  if (!todo.length) { obRender(); return; }
+  OBS.busy = true;
+  obRender();
+  let sent = 0, stopped = false;
+  for (const it of todo) {
+    let res = null, data = null;
+    try {
+      res = await fetch('/api/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, obQuiet: true,
+        body: JSON.stringify(Object.assign({}, it.payload, { token: it.token, offline_at: it.at, offline_owner: OB_OWNER })) });
+      try { data = await res.json(); } catch (e) { data = null; }
+    } catch (e) { stopped = true; break; }  // связи всё ещё нет — попробуем позже
+    try { localStorage.setItem(OB_KEY + '_lock', String(Date.now())); } catch (e) {}
+    if (res.status === 402 || res.status >= 500 || !data) { stopped = true; break; }  // подписка / сервер занят — позже
+    if (data.ok) { obUpdate(it.token, () => null); sent++; continue; }
+    obUpdate(it.token, x => Object.assign(x, { status: 'error', error: String(data.error || res.status).slice(0, 300) }));
+  }
+  OBS.busy = false;
+  try { localStorage.removeItem(OB_KEY + '_lock'); } catch (e) {}
+  obRender();
+  if (sent) {
+    if (window.netToast) netToast(T.off_sent.replace('{n}', sent), 'ok', 4000);
+    if (typeof carsCache !== 'undefined') { carsCache = []; CARS_VER = ''; }
+    if (typeof CURRENT_TAB !== 'undefined' && CURRENT_TAB === 'table' && typeof loadCars === 'function') loadCars();
+    if (typeof CURRENT_TAB !== 'undefined' && CURRENT_TAB === 'dayclose' && typeof dcLoad === 'function') dcLoad(DC.day);
+  } else if (manual && stopped && window.netToast) netToast(T.off_still_offline, 'err', 4000);
+  if (!stopped && obList().some(x => x.status === 'error') && !manual && window.netToast) netToast(T.off_has_errors, 'err', 6000);
+  obSchedule();
+}
+function obRender() {
+  const list = obList(), pill = document.getElementById('obPill');
+  if (pill) {
+    const err = list.some(x => x.status === 'error');
+    pill.classList.toggle('show', list.length > 0);
+    pill.classList.toggle('err', err);
+    pill.innerHTML = `<i class="fa-solid ${OBS.busy ? 'fa-rotate fa-spin' : 'fa-mobile-screen-button'}"></i> ${escapeHtml(T.off_pill.replace('{n}', list.length))} <span style="font-weight:500; opacity:.9;">· ${escapeHtml(err ? T.off_st_error : (OBS.busy ? T.off_st_sending : T.off_st_wait))} ›</span>`;
+  }
+  const box = document.getElementById('obList');
+  if (!box) return;
+  const money = v => (Math.round(Number(v) || 0)).toLocaleString('ru-RU');
+  box.innerHTML = list.length ? list.map(x => `<div class="ob-row">
+      <div style="min-width:0;"><b>${escapeHtml(x.plate || '')}</b> · ${escapeHtml(x.owner || '')}
+        <small>${escapeHtml(String(x.at || '').slice(8, 10) + '.' + String(x.at || '').slice(5, 7) + ' ' + String(x.at || '').slice(11, 16))} · ${money(x.total)} ${escapeHtml(T.currency)}</small>
+        <span class="ob-st${x.status === 'error' ? ' err' : ''}">${escapeHtml(x.status === 'error' ? T.off_st_error + ': ' + (x.error || '') : (OBS.busy ? T.off_st_sending : T.off_st_wait))}</span>
+      </div>
+      <div class="ob-acts">
+        ${x.status === 'error' ? `<button type="button" onclick="obRetry(${escapeHtml(JSON.stringify(x.token))})">${escapeHtml(T.off_retry)}</button>` : ''}
+        <button type="button" onclick="obDelete(${escapeHtml(JSON.stringify(x.token))})">${escapeHtml(T.off_delete)}</button>
+      </div></div>`).join('') : `<div class="hint-text" style="text-align:center; padding:14px 0;">${escapeHtml(T.off_empty)}</div>`;
+  const btn = document.getElementById('obSendBtn');
+  if (btn) btn.style.display = list.length ? '' : 'none';
+}
+function obOpen() { obRender(); document.getElementById('obModal').classList.add('open'); }
+function obClose() { document.getElementById('obModal').classList.remove('open'); }
+function obRetry(token) { obUpdate(token, x => Object.assign(x, { status: 'wait', error: '' })); obSync(true); }
+function obDelete(token) {
+  if (!confirm(T.off_del_confirm)) return;
+  obUpdate(token, () => null);
+  obRender();
+}
+function obWarnHtml() {
+  const n = obList().length;
+  return n ? `<div class="ob-warn"><i class="fa-solid fa-mobile-screen-button"></i> ${escapeHtml(T.off_dc_warn.replace('{n}', n))}</div>` : '';
+}
+window.addEventListener('online', () => setTimeout(() => obSync(false), 1500));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) obSync(false); });
+window.addEventListener('storage', e => { if (e.key === OB_KEY) obRender(); });
+document.addEventListener('DOMContentLoaded', () => { obRender(); setTimeout(() => obSync(false), 2500); });
 const CAR_MODELS = {{ car_models|tojson }};
 let USD_RATE = {{ usd_rate|tojson }};
 const BOT_USERNAME = {{ bot_username|tojson }};
@@ -10495,7 +10661,7 @@ function dcRender() {
       `<div class="dc-row"><span>${dcDayLabel(h.day)} · ${dcMoney(h.counted)}</span>${h.diff ? `<span class="dc-pill ${h.diff < 0 ? 'bad' : 'over'}">${h.diff > 0 ? '+' : '−'}${dcMoney(Math.abs(h.diff))}</span>` : `<span class="dc-pill ok"><i class="fa-solid fa-check"></i></span>`}</div>`
     ).join('') + `</div>`;
   }
-  body.innerHTML = uoDcHint(d) + html;
+  body.innerHTML = obWarnHtml() + uoDcHint(d) + html;
   dcLive();
 }
 function dcSet(what, v) {
@@ -10580,7 +10746,7 @@ function dcRenderBlind(justNow) {
     <div class="dc-err" id="dcErr"></div>
     <button type="button" class="dc-go" onclick="dcSubmit()"><i class="fa-solid fa-paper-plane"></i>${escapeHtml(d.closed ? T.dc_emp_resend : T.dc_emp_send)}</button>
   </div>`;
-  body.innerHTML = uoDcHint(d) + html;
+  body.innerHTML = obWarnHtml() + uoDcHint(d) + html;
 }
 
 
@@ -11596,6 +11762,22 @@ async function lookupPlate(force) {
     setKnownMode(false);
     lastKnownNextMileage = null;
     checkMileageVsDue();
+    // без интернета: имя и машину берём из базы, сохранённой в телефоне
+    if (e && e.oilNet) {
+      try { await ensureCarsCacheLoaded(); } catch (x) {}
+      const want = plate.toUpperCase().replace(/ /g, '');
+      const row = (carsCache || []).find(c => String(c.plate_number || '').toUpperCase().replace(/ /g, '') === want);
+      if (row && document.getElementById('plate').value.trim() === plate) {
+        const nameEl = document.getElementById('owner_name'), phoneEl = document.getElementById('owner_phone');
+        if (!nameEl.value.trim()) nameEl.value = row.owner_name || '';
+        if (!phoneEl.value.trim() && row.owner_phone) phoneEl.value = row.owner_phone;
+        if (row.car_brand) document.getElementById('car_brand').value = row.car_brand;
+        if (row.car_model && !document.getElementById('car_model').value.trim()) document.getElementById('car_model').value = row.car_model;
+        KNOWN_OWNER = { name: (row.owner_name || '').trim(), phone: (row.owner_phone || '').trim() };
+        LAST_LOOKED_PLATE = plate;
+        panel.innerHTML = `<div class="ob-warn" style="font-weight:500;"><i class="fa-solid fa-mobile-screen-button"></i> ${escapeHtml(T.off_known_hint)}</div>`;
+      }
+    }
   }
 }
 
@@ -11915,6 +12097,49 @@ function restoreAddDraft() {
 })();
 initItemForms();
 
+function addFormReset() {
+  ['plate','owner_name','owner_phone','car_model','vin','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
+  SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
+  loadQuickModels(true);
+  KM.manual = false;
+  KNOWN_OWNER = null;
+  NEW_OWNER = false;
+  LAST_LOOKED_PLATE = '';
+  LAST_VISIT_ITEMS = [];
+  resetItemInputs();
+  document.getElementById('interval_value').value = 3;
+  document.getElementById('interval_unit').value = 'months';
+  paymentSplitTouched = false;
+  resetDailyKm();
+  resetDiscount();
+  setPayMode('cash');
+  const payCash = document.getElementById('pay_cash');
+  const payCard = document.getElementById('pay_card');
+  if (payCash) payCash.value = '';
+  if (payCard) payCard.value = '';
+  const debtCheckbox = document.getElementById('debt_enabled');
+  if (debtCheckbox) {
+    debtCheckbox.checked = false;
+    document.getElementById('debtFields').style.display = 'none';
+    document.getElementById('debt_installment_amount').value = '';
+    document.getElementById('debt_interval_days').value = '';
+  }
+  lastKnownNextMileage = null;
+  document.getElementById('mileageCompare').innerHTML = '';
+  document.getElementById('knownClientPanel').innerHTML = '';
+  setKnownMode(false);
+  document.querySelectorAll('#debtTerms button').forEach(b => b.classList.remove('on'));
+}
+
+function addSaveOffline(payload, items) {
+  if (!obQueue(payload, payTotal(items))) { showMsg(T.off_no_space, false); return; }
+  window.ADD_TOKEN = null;
+  clearAddDraft();
+  addFormReset();
+  showMsg(`<i class="fa-solid fa-mobile-screen-button"></i> ${escapeHtml(T.off_saved)}`, true);
+  window.scrollTo(0, 0);
+}
+
 async function submitCar() {
   const items = collectItems();
   const payCashEl = document.getElementById('pay_cash');
@@ -11986,13 +12211,18 @@ async function submitCar() {
     window.ADD_TOKEN_AT = Date.now();
   }
   payload.token = window.ADD_TOKEN;
+  // нет интернета — замена ложится в очередь телефона и уйдёт сама
+  if (navigator.onLine === false) { addSaveOffline(payload, items); return; }
   let data;
   try {
     const res = await fetch('/api/add', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload), obQuiet: true
     });
     data = await res.json();
   } catch (e) {
+    // связь оборвалась: неизвестно, дошла ли замена, — кладём в очередь с тем
+    // же номером отправки: если дошла, сервер ответит «уже сохранено», дубля не будет
+    if (e && (e.oilNet === 'offline' || e.oilNet === 'timeout')) { addSaveOffline(payload, items); return; }
     showMsg(T.msg_no_connection, false);
     return;
   }
@@ -12001,37 +12231,7 @@ async function submitCar() {
     clearAddDraft();
     setTimeout(loadFrequentItems, 1500);
     showMsg(`✅ ${data.duplicate ? T.msg_already_saved : T.msg_saved} ${data.next_date || '—'}.`, true);
-    ['plate','owner_name','owner_phone','car_model','vin','mileage','next_mileage','notes'].forEach(id => document.getElementById(id).value = '');
-    SPEC.list = []; SPEC.hiddenFor = ''; renderSpecCard(); renderVinHint();
-    loadQuickModels(true);
-    KM.manual = false;
-    KNOWN_OWNER = null;
-    NEW_OWNER = false;
-    LAST_LOOKED_PLATE = '';
-    LAST_VISIT_ITEMS = [];
-    resetItemInputs();
-    document.getElementById('interval_value').value = 3;
-    document.getElementById('interval_unit').value = 'months';
-    paymentSplitTouched = false;
-    resetDailyKm();
-    resetDiscount();
-    setPayMode('cash');
-    const payCash = document.getElementById('pay_cash');
-    const payCard = document.getElementById('pay_card');
-    if (payCash) payCash.value = '';
-    if (payCard) payCard.value = '';
-    const debtCheckbox = document.getElementById('debt_enabled');
-    if (debtCheckbox) {
-      debtCheckbox.checked = false;
-      document.getElementById('debtFields').style.display = 'none';
-      document.getElementById('debt_installment_amount').value = '';
-      document.getElementById('debt_interval_days').value = '';
-    }
-    lastKnownNextMileage = null;
-    document.getElementById('mileageCompare').innerHTML = '';
-    document.getElementById('knownClientPanel').innerHTML = '';
-    setKnownMode(false);
-    document.querySelectorAll('#debtTerms button').forEach(b => b.classList.remove('on'));
+    addFormReset();
     // экран «Сохранено»: следующая замена, отправить клиенту, отмена 10 с
     if (!showSaved(data, payload, items) && data.client_link) {
       openModal(payload.plate, data.client_link, payload.owner_phone);
@@ -13434,7 +13634,8 @@ NET_GUARD_JS = """<style>
       if (callerAborted) throw e;
       const kind = timedOut ? 'timeout' : 'offline';
       if (write) {
-        toast(NT.unsure, 'err', 9000);
+        // obQuiet — вызывающий сам решает, что сказать (замена уходит в очередь телефона)
+        if (!init.obQuiet) toast(NT.unsure, 'err', 9000);
         throw netError(kind, NT.unsure, true);
       }
       // чтение не удалось: многие разделы в этом случае просто оставляют
@@ -13443,7 +13644,7 @@ NET_GUARD_JS = """<style>
       const msg = kind === 'timeout' ? NT.timeout : NT.offline;
       const offBar = document.getElementById('netOffline');
       const barShown = offBar && offBar.style.display === 'block';
-      if (!document.hidden && !barShown) toast(msg, 'err');
+      if (!document.hidden && !barShown && navigator.onLine !== false) toast(msg, 'err');
       throw netError(kind, msg, true);
     } finally {
       clearTimeout(timer);

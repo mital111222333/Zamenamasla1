@@ -1758,6 +1758,11 @@ def welcome_for_guests(view):
     return wrapped
 
 
+def _draft_owner() -> str:
+    """Чей это телефонный черновик/очередь замен: точка + логин."""
+    return f"{g.shop_id}_{session.get('username') or ''}"
+
+
 @app.route("/")
 @welcome_for_guests
 @login_required
@@ -1765,7 +1770,7 @@ def index():
     import json as _json
     shop = db.get_shop(g.shop_id)
     _has_staff = (not g.is_employee) and bool(db.list_shop_employees(g.shop_id))
-    return render_template_string(
+    html = render_template_string(
         PAGE, brands=CAR_BRANDS, car_models=CAR_MODELS, service_types=SERVICE_TYPES,
         shop_name=session.get("shop_name") or "Замена масла",
         T=g.T, lang=g.lang, t_json=_json.dumps(g.T, ensure_ascii=False), bot_username=BOT_USERNAME,
@@ -1783,12 +1788,17 @@ def index():
         usd_rate=_effective_usd_rate(shop),
         usd_rate_own=shop.get("usd_rate") if shop else None,
         usd_rate_head=_head_usd_rate(shop),
-        draft_owner=f"{g.shop_id}_{session.get('username') or ''}",
+        draft_owner=_draft_owner(),
         sub_banner=_sub_banner(shop),
         sub_ro=_sub_ro_ctx(),
         is_sub_owner=_is_sub_owner(),
         **_help_context(shop),
     )
+    resp = make_response(html)
+    # по этому заголовку телефон понимает, что это панель, и хранит её копию —
+    # чтобы открыть «Замену» без интернета
+    resp.headers["X-OB-Panel"] = "1"
+    return resp
 
 
 def _support_contact():
@@ -2815,6 +2825,12 @@ def api_add():
         # одновременно вносящие одну и ту же новую машину, больше не получают
         # ошибку «UNIQUE constraint failed» и не плодят пустых клиентов
         add_token = str(data.get("token") or "")[:64] or None
+        # замена из очереди телефона (вносили без интернета): она должна уйти в
+        # тот же аккаунт, где её вносили, и получить время, когда её внесли
+        offline_owner = data.get("offline_owner")
+        if offline_owner is not None and str(offline_owner) != _draft_owner():
+            return jsonify({"ok": False, "error": g.T["off_err_owner"], "wrong_owner": True}), 409
+        offline_at = db.parse_offline_at(data.get("offline_at")) if offline_owner is not None else None
         with db.WRITE_LOCK:
             # повторная отправка той же замены (ответ не дошёл по слабому
             # интернету, нажали ещё раз) — ничего не пишем, отвечаем «уже сохранено»
@@ -2866,6 +2882,9 @@ def api_add():
 
             if debt_amount > 0:
                 db.create_installment_plan(g.shop_id, car_id, debt_amount, installment_amount, interval_days, oil_change_id=oc_id)
+            if offline_at:
+                db.apply_offline_time(oc_id, g.shop_id, offline_at)
+                next_date = (db.get_oil_change_for_shop(oc_id, g.shop_id) or {}).get("next_change_date") or next_date
 
         # с этого места замена УЖЕ сохранена — что бы дальше ни случилось,
         # человеку нельзя показывать «ошибку» (он нажмёт ещё раз и будет дубль)
