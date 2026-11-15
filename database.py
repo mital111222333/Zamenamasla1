@@ -2304,7 +2304,7 @@ def get_all_cars_overview(shop_id: int):
             FROM cars c JOIN clients cl ON cl.id = c.client_id
             LEFT JOIN oil_changes oc ON oc.id = (
                 SELECT id FROM oil_changes WHERE car_id=c.id ORDER BY change_date DESC, id DESC LIMIT 1)
-            WHERE c.shop_id=?
+            WHERE c.shop_id=? AND c.plate_number <> '#SALE'
             ORDER BY c.created_at DESC
         """, (shop_id,)).fetchall()
         return [dict(r) for r in rows]
@@ -2462,6 +2462,70 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
               *[atf_row[k] for k in ATF_FIELDS]))
         conn.commit()
         return cur.lastrowid, next_date
+
+
+# ---------- Продажа без машины и «Мелкие услуги за день» ----------
+# Хранятся обычными записями (oil_changes) на служебной «машине» точки с
+# номером WALKIN_PLATE — так выручка, прибыль, касса сотрудника, закрытие дня,
+# склад и статистика считаются сами. Из базы машин, клиентов, напоминаний и
+# сводок служебная машина исключена.
+WALKIN_PLATE = "#SALE"
+WALKIN_KINDS = ("sale", "day_svc")
+
+
+def get_walkin_car(shop_id: int) -> int:
+    with WRITE_LOCK, get_conn() as conn:
+        row = conn.execute("SELECT id FROM cars WHERE shop_id=? AND plate_number=?",
+                           (shop_id, WALKIN_PLATE)).fetchone()
+        if row:
+            return row["id"]
+        cur = conn.execute("INSERT INTO clients (shop_id, full_name, link_token) VALUES (?, ?, ?)",
+                           (shop_id, "—", generate_token()))
+        car = conn.execute("INSERT INTO cars (shop_id, plate_number, client_id) VALUES (?, ?, ?)",
+                           (shop_id, WALKIN_PLATE, cur.lastrowid))
+        conn.commit()
+        return car.lastrowid
+
+
+def add_walkin(shop_id: int, kind: str, items, cash_amount=None, card_amount=None,
+               employee_id=None, day: str = None):
+    """kind: sale — продажа без машины (товары склада, списываются), day_svc —
+    мелкие услуги одной суммой за день (подкачка и т.п.). Возвращает id записи."""
+    if kind not in WALKIN_KINDS:
+        raise ValueError("bad kind")
+    with WRITE_LOCK:
+        car_id = get_walkin_car(shop_id)
+        oc_id, _ = add_oil_change(car_id, None, kind, None, False, None, 0, "months", "",
+                                  items=items, cash_amount=cash_amount, card_amount=card_amount,
+                                  employee_id=employee_id)
+        with get_conn() as conn:
+            fields, vals = ["service_type=?", "status='done'"], [kind]
+            if day and day != datetime.now().strftime("%Y-%m-%d"):
+                fields.append("change_date=?")
+                vals.append(day)
+            conn.execute(f"UPDATE oil_changes SET {', '.join(fields)} WHERE id=?", (*vals, oc_id))
+            conn.commit()
+    return oc_id
+
+
+def list_walkin(shop_id: int, day: str, kind: str) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.id, oc.cost, oc.cash_amount, oc.card_amount, oc.items_json, oc.employee_id
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND c.plate_number=? AND oc.change_date=? AND oc.service_type=?
+            ORDER BY oc.id
+        """, (shop_id, WALKIN_PLATE, day, kind)).fetchall()
+    out = []
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"] or "[]") or []
+        except (TypeError, ValueError):
+            items = []
+        out.append({"id": r["id"], "total": r["cost"] or 0, "employee_id": r["employee_id"],
+                    "items": [{"name": i.get("brand") or i.get("name"), "qty": i.get("qty"), "total": i.get("total")}
+                              for i in items if isinstance(i, dict)]})
+    return out
 
 
 def get_oil_change_for_shop(oc_id: int, shop_id: int):
@@ -3625,7 +3689,7 @@ def _client_split(conn, shop_id: int, date_from: str, date_to: str) -> dict:
         FROM (
             SELECT c.client_id, MIN(oc.change_date) as first_ever
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id = ?
+            WHERE c.shop_id = ? AND c.plate_number <> '#SALE'
             GROUP BY c.client_id
             HAVING SUM(CASE WHEN oc.change_date >= ? AND oc.change_date <= ? THEN 1 ELSE 0 END) > 0
         )
@@ -3711,9 +3775,12 @@ def get_day_details(shop_id: int, day: str) -> dict:
                 items = json.loads(r["items_json"]) if r["items_json"] else []
             except (TypeError, ValueError):
                 items = []
+            walkin = r["plate_number"] == WALKIN_PLATE
             services.append({
-                "id": r["id"], "plate": r["plate_number"], "car_brand": r["car_brand"],
-                "car_model": r["car_model"], "owner_name": r["owner_name"], "owner_phone": r["owner_phone"],
+                "id": r["id"], "plate": "" if walkin else r["plate_number"], "car_brand": r["car_brand"],
+                "walkin": r["service_type"] if walkin else None,
+                "car_model": r["car_model"], "owner_name": None if walkin else r["owner_name"],
+                "owner_phone": None if walkin else r["owner_phone"],
                 "mileage": r["mileage"], "service_type": r["service_type"], "notes": r["notes"],
                 "items": [{"name": i.get("name"), "brand": i.get("brand"), "qty": i.get("qty"),
                            "unit": i.get("unit"), "total": i.get("total")} for i in items if isinstance(i, dict)],
@@ -9934,6 +10001,7 @@ def digest_due(shop_id: int, date_from: str, date_to: str, limit: int = 30) -> l
             SELECT c.plate_number AS plate, cl.full_name AS owner_name, oc.next_change_date AS due
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id LEFT JOIN clients cl ON cl.id = c.client_id
             WHERE c.shop_id=? AND oc.status='active' AND oc.next_change_date >= ? AND oc.next_change_date <= ?
+              AND c.plate_number <> '#SALE'
             ORDER BY oc.next_change_date, c.plate_number LIMIT ?
         """, (shop_id, date_from, date_to, limit)).fetchall()
     return [dict(r) for r in rows]
@@ -10047,7 +10115,7 @@ def base_due(shop_id: int, today=None) -> dict:
                c.plate_number AS plate, c.car_brand, c.car_model,
                cl.full_name AS owner_name, cl.phone AS owner_phone, cl.telegram_id
         FROM oil_changes oc JOIN cars c ON c.id = oc.car_id LEFT JOIN clients cl ON cl.id = c.client_id
-        WHERE c.shop_id=?
+        WHERE c.shop_id=? AND c.plate_number <> '#SALE'
     """
     with get_conn() as conn:
         oil = conn.execute(base_sql + " AND oc.status IN ('active', 'booked') "
@@ -10058,7 +10126,7 @@ def base_due(shop_id: int, today=None) -> dict:
                            (shop_id, lo, hi, MAX_FOLLOWUP_REMINDERS)).fetchall()
         calls = _latest_calls(conn, shop_id)
         totals = conn.execute("""SELECT COUNT(*) AS cars, COUNT(DISTINCT client_id) AS clients
-                                 FROM cars WHERE shop_id=?""", (shop_id,)).fetchone()
+                                 FROM cars WHERE shop_id=? AND plate_number <> '#SALE'""", (shop_id,)).fetchone()
         # давно не были: последний визит машины старше полугода
         lost = conn.execute(base_sql + " AND oc.change_date <= ? "
                             "AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = oc.car_id) "
