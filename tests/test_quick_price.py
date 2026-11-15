@@ -30,12 +30,15 @@ def test_texts_exist_in_both_languages():
 
 def test_section_is_wired_into_navigation():
     src = _src()
-    assert 'id="view-price"' in src and 'id="tab-price"' in src
-    assert """data-tab="price" onclick="showTab('price')\"""" in src
+    assert 'id="view-price"' in src
     assert "if (t === 'price') prOpen();" in src
-    # кнопка стоит в нижней панели сразу после «Базы»
+    # «Цена» открывается кнопкой в форме замены, а не из нижней панели
     bar = src[src.index('id="bottomBar"'):src.index('id="bbMore"')]
-    assert bar.index('data-tab="table"') < bar.index('data-tab="price"') < bar.index('data-tab="add"')
+    assert 'data-tab="price"' not in bar
+    form = src[src.index('id="view-add"'):src.index('<div class="af-main">')]
+    assert "showTab('price')" in form
+    view = src[src.index('id="view-price"'):src.index('id="prBody"')]
+    assert "showTab('add')" in view
 
 
 def test_price_screen_never_shows_purchase_price():

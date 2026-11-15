@@ -243,7 +243,7 @@ if ('serviceWorker' in navigator) {
   .pr-line:first-of-type { border-top:0; }
   .pr-line b.m { font-family:var(--font-mono); font-size:18px; white-space:nowrap; }
   .pr-line label { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; min-height:44px; cursor:pointer; min-width:0; flex:1; margin:0; text-transform:none; letter-spacing:0; color:#0F172A; }
-  #view-price.pr-detail .pr-head, #view-price.pr-detail .pr-seg { display:none; }
+  #view-price.pr-detail .pr-head, #view-price.pr-detail .pr-seg, #view-price.pr-detail .pr-back-entry { display:none; }
   .pr-line input[type=checkbox] { width:22px; height:22px; flex:none; accent-color:var(--blue); }
   .pr-line select, .pr-line input[type=number] { min-height:44px; border-radius:10px; border:1.5px solid var(--border); font:inherit; font-size:14px; background:#fff; color:#0F172A; padding:0 8px; }
   .pr-line select { flex:1; min-width:0; max-width:60%; }
@@ -575,6 +575,9 @@ if ('serviceWorker' in navigator) {
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .add-form { max-width:760px; }
   .af-title { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:18px; text-transform:uppercase; letter-spacing:.3px; color:var(--darkblue, #0A2540); margin:2px 4px 10px; }
+  .af-price { margin-left:auto; display:inline-flex; align-items:center; gap:7px; min-height:40px; padding:0 14px; border-radius:999px; border:1.5px solid var(--blue); background:#fff; color:var(--blue); font-family:var(--font-body); font-style:normal; font-size:14px; font-weight:700; text-transform:none; letter-spacing:0; cursor:pointer; }
+  .af-price:active { transform:scale(.97); }
+  .pr-back-entry { display:inline-flex; align-items:center; gap:6px; margin:0 0 4px; }
   .af-title .dot { width:9px; height:9px; border-radius:50%; background:var(--btn); flex:none; box-shadow:0 0 0 4px rgba(225,6,0,.18); }
   .af-sec { background:#fff; border:1px solid #E2E8F0; border-radius:18px; padding:14px; margin-bottom:12px; box-shadow:0 4px 14px -6px rgba(15,82,186,.10); }
   .af-h { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#0F172A; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
@@ -885,7 +888,7 @@ if ('serviceWorker' in navigator) {
   @media (min-width: 1200px) {
     .add-form { max-width:none; display:grid; grid-template-columns:minmax(0, 1fr) 380px; gap:0 20px; align-items:start; }
     .af-title { grid-column:1 / -1; }
-    .af-keys { display:inline; margin-left:auto; font-family:var(--font-body); font-style:normal; text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:500; color:var(--hint); }
+    .af-keys { display:inline; margin-left:12px; font-family:var(--font-body); font-style:normal; text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:500; color:var(--hint); }
     .af-main, .af-side { display:block; min-width:0; }
     /* колонка чека не выше экрана: длинный список товаров и блок оплаты
        прокручиваются внутри, а «Итого» и «Сохранить» всегда видны внизу */
@@ -1726,7 +1729,6 @@ if ('serviceWorker' in navigator) {
     <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span><kbd class="side-kbd">F2</kbd></div>
     <div class="side-group">{{ T.nav_grp_work }}</div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
-    <div class="side-item" id="tab-price" data-tab="price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     <div class="side-item" id="tab-dayclose" data-tab="dayclose" onclick="showTab('dayclose')"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
     {% if is_employee or has_staff %}<div class="side-item" id="tab-cash" data-tab="cash" onclick="showTab('cash')"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
@@ -1757,9 +1759,8 @@ if ('serviceWorker' in navigator) {
 
 {% set bar_slot2 = 'debts' if is_employee else 'stats' %}
 {% set bar_slot4 = 'warehouse' if (warehouse_enabled and not is_employee) else ('broadcast' if is_employee else 'debts') %}
-<nav class="bottom-bar bb6" id="bottomBar">
+<nav class="bottom-bar" id="bottomBar">
   <div class="bb-item" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
-  <div class="bb-item" data-tab="price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></div>
   {% if bar_slot2 == 'stats' %}
   <div class="bb-item" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>
   {% else %}
@@ -1777,7 +1778,7 @@ if ('serviceWorker' in navigator) {
 </nav>
 
 <div class="more-backdrop" id="moreBackdrop" onclick="closeMore()"></div>
-<div class="more-sheet" id="moreSheet" data-bar="table,price,{{ bar_slot2 }},add,{{ bar_slot4 }}">
+<div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
   <div class="more-list">
       <div class="more-item" data-tab="dayclose" data-more-slot="dayclose" onclick="showTab('dayclose'); closeMore();"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
@@ -1848,7 +1849,7 @@ if ('serviceWorker' in navigator) {
     };
     </script>
     {% endif %}
-    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<span class="af-keys">{{ T.rcpt_keys }}</span></div>
+    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<button type="button" class="af-price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></button><span class="af-keys">{{ T.rcpt_keys }}</span></div>
 
     <div class="af-main">
     <div class="af-sec">
@@ -2128,6 +2129,7 @@ if ('serviceWorker' in navigator) {
   </div>
 
   <div id="view-price" style="display:none;">
+    <button type="button" class="pr-back pr-back-entry" onclick="showTab('add')"><i class="fa-solid fa-chevron-left"></i>{{ T.nav_add_short }}</button>
     <div class="pr-head"><h2>{{ T.tab_price }}</h2><div class="pr-hint">{{ T.pr_hint }}</div></div>
     <div class="pr-seg">
       <button type="button" id="prModeItem" class="on" onclick="prMode('item')">{{ T.pr_mode_item }}</button>
@@ -3247,11 +3249,13 @@ function showTab(t, keepScroll) {
   if (rateView) rateView.style.display = t === 'rate' ? 'block' : 'none';
   if (t === 'rate') loadRateTab();
   if (t === 'broadcast') loadBroadcastInfo();
-  document.querySelectorAll('[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  // «Цена» открывается из формы замены — в панели подсвечена «Замена»
+  const navT = t === 'price' ? 'add' : t;
+  document.querySelectorAll('[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === navT));
   // пункт «Ещё» подсвечен, если открыт раздел, которого нет в нижней панели
   const sheet = document.getElementById('moreSheet');
   const bbMore = document.getElementById('bbMore');
-  if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(t));
+  if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(navT));
   if (!keepScroll) window.scrollTo(0, 0);
   if (window.glEnter && !keepScroll) glEnter('view-' + t);
   if (t === 'stats') { ensureChartJs(); loadStats(); }
