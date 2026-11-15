@@ -10756,3 +10756,198 @@ def stats_analytics(shop_id: int, today=None) -> dict:
         "hours": hours,
     }
 
+
+
+# ---------- Статистика: вкладки «Шиномонтаж» и «Запчасти» ----------
+def _dir_part_of(cost, items, dr):
+    """Сколько из оплаченной суммы записи (уже со скидкой) приходится на
+    направление dr — так же, как в get_direction_range — и позиции этого
+    направления."""
+    sums = {}
+    for it in items:
+        k = item_dir(it)
+        sums[k] = sums.get(k, 0) + (it.get("total") or 0)
+    sub = sum(sums.values())
+    if not items or sub <= 0:
+        return (cost if dr == "oil" else 0), []
+    mine = [it for it in items if item_dir(it) == dr]
+    return cost * sums.get(dr, 0) / sub, mine
+
+
+def dir_analytics(shop_id: int, dr: str, today=None, with_profit: bool = False) -> dict:
+    """Аналитика одного направления (tire — шиномонтаж, part — запчасти):
+    выручка за сегодня / неделю / месяц / год с сравнением, доля в бизнесе,
+    30 дней против прошлых 30, топ услуг и товаров, клиенты, продажи без
+    машины, «мелкие услуги за день», загрузка по дням недели, склад
+    направления. Прибыль и стоимость склада — только если with_profit
+    (главная или одиночная точка со складом; филиалу и сотруднику — нет)."""
+    if dr not in ITEM_DIRS:
+        raise ValueError("bad dir")
+    today = today or datetime.now().date()
+    d = lambda x: x.strftime("%Y-%m-%d")
+    t30, t60, t90 = today - timedelta(days=29), today - timedelta(days=59), today - timedelta(days=89)
+    week_start = today - timedelta(days=today.weekday())
+    pw_start = week_start - timedelta(days=7)
+    pw_end = pw_start + timedelta(days=today.weekday())
+    mstart = today.replace(day=1)
+    pm_end = mstart - timedelta(days=1)
+    pm_start = pm_end.replace(day=1)
+    pm_same = pm_end.replace(day=min(today.day, pm_end.day))
+    ystart = today.replace(month=1, day=1)
+    py_start = ystart.replace(year=ystart.year - 1)
+    try:
+        py_same = today.replace(year=today.year - 1)
+    except ValueError:  # 29 февраля
+        py_same = today.replace(year=today.year - 1, day=28)
+    yday = today - timedelta(days=1)
+    periods = {
+        "today": ((d(today), d(today)), (d(yday), d(yday))),
+        "week": ((d(week_start), d(today)), (d(pw_start), d(pw_end))),
+        "month": ((d(mstart), d(today)), (d(pm_start), d(pm_same))),
+        "year": ((d(ystart), d(today)), (d(py_start), d(py_same))),
+    }
+    since = min(d(py_start), d(t90), d(pm_start))
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date, oc.cost, oc.items_json, oc.service_type, c.plate_number, c.id AS car_id
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.cost IS NOT NULL
+            ORDER BY oc.change_date
+        """, (shop_id, since)).fetchall()
+        first_dir = {}
+        old = conn.execute("""
+            SELECT oc.change_date, oc.items_json, c.id AS car_id FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date < ? AND c.plate_number <> ? AND oc.items_json LIKE ?
+        """, (shop_id, d(t30), WALKIN_PLATE, '%' + ('"tire' if dr == "tire" else '"part') + '%')).fetchall()
+    for r in old:
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            continue
+        if any(item_dir(i) == dr for i in items):
+            first_dir.setdefault(r["car_id"], r["change_date"])
+
+    agg = {k: {"cur": [0.0, 0, 0.0, 0.0], "prev": [0.0, 0, 0.0, 0.0]} for k in periods}  # сумма, визиты, прибыль, непосчитано
+    all_month = 0
+    cur30, prev30 = {}, {}
+    top = {}
+    walk = {"count": 0, "total": 0}
+    day_svc = {"days": set(), "total": 0, "week_days": set()}
+    week = [0] * 7
+    cars30 = set()
+    oil_visits = cross = 0
+    sold90 = {}
+    for r in rows:
+        day = r["change_date"]
+        cost = r["cost"] or 0
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            items = []
+        amount, mine = _dir_part_of(cost, items, dr)
+        if periods["month"][0][0] <= day <= periods["month"][0][1]:
+            all_month += cost
+        walkin = r["plate_number"] == WALKIN_PLATE
+        if not walkin and day >= d(t30) and any(i.get("key") == "fluid_0" for i in items):
+            oil_visits += 1
+            if mine:
+                cross += 1
+        if not mine:
+            continue
+        # прибыль направления: доля суммы минус закупка товаров; позиции без
+        # цены закупки в прибыль не входят (как в общей статистике)
+        sub = sum(i.get("total") or 0 for i in mine) or 1
+        k = amount / sub
+        unpriced = goods_cost = 0
+        for i in mine:
+            if i.get("cost_price") is not None and i.get("qty") is not None:
+                goods_cost += i["qty"] * i["cost_price"]
+            elif i.get("product_id"):
+                unpriced += (i.get("total") or 0) * k
+        profit = amount - unpriced - goods_cost
+        for p, ((cf, ct), (pf, pt)) in periods.items():
+            for side, (a, b) in (("cur", (cf, ct)), ("prev", (pf, pt))):
+                if a <= day <= b:
+                    s = agg[p][side]
+                    s[0] += amount
+                    s[1] += 1
+                    s[2] += profit
+                    s[3] += unpriced
+        if day >= d(t30):
+            cur30[day] = cur30.get(day, 0) + amount
+        elif day >= d(t60):
+            prev30[day] = prev30.get(day, 0) + amount
+        if day >= d(t90):
+            for i in mine:
+                if i.get("product_id"):
+                    sold90[i["product_id"]] = sold90.get(i["product_id"], 0) + (i.get("qty") or 0)
+        if walkin:
+            if day >= d(t30):
+                if r["service_type"] == "day_svc":
+                    day_svc["days"].add(day)
+                    day_svc["total"] += amount
+                else:
+                    walk["count"] += 1
+                    walk["total"] += amount
+            if r["service_type"] == "day_svc" and day >= d(today - timedelta(days=6)):
+                day_svc["week_days"].add(day)
+            continue
+        try:
+            dt = datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if day >= d(t90):
+            week[dt.weekday()] += 1
+        if day < d(t30):
+            continue
+        cars30.add(r["car_id"])
+        for i in mine:
+            name = str(i.get("brand") or i.get("name") or "—").strip()[:60] or "—"
+            key = name.lower()
+            t = top.setdefault(key, {"name": name, "qty": 0, "total": 0})
+            t["qty"] += i.get("qty") or 0
+            t["total"] += (i.get("total") or 0) * k
+
+    def pack(p):
+        c, pv = agg[p]["cur"], agg[p]["prev"]
+        out = {"total": int(round(c[0])), "prev": int(round(pv[0])), "pct": _pct_change(round(c[0]), round(pv[0])),
+               "visits": c[1], "avg": int(round(c[0] / c[1])) if c[1] else 0}
+        if with_profit:
+            out["profit"] = int(round(c[2]))
+            out["unpriced"] = int(round(c[3]))
+        return out
+
+    returning = sum(1 for cid in cars30 if cid in first_dir)
+    stock = None
+    if not dr == "oil":
+        prods = [p for p in list_products(shop_id) if (p.get("dir") or "") == dr]
+        if prods:
+            low = sorted((p for p in prods if p["stock_qty"] <= 3 and sold90.get(p["id"])),
+                         key=lambda p: -sold90.get(p["id"], 0))
+            idle = [p for p in prods if p["stock_qty"] > 0 and not sold90.get(p["id"])]
+            stock = {"items": len(prods), "qty": round(sum(max(0, p["stock_qty"]) for p in prods), 1),
+                     "low": [{"name": p["name"], "qty": p["stock_qty"], "sold90": round(sold90[p["id"]], 1)} for p in low[:5]],
+                     "low_count": len(low), "idle_count": len(idle)}
+            if with_profit:
+                stock["value"] = int(sum(max(0, p["stock_qty"]) * (p.get("purchase_price") or 0) for p in prods))
+                stock["idle_value"] = int(sum(p["stock_qty"] * (p.get("purchase_price") or 0) for p in idle))
+    month_total = agg["month"]["cur"][0]
+    return {
+        "dir": dr,
+        "periods": {p: pack(p) for p in periods},
+        "share_month": round(month_total / all_month * 100) if all_month else 0,
+        "daily": [{"date": d(t30 + timedelta(days=i)), "total": int(round(cur30.get(d(t30 + timedelta(days=i)), 0))),
+                   "prev": int(round(prev30.get(d(t60 + timedelta(days=i)), 0)))} for i in range(30)],
+        "sum30": int(round(sum(cur30.values()))), "sum_prev30": int(round(sum(prev30.values()))),
+        "top": [dict(t, total=int(round(t["total"])), qty=round(t["qty"], 1))
+                for t in sorted(top.values(), key=lambda x: -x["total"])[:8]],
+        "clients": {"cars": len(cars30), "returning": returning, "new": len(cars30) - returning,
+                    "oil_visits": oil_visits, "cross": cross},
+        "walkin": {"count": walk["count"], "total": int(round(walk["total"]))},
+        "day_svc": {"days": len(day_svc["days"]), "total": int(round(day_svc["total"])),
+                    "week_days": len(day_svc["week_days"])},
+        "week": week,
+        "month_no": today.month,
+        "stock": stock,
+        "with_profit": with_profit,
+    }
