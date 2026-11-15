@@ -2524,7 +2524,8 @@ def api_history(plate):
     if g.is_employee or g.is_branch:
         history = _strip_cost_price(history)
     cross_history = db.get_cross_network_history(plate, g.shop_id)
-    return jsonify({"car": car, "history": history, "cross_history": cross_history})
+    owner_cars = db.get_owner_cars(g.shop_id, plate) if car else []
+    return jsonify({"car": car, "history": history, "cross_history": cross_history, "owner_cars": owner_cars})
 
 
 @app.route("/api/passport/send_tg/<plate>", methods=["POST"])

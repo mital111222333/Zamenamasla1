@@ -1868,6 +1868,98 @@ def create_or_update_car(shop_id: int, plate_number: str, client_id: int, car_br
             return cur.lastrowid
 
 
+def _phone_tail(phone) -> str:
+    """Последние 9 цифр телефона — чтобы +998 90 123-45-67 и 901234567 были
+    одним номером. Короче 9 цифр — не ключ (пусто)."""
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    return digits[-9:] if len(digits) >= 9 else ""
+
+
+_DUE_RANK = {"over": 0, "soon": 1, "ok": 2, "none": 3}
+
+
+def _car_due_status(history, today=None) -> dict:
+    """Когда машине пора на замену — по плану последней записи: моторное масло
+    и масло коробки. over — срок вышел, soon — до 1000 км или 14 дней, ok —
+    есть запас, none — плана нет. Деньги и закупка тут не участвуют."""
+    today = today or datetime.now().date()
+    out = {"state": "none", "km_left": None, "days_left": None, "what": None}
+    if not history:
+        return out
+    last = history[0]
+    est_km = car_health(history, today).get("est_km")
+    best = None
+    for what, km_key, date_key in (("oil", "next_mileage", "next_change_date"),
+                                   ("atf", "atf_next_mileage", "atf_next_date")):
+        km_plan, date_plan = last.get(km_key), _day(last.get(date_key))
+        if not km_plan and not date_plan:
+            continue
+        km_left = (km_plan - est_km) if (km_plan and est_km is not None) else None
+        days_left = (date_plan - today).days if date_plan else None
+        if (km_left is not None and km_left < 0) or (days_left is not None and days_left < 0):
+            state = "over"
+        elif (km_left is not None and km_left <= 1000) or (days_left is not None and days_left <= 14):
+            state = "soon"
+        elif km_left is None and days_left is None:
+            continue
+        else:
+            state = "ok"
+        cand = {"state": state, "km_left": km_left, "days_left": days_left, "what": what}
+        if best is None or _DUE_RANK[state] < _DUE_RANK[best["state"]]:
+            best = cand
+    return best or out
+
+
+def get_owner_cars(shop_id: int, plate: str, limit_other: int = 10) -> list:
+    """Все машины владельца этой машины: свои на точке + машины с тем же
+    телефоном на ДРУГИХ точках OilBook. Для каждой — номер, модель, статус
+    «когда менять», последний визит. Без цен, без телефона, без закупки —
+    только то, что и так видно в общей истории машины."""
+    plate = normalize_plate(plate)
+    today = datetime.now().date()
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT c.client_id, cl.phone FROM cars c JOIN clients cl ON cl.id=c.client_id "
+            "WHERE c.shop_id=? AND c.plate_number=?", (shop_id, plate)).fetchone()
+        if not cur:
+            return []
+        rows = [(dict(r), None) for r in conn.execute(
+            "SELECT id, plate_number, car_brand, car_model FROM cars WHERE shop_id=? AND client_id=? LIMIT 30",
+            (shop_id, cur["client_id"])).fetchall()]
+        own_plates = {r["plate_number"] for r, _ in rows}
+        key = _phone_tail(cur["phone"])
+        if key:
+            norm = ("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cl.phone,'+',''),' ',''),'-',''),'(',''),')','')")
+            seen = set()
+            for r in conn.execute(
+                    "SELECT c.id, c.plate_number, c.car_brand, c.car_model, s.shop_name "
+                    "FROM clients cl JOIN cars c ON c.client_id=cl.id JOIN shops s ON s.id=cl.shop_id "
+                    f"WHERE cl.shop_id != ? AND s.is_active=1 AND {norm} LIKE ? "
+                    "ORDER BY c.id DESC LIMIT 60", (shop_id, "%" + key)).fetchall():
+                pl = r["plate_number"]
+                if pl in own_plates or pl in seen or pl == plate:
+                    continue
+                seen.add(pl)
+                rows.append((dict(r), r["shop_name"] or ""))
+                if len(seen) >= limit_other:
+                    break
+        out = []
+        for car, shop_name in rows:
+            hist = [dict(h) for h in conn.execute(
+                "SELECT * FROM oil_changes WHERE car_id=? ORDER BY change_date DESC, id DESC LIMIT 30",
+                (car["id"],)).fetchall()]
+            st = _car_due_status(hist, today)
+            out.append({
+                "plate": car["plate_number"], "brand": car.get("car_brand"), "model": car.get("car_model"),
+                "current": car["plate_number"] == plate, "shop": shop_name,
+                "state": st["state"], "what": st["what"], "km_left": st["km_left"], "days_left": st["days_left"],
+                "last_date": hist[0].get("change_date") if hist else None,
+                "last_mileage": hist[0].get("mileage") if hist else None,
+            })
+    out.sort(key=lambda c: (_DUE_RANK[c["state"]], c["km_left"] if c["km_left"] is not None else 10 ** 9))
+    return out
+
+
 def get_car_history(shop_id: int, plate_number: str):
     plate_number = normalize_plate(plate_number)
     with get_conn() as conn:

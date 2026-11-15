@@ -468,6 +468,24 @@ if ('serviceWorker' in navigator) {
   .cross-network-card .cn-entry-date { font-size:11.5px; color:var(--hint); margin-top:1px; }
   .cross-network-card .kc-lv-items { margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); }
   .cross-network-card .kc-lv-item { font-size:12px; color:var(--text); padding:1px 0; }
+  .oc-box { margin-top:12px; }
+  .oc-title { font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px; }
+  .oc-list { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#fff; }
+  .oc-row { width:100%; display:flex; align-items:center; gap:10px; padding:10px 12px; border:none; border-top:1px solid var(--border); background:#fff; text-align:left; font-family:inherit; cursor:pointer; color:var(--text); }
+  .oc-row:first-child { border-top:none; }
+  .oc-row.cur { background:#EFF6FF; cursor:default; }
+  .oc-row:not(.cur):active { background:var(--field-bg); }
+  .oc-main { flex:1; min-width:0; }
+  .oc-plate { font-size:14px; font-weight:800; }
+  .oc-plate small { font-size:11px; font-weight:700; color:var(--blue); margin-left:4px; }
+  .oc-sub { font-size:12px; color:#475569; margin:2px 0 6px; }
+  .oc-chip { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:3px 9px; font-size:12px; font-weight:700; line-height:1.2; border:1px solid; }
+  .oc-chip.over { background:#FEF2F2; color:#B3241C; border-color:#FECACA; }
+  .oc-chip.soon { background:#FEF3C7; color:#92400E; border-color:#FDE68A; }
+  .oc-chip.ok { background:#F0FDF4; color:#15803D; border-color:#BBF7D0; }
+  .oc-chip.none { background:var(--field-bg); color:#475569; border-color:var(--border); }
+  .oc-go { color:#64748B; font-size:12px; flex:none; }
+  .oc-hint { font-size:12px; color:#64748B; margin-top:8px; }
   .known-client .kc-header {
     background:linear-gradient(90deg, var(--blue), #1a6fd4); color:#fff; padding:12px 14px;
     display:flex; align-items:center; gap:8px;
@@ -10036,6 +10054,7 @@ async function lookupPlate(force) {
         <div id="kcStatus" class="kc-st"></div>
         ${notesHtml}
         ${LAST_VISIT_ITEMS.length ? `<div class="kc-quick"><button type="button" class="kc-repeat" onclick="repeatLastVisit()"><i class="fa-solid fa-rotate-right"></i> ${T.kc_repeat_short}<kbd class="af-kbd">F4</kbd></button><div id="kcPresets" class="kc-presets"></div></div>` : '<div class="kc-quick"><div id="kcPresets" class="kc-presets"></div></div>'}
+        ${renderOwnerCars(data.owner_cars)}
         <div class="kc-details" hidden>
           <div class="kc-detail-actions">
             <button type="button" class="kc-edit-data" onclick="showOwnerFields()"><i class="fa-solid fa-pen"></i> ${T.kc_edit_data}</button>
@@ -10180,6 +10199,46 @@ function renderCrossNetworkHistory(crossHistory) {
       ${entries}
     </div>
   `;
+}
+
+// «Все машины клиента»: свои и с других точек OilBook, срочные сверху.
+// Деньги и телефон других точек сюда не приходят — только номер, модель и срок.
+function renderOwnerCars(list) {
+  list = Array.isArray(list) ? list : [];
+  if (list.length < 2) return '';
+  const icons = { over: 'fa-triangle-exclamation', soon: 'fa-clock', ok: 'fa-circle-check', none: 'fa-circle-minus' };
+  const km = n => Math.abs(Math.round(n)).toLocaleString('ru-RU') + ' ' + T.km_short;
+  const label = c => {
+    if (c.state === 'over') {
+      const why = (c.km_left != null && c.km_left < 0) ? (T.kc_st_over + ' ' + km(c.km_left)) : T.kc_st_date_over;
+      return T.kc_cars_due + ': ' + why;
+    }
+    if (c.state === 'soon' || c.state === 'ok') {
+      const left = (c.km_left != null) ? (T.kc_st_left + ' ' + km(c.km_left)) : (T.kc_st_left + ' ' + c.days_left + ' ' + T.kc_cars_days);
+      return (c.state === 'soon' ? T.kc_cars_soon + ': ' : '') + left;
+    }
+    return T.kc_cars_none;
+  };
+  const rows = list.map(c => {
+    const model = [c.brand, c.model].filter(Boolean).join(' ');
+    const sub = [model, c.shop ? (T.kc_cars_other + ' «' + c.shop + '»') : ''].filter(Boolean).join(' · ');
+    return `
+      <button type="button" class="oc-row${c.current ? ' cur' : ''}" ${c.current ? 'aria-current="true"' : ''} onclick="pickOwnerCar(${escapeHtml(JSON.stringify(c.plate))})">
+        <div class="oc-main">
+          <div class="oc-plate">${escapeHtml(c.plate)}${c.current ? ' <small>' + T.kc_cars_now + '</small>' : ''}</div>
+          <div class="oc-sub">${escapeHtml(sub || '—')}</div>
+          <span class="oc-chip ${c.state}"><i class="fa-solid ${icons[c.state] || icons.none}"></i>${escapeHtml(label(c))}</span>
+        </div>
+        ${c.current ? '' : '<i class="fa-solid fa-chevron-right oc-go"></i>'}
+      </button>`;
+  }).join('');
+  return `<div class="oc-box"><div class="oc-title">${T.kc_cars_title} · ${list.length}</div><div class="oc-list">${rows}</div><div class="oc-hint">${T.kc_cars_hint}</div></div>`;
+}
+function pickOwnerCar(plate) {
+  const el = document.getElementById('plate');
+  if (!el || el.value.trim().toUpperCase() === String(plate).toUpperCase()) return;
+  el.value = plate;
+  lookupPlate(true);
 }
 
 function focusNextEntry() {
