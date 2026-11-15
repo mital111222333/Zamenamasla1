@@ -320,6 +320,7 @@ def init_db():
         _migrate_day_close(conn)
         _migrate_car_queue(conn)
         _migrate_stats_next(conn)
+        _migrate_used_oil(conn)
         _bootstrap_accounts(conn)
 
 
@@ -890,6 +891,7 @@ def normalize_plate(plate: str) -> str:
 # Направление позиции чека: у товара — от товара на складе, у услуги
 # шиномонтажа (key tire_svc) — tire.
 ITEM_DIRS = ("tire", "part")
+USED_OIL_KEY = "used_oil"   # продажа отработки (служебная запись #SALE, kind used_oil)
 
 
 def item_dir(item: dict) -> str:
@@ -897,7 +899,10 @@ def item_dir(item: dict) -> str:
     d = (item or {}).get("dir")
     if d in ITEM_DIRS:
         return d
-    return "tire" if (item or {}).get("key") == "tire_svc" else "oil"
+    key = (item or {}).get("key")
+    if key == USED_OIL_KEY:
+        return "used"
+    return "tire" if key == "tire_svc" else "oil"
 
 
 def _stamp_item_dir(item: dict, product) -> None:
@@ -2476,7 +2481,7 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
 # склад и статистика считаются сами. Из базы машин, клиентов, напоминаний и
 # сводок служебная машина исключена.
 WALKIN_PLATE = "#SALE"
-WALKIN_KINDS = ("sale", "day_svc")
+WALKIN_KINDS = ("sale", "day_svc", "used_oil")
 
 
 def get_walkin_car(shop_id: int) -> int:
@@ -3030,6 +3035,8 @@ def get_brand_breakdown(shop_id, date_from: str, date_to: str, limit: int = 10) 
         except (TypeError, ValueError):
             continue
         for item in items or []:
+            if not isinstance(item, dict) or item.get("key") == USED_OIL_KEY:
+                continue
             cat = _item_category_key(item, name_to_key)
             if cat == "other":
                 label = (item.get("name") or "").strip()
@@ -3772,9 +3779,9 @@ def get_revenue_stats(shop_id: int) -> dict:
     with get_conn() as conn:
         def agg(date_filter, param):
             row = conn.execute(f"""
-                SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt,
+                SELECT COALESCE(SUM(oc.cost), 0) as total, COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END), 0) as cnt,
                        COALESCE(SUM(oc.cash_amount), 0) as cash, COALESCE(SUM(oc.card_amount), 0) as card,
-                       SUM(CASE WHEN oc.cost > 0 THEN 1 ELSE 0 END) as paid_cnt
+                       SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt
                 FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
                 WHERE c.shop_id=? AND oc.cost IS NOT NULL AND {date_filter}
             """, (shop_id, param)).fetchone()
@@ -3862,7 +3869,8 @@ def get_day_details(shop_id: int, day: str) -> dict:
     expenses_sum = sum(e["amount"] for e in expenses)
     suppliers_sum = sum(p["amount"] for p in supplier_payments)
     totals = {
-        "revenue": sum(s["cost"] for s in services), "count": len(services),
+        "revenue": sum(s["cost"] for s in services),
+        "count": sum(1 for s in services if s["walkin"] != "used_oil"),
         "cash": cash, "card": card, "debt_out": sum(s["debt"] for s in services),
         "repaid": repaid_sum, "income": cash + card + repaid_sum,
         "expenses": expenses_sum, "suppliers": suppliers_sum, "outcome": expenses_sum + suppliers_sum,
@@ -3903,7 +3911,7 @@ def get_revenue_comparison(shop_id: int) -> dict:
         with get_conn() as conn:
             row = conn.execute("""
                 SELECT COALESCE(SUM(oc.cost), 0) as total,
-                       SUM(CASE WHEN oc.cost > 0 THEN 1 ELSE 0 END) as paid_cnt
+                       SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt
                 FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
                 WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ? AND oc.change_date <= ?
             """, (shop_id, date_from, date_to)).fetchone()
@@ -3958,9 +3966,10 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
     сторон), например для выбора дат через календарь на сайте."""
     with get_conn() as conn:
         row = conn.execute("""
-            SELECT COALESCE(SUM(oc.cost), 0) as total, COUNT(*) as cnt,
+            SELECT COALESCE(SUM(oc.cost), 0) as total,
+                   COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END), 0) as cnt,
                    COALESCE(SUM(oc.cash_amount), 0) as cash, COALESCE(SUM(oc.card_amount), 0) as card,
-                   SUM(CASE WHEN oc.cost > 0 THEN 1 ELSE 0 END) as paid_cnt
+                   SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.cost IS NOT NULL
               AND oc.change_date >= ? AND oc.change_date <= ?
@@ -3978,7 +3987,7 @@ def get_direction_range(shop_id: int, date_from: str, date_to: str) -> dict:
     направлениями пропорционально позициям. Записи без позиций — масло.
     Ещё: визиты по направлению, литры масла, услуги шиномонтажа (шт),
     проданные запчасти (шт)."""
-    out = {d: {"total": 0, "visits": 0, "qty": 0} for d in ("oil", "tire", "part")}
+    out = {d: {"total": 0, "visits": 0, "qty": 0} for d in ("oil", "tire", "part", "used")}
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT oc.cost, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
@@ -3995,7 +4004,7 @@ def get_direction_range(shop_id: int, date_from: str, date_to: str) -> dict:
             d = item_dir(it)
             sums[d] = sums.get(d, 0) + (it.get("total") or 0)
             q = it.get("qty") or 0
-            if (d == "oil" and str(it.get("key") or "").startswith("fluid_")) or d in ("tire", "part"):
+            if (d == "oil" and str(it.get("key") or "").startswith("fluid_")) or d in ("tire", "part", "used"):
                 out[d]["qty"] += q
         sub = sum(sums.values())
         if not sums or sub <= 0:
@@ -10951,3 +10960,279 @@ def dir_analytics(shop_id: int, dr: str, today=None, with_profit: bool = False) 
         "stock": stock,
         "with_profit": with_profit,
     }
+
+
+# ---------- Учёт отработки (отработанного масла) ----------
+# Собрано — считается само: при каждой замене из машины сливается примерно
+# столько, сколько залили моторного масла и масла коробки (fluid_0, fluid_1),
+# умножить на процент слива точки (по умолчанию 90%: залили 4 л — слили ~3,6 л).
+# Продано — обычные записи «без машины» (kind used_oil, позиция key used_oil:
+# литры × цена, покупатель в brand) — поэтому деньги сами попадают в кассу,
+# кассу сотрудника, «Закрыть день», выручку и прибыль (себестоимости нет).
+# Остаток в ёмкостях = собрано − продано + поправки замеров с даты начала
+# учёта (used_oil_since). Замер: владелец вписывает, сколько реально в бочках,
+# — разница сохраняется поправкой (минус — недостача).
+
+USED_OIL_PCT_DEFAULT = 90
+USED_OIL_MAX_LITERS = 100000
+USED_OIL_MAX_PRICE = 1_000_000
+
+
+def _migrate_used_oil(conn):
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    if "used_oil_pct" not in cols:
+        conn.execute("ALTER TABLE shops ADD COLUMN used_oil_pct INTEGER")
+    if "used_oil_since" not in cols:
+        conn.execute("ALTER TABLE shops ADD COLUMN used_oil_since TEXT")
+        # у всех точек учёт начинается с дня появления функции — с нуля
+        conn.execute("UPDATE shops SET used_oil_since=?", (_today().strftime("%Y-%m-%d"),))
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS used_oil_checks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        measured REAL NOT NULL,
+        expected REAL NOT NULL,
+        delta REAL NOT NULL,
+        note TEXT,
+        by_name TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_used_oil_checks_shop ON used_oil_checks(shop_id, day)")
+    conn.commit()
+
+
+def _uo_settings(conn, shop_id: int) -> tuple:
+    r = conn.execute("SELECT used_oil_pct, used_oil_since FROM shops WHERE id=?", (shop_id,)).fetchone()
+    pct = (r["used_oil_pct"] if r else None) or USED_OIL_PCT_DEFAULT
+    since = r["used_oil_since"] if r else None
+    if not since:
+        since = _today().strftime("%Y-%m-%d")
+        conn.execute("UPDATE shops SET used_oil_since=? WHERE id=? AND used_oil_since IS NULL", (since, shop_id))
+        conn.commit()
+    return int(pct), since
+
+
+def _uo_collected(conn, shop_id: int, d_from: str, d_to: str, pct: int) -> dict:
+    """{день: {"liters": слито, "cars": машин с маслом}} — по заменам точки."""
+    rows = conn.execute("""
+        SELECT oc.change_date AS d, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+        WHERE c.shop_id=? AND c.plate_number <> ? AND oc.change_date >= ? AND oc.change_date <= ?
+          AND oc.items_json LIKE '%fluid_%'
+    """, (shop_id, WALKIN_PLATE, d_from, d_to)).fetchall()
+    out = {}
+    for r in rows:
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            continue
+        q = 0.0
+        for i in items:
+            if i.get("key") in ("fluid_0", "fluid_1"):
+                try:
+                    q += max(0.0, float(i.get("qty") or 0))
+                except (TypeError, ValueError):
+                    pass
+        if q <= 0:
+            continue
+        e = out.setdefault(r["d"], {"liters": 0.0, "cars": 0})
+        e["liters"] += q * pct / 100
+        e["cars"] += 1
+    return out
+
+
+def _uo_sales(conn, shop_id: int, d_from: str, d_to: str) -> list:
+    rows = conn.execute("""
+        SELECT oc.id, oc.change_date AS d, oc.created_at, oc.cost, oc.employee_id, oc.items_json
+        FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+        WHERE c.shop_id=? AND c.plate_number=? AND oc.service_type='used_oil'
+          AND oc.change_date >= ? AND oc.change_date <= ?
+        ORDER BY oc.change_date, oc.id
+    """, (shop_id, WALKIN_PLATE, d_from, d_to)).fetchall()
+    out = []
+    for r in rows:
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            items = []
+        it = next((i for i in items if i.get("key") == USED_OIL_KEY), {})
+        out.append({"id": r["id"], "day": r["d"], "time": str(r["created_at"] or "")[11:16],
+                    "liters": float(it.get("qty") or 0), "price": int(it.get("unit_price") or 0),
+                    "total": int(r["cost"] or 0), "buyer": it.get("brand") or "",
+                    "employee_id": r["employee_id"]})
+    return out
+
+
+def _uo_balance(conn, shop_id: int, pct: int, since: str, today: str) -> float:
+    col = sum(v["liters"] for v in _uo_collected(conn, shop_id, since, today, pct).values())
+    sold = sum(x["liters"] for x in _uo_sales(conn, shop_id, since, today))
+    adj = conn.execute("SELECT COALESCE(SUM(delta), 0) FROM used_oil_checks WHERE shop_id=? AND day>=?",
+                       (shop_id, since)).fetchone()[0] or 0
+    return col - sold + adj
+
+
+def add_used_oil_sale(shop_id: int, liters, price, buyer: str = "", employee_id=None) -> dict:
+    """Продажа отработки: литры × цена за литр, всегда наличными."""
+    try:
+        liters = round(float(liters), 2)
+        price = int(round(float(price)))
+    except (TypeError, ValueError):
+        return {"error": "amount"}
+    if not (0 < liters <= USED_OIL_MAX_LITERS) or not (0 < price <= USED_OIL_MAX_PRICE):
+        return {"error": "amount"}
+    import i18n
+    buyer = " ".join(str(buyer or "").split())[:80]
+    shop = get_shop(shop_id) or {}
+    lang = shop.get("language") if shop.get("language") in i18n.TEXTS else "ru"
+    total = int(round(liters * price))
+    item = {"key": USED_OIL_KEY, "name": i18n.TEXTS[lang].get("uo_item") or "Отработка",
+            "qty": liters, "unit": "л", "unit_price": price, "total": total}
+    if buyer:
+        item["brand"] = buyer
+    oc_id = add_walkin(shop_id, "used_oil", [item], cash_amount=total, card_amount=0, employee_id=employee_id)
+    return {"ok": True, "id": oc_id, "total": total}
+
+
+@_serialized
+def add_used_oil_check(shop_id: int, measured, note: str = None, by_name: str = None) -> dict:
+    """Замер: сколько реально в ёмкостях. Разница с расчётом — поправка."""
+    try:
+        measured = round(float(measured), 1)
+    except (TypeError, ValueError):
+        return {"error": "amount"}
+    if not (0 <= measured <= USED_OIL_MAX_LITERS):
+        return {"error": "amount"}
+    today = _today().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        pct, since = _uo_settings(conn, shop_id)
+        expected = round(_uo_balance(conn, shop_id, pct, since, today), 1)
+        delta = round(measured - expected, 1)
+        conn.execute("""INSERT INTO used_oil_checks (shop_id, day, measured, expected, delta, note, by_name, created_at)
+                        VALUES (?,?,?,?,?,?,?,?)""",
+                     (shop_id, today, measured, expected, delta, (note or "").strip()[:200] or None,
+                      (by_name or "")[:80] or None, _now_str()))
+        conn.commit()
+    return {"ok": True, "measured": measured, "expected": expected, "delta": delta}
+
+
+@_serialized
+def delete_used_oil_check(shop_id: int, check_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM used_oil_checks WHERE id=? AND shop_id=?", (check_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+@_serialized
+def set_used_oil_pct(shop_id: int, pct) -> bool:
+    try:
+        pct = int(pct)
+    except (TypeError, ValueError):
+        return False
+    if not 50 <= pct <= 100:
+        return False
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET used_oil_pct=? WHERE id=?", (pct, shop_id))
+        conn.commit()
+    return True
+
+
+def used_oil_day(shop_id: int, day: str) -> dict:
+    """Для «Закрыть день»: сколько слито и продано за день."""
+    with get_conn() as conn:
+        pct, _ = _uo_settings(conn, shop_id)
+        col = _uo_collected(conn, shop_id, day, day, pct).get(day, {"liters": 0, "cars": 0})
+        sales = _uo_sales(conn, shop_id, day, day)
+    return {"collected": round(col["liters"], 1), "cars": col["cars"],
+            "sold": round(sum(x["liters"] for x in sales), 1), "sum": sum(x["total"] for x in sales),
+            "count": len(sales)}
+
+
+def used_oil_overview(shop_id: int, full: bool = True, employee_id=None, today=None) -> dict:
+    """Экран «Отработка». full=False — для сотрудника: остаток, сегодня,
+    подсказки цены и только свои продажи за сегодня (без истории и итогов)."""
+    today = today or _today()
+    d = lambda x: x.strftime("%Y-%m-%d")
+    t = d(today)
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    prev_month_end = month_start - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+    year_start = today.replace(month=1, day=1)
+    with get_conn() as conn:
+        pct, since = _uo_settings(conn, shop_id)
+        balance = _uo_balance(conn, shop_id, pct, since, t)
+        far = min(d(year_start), d(prev_month_start), d(today - timedelta(days=13)))
+        col = _uo_collected(conn, shop_id, far, t, pct)
+        sales = _uo_sales(conn, shop_id, "2000-01-01", t)
+        checks = [dict(r) for r in conn.execute(
+            "SELECT id, day, measured, expected, delta, note, by_name, created_at FROM used_oil_checks "
+            "WHERE shop_id=? ORDER BY id DESC LIMIT 30", (shop_id,)).fetchall()]
+    today_col = col.get(t, {"liters": 0, "cars": 0})
+    today_sales = [x for x in sales if x["day"] == t]
+    # подсказка цены: последняя цена у каждого покупателя и у разовых
+    buyers, walk_price = {}, None
+    for x in sales:
+        if x["buyer"]:
+            k = x["buyer"].upper()
+            b = buyers.setdefault(k, {"name": x["buyer"], "liters": 0.0, "count": 0})
+            b.update({"name": x["buyer"], "last_price": x["price"], "last_day": x["day"]})
+            b["liters"] += x["liters"]
+            b["count"] += 1
+        else:
+            walk_price = x["price"]
+    buyer_list = sorted(buyers.values(), key=lambda b: b["last_day"], reverse=True)[:12]
+    for b in buyer_list:
+        b["liters"] = round(b["liters"], 1)
+    out = {
+        "pct": pct, "since": since, "today_date": t,
+        "balance": round(max(0.0, balance), 1), "balance_raw": round(balance, 1),
+        "today": {"collected": round(today_col["liters"], 1), "cars": today_col["cars"],
+                  "sold": round(sum(x["liters"] for x in today_sales), 1),
+                  "sum": sum(x["total"] for x in today_sales)},
+        "walk_price": walk_price, "buyers": buyer_list,
+    }
+    if not full:
+        mine = [x for x in today_sales if employee_id and x["employee_id"] == employee_id]
+        out["today"]["sum"] = None
+        out["my_sales"] = [{k: x[k] for k in ("id", "time", "liters", "price", "total", "buyer")} for x in mine]
+        return out
+
+    def per(a, b):
+        ss = [x for x in sales if a <= x["day"] <= b]
+        cc = [v for k, v in col.items() if a <= k <= b]
+        sold = sum(x["liters"] for x in ss)
+        return {"sold": round(sold, 1), "sum": sum(x["total"] for x in ss), "count": len(ss),
+                "collected": round(sum(v["liters"] for v in cc), 1), "cars": sum(v["cars"] for v in cc),
+                "avg_price": int(round(sum(x["total"] for x in ss) / sold)) if sold else None}
+    month = per(d(month_start), t)
+    month["per_car"] = round(month["collected"] / month["cars"], 1) if month["cars"] else None
+    month["shortage"] = round(-sum(c["delta"] for c in checks if c["day"] >= d(month_start) and c["delta"] < 0), 1)
+    prev_same = min(prev_month_end, prev_month_start + timedelta(days=today.day - 1))
+    out.update({
+        "periods": {"today": per(t, t), "week": per(d(week_start), t), "month": month,
+                    "year": per(d(year_start), t),
+                    "prev_month_same": per(d(prev_month_start), d(prev_same))},
+        "daily": [{"day": d(today - timedelta(days=13 - i)),
+                   "collected": round(col.get(d(today - timedelta(days=13 - i)), {}).get("liters", 0), 1),
+                   "sold": round(sum(x["liters"] for x in sales if x["day"] == d(today - timedelta(days=13 - i))), 1)}
+                  for i in range(14)],
+        "history": [dict(x, kind="sale") for x in reversed(sales[-40:])],
+        "checks": checks,
+    })
+    return out
+
+
+def used_oil_network(head_id: int) -> list:
+    """Для главной точки: отработка каждого филиала (остаток, месяц)."""
+    out = []
+    for b in [get_shop(head_id) or {}] + list(get_branches(head_id) or []):
+        if not b or not b.get("id"):
+            continue
+        o = used_oil_overview(b["id"])
+        m = o["periods"]["month"]
+        out.append({"id": b["id"], "name": b.get("shop_name") or b.get("username"), "head": b["id"] == head_id,
+                    "balance": o["balance"], "today_collected": o["today"]["collected"],
+                    "month_collected": m["collected"], "month_sold": m["sold"], "month_sum": m["sum"]})
+    return out

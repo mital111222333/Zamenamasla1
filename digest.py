@@ -24,6 +24,8 @@ TEXT = {
         "dc_exp_cash": "Расходы из кассы: {sum} сум",
         "dc_exp_other": "Расходы (не из кассы): {sum} сум",
         "dc_sup_cash": "Поставщикам из кассы: {sum} сум",
+        "dc_uo": "🛢 Отработка: слито ≈{col} л · продано {sold} л",
+        "dc_uo_sum": " · {sum} сум",
         "dc_profit": "Прибыль: {sum} сум",
         "dc_expected": "💵 Должно быть в кассе: {sum} сум",
         "dc_counted": "Посчитали в кассе: {sum} сум",
@@ -115,6 +117,8 @@ TEXT = {
         "dc_exp_cash": "Kassadan xarajat: {sum} so'm",
         "dc_exp_other": "Xarajat (kassadan emas): {sum} so'm",
         "dc_sup_cash": "Kassadan yetkazib beruvchilarga: {sum} so'm",
+        "dc_uo": "🛢 Otrabotka: to'kildi ≈{col} l · sotildi {sold} l",
+        "dc_uo_sum": " · {sum} so'm",
         "dc_profit": "Foyda: {sum} so'm",
         "dc_expected": "💵 Kassada bo'lishi kerak: {sum} so'm",
         "dc_counted": "Kassada sanaldi: {sum} so'm",
@@ -431,6 +435,16 @@ def render_day_close(shop: dict, c: dict, lang: str, profit=None, branch_name: s
         lines.append(T["dc_exp_cash" if c["expenses_from_cash"] else "dc_exp_other"].format(sum=money(c["expenses"])))
     if c["suppliers"] and c["suppliers_from_cash"]:
         lines.append(T["dc_sup_cash"].format(sum=money(c["suppliers"])))
+    uo = c.get("used_oil")
+    if uo is None and shop.get("id"):
+        try:
+            uo = db.used_oil_day(shop["id"], c["day"])
+        except Exception:
+            uo = None
+    if uo and (uo.get("collected") or uo.get("sold")):
+        lit = lambda v: f"{v:g}".replace(".", ",")
+        lines.append(T["dc_uo"].format(col=lit(uo["collected"]), sold=lit(uo["sold"]))
+                     + (T["dc_uo_sum"].format(sum=money(uo["sum"])) if uo.get("sum") else ""))
     if profit is not None and profit > 0:
         lines.append(T["dc_profit"].format(sum=money(profit)))
     lines.append("")
