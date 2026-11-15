@@ -4082,3 +4082,25 @@ UZ.update({
     "pr_sets_empty": "Bu model uchun hali to'plam yo'q. Bir xil almashtirish ikki marta takrorlansa, o'zi paydo bo'ladi.",
     "pr_times": "qo'yilgan:", "pr_no_labor": "ish haqisiz",
 })
+
+# --- Все машины клиента (список в карточке) ---
+RU.update({
+    "kc_cars_title": "Все машины клиента",
+    "kc_cars_hint": "Нажмите на машину — её номер подставится в форму замены",
+    "kc_cars_now": "сейчас",
+    "kc_cars_other": "другая точка",
+    "kc_cars_due": "Пора менять",
+    "kc_cars_soon": "Скоро",
+    "kc_cars_none": "План замены не указан",
+    "kc_cars_days": "дн.",
+})
+UZ.update({
+    "kc_cars_title": "Mijozning barcha mashinalari",
+    "kc_cars_hint": "Mashinani bosing — raqami almashtirish formasiga qo'yiladi",
+    "kc_cars_now": "hozir",
+    "kc_cars_other": "boshqa nuqta",
+    "kc_cars_due": "Almashtirish vaqti",
+    "kc_cars_soon": "Tez orada",
+    "kc_cars_none": "Almashtirish rejasi yo'q",
+    "kc_cars_days": "kun",
+})
