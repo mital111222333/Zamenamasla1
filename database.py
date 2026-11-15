@@ -321,6 +321,11 @@ def init_db():
         _migrate_car_queue(conn)
         _migrate_stats_next(conn)
         _migrate_used_oil(conn)
+        _oc_cols = {r[1] for r in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
+        if "offline_saved" not in _oc_cols:
+            # 1 — замену внесли без интернета, на сервер она пришла позже
+            conn.execute("ALTER TABLE oil_changes ADD COLUMN offline_saved INTEGER")
+            conn.commit()
         _bootstrap_accounts(conn)
 
 
@@ -865,7 +870,9 @@ def save_add_token_result(shop_id, token, result):
         conn.execute("INSERT OR REPLACE INTO add_request_tokens (shop_id, token, result, created_at) "
                      "VALUES (?, ?, ?, datetime('now'))",
                      (shop_id, str(token)[:64], json.dumps(result, ensure_ascii=False)))
-        conn.execute("DELETE FROM add_request_tokens WHERE created_at < datetime('now', '-3 days')")
+        # 30 дней: замена, внесённая без интернета, может уйти на сервер через
+        # несколько дней — повтор с тем же номером всё равно не создаст дубль
+        conn.execute("DELETE FROM add_request_tokens WHERE created_at < datetime('now', '-30 days')")
         conn.commit()
 
 
@@ -11236,3 +11243,51 @@ def used_oil_network(head_id: int) -> list:
                     "balance": o["balance"], "today_collected": o["today"]["collected"],
                     "month_collected": m["collected"], "month_sold": m["sold"], "month_sum": m["sum"]})
     return out
+
+
+
+# ---------- Замены, внесённые без интернета ----------
+OFFLINE_MAX_DAYS = 7
+
+
+def parse_offline_at(raw, now=None):
+    """Время, когда замену внесли на телефоне без интернета ("YYYY-MM-DD HH:MM:SS").
+    Не старше недели и не из будущего (часы телефона могут врать) — иначе None."""
+    if not raw:
+        return None
+    try:
+        t = datetime.strptime(str(raw).strip()[:19].replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    now = now or datetime.now()
+    if t > now + timedelta(minutes=10) or t < now - timedelta(days=OFFLINE_MAX_DAYS):
+        return None
+    return min(t, now)
+
+
+@_serialized
+def apply_offline_time(oc_id: int, shop_id: int, when: datetime) -> None:
+    """Запись создана при отправке — ставим ей дату и время, когда её внесли
+    на самом деле, и сдвигаем даты напоминаний на столько же дней."""
+    rec = get_oil_change_for_shop(oc_id, shop_id)
+    if not rec:
+        return
+    day = when.strftime("%Y-%m-%d")
+    try:
+        delta = (when.date() - datetime.strptime(str(rec["change_date"])[:10], "%Y-%m-%d").date()).days
+    except (TypeError, ValueError):
+        delta = 0
+
+    def shift(v):
+        if not v or not delta:
+            return v
+        try:
+            return (datetime.strptime(str(v)[:10], "%Y-%m-%d") + timedelta(days=delta)).strftime("%Y-%m-%d")
+        except ValueError:
+            return v
+    with get_conn() as conn:
+        conn.execute("""UPDATE oil_changes SET change_date=?, created_at=?, next_change_date=?, atf_next_date=?,
+                        offline_saved=1 WHERE id=?""",
+                     (day, when.strftime("%Y-%m-%d %H:%M:%S"), shift(rec.get("next_change_date")),
+                      shift(rec.get("atf_next_date")), oc_id))
+        conn.commit()
