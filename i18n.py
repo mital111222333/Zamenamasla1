@@ -4033,3 +4033,52 @@ UZ.update({
 
 RU.update({"bot_booked_notify": "📅 Клиент записался на замену масла!\n\nАвто: {plate}\nВладелец: {owner}"})
 UZ.update({"bot_booked_notify": "📅 Mijoz moy almashtirishga yozildi!\n\nAvto: {plate}\nEgasi: {owner}"})
+
+
+# --- Раздел «Цена»: быстро назвать клиенту цену товара и всей замены ---
+RU.update({
+    "tab_price": "Цена",
+    "pr_hint": "Найдите товар и назовите клиенту цену. Закупочных цен здесь нет.",
+    "pr_mode_item": "По товару", "pr_mode_car": "По машине",
+    "pr_search_ph": "Название: 5w30, фильтр…",
+    "pr_cat_all": "Все", "pr_cat_oil": "Масло", "pr_cat_fluids": "Жидкости", "pr_cat_filters": "Фильтры",
+    "pr_per_l": "за литр", "pr_per_pc": "за штуку",
+    "pr_stock": "остаток", "pr_out": "нет в наличии", "pr_no_price": "цена не указана",
+    "pr_none": "Ничего не найдено. Проверьте название или выберите «Все».",
+    "pr_empty": "Здесь появятся ваши товары с ценами: добавьте их на склад или внесите первые замены.",
+    "pr_more": "Показаны первые 60 — уточните название.",
+    "pr_back": "К списку",
+    "pr_qty_l": "Сколько литров", "pr_qty_pc": "Сколько штук", "pr_other": "другое",
+    "pr_full": "Замена целиком", "pr_filter_none": "без фильтра", "pr_labor": "Работа",
+    "pr_total": "Итого клиенту",
+    "pr_to_entry": "Внести замену", "pr_to_entry_hint": "Откроется форма замены с этими позициями.",
+    "pr_filled": "Позиции перенесены. Введите номер и пробег.",
+    "pr_model_ph": "Модель машины, например Cobalt",
+    "pr_sets_pick": "Выберите модель — покажем, что вы чаще всего ставите на неё и сколько это стоит.",
+    "pr_sets_hint": "Наборы, которые вы чаще всего ставили на эту модель за год. Цены — сегодняшние.",
+    "pr_sets_empty": "Для этой модели наборов пока нет. Они появятся сами, когда одинаковая замена повторится два раза.",
+    "pr_times": "ставили:", "pr_no_labor": "без работы",
+})
+UZ.update({
+    "tab_price": "Narx",
+    "pr_hint": "Tovarni toping va mijozga narxini ayting. Bu yerda kirim narxlari yo'q.",
+    "pr_mode_item": "Tovar bo'yicha", "pr_mode_car": "Mashina bo'yicha",
+    "pr_search_ph": "Nomi: 5w30, filtr…",
+    "pr_cat_all": "Hammasi", "pr_cat_oil": "Moy", "pr_cat_fluids": "Suyuqliklar", "pr_cat_filters": "Filtrlar",
+    "pr_per_l": "1 litr", "pr_per_pc": "1 dona",
+    "pr_stock": "qoldiq", "pr_out": "tugagan", "pr_no_price": "narx ko'rsatilmagan",
+    "pr_none": "Hech narsa topilmadi. Nomini tekshiring yoki «Hammasi»ni tanlang.",
+    "pr_empty": "Bu yerda tovarlaringiz narxi bilan chiqadi: ularni omborga qo'shing yoki birinchi almashtirishlarni kiriting.",
+    "pr_more": "Birinchi 60 tasi ko'rsatildi — nomini aniqroq yozing.",
+    "pr_back": "Ro'yxatga",
+    "pr_qty_l": "Necha litr", "pr_qty_pc": "Nechta", "pr_other": "boshqa",
+    "pr_full": "To'liq almashtirish", "pr_filter_none": "filtrsiz", "pr_labor": "Ish haqi",
+    "pr_total": "Mijozga jami",
+    "pr_to_entry": "Almashtirishni kiritish", "pr_to_entry_hint": "Almashtirish formasi shu pozitsiyalar bilan ochiladi.",
+    "pr_filled": "Pozitsiyalar ko'chirildi. Raqam va probegni kiriting.",
+    "pr_model_ph": "Mashina modeli, masalan Cobalt",
+    "pr_sets_pick": "Modelni tanlang — unga ko'pincha nima qo'yishingiz va narxi chiqadi.",
+    "pr_sets_hint": "Bir yil ichida shu modelga eng ko'p qo'ygan to'plamlaringiz. Narxlar — bugungi.",
+    "pr_sets_empty": "Bu model uchun hali to'plam yo'q. Bir xil almashtirish ikki marta takrorlansa, o'zi paydo bo'ladi.",
+    "pr_times": "qo'yilgan:", "pr_no_labor": "ish haqisiz",
+})
