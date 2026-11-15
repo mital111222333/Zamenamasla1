@@ -93,3 +93,65 @@ def test_old_visit_without_atf_keeps_old_behaviour():
     db.add_oil_change(car, 90000, "", "", False, 0, 3, items=[OIL])
     r = _last(car)
     assert r["atf_next_date"] is None and r["next_change_date"]
+
+
+def _ago(days):
+    return (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+
+def _due_ids():
+    return {x["id"] for x in db.get_due_reminders()}
+
+
+def test_booked_but_not_came_gets_reminded_again():
+    """«Записался», но не приехал — через 14 дней напоминаем снова (раньше — молчание навсегда)."""
+    car = _car("01R006AA")
+    db.add_oil_change(car, 60000, "", "", False, 0, 3, items=[OIL])
+    r = _last(car)
+    _set(r["id"], next_change_date=_ago(20), reminder_count=1, last_reminder_date=_ago(15))
+    db.mark_booked(r["id"])
+    assert r["id"] in _due_ids()
+
+
+def test_changed_elsewhere_moves_date_forward():
+    """«Уже поменял» — следующее напоминание через тот же интервал, а не никогда."""
+    car = _car("01R007AA")
+    db.add_oil_change(car, 60000, "", "", False, 0, 3, items=[OIL])
+    r = _last(car)
+    _set(r["id"], next_change_date=_ago(1), reminder_count=1, last_reminder_date=_ago(1))
+    db.mark_already_changed_elsewhere(r["id"])
+    after = _last(car)
+    assert after["status"] == "active" and after["reminder_count"] == 0
+    assert after["next_change_date"] >= (datetime.now() + timedelta(days=88)).strftime("%Y-%m-%d")
+    assert r["id"] not in _due_ids()
+
+
+def test_followup_waits_for_new_date_after_edit():
+    """Мастер перенёс срок вперёд — повтор не приходит раньше нового срока."""
+    car = _car("01R008AA")
+    db.add_oil_change(car, 60000, "", "", False, 0, 3, items=[OIL])
+    r = _last(car)
+    _set(r["id"], reminder_count=6, last_reminder_date=_ago(30))
+    with sqlite3.connect(db.DB_PATH) as c:
+        sid = c.execute("SELECT shop_id FROM cars WHERE id=?", (car,)).fetchone()[0]
+    db.update_oil_change(r["id"], sid, interval_value=1, interval_unit="days")
+    after = _last(car)
+    assert after["reminder_count"] == 0 and r["id"] not in _due_ids()
+
+
+def test_debt_reminder_first_on_due_day_then_every_3_days():
+    car = _car("01R009AA")
+    with sqlite3.connect(db.DB_PATH) as c:
+        sid = c.execute("SELECT shop_id FROM cars WHERE id=?", (car,)).fetchone()[0]
+    plan = db.create_installment_plan(sid, car, 100000, 50000, 7)
+    with sqlite3.connect(db.DB_PATH) as c:
+        c.execute("UPDATE installment_plans SET next_due_date=? WHERE id=?", (_ago(0), plan["id"]))
+        c.commit()
+    ids = lambda: {p["id"] for p in db.get_due_installment_reminders()}
+    assert plan["id"] in ids()
+    db.mark_installment_reminded(plan["id"])
+    assert plan["id"] not in ids()                       # сегодня уже напомнили
+    with sqlite3.connect(db.DB_PATH) as c:
+        c.execute("UPDATE installment_plans SET last_reminder_date=? WHERE id=?", (_ago(3), plan["id"]))
+        c.commit()
+    assert plan["id"] in ids()                           # прошло 3 дня — снова

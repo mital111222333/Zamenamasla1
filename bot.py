@@ -706,99 +706,117 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE):
     sms_creds = {}  # пароль Eskiz хранится зашифрованным — расшифровываем один раз на точку
     for item in due:
         await asyncio.sleep(0.05)  # не упираться в лимиты Telegram
-        due_oil, due_atf = item.get("due_oil", True), item.get("due_atf", False)
-        # о чём напоминаем: моторное масло, масло АКПП или оба — одним сообщением
-        kinds = ("o" if due_oil else "") + ("a" if due_atf else "")
-        is_followup = (item["reminder_count"] > 0) if due_oil else ((item.get("atf_reminder_count") or 0) > 0)
-        lang = item.get("language") or "ru"
-        shop_name = item.get('shop_name') or SHOP_NAME
-        what = i18n.t({"o": "rem_what_oil", "a": "rem_what_atf", "oa": "rem_what_both"}[kinds], lang)
+        try:
+            await _send_one_reminder(context, item, sms_creds)
+        except Exception as e:
+            # одна «кривая» запись не должна останавливать напоминания всем остальным
+            logger.exception(f"Ошибка напоминания {item.get('id')}: {e}")
 
-        def mark(item=item, due_oil=due_oil, due_atf=due_atf):
-            db.mark_reminder_sent(item["id"], oil=due_oil, atf=due_atf)
 
-        if item.get("telegram_id"):
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}:{kinds}"),
-                    InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}:{kinds}"),
-                ]
-            ])
-            if kinds != "o":
-                key = "bot_reminder_any_followup" if is_followup else "bot_reminder_any_first"
-                text = i18n.t(key, lang, plate=item['plate_number'], what=what, shop=shop_name)
-            elif is_followup:
-                text = i18n.t("bot_reminder_followup", lang, plate=item['plate_number'], shop=shop_name)
-            else:
-                service = item.get('service_type') or i18n.t("history_service_fallback", lang)
-                text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
-            try:
-                await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
-                mark()
-            except Forbidden:
-                # клиент остановил бота — отмечаем, иначе попытка повторялась каждый час
-                mark()
-            except Exception as e:
-                logger.error(f"Не удалось отправить напоминание {item['id']}: {e}")
+async def _send_one_reminder(context, item, sms_creds):
+    due_oil, due_atf = item.get("due_oil", True), item.get("due_atf", False)
+    # о чём напоминаем: моторное масло, масло АКПП или оба — одним сообщением
+    kinds = ("o" if due_oil else "") + ("a" if due_atf else "")
+    is_followup = (item["reminder_count"] > 0) if due_oil else ((item.get("atf_reminder_count") or 0) > 0)
+    lang = item.get("language") or "ru"
+    shop_name = item.get('shop_name') or SHOP_NAME
+    what = i18n.t({"o": "rem_what_oil", "a": "rem_what_atf", "oa": "rem_what_both"}[kinds], lang)
 
-        elif item.get("sms_enabled") and item.get("owner_phone"):
-            if kinds != "o":
-                text = i18n.t("sms_reminder_any", lang, plate=item['plate_number'], what=what, shop=shop_name)
-            else:
-                key = "sms_reminder_followup" if is_followup else "sms_reminder_first"
-                text = i18n.t(key, lang, plate=item['plate_number'], shop=shop_name)
-            if item["shop_id"] not in sms_creds:
-                sms_creds[item["shop_id"]] = db.get_shop_eskiz_credentials(item["shop_id"])
-            eskiz_email, eskiz_password = sms_creds[item["shop_id"]]
-            # отправка SMS — обычный сетевой запрос; в отдельном потоке, чтобы бот
-            # в это время продолжал отвечать клиентам
-            ok, err = await asyncio.to_thread(
-                sms.send_sms, item["shop_id"], eskiz_email, eskiz_password, item["owner_phone"], text
-            )
-            if ok:
-                mark()
-            else:
-                logger.warning(f"Не удалось отправить SMS-напоминание {item['id']}: {err}")
-        # иначе — ни Telegram, ни SMS недоступны для этого клиента, пропускаем
-        # (не отмечаем как отправленное — вдруг клиент привяжет Telegram позже)
+    def mark(item=item, due_oil=due_oil, due_atf=due_atf):
+        db.mark_reminder_sent(item["id"], oil=due_oil, atf=due_atf)
+
+    if item.get("telegram_id"):
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(i18n.t("btn_changed", lang), callback_data=f"changed:{item['id']}:{kinds}"),
+                InlineKeyboardButton(i18n.t("btn_book", lang), callback_data=f"book:{item['id']}:{kinds}"),
+            ]
+        ])
+        if kinds != "o":
+            key = "bot_reminder_any_followup" if is_followup else "bot_reminder_any_first"
+            text = i18n.t(key, lang, plate=item['plate_number'], what=what, shop=shop_name)
+        elif is_followup:
+            text = i18n.t("bot_reminder_followup", lang, plate=item['plate_number'], shop=shop_name)
+        else:
+            service = item.get('service_type') or i18n.t("history_service_fallback", lang)
+            text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
+        try:
+            await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
+            mark()
+        except Forbidden:
+            # клиент остановил бота — отмечаем, иначе попытка повторялась каждый час
+            mark()
+        except Exception as e:
+            logger.error(f"Не удалось отправить напоминание {item['id']}: {e}")
+
+    elif item.get("sms_enabled") and item.get("owner_phone"):
+        if kinds != "o":
+            text = i18n.t("sms_reminder_any", lang, plate=item['plate_number'], what=what, shop=shop_name)
+        else:
+            key = "sms_reminder_followup" if is_followup else "sms_reminder_first"
+            text = i18n.t(key, lang, plate=item['plate_number'], shop=shop_name)
+        if item["shop_id"] not in sms_creds:
+            sms_creds[item["shop_id"]] = db.get_shop_eskiz_credentials(item["shop_id"])
+        eskiz_email, eskiz_password = sms_creds[item["shop_id"]]
+        # отправка SMS — обычный сетевой запрос; в отдельном потоке, чтобы бот
+        # в это время продолжал отвечать клиентам
+        ok, err = await asyncio.to_thread(
+            sms.send_sms, item["shop_id"], eskiz_email, eskiz_password, item["owner_phone"], text
+        )
+        if ok:
+            mark()
+        else:
+            logger.warning(f"Не удалось отправить SMS-напоминание {item['id']}: {err}")
+    # иначе — ни Telegram, ни SMS недоступны для этого клиента, пропускаем
+    # (не отмечаем как отправленное — вдруг клиент привяжет Telegram позже)
 
 
 async def check_and_send_installment_reminders(context: ContextTypes.DEFAULT_TYPE):
-    """Напоминания о платежах по рассрочке — клиенту, если он привязан к
-    боту, иначе владельцу точки (в его уведомления), чтобы напомнил сам."""
+    """Напоминания о платежах по рассрочке: клиенту (если привязан к боту)
+    И владельцу/мастеру точки — в день платежа, потом раз в 3 дня, пока не
+    оплатят. Если клиент не получил (не привязан или остановил бота) —
+    мастеру пишем «напомните сами»."""
     if not _daytime():
         return
-    due = db.get_due_installment_reminders()
+    due = await asyncio.to_thread(db.get_due_installment_reminders)
+    fmt = lambda n: f"{int(n or 0):,}".replace(",", " ")
     for plan in due:
         await asyncio.sleep(0.05)
-        lang = plan.get("language") or "ru"
-        shop_name = plan.get("shop_name") or SHOP_NAME
-        amount = plan["installment_amount"]
-        remaining = plan["remaining"]
-        sent = False
+        try:
+            lang = plan.get("language") or "ru"
+            shop_name = plan.get("shop_name") or SHOP_NAME
+            remaining = plan["remaining"]
+            # последний платёж бывает меньше обычного — не просим больше остатка
+            amount = min(plan["installment_amount"] or remaining, remaining)
+            client_ok = False
+            owner_ok = False
 
-        if plan.get("telegram_id"):
-            text = i18n.t("debt_reminder_client", lang, plate=plan["plate_number"], shop=shop_name,
-                           amount=f"{amount:,}".replace(",", " "), remaining=f"{remaining:,}".replace(",", " "))
-            try:
-                await context.bot.send_message(chat_id=plan["telegram_id"], text=text)
-                sent = True
-            except Exception as e:
-                logger.error(f"Не удалось отправить напоминание о рассрочке {plan['id']} клиенту: {e}")
+            if plan.get("telegram_id"):
+                text = i18n.t("debt_reminder_client", lang, plate=plan["plate_number"], shop=shop_name,
+                              amount=fmt(amount), remaining=fmt(remaining))
+                try:
+                    await context.bot.send_message(chat_id=plan["telegram_id"], text=text)
+                    client_ok = True
+                except Exception as e:
+                    logger.warning(f"Напоминание о рассрочке {plan['id']} клиенту не дошло: {e}")
 
-        if not sent and plan.get("notify_telegram_id"):
-            text = i18n.t("debt_reminder_owner", lang, plate=plan["plate_number"],
-                           amount=f"{amount:,}".replace(",", " "), remaining=f"{remaining:,}".replace(",", " "))
-            try:
-                await context.bot.send_message(chat_id=plan["notify_telegram_id"], text=text)
-                sent = True
-            except Exception as e:
-                logger.error(f"Не удалось отправить напоминание о рассрочке {plan['id']} владельцу: {e}")
+            if plan.get("notify_telegram_id"):
+                key = "debt_reminder_owner_sent" if client_ok else "debt_reminder_owner"
+                text = i18n.t(key, lang, plate=plan["plate_number"], amount=fmt(amount), remaining=fmt(remaining),
+                              owner=plan.get("owner_name") or "—", phone=plan.get("owner_phone") or "—",
+                              date="{2}.{1}.{0}".format(*plan["next_due_date"].split("-")))
+                try:
+                    await context.bot.send_message(chat_id=int(plan["notify_telegram_id"]), text=text)
+                    owner_ok = True
+                except Exception as e:
+                    logger.warning(f"Напоминание о рассрочке {plan['id']} точке не дошло: {e}")
 
-        if sent:
-            db.mark_installment_reminded(plan["id"])
-        # иначе — ни клиент не привязан, ни у владельца не настроены уведомления,
-        # пропускаем без отметки (попробуем снова завтра)
+            if client_ok or owner_ok:
+                await asyncio.to_thread(db.mark_installment_reminded, plan["id"])
+            # иначе — никому не дошло, попробуем через час
+        except Exception as e:
+            # одна «кривая» запись не должна останавливать напоминания всем остальным
+            logger.exception(f"Ошибка напоминания о рассрочке {plan.get('id')}: {e}")
 
 
 async def check_supplier_debts(context: ContextTypes.DEFAULT_TYPE):
