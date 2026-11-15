@@ -5702,6 +5702,7 @@ def api_miniapp_garage():
     garage = db.miniapp_garage(g.tg_id)
     garage["docs"] = db.list_client_documents(g.tg_id)
     garage["lang"] = db.client_lang_by_telegram(g.tg_id) if garage["cars"] else None
+    garage["owner"] = db.shop_owner_telegram(g.tg_id)
     garage["ok"] = True
     return jsonify(garage)
 
@@ -6050,7 +6051,7 @@ function garageView() {
   const last = (c.history || [])[0];
   const booked = S.booked[c.plate];
   const soon = (d.docs || []).filter(x => x.days_left <= 30);
-  return `<h1>${T('garage_title')}</h1>
+  return `${d.owner ? `<button class="lang" style="float:right;margin-top:10px;" onclick="location.href='/tg'">🛠 ${T('owner_panel')}</button>` : ''}<h1>${T('garage_title')}</h1>
     <div class="wallet ${many ? 'many' : ''}" id="wallet">${d.cars.map(walletCard).join('')}</div>
     ${many ? `<div class="dots">${d.cars.map((_, i) => `<i class="${i === S.idx ? 'on' : ''}"></i>`).join('')}</div>` : ''}
     <div style="margin-top:12px;"><span class="pill ${f.cls}">${f.pill}</span></div>
