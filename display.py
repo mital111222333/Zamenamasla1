@@ -182,6 +182,19 @@ DISPLAY_PAGE = """
   .welcome { animation: fadein .45s ease; display:flex; flex-direction:column; align-items:center; gap: 3vh; }
   .welcome .greet { font-weight:700; font-size: 5vw; color:#0C447C; }
   .welcome .notfound { background:#fff; border-radius: 1.2vw; padding: 1.6vh 2.4vw; font-size: 2.4vw; color:#185FA5; }
+  .qwrap { width:92vw; display:grid; grid-template-columns: 1fr 1.25fr; gap: 3vw; align-items:center; text-align:left; }
+  .qwrap .idle { text-align:center; }
+  .qwrap .idle .clock { font-size: 8vw; }
+  .qbox { background:#fff; border-radius: 1.6vw; padding: 2.4vh 2.2vw; }
+  .qbox h2 { font-size: 2vw; color:#378ADD; text-transform:uppercase; letter-spacing:.15vw; margin-bottom: 1.4vh; }
+  .qrow { display:flex; align-items:center; justify-content:space-between; gap: 1.5vw; padding: 1.3vh 0; border-top: .15vw solid #E6F1FB; }
+  .qrow:first-of-type { border-top:0; }
+  .qrow .uzp { font-size: 2.4vw; }
+  .qst { font-size: 1.9vw; font-weight:700; border-radius: 3vw; padding: .6vh 1.4vw; white-space:nowrap; }
+  .qst.wait { background:#E6F1FB; color:#185FA5; }
+  .qst.work { background:#FAEEDA; color:#854F0B; }
+  .qst.done { background:#E1F5EE; color:#0F6E56; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
   @keyframes fadein { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
 </style>
 </head>
@@ -212,16 +225,33 @@ function decoHtml() {
   const d = m === 11 || m <= 1 ? ['❄ ❄', '❄'] : m <= 4 ? ['✿ ✿', '✿'] : m <= 7 ? ['☀', '☀'] : ['🍂', '🍂'];
   return `<div class="deco tl">${d[0]}</div><div class="deco br">${d[1]}</div>`;
 }
+// очередь машин (только номера и статус) — справа от часов, когда она есть
+let QUEUE = [];
+async function loadQueue() {
+  try { QUEUE = (await (await fetch('/api/display_queue/' + ANPR_TOKEN, { cache: 'no-store' })).json()).items || []; }
+  catch (e) { /* остаётся прошлая очередь */ }
+}
+function queueHtml() {
+  const order = { done: 0, work: 1, wait: 2 };
+  const rows = QUEUE.slice().sort((a, b) => order[a.status] - order[b.status] || (a.position || 0) - (b.position || 0)).slice(0, 7);
+  return `<div class="qbox"><h2>${esc(T.q_tv_title)}</h2>` + rows.map(r => {
+    const st = r.status === 'done' ? '✅ ' + T.q_tv_done : (r.status === 'work' ? T.q_tv_work
+      : T.q_tv_wait + (r.eta_min ? ' · ~' + r.eta_min + ' ' + T.q_tv_min : ''));
+    return `<div class="qrow">${plateHtml(r.plate)}<span class="qst ${esc(r.status)}">${esc(st)}</span></div>`;
+  }).join('') + `</div>`;
+}
 function renderIdle() {
   const now = new Date();
   const days = T.days_of_week;
   const clock = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  show('idle' + clock, `
+  const idle = `
     <div class="idle">
       <div class="shop">${SHOP_NAME ? esc(SHOP_NAME) : '🔧 ' + T.app_title}</div>
       <div class="clock">${clock}</div>
       <div class="date">${days[now.getDay()]}, ${pad(now.getDate())}.${pad(now.getMonth()+1)}.${now.getFullYear()}</div>
-    </div>`);
+    </div>`;
+  if (!QUEUE.length) { show('idle' + clock, idle); return; }
+  show('idleq' + clock + JSON.stringify(QUEUE), `<div class="qwrap">${idle}${queueHtml()}</div>`);
 }
 
 function greetWord() {
@@ -298,6 +328,8 @@ async function tick() {
   } catch (e) { renderIdle(); }
 }
 
+loadQueue();
+setInterval(loadQueue, 5000);
 tick();
 setInterval(tick, 1000);  // раз в секунду: приветствие появляется почти сразу после распознавания
 </script>

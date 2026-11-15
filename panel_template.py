@@ -575,6 +575,30 @@ if ('serviceWorker' in navigator) {
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .add-form { max-width:760px; }
   .af-title { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:18px; text-transform:uppercase; letter-spacing:.3px; color:var(--darkblue, #0A2540); margin:2px 4px 10px; }
+  .af-price.af-queue { margin-left:8px; }
+  .af-queue b { min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--btn); color:#fff; font-size:12px; line-height:20px; text-align:center; }
+  .af-queue b:empty { display:none; }
+  .q-add { background:#fff; border:1px solid var(--border); border-radius:16px; padding:12px; margin-bottom:14px; }
+  .q-add .plate-wrap input { font-family:var(--font-mono); font-size:20px; font-weight:700; letter-spacing:1px; }
+  .q-what { width:100%; min-height:44px; border-radius:12px; border:1.5px solid var(--border); padding:0 12px; font:inherit; font-size:15px; margin-top:8px; }
+  .q-res { margin-top:10px; padding:10px 12px; border-radius:12px; background:#ECFDF5; color:#065F46; font-size:14px; }
+  .q-res .q-acts { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .q-btn { min-height:40px; padding:0 14px; border-radius:999px; border:1.5px solid var(--border); background:transparent; font:inherit; font-size:13.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; color:#0F172A; }
+  .q-btn.wa { border-color:#16A34A; color:#15803D; }
+  .q-btn.go { border:0; background:#378ADD; color:#fff; }
+  .q-btn.ok { border:0; background:#1D9E75; color:#fff; }
+  .q-btn.red { border:0; background:var(--btn); color:#fff; }
+  .q-col { background:#fff; border:1px solid var(--border); border-radius:16px; padding:8px 12px; margin-bottom:10px; }
+  .q-col-h { display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:.3px; padding:4px 0; }
+  .q-car { border-top:1px solid var(--border); padding:10px 0; }
+  .q-car-top { display:flex; align-items:center; gap:8px; }
+  .q-pl { font-family:var(--font-mono); font-weight:700; font-size:15px; border:1.5px solid #0F172A; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+  .q-info { flex:1; min-width:0; font-size:12.5px; color:var(--hint); }
+  .q-info b { color:var(--text); font-weight:600; }
+  .q-x { border:0; background:transparent; color:var(--hint); min-width:40px; min-height:40px; font-size:16px; cursor:pointer; }
+  .q-car .q-acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .q-empty { font-size:13px; color:var(--hint); padding:6px 0 8px; }
+  .q-foot { font-size:13px; color:var(--hint); margin:6px 2px 20px; line-height:1.6; }
   .ds-card { border:1.5px solid #86EFAC; }
   .ds-h { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
   .ds-h i { color:#0F9F6E; font-size:20px; margin-top:2px; }
@@ -1773,6 +1797,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span><kbd class="side-kbd">F2</kbd></div>
     {% if sale_on %}<div class="side-item" id="tab-sale" data-tab="sale" onclick="showTab('sale')"><i class="fa-solid fa-bag-shopping"></i><span>{{ T.ws_title }}</span></div>{% endif %}
     <div class="side-group">{{ T.nav_grp_work }}</div>
+    <div class="side-item" id="tab-queue" data-tab="queue" onclick="showTab('queue')"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b class="nav-badge" data-badge="queue"></b></div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     <div class="side-item" id="tab-dayclose" data-tab="dayclose" onclick="showTab('dayclose')"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
@@ -1835,6 +1860,7 @@ if ('serviceWorker' in navigator) {
 <div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
   <div class="more-list">
+      <div class="more-item" data-tab="queue" data-more-slot="queue" onclick="showTab('queue'); closeMore();"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b class="nav-badge" data-badge="queue"></b></div>
       <div class="more-item" data-tab="dayclose" data-more-slot="dayclose" onclick="showTab('dayclose'); closeMore();"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
       {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
       {% if team_on %}<div class="more-item" data-tab="team" data-more-slot="team" onclick="showTab('team'); closeMore();"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
@@ -1903,7 +1929,7 @@ if ('serviceWorker' in navigator) {
     };
     </script>
     {% endif %}
-    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<button type="button" class="af-price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></button><span class="af-keys">{{ T.rcpt_keys }}</span></div>
+    <div class="af-title"><span class="dot"></span>{{ T.tab_add }}<button type="button" class="af-price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></button><button type="button" class="af-price af-queue" onclick="showTab('queue')"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b id="afQueueN"></b></button><span class="af-keys">{{ T.rcpt_keys }}</span></div>
 
     <div class="af-main">
     <div class="af-sec">
@@ -2189,6 +2215,20 @@ if ('serviceWorker' in navigator) {
     <div id="wsBody"></div>
   </div>
   {% endif %}
+
+  <div id="view-queue" style="display:none;">
+    <div class="pr-head"><h2>{{ T.q_title }}</h2><div class="pr-hint">{{ T.q_hint }}</div></div>
+    <div class="q-add">
+      <div class="plate-wrap"><input id="qPlate" placeholder="01A123BC" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="{{ T.q_plate_ph }}" oninput="this.value = this.value.toUpperCase(); qErr('')" onkeydown="if (event.key === 'Enter') qAdd()"></div>
+      <div class="pr-chips" id="qChips"></div>
+      <input id="qWhat" class="q-what" maxlength="80" placeholder="{{ T.q_what_ph }}" aria-label="{{ T.q_what_ph }}" onkeydown="if (event.key === 'Enter') qAdd()">
+      <div class="ds-err" id="qErr"></div>
+      <button type="button" class="ds-go" id="qAddBtn" onclick="qAdd()"><i class="fa-solid fa-plus"></i> {{ T.q_add }}</button>
+      <div id="qResult"></div>
+    </div>
+    <div id="qBoard"></div>
+    <div id="qFoot" class="q-foot"></div>
+  </div>
 
   <div id="view-price" style="display:none;">
     <button type="button" class="pr-back pr-back-entry" onclick="showTab('add')"><i class="fa-solid fa-chevron-left"></i>{{ T.nav_add_short }}</button>
@@ -3317,6 +3357,9 @@ function showTab(t, keepScroll) {
   const expTab = document.getElementById('tab-expenses');
   if (expView) expView.style.display = t === 'expenses' ? 'block' : 'none';
   if (expTab) expTab.classList.toggle('active', t === 'expenses');
+  const queueView = document.getElementById('view-queue');
+  if (queueView) queueView.style.display = t === 'queue' ? 'block' : 'none';
+  if (t === 'queue') qOpen();
   const saleView = document.getElementById('view-sale');
   if (saleView) saleView.style.display = t === 'sale' ? 'block' : 'none';
   if (t === 'sale') { wsRender(); if (!ITEM_CATALOG_OK) loadItemCatalog().then(() => wsRender()); }
@@ -10092,6 +10135,143 @@ async function wsSave() {
   try { ITEM_CATALOG_OK = false; await loadItemCatalog(); } catch (e) {}
   wsRender();
 }
+
+
+// ---- «Машина готова» и живая очередь ----
+const QU = { items: [], avg: 20, display: '', seq: 0, last: null, timer: null };
+function qMin(v) { return Math.max(1, Math.round(Number(v) || 0)); }
+function qErr(t) { const el = document.getElementById('qErr'); if (el) el.textContent = t || ''; }
+function qOpen() {
+  const chips = document.getElementById('qChips');
+  if (chips && !chips.innerHTML) {
+    chips.innerHTML = String(T.q_what_chips || '').split('|').filter(Boolean).map(w =>
+      `<button type="button" class="pr-chip" onclick="qPickWhat(this)">${escapeHtml(w)}</button>`).join('');
+  }
+  qLoad();
+  clearInterval(QU.timer);
+  QU.timer = setInterval(() => { if (CURRENT_TAB === 'queue' && !document.hidden) qLoad(); }, 20000);
+}
+function qPickWhat(btn) {
+  const el = document.getElementById('qWhat');
+  const w = btn.textContent;
+  el.value = el.value.trim() && el.value.indexOf(w) < 0 ? el.value.trim() + ', ' + w : w;
+}
+async function qLoad() {
+  const seq = ++QU.seq;
+  let d = null;
+  try { d = await (await fetch('/api/queue', { credentials: 'same-origin', cache: 'no-store' })).json(); } catch (e) { d = null; }
+  if (seq !== QU.seq || !d || !d.ok) return;
+  QU.items = d.items || []; QU.avg = d.avg_min || 20; QU.display = d.display_url || '';
+  qRender();
+}
+function qBadge() {
+  const n = QU.items.filter(i => i.status === 'wait' || i.status === 'work').length;
+  const a = document.getElementById('afQueueN');
+  if (a) a.textContent = n ? String(n) : '';
+  document.querySelectorAll('[data-badge="queue"]').forEach(b => { b.textContent = n ? String(n) : ''; });
+}
+function qPhoneDigits(p) {
+  let d = String(p || '').replace(/[^0-9]/g, '');
+  if (d.length === 9) d = '998' + d;
+  return d.length >= 11 ? d : '';
+}
+function qWaUrl(it, kind) {
+  const text = kind === 'ready'
+    ? T.q_msg_ready.replace('{shop}', BASE_SHOP_NAME || 'OilBook').replace('{plate}', it.plate)
+    : T.q_msg_added.replace('{shop}', BASE_SHOP_NAME || 'OilBook').replace('{plate}', it.plate)
+        .replace('{pos}', it.position || 1).replace('{min}', it.eta_min || QU.avg).replace('{link}', it.link);
+  const ph = qPhoneDigits(it.owner_phone);
+  return 'https://wa.me/' + ph + '?text=' + encodeURIComponent(text);
+}
+function qShareHtml(it, kind) {
+  if (it.has_tg) return `<div><i class="fa-brands fa-telegram"></i> ${escapeHtml(T.q_tg_sent)}</div>`;
+  return `<div class="q-acts"><a class="q-btn wa" href="${escapeHtml(qWaUrl(it, kind))}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i>${escapeHtml(T.q_send_wa)}</a>`
+    + (kind === 'ready' ? '' : `<button type="button" class="q-btn" onclick="qCopy('${escapeHtml(it.link)}')"><i class="fa-regular fa-copy"></i>${escapeHtml(T.q_copy_link)}</button>`) + `</div>`;
+}
+async function qCopy(link) {
+  try { await navigator.clipboard.writeText(link); showMsg(T.q_link_copied, true); }
+  catch (e) { prompt(T.q_copy_link, link); }
+}
+function qTime(s) { return String(s || '').slice(11, 16); }
+function qCarHtml(it) {
+  const who = [it.owner_name, it.car_label].filter(Boolean).join(' · ');
+  let info = '';
+  if (it.status === 'wait') info = T.q_pos.replace('{pos}', it.position || 1).replace('{min}', qMin(it.eta_min));
+  else if (it.status === 'work') info = T.q_left.replace('{min}', qMin(it.eta_min));
+  else info = T.q_ready_at.replace('{time}', qTime(it.done_at));
+  let acts = '';
+  const plateJs = escapeHtml(JSON.stringify(it.plate));
+  if (it.status === 'wait') acts = `<button type="button" class="q-btn go" onclick="qSet(${it.id}, 'work')">${escapeHtml(T.q_to_work)}</button>`;
+  if (it.status === 'work') acts = `<button type="button" class="q-btn ok" onclick="qSet(${it.id}, 'done')"><i class="fa-solid fa-check"></i>${escapeHtml(T.q_to_done)}</button>`;
+  if (it.status === 'done') acts = `<button type="button" class="q-btn" onclick="qSet(${it.id}, 'gone')">${escapeHtml(T.q_gone)}</button>`
+    + (it.has_tg ? '' : `<a class="q-btn wa" href="${escapeHtml(qWaUrl(it, 'ready'))}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i>${escapeHtml(T.q_send_wa)}</a>`);
+  acts += `<button type="button" class="q-btn red" onclick="qEntry(${plateJs})"><i class="fa-solid fa-plus"></i>${escapeHtml(T.q_to_entry)}</button>`;
+  return `<div class="q-car"><div class="q-car-top"><span class="q-pl">${escapeHtml(it.plate)}</span>
+      <div class="q-info">${it.what ? `<b>${escapeHtml(it.what)}</b><br>` : ''}${escapeHtml(who ? who + ' · ' : '')}${escapeHtml(info)}</div>
+      <button type="button" class="q-x" onclick="qRemove(${it.id})" aria-label="${escapeHtml(T.af_remove)}">✕</button></div>
+    <div class="q-acts">${acts}</div></div>`;
+}
+function qRender() {
+  qBadge();
+  const board = document.getElementById('qBoard');
+  if (!board) return;
+  const col = (st, title) => {
+    const l = QU.items.filter(i => i.status === st);
+    return `<div class="q-col"><div class="q-col-h"><span>${escapeHtml(title)}</span><span>${l.length}</span></div>`
+      + (l.length ? l.map(qCarHtml).join('') : `<div class="q-empty">${escapeHtml(T.q_empty)}</div>`) + `</div>`;
+  };
+  board.innerHTML = col('work', T.q_col_work) + col('wait', T.q_col_wait) + col('done', T.q_col_done);
+  const foot = document.getElementById('qFoot');
+  foot.innerHTML = escapeHtml(T.q_avg.replace('{min}', QU.avg))
+    + (QU.display ? `<br><i class="fa-solid fa-tv"></i> ${escapeHtml(T.q_display)}: <a href="${escapeHtml(QU.display)}" target="_blank" rel="noopener">${escapeHtml(T.q_display_open)}</a>` : '');
+}
+async function qAdd() {
+  const pEl = document.getElementById('qPlate');
+  const plate = pEl.value.replace(/\\s+/g, '').toUpperCase();
+  if (!plate) { qErr(T.q_err_plate); pEl.focus(); return; }
+  const btn = document.getElementById('qAddBtn');
+  btn.disabled = true;
+  let d = null;
+  try {
+    d = await (await fetch('/api/queue', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plate, what: document.getElementById('qWhat').value }) })).json();
+  } catch (e) { d = null; }
+  btn.disabled = false;
+  if (!d || !d.ok) { qErr((d && d.error) || T.dc_err_net); return; }
+  const it = d.item;
+  pEl.value = ''; document.getElementById('qWhat').value = '';
+  document.getElementById('qResult').innerHTML = `<div class="q-res"><b>${escapeHtml(it.plate)}</b> · ${escapeHtml(d.item.duplicate ? T.q_dup : T.q_pos.replace('{pos}', it.position || 1).replace('{min}', qMin(it.eta_min)))}${qShareHtml(it, 'added')}</div>`;
+  qLoad();
+}
+async function qSet(id, status) {
+  let d = null;
+  try {
+    d = await (await fetch('/api/queue/' + id, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }) })).json();
+  } catch (e) { d = null; }
+  if (!d || !d.ok) { showMsg(T.msg_error, false); return; }
+  if (status === 'done') {
+    const it = d.item;
+    document.getElementById('qResult').innerHTML = `<div class="q-res"><b>${escapeHtml(it.plate)}</b> · ✅ ${escapeHtml(T.q_col_done)}${qShareHtml(it, 'ready')}</div>`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  qLoad();
+}
+async function qRemove(id) {
+  if (!confirm(T.q_remove_confirm)) return;
+  try { await fetch('/api/queue/' + id, { method: 'DELETE', credentials: 'same-origin' }); } catch (e) {}
+  qLoad();
+}
+function qEntry(plate) {
+  showTab('add');
+  const el = document.getElementById('plate');
+  if (!el) return;
+  el.value = plate;
+  if (typeof onPlateInput === 'function') onPlateInput();
+  if (typeof onPlateBlur === 'function') onPlateBlur();
+}
+// счётчик на кнопке «Очередь» в форме — сразу после загрузки панели
+setTimeout(() => { if (!window.OB_RO) qLoad(); }, 1500);
 
 // ===== «Цена»: за секунду назвать клиенту цену товара и всей замены =====
 // Только цены продажи (закупки здесь нет ни для кого) — экран можно
