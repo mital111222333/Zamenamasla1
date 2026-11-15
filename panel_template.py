@@ -204,6 +204,61 @@ if ('serviceWorker' in navigator) {
   .side-nav { display:none; }
   .role-tag { color:#B45309; }
   .bottom-bar { position:fixed; left:0; right:0; bottom:0; z-index:50; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); background:rgba(255,255,255,0.97); border-top:1px solid var(--border); padding:6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -4px 16px rgba(15,23,42,0.06); }
+  .bottom-bar.bb6 { grid-template-columns:repeat(6, minmax(0,1fr)); padding-left:2px; padding-right:2px; }
+  .bottom-bar.bb6 .bb-item { font-size:10.5px; letter-spacing:-.2px; }
+  @media (max-width:411px) { .bottom-bar.bb6 .bb-item { font-size:9.5px; letter-spacing:-.35px; } }
+  .pr-head h2 { margin:0 0 2px; font-size:20px; }
+  .pr-hint { font-size:13px; color:var(--hint); margin-bottom:10px; }
+  .pr-seg { display:flex; padding:3px; border-radius:12px; background:#E2E8F0; margin-bottom:10px; }
+  .pr-seg button { flex:1; min-height:44px; border:0; background:transparent; border-radius:9px; font:inherit; font-size:14px; font-weight:700; color:#475569; cursor:pointer; }
+  .pr-seg button.on { background:#fff; color:#0F172A; }
+  .pr-search { position:relative; margin-bottom:8px; }
+  .pr-search i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--blue); }
+  .pr-search input { width:100%; min-height:52px; padding:0 14px 0 42px; border-radius:14px; border:2px solid var(--blue); font:inherit; font-size:17px; font-weight:600; background:#fff; color:#0F172A; }
+  .pr-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:6px; scrollbar-width:none; }
+  .pr-chips::-webkit-scrollbar { display:none; }
+  .pr-chip { flex:none; min-height:44px; padding:0 14px; border-radius:12px; border:1.5px solid var(--border); background:#fff; font:inherit; font-size:14px; font-weight:700; color:#0F172A; cursor:pointer; white-space:nowrap; }
+  .pr-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .pr-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:10px; }
+  .pr-list { padding:2px 14px; }
+  .pr-row { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:60px; padding:8px 0; border:0; border-bottom:1px solid #EEF2F6; background:transparent; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .pr-row:last-child { border-bottom:0; }
+  .pr-row-main { min-width:0; }
+  .pr-name { font-size:15px; font-weight:700; overflow-wrap:anywhere; }
+  .pr-sub { font-size:12.5px; color:var(--hint); margin-top:1px; }
+  .pr-sub.out { color:#B45309; font-weight:600; }
+  .pr-price { flex:none; text-align:right; }
+  .pr-price b { display:block; font-family:var(--font-mono); font-size:17px; white-space:nowrap; }
+  .pr-price span { font-size:12px; color:var(--hint); }
+  .pr-empty { text-align:center; color:var(--hint); font-size:14px; padding:22px 10px; line-height:1.45; }
+  .pr-back { border:0; background:transparent; color:var(--blue); font:inherit; font-size:15px; font-weight:700; min-height:44px; padding:0 4px 0 0; cursor:pointer; }
+  .pr-big { font-family:var(--font-mono); font-size:34px; font-weight:700; letter-spacing:-.5px; margin:2px 0 12px; }
+  .pr-big small { font-family:inherit; font-size:15px; font-weight:600; color:var(--hint); letter-spacing:0; }
+  .pr-lbl { font-size:13px; color:var(--hint); margin-bottom:6px; }
+  .pr-qty { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
+  .pr-qty .pr-chip { padding:0; }
+  .pr-qty input { min-height:44px; min-width:0; border-radius:12px; border:1.5px solid var(--border); font:inherit; font-size:15px; font-weight:700; text-align:center; padding:0 4px; background:#fff; color:#0F172A; }
+  .pr-qty input.on { border-color:var(--blue); box-shadow:0 0 0 2px var(--blue) inset; }
+  .pr-line { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:52px; border-top:1px solid #EEF2F6; }
+  .pr-line:first-of-type { border-top:0; }
+  .pr-line b.m { font-family:var(--font-mono); font-size:18px; white-space:nowrap; }
+  .pr-line label { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; min-height:44px; cursor:pointer; min-width:0; flex:1; margin:0; text-transform:none; letter-spacing:0; color:#0F172A; }
+  #view-price.pr-detail .pr-head, #view-price.pr-detail .pr-seg { display:none; }
+  .pr-line input[type=checkbox] { width:22px; height:22px; flex:none; accent-color:var(--blue); }
+  .pr-line select, .pr-line input[type=number] { min-height:44px; border-radius:10px; border:1.5px solid var(--border); font:inherit; font-size:14px; background:#fff; color:#0F172A; padding:0 8px; }
+  .pr-line select { flex:1; min-width:0; max-width:60%; }
+  .pr-line input[type=number] { width:118px; text-align:right; font-family:var(--font-mono); font-weight:700; font-size:16px; }
+  .pr-total { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding-top:12px; border-top:2px solid #E2E8F0; margin-top:4px; }
+  .pr-total span { font-size:15px; font-weight:700; }
+  .pr-total b { font-family:var(--font-mono); font-size:28px; color:var(--blue); white-space:nowrap; }
+  .pr-go { width:100%; min-height:52px; border:0; border-radius:14px; background:var(--blue); color:#fff; font:inherit; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .pr-set { display:block; width:100%; text-align:left; font:inherit; color:inherit; cursor:pointer; }
+  .pr-set.on { border:2px solid var(--blue); }
+  .pr-set-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pr-set-top b { font-family:var(--font-mono); font-size:21px; white-space:nowrap; }
+  .pr-tag { font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; background:#DCFCE7; color:#166534; white-space:nowrap; }
+  .pr-set-name { font-size:15px; font-weight:700; margin:8px 0 2px; overflow-wrap:anywhere; }
+  .pr-model { width:100%; min-height:48px; padding:0 14px; border-radius:12px; border:1.5px solid var(--border); font:inherit; font-size:16px; background:#fff; color:#0F172A; margin-bottom:8px; }
   .bb-item { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; min-height:50px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
   .bb-item i { font-size:19px; }
   .bb-item span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1620,6 +1675,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span><kbd class="side-kbd">F2</kbd></div>
     <div class="side-group">{{ T.nav_grp_work }}</div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
+    <div class="side-item" id="tab-price" data-tab="price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     {% if is_employee or has_staff %}<div class="side-item" id="tab-cash" data-tab="cash" onclick="showTab('cash')"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
     {% if team_on %}<div class="side-item" id="tab-team" data-tab="team" onclick="showTab('team')"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
@@ -1649,8 +1705,9 @@ if ('serviceWorker' in navigator) {
 
 {% set bar_slot2 = 'debts' if is_employee else 'stats' %}
 {% set bar_slot4 = 'warehouse' if (warehouse_enabled and not is_employee) else ('broadcast' if is_employee else 'debts') %}
-<nav class="bottom-bar" id="bottomBar">
+<nav class="bottom-bar bb6" id="bottomBar">
   <div class="bb-item" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
+  <div class="bb-item" data-tab="price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></div>
   {% if bar_slot2 == 'stats' %}
   <div class="bb-item" data-tab="stats" onclick="showTab('stats')"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>
   {% else %}
@@ -1668,7 +1725,7 @@ if ('serviceWorker' in navigator) {
 </nav>
 
 <div class="more-backdrop" id="moreBackdrop" onclick="closeMore()"></div>
-<div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
+<div class="more-sheet" id="moreSheet" data-bar="table,price,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
   <div class="more-list">
       {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
@@ -2005,6 +2062,15 @@ if ('serviceWorker' in navigator) {
         <button type="button" class="sv-undo" id="svUndo" onclick="undoSaved()"></button>
       </div>
     </div>
+  </div>
+
+  <div id="view-price" style="display:none;">
+    <div class="pr-head"><h2>{{ T.tab_price }}</h2><div class="pr-hint">{{ T.pr_hint }}</div></div>
+    <div class="pr-seg">
+      <button type="button" id="prModeItem" class="on" onclick="prMode('item')">{{ T.pr_mode_item }}</button>
+      <button type="button" id="prModeCar" onclick="prMode('car')">{{ T.pr_mode_car }}</button>
+    </div>
+    <div id="prBody"></div>
   </div>
 
   <div id="view-table" style="display:none;">
@@ -3105,6 +3171,9 @@ function showTab(t, keepScroll) {
   const expTab = document.getElementById('tab-expenses');
   if (expView) expView.style.display = t === 'expenses' ? 'block' : 'none';
   if (expTab) expTab.classList.toggle('active', t === 'expenses');
+  const priceView = document.getElementById('view-price');
+  if (priceView) priceView.style.display = t === 'price' ? 'block' : 'none';
+  if (t === 'price') prOpen();
   if (t === 'table') { loadCars(); loadBaseDue(); }
   if (t === 'debts') loadDebts();
   if (t === 'expenses') loadExpensesTab();
@@ -9298,6 +9367,238 @@ function repeatLastVisit(itemsArg, doneMsg) {
   else showMsg(doneMsg || T.kc_repeat_done, true);
   const mileageEl = document.getElementById('mileage');
   if (mileageEl) { mileageEl.focus(); mileageEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+
+// ===== «Цена»: за секунду назвать клиенту цену товара и всей замены =====
+// Только цены продажи (закупки здесь нет ни для кого) — экран можно
+// открывать при клиенте. Данные — те же, что уже есть в панели: товары
+// склада, «часто берут» и готовые наборы точки. «Внести замену» переносит
+// выбранное в форму замены тем же способом, что «Готовый набор».
+const PR = { mode: 'item', q: '', cat: 'all', items: [], sel: null, qty: null, filterId: '', filterOn: true,
+             laborOn: true, labor: 0, laborName: '', models: [], model: '', sets: [], setIdx: -1, loaded: false, seq: 0 };
+const PR_QTY_L = [0.5, 1, 3, 3.5, 4, 4.5, 5], PR_QTY_PC = [1, 2, 3, 4];
+function prMoney(v) { return (Math.round(Number(v) || 0)).toLocaleString('ru-RU'); }
+function prNum(v) { return String(v).replace('.', ','); }
+function prNorm(s) { return String(s || '').toUpperCase().split('').filter(ch => ch !== ' ' && ch !== '-' && ch !== '.' && ch !== ',' && ch !== '_' && ch !== '/').join(''); }
+function prIsFluid(cat) { return FLUID_KEYS.indexOf(cat) >= 0; }
+async function prLoad() {
+  let prods = [];
+  if (WAREHOUSE_ENABLED) {
+    try { prods = await (await fetch('/api/products')).json(); } catch (e) { prods = []; }
+  }
+  if (!Object.keys(FREQ || {}).length) { try { await loadFrequentItems(); } catch (e) {} }
+  if (Array.isArray(prods) && prods.length) {
+    PR.items = prods.map(p => ({ id: p.id, name: p.name, cat: p.category, unit: p.unit === 'pc' ? 'pc' : 'l',
+                                 price: p.sell_price || 0, stock: Number(p.stock_qty) || 0, hasStock: true }));
+  } else {
+    // точка без склада: то, что она реально продавала, с последней ценой
+    PR.items = [];
+    FLUID_KEYS.concat(FILTER_KEYS).forEach(key => ((FREQ || {})[key] || []).forEach(f => {
+      if (f.label) PR.items.push({ id: null, name: f.label, cat: key, unit: prIsFluid(key) ? 'l' : 'pc', price: f.price || 0, stock: 0, hasStock: false });
+    }));
+  }
+  const lab = ((FREQ || {}).other || [])[0];
+  PR.labor = lab && lab.price ? Math.round(lab.price) : 0;
+  PR.laborName = (lab && lab.label) || T.labor_name;
+  const f0 = ((FREQ || {}).filter_0 || [])[0];
+  const f0item = f0 ? PR.items.find(i => i.cat === 'filter_0' && ((f0.product_id && i.id === f0.product_id) || prNorm(i.name) === prNorm(f0.label))) : null;
+  PR.filterId = f0item ? prKey(f0item) : '';
+  try { PR.models = ((await (await fetch('/api/top_models')).json()).models || []).slice(0, 12); } catch (e) { PR.models = []; }
+  PR.loaded = true;
+}
+function prKey(i) { return i.id ? 'p' + i.id : 'n' + prNorm(i.name) + '|' + i.cat; }
+function prFind(key) { return PR.items.find(i => prKey(i) === key) || null; }
+async function prOpen() {
+  const body = document.getElementById('prBody');
+  if (!body) return;
+  if (!PR.loaded) { body.innerHTML = `<div class="pr-empty">${T.loading || '…'}</div>`; await prLoad(); }
+  prRender();
+}
+function prMode(m) {
+  PR.mode = m; PR.sel = null;
+  document.getElementById('prModeItem').classList.toggle('on', m === 'item');
+  document.getElementById('prModeCar').classList.toggle('on', m === 'car');
+  prRender();
+}
+function prRender() {
+  const body = document.getElementById('prBody');
+  if (!body) return;
+  // карточка товара — без шапки и переключателя: «Итого» видно без прокрутки
+  document.getElementById('view-price').classList.toggle('pr-detail', PR.mode === 'item' && !!PR.sel);
+  if (PR.mode === 'car') { prRenderCar(); return; }
+  if (PR.sel) { prRenderItem(); return; }
+  const cats = [['all', T.pr_cat_all], ['oil', T.pr_cat_oil], ['fluids', T.pr_cat_fluids], ['filters', T.pr_cat_filters]];
+  body.innerHTML = `
+    <div class="pr-search"><i class="fa-solid fa-magnifying-glass"></i><input id="prQ" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="${T.pr_search_ph}" aria-label="${T.pr_search_ph}" oninput="PR.q = this.value; prRenderList()"></div>
+    <div class="pr-chips">${cats.map(c => `<button type="button" class="pr-chip${PR.cat === c[0] ? ' on' : ''}" onclick="PR.cat = '${c[0]}'; prRender()">${c[1]}</button>`).join('')}</div>
+    <div id="prList"></div>`;
+  const q = document.getElementById('prQ');
+  q.value = PR.q;
+  prRenderList();
+  if (window.matchMedia && window.matchMedia('(min-width: 900px)').matches) q.focus();
+}
+function prRenderList() {
+  const box = document.getElementById('prList');
+  if (!box) return;
+  if (!PR.items.length) { box.innerHTML = `<div class="pr-card pr-empty">${T.pr_empty}</div>`; return; }
+  const toks = String(PR.q || '').split(' ').map(prNorm).filter(Boolean);
+  const inCat = i => PR.cat === 'all' || (PR.cat === 'oil' && i.cat === 'fluid_0')
+    || (PR.cat === 'fluids' && prIsFluid(i.cat) && i.cat !== 'fluid_0') || (PR.cat === 'filters' && FILTER_KEYS.indexOf(i.cat) >= 0);
+  let list = PR.items.filter(i => inCat(i) && toks.every(t => prNorm(i.name).indexOf(t) >= 0 || prNorm(T[i.cat] || '').indexOf(t) >= 0));
+  // сначала то, что есть в наличии
+  list = list.slice().sort((a, b) => (a.hasStock && a.stock <= 0 ? 1 : 0) - (b.hasStock && b.stock <= 0 ? 1 : 0));
+  if (!list.length) { box.innerHTML = `<div class="pr-card pr-empty">${T.pr_none}</div>`; return; }
+  const shown = list.slice(0, 60);
+  box.innerHTML = `<div class="pr-card pr-list">${shown.map(i => {
+    const unit = i.unit === 'pc' ? T.unit_pc : T.unit_l;
+    const out = i.hasStock && i.stock <= 0;
+    const sub = (T[i.cat] || '') + (i.hasStock ? (out ? ` · ${T.pr_out}` : ` · ${T.pr_stock} ${prNum(Math.round(i.stock * 100) / 100)} ${unit}`) : '');
+    return `<button type="button" class="pr-row" onclick="prPick('${escapeHtml(prKey(i)).split("'").join('&#39;')}')">
+      <span class="pr-row-main"><span class="pr-name">${escapeHtml(i.name)}</span><span class="pr-sub${out ? ' out' : ''}" style="display:block;">${escapeHtml(sub)}</span></span>
+      <span class="pr-price">${i.price ? `<b>${prMoney(i.price)}</b><span>${i.unit === 'pc' ? T.pr_per_pc : T.pr_per_l}</span>` : `<span>${T.pr_no_price}</span>`}</span>
+    </button>`;
+  }).join('')}</div>${list.length > shown.length ? `<div class="pr-hint" style="text-align:center;">${T.pr_more}</div>` : ''}`;
+}
+function prPick(key) {
+  const it = prFind(key);
+  if (!it) return;
+  PR.sel = it;
+  PR.qty = it.unit === 'pc' ? 1 : (it.cat === 'fluid_0' ? 4 : 1);
+  prRender();
+  window.scrollTo(0, 0);
+}
+function prSetQty(v) {
+  const n = parseFloat(String(v).replace(',', '.'));
+  if (!(n > 0) || n > 999) { prRenderItem(); return; }
+  // штуки — только целые; литры — любые (3,8; 0,5 на доливку)
+  PR.qty = PR.sel && PR.sel.unit === 'pc' ? Math.max(1, Math.round(n)) : Math.round(n * 100) / 100;
+  prRenderItem(true);
+}
+function prItemTotals() {
+  const it = PR.sel, goods = Math.round((it.price || 0) * (PR.qty || 0));
+  const flt = (it.cat === 'fluid_0' && PR.filterOn) ? prFind(PR.filterId) : null;
+  const labor = (prIsFluid(it.cat) && PR.laborOn) ? (Number(PR.labor) || 0) : 0;
+  return { goods, flt, labor, total: goods + (flt ? (flt.price || 0) : 0) + labor };
+}
+function prRenderItem(keepFocus) {
+  const body = document.getElementById('prBody'), it = PR.sel;
+  if (!body || !it) return;
+  const focusId = keepFocus && document.activeElement ? document.activeElement.id : '';
+  const unit = it.unit === 'pc' ? T.unit_pc : T.unit_l;
+  const opts = it.unit === 'pc' ? PR_QTY_PC : PR_QTY_L;
+  const custom = opts.indexOf(PR.qty) < 0;
+  const t = prItemTotals();
+  const filters = PR.items.filter(i => i.cat === 'filter_0');
+  const out = it.hasStock && it.stock <= 0;
+  const canEnter = FLUID_KEYS.indexOf(it.cat) >= 0 || FILTER_KEYS.indexOf(it.cat) >= 0;
+  body.innerHTML = `
+    <button type="button" class="pr-back" onclick="PR.sel = null; prRender()"><i class="fa-solid fa-chevron-left"></i> ${T.pr_back}</button>
+    <div class="pr-card">
+      <div class="pr-name" style="font-size:17px;">${escapeHtml(it.name)}</div>
+      <div class="pr-sub${out ? ' out' : ''}">${escapeHtml(T[it.cat] || '')}${it.hasStock ? (out ? ` · ${T.pr_out}` : ` · ${T.pr_stock} ${prNum(Math.round(it.stock * 100) / 100)} ${unit}`) : ''}</div>
+      <div class="pr-lbl" style="margin-top:12px;">${it.unit === 'pc' ? T.pr_per_pc : T.pr_per_l}</div>
+      <div class="pr-big">${it.price ? prMoney(it.price) : '—'} <small>${T.currency}</small></div>
+      <div class="pr-lbl">${it.unit === 'pc' ? T.pr_qty_pc : T.pr_qty_l}</div>
+      <div class="pr-qty">
+        ${opts.map(v => `<button type="button" class="pr-chip${PR.qty === v ? ' on' : ''}" onclick="prSetQty(${v})">${prNum(v)}</button>`).join('')}
+        <input id="prQtyOwn" type="text" inputmode="decimal" class="${custom ? 'on' : ''}" value="${custom ? prNum(PR.qty) : ''}" placeholder="${T.pr_other}" aria-label="${T.pr_other}" onchange="prSetQty(this.value)">
+      </div>
+      <div class="pr-line" style="margin-top:12px; border-top:1px solid #EEF2F6;"><span style="font-weight:700;">${prNum(PR.qty)} ${unit}</span><b class="m">${prMoney(t.goods)}</b></div>
+    </div>
+    ${prIsFluid(it.cat) ? `<div class="pr-card">
+      <div style="font-size:16px; font-weight:700; margin-bottom:4px;">${T.pr_full}</div>
+      ${it.cat === 'fluid_0' && filters.length ? `<div class="pr-line">
+        <label><input type="checkbox" ${PR.filterOn ? 'checked' : ''} onchange="PR.filterOn = this.checked; prRenderItem()"> ${T.filter_0}</label>
+        <select id="prFilter" aria-label="${T.filter_0}" onchange="PR.filterId = this.value; PR.filterOn = !!this.value; prRenderItem()">
+          <option value="">${T.pr_filter_none}</option>
+          ${filters.map(f => `<option value="${escapeHtml(prKey(f))}" ${prKey(f) === PR.filterId ? 'selected' : ''}>${escapeHtml(f.name)} — ${prMoney(f.price)}</option>`).join('')}
+        </select></div>` : ''}
+      <div class="pr-line">
+        <label><input type="checkbox" ${PR.laborOn ? 'checked' : ''} onchange="PR.laborOn = this.checked; prRenderItem()"> ${T.pr_labor}</label>
+        <input id="prLabor" type="number" inputmode="numeric" min="0" step="1000" value="${PR.labor || ''}" placeholder="0" aria-label="${T.pr_labor}" onchange="PR.labor = Math.max(0, Math.round(Number(this.value) || 0)); PR.laborOn = PR.labor > 0; prRenderItem()">
+      </div>
+      <div class="pr-total"><span>${T.pr_total}</span><b>${prMoney(t.total)}</b></div>
+    </div>` : ''}
+    ${canEnter ? `<button type="button" class="pr-go" onclick="prToEntry()"><i class="fa-solid fa-plus"></i> ${T.pr_to_entry}</button>
+    <div class="pr-hint" style="text-align:center; margin-top:8px;">${T.pr_to_entry_hint}</div>` : ''}`;
+  if (focusId) { const el = document.getElementById(focusId); if (el) el.focus(); }
+}
+function prLaborItem() {
+  return { key: 'other', name: PR.laborName || T.labor_name, unit_price: PR.labor, qty: 1, total: PR.labor };
+}
+function prGo(items) {
+  PR.sel = null;  // при возврате в «Цену» — снова поиск, а не прошлая карточка
+  showTab('add');
+  repeatLastVisit(items, T.pr_filled);
+}
+function prToEntry() {
+  const it = PR.sel, t = prItemTotals();
+  const items = [{ key: it.cat, name: T[it.cat] || '', brand: it.name, product_id: it.id, unit_price: it.price, qty: PR.qty }];
+  if (t.flt) items.push({ key: 'filter_0', name: T.filter_0, brand: t.flt.name, product_id: t.flt.id, unit_price: t.flt.price, qty: 1 });
+  if (t.labor > 0) items.push(prLaborItem());
+  prGo(items);
+}
+// ---- «По машине»: наборы, которые точка чаще всего ставила на эту модель ----
+function prSetTotal(set) {
+  // цены — сегодняшние со склада, если товар ещё есть; иначе цена прошлой продажи
+  return set.items.reduce((sum, i) => {
+    const cur = i.product_id ? PR.items.find(p => p.id === i.product_id) : null;
+    return sum + Math.round(((cur && cur.price) || i.unit_price || 0) * (i.qty || 1));
+  }, 0) + (PR.laborOn ? (Number(PR.labor) || 0) : 0);
+}
+function prRenderCar() {
+  const body = document.getElementById('prBody');
+  const chips = PR.models.map(m => `<button type="button" class="pr-chip${PR.model.toLowerCase() === String(m.model).toLowerCase() ? ' on' : ''}" onclick="prPickModel('${escapeHtml(m.model).split("'").join('&#39;')}')">${escapeHtml(m.model)}</button>`).join('');
+  body.innerHTML = `
+    <input id="prModel" class="pr-model" type="text" autocomplete="off" value="${escapeHtml(PR.model)}" placeholder="${T.pr_model_ph}" aria-label="${T.pr_model_ph}" onchange="prPickModel(this.value)">
+    ${chips ? `<div class="pr-chips">${chips}</div>` : ''}
+    <div id="prSets"></div>`;
+  prRenderSets();
+}
+async function prPickModel(model) {
+  PR.model = String(model || '').trim();
+  PR.sets = []; PR.setIdx = -1;
+  prRenderCar();
+  if (PR.model.length < 2) return;
+  const seq = ++PR.seq;
+  const box = document.getElementById('prSets');
+  if (box) box.innerHTML = `<div class="pr-empty">${T.loading || '…'}</div>`;
+  let data = null;
+  try { data = await (await fetch('/api/entry_presets?model=' + encodeURIComponent(PR.model))).json(); } catch (e) { data = null; }
+  if (seq !== PR.seq) return;
+  PR.sets = (data && data.sets) || [];
+  PR.setIdx = PR.sets.length ? 0 : -1;
+  prRenderSets();
+}
+function prRenderSets() {
+  const box = document.getElementById('prSets');
+  if (!box) return;
+  if (PR.model.length < 2) { box.innerHTML = `<div class="pr-card pr-empty">${T.pr_sets_pick}</div>`; return; }
+  if (!PR.sets.length) { box.innerHTML = `<div class="pr-card pr-empty">${T.pr_sets_empty}</div>`; return; }
+  const isFl = i => String(i.key).indexOf('fluid_') === 0;
+  // сначала масло, потом фильтры
+  const describe = set => set.items.filter(isFl).concat(set.items.filter(i => !isFl(i))).map(i => (i.brand || i.name || '') + (isFl(i) && i.qty ? ` · ${prNum(i.qty)} ${T.unit_l}` : '')).join(' + ');
+  box.innerHTML = `<div class="pr-hint">${T.pr_sets_hint}</div>` + PR.sets.map((set, idx) => `
+    <button type="button" class="pr-card pr-set${idx === PR.setIdx ? ' on' : ''}" onclick="PR.setIdx = ${idx}; prRenderSets()">
+      <span class="pr-set-top"><span class="pr-tag">${T.pr_times} ${set.count}</span><b>${prMoney(prSetTotal(set))}</b></span>
+      <span class="pr-set-name" style="display:block;">${escapeHtml(describe(set))}</span>
+      <span class="pr-sub" style="display:block;">${PR.laborOn && PR.labor ? `+ ${T.pr_labor} ${prMoney(PR.labor)}` : T.pr_no_labor}</span>
+    </button>`).join('') + `
+    <div class="pr-card"><div class="pr-line">
+      <label><input type="checkbox" ${PR.laborOn ? 'checked' : ''} onchange="PR.laborOn = this.checked; prRenderSets()"> ${T.pr_labor}</label>
+      <input type="number" inputmode="numeric" min="0" step="1000" value="${PR.labor || ''}" placeholder="0" aria-label="${T.pr_labor}" onchange="PR.labor = Math.max(0, Math.round(Number(this.value) || 0)); PR.laborOn = PR.labor > 0; prRenderSets()">
+    </div></div>
+    <button type="button" class="pr-go" onclick="prSetToEntry()"><i class="fa-solid fa-plus"></i> ${T.pr_to_entry}</button>`;
+}
+function prSetToEntry() {
+  const set = PR.sets[PR.setIdx];
+  if (!set) return;
+  const items = set.items.slice();
+  if (PR.laborOn && PR.labor > 0) items.push(prLaborItem());
+  const model = PR.model;
+  prGo(items);
+  const mEl = document.getElementById('car_model');
+  if (mEl && !mEl.value.trim()) { mEl.value = model; mEl.dispatchEvent(new Event('input', { bubbles: true })); }
 }
 
 // «Готовые наборы»: частые сочетания масла и фильтров этой точки для модели
