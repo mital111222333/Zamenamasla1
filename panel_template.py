@@ -575,6 +575,41 @@ if ('serviceWorker' in navigator) {
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .add-form { max-width:760px; }
   .af-title { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:18px; text-transform:uppercase; letter-spacing:.3px; color:var(--darkblue, #0A2540); margin:2px 4px 10px; }
+  .ds-card { border:1.5px solid #86EFAC; }
+  .ds-h { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
+  .ds-h i { color:#0F9F6E; font-size:20px; margin-top:2px; }
+  .ds-h b { display:block; font-size:16px; }
+  .ds-h span { font-size:13px; color:var(--hint); }
+  .ds-row { display:flex; align-items:center; gap:10px; min-height:52px; border-top:1px solid var(--border); }
+  .ds-name { flex:1; min-width:0; font-size:15px; font-weight:600; }
+  input.ds-name { min-height:44px; border-radius:10px; border:1.5px solid var(--border); padding:0 10px; font:inherit; font-size:15px; }
+  .ds-sum { width:130px; min-height:44px; border-radius:10px; border:1.5px solid var(--border); text-align:right; padding:0 10px; font-family:var(--font-mono); font-size:16px; font-weight:700; }
+  .ds-add { border:0; background:transparent; color:var(--blue); font:inherit; font-weight:700; min-height:44px; padding:0; cursor:pointer; }
+  .ds-tot { display:flex; justify-content:space-between; align-items:baseline; margin-top:8px; padding:10px 12px; border-radius:10px; background:#F1F5F9; }
+  .ds-tot b { font-family:var(--font-mono); font-size:20px; }
+  .ds-err { color:#DC2626; font-size:13px; font-weight:600; min-height:4px; margin-top:6px; }
+  .ds-go { width:100%; min-height:48px; margin-top:8px; border:0; border-radius:999px; background:var(--btn); color:#fff; font:inherit; font-size:16px; font-weight:700; cursor:pointer; }
+  .ds-go[disabled] { opacity:.6; }
+  .ds-srow { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13.5px; padding:6px 0; border-top:1px solid var(--border); }
+  .ds-srow button { border:0; background:transparent; color:var(--hint); min-width:44px; min-height:40px; font-size:16px; cursor:pointer; }
+  .ws-list { max-height:44vh; overflow-y:auto; margin:8px 0 12px; }
+  .ws-cart { background:#fff; border:1px solid var(--border); border-radius:16px; padding:12px; }
+  .ws-line { display:flex; align-items:center; gap:8px; min-height:52px; border-top:1px solid var(--border); }
+  .ws-ln { flex:1; min-width:0; }
+  .ws-ln b { display:block; font-size:14.5px; }
+  .ws-ln a { font-size:12.5px; color:var(--blue); cursor:pointer; }
+  .ws-sum { font-family:var(--font-mono); white-space:nowrap; }
+  .ws-pay { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; margin-top:12px; }
+  .ws-pay button { min-height:44px; border-radius:12px; border:1.5px solid var(--border); background:#fff; font:inherit; font-size:13.5px; font-weight:700; cursor:pointer; }
+  .ws-pay button.on { border-color:var(--blue); color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset; }
+  .ws-mix { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; font-size:13.5px; }
+  .ws-mix label { display:flex; align-items:center; gap:8px; margin:0; text-transform:none; letter-spacing:0; font-size:13.5px; }
+  .ws-mix input { width:120px; min-height:44px; border-radius:10px; border:1.5px solid var(--border); text-align:right; padding:0 8px; font-family:var(--font-mono); font-weight:700; }
+  .add-ch-t { font-size:16px; font-weight:800; margin:6px 2px 10px; }
+  .add-ch-o { display:flex; align-items:center; gap:14px; width:100%; text-align:left; padding:14px; margin-bottom:10px; border-radius:14px; border:1.5px solid var(--border); background:#fff; font:inherit; cursor:pointer; }
+  .add-ch-o i { font-size:24px; color:var(--blue); width:28px; text-align:center; }
+  .add-ch-o b { display:block; font-size:15.5px; }
+  .add-ch-o small { font-size:12.5px; color:var(--hint); }
   .dir-bar { display:flex; height:12px; border-radius:6px; overflow:hidden; margin:4px 0 12px; background:#E2E8F0; }
   .dir-bar span { display:block; height:100%; }
   .dir-total { display:flex; justify-content:flex-end; margin-top:10px; }
@@ -1736,6 +1771,7 @@ if ('serviceWorker' in navigator) {
   </div>
   <nav class="side-list">
     <div class="side-item side-add active" id="tab-add" data-tab="add" onclick="showTab('add')"><i class="fa-solid fa-plus"></i><span>{{ T.tab_add }}</span><kbd class="side-kbd">F2</kbd></div>
+    {% if sale_on %}<div class="side-item" id="tab-sale" data-tab="sale" onclick="showTab('sale')"><i class="fa-solid fa-bag-shopping"></i><span>{{ T.ws_title }}</span></div>{% endif %}
     <div class="side-group">{{ T.nav_grp_work }}</div>
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
@@ -1775,7 +1811,7 @@ if ('serviceWorker' in navigator) {
   {% else %}
   <div class="bb-item" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
   {% endif %}
-  <div class="bb-item bb-add active" data-tab="add" onclick="showTab('add')"><div class="bb-plus"><i class="fa-solid fa-plus"></i></div><span>{{ T.nav_add_short }}</span></div>
+  <div class="bb-item bb-add active" data-tab="add" onclick="{{ 'openAddChooser()' if sale_on else "showTab('add')" }}"><div class="bb-plus"><i class="fa-solid fa-plus"></i></div><span>{{ T.nav_add_short }}</span></div>
   {% if bar_slot4 == 'warehouse' %}
   <div class="bb-item" data-tab="warehouse" onclick="showTab('warehouse')"><i class="fa-solid fa-boxes-stacked"></i><span>{{ T.tab_warehouse }}</span></div>
   {% elif bar_slot4 == 'debts' %}
@@ -1786,6 +1822,15 @@ if ('serviceWorker' in navigator) {
   <div class="bb-item" id="bbMore" onclick="openMore()"><i class="fa-solid fa-ellipsis"></i><span>{{ T.nav_more }}</span><b class="nav-badge" id="moreBadge"></b></div>
 </nav>
 
+{% if sale_on %}
+<div class="more-backdrop" id="addChBackdrop" onclick="closeAddChooser()"></div>
+<div class="more-sheet add-ch" id="addChooser" role="dialog" aria-modal="true" aria-label="{{ T.ws_choose }}">
+  <div class="more-grab"></div>
+  <div class="add-ch-t">{{ T.ws_choose }}</div>
+  <button type="button" class="add-ch-o" onclick="closeAddChooser(); showTab('add')"><i class="fa-solid fa-car"></i><span><b>{{ T.ws_opt_visit }}</b><small>{{ T.ws_opt_visit_sub }}</small></span></button>
+  <button type="button" class="add-ch-o" onclick="closeAddChooser(); showTab('sale')"><i class="fa-solid fa-bag-shopping"></i><span><b>{{ T.ws_title }}</b><small>{{ T.ws_opt_sale_sub }}</small></span></button>
+</div>
+{% endif %}
 <div class="more-backdrop" id="moreBackdrop" onclick="closeMore()"></div>
 <div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
@@ -2134,8 +2179,16 @@ if ('serviceWorker' in navigator) {
       <button type="button" id="dcYday" onclick="dcPickDay(1)">{{ T.dc_yesterday }}</button>
       <input type="date" id="dcDate" onchange="dcPickDate(this.value)" aria-label="{{ T.dc_date }}">
     </div>
+    {% if dirs.tire %}<div id="dsvcBox"></div>{% endif %}
     <div id="dcBody"></div>
   </div>
+
+  {% if sale_on %}
+  <div id="view-sale" style="display:none;">
+    <div class="pr-head"><h2>{{ T.ws_title }}</h2><div class="pr-hint">{{ T.ws_hint }}</div></div>
+    <div id="wsBody"></div>
+  </div>
+  {% endif %}
 
   <div id="view-price" style="display:none;">
     <button type="button" class="pr-back pr-back-entry" onclick="showTab('add')"><i class="fa-solid fa-chevron-left"></i>{{ T.nav_add_short }}</button>
@@ -3264,6 +3317,9 @@ function showTab(t, keepScroll) {
   const expTab = document.getElementById('tab-expenses');
   if (expView) expView.style.display = t === 'expenses' ? 'block' : 'none';
   if (expTab) expTab.classList.toggle('active', t === 'expenses');
+  const saleView = document.getElementById('view-sale');
+  if (saleView) saleView.style.display = t === 'sale' ? 'block' : 'none';
+  if (t === 'sale') { wsRender(); if (!ITEM_CATALOG_OK) loadItemCatalog().then(() => wsRender()); }
   const priceView = document.getElementById('view-price');
   if (priceView) priceView.style.display = t === 'price' ? 'block' : 'none';
   if (t === 'price') prOpen();
@@ -3280,10 +3336,12 @@ function showTab(t, keepScroll) {
   // «Цена» открывается из формы замены — в панели подсвечена «Замена»
   const navT = t === 'price' ? 'add' : t;
   document.querySelectorAll('[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === navT));
+  // «Продажа без машины» открывается красной кнопкой — она и подсвечена
+  if (t === 'sale') document.querySelectorAll('.bb-add').forEach(el => el.classList.add('active'));
   // пункт «Ещё» подсвечен, если открыт раздел, которого нет в нижней панели
   const sheet = document.getElementById('moreSheet');
   const bbMore = document.getElementById('bbMore');
-  if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(navT));
+  if (sheet && bbMore) bbMore.classList.toggle('active', !sheet.dataset.bar.split(',').includes(t === 'sale' ? 'add' : navT));
   if (!keepScroll) window.scrollTo(0, 0);
   if (window.glEnter && !keepScroll) glEnter('view-' + t);
   if (t === 'stats') { ensureChartJs(); loadStats(); }
@@ -4197,6 +4255,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function openMore() {
   document.getElementById('moreSheet').classList.add('open');
   document.getElementById('moreBackdrop').classList.add('open');
+}
+
+function openAddChooser() {
+  document.getElementById('addChooser').classList.add('open');
+  document.getElementById('addChBackdrop').classList.add('open');
+}
+function closeAddChooser() {
+  const a = document.getElementById('addChooser'), b = document.getElementById('addChBackdrop');
+  if (a) a.classList.remove('open');
+  if (b) b.classList.remove('open');
 }
 
 function closeMore() {
@@ -7513,7 +7581,7 @@ async function loadDayDetails(day) {
       s.debt ? `<span class="debt">${T.st_debt_part}: ${fmtNum(s.debt)}</span>` : '',
     ].join('');
     return `<div class="dd-item">
-      <div class="dd-item-h"><span class="dd-plate">${escapeHtml(s.plate || '')}</span><b>${money(s.cost)}</b></div>
+      <div class="dd-item-h"><span class="dd-plate">${escapeHtml(s.walkin ? (s.walkin === 'sale' ? T.ws_title : T.ds_title) : (s.plate || ''))}</span><b>${money(s.cost)}</b></div>
       ${car || owner ? `<div class="dd-sub">${escapeHtml(car)}${car && owner ? ' — ' : ''}${escapeHtml(owner)}</div>` : ''}
       ${s.mileage ? `<div class="dd-sub">${T.dd_mileage}: ${fmtNum(s.mileage)} ${T.dd_km}</div>` : ''}
       ${lines ? `<ul class="dd-lines">${lines}</ul>` : (s.service_type ? `<div class="dd-sub">${escapeHtml(s.service_type)}</div>` : '')}
@@ -9699,6 +9767,7 @@ async function dcLoad(day) {
   if (day !== data.day) { DC.counted = ''; DC.note = ''; }
   DC.day = data.day; DC.data = data;
   dcMarkDays();
+  dsvcRender();
   dcRender();
 }
 function dcExpected() {
@@ -9834,6 +9903,194 @@ function dcRenderBlind(justNow) {
     <button type="button" class="dc-go" onclick="dcSubmit()"><i class="fa-solid fa-paper-plane"></i>${escapeHtml(d.closed ? T.dc_emp_resend : T.dc_emp_send)}</button>
   </div>`;
   body.innerHTML = html;
+}
+
+
+// ---- «Мелкие услуги за день»: подкачка и т.п. одной суммой за день ----
+// Сохраняется как обычная запись (наличные) — попадает в выручку, кассу,
+// «Закрыть день» и в «Шиномонтаж» статистики. Повторный ввод прибавляется.
+const DS = { rows: null, err: '', busy: false, token: null };
+const DS_NAMES_KEY = 'ob_ds_names_' + {{ draft_owner|tojson }};
+function dsNames() {
+  let own = [];
+  try { own = JSON.parse(localStorage.getItem(DS_NAMES_KEY) || '[]') || []; } catch (e) { own = []; }
+  const out = [], seen = new Set();
+  String(T.ds_defaults || '').split('|').concat(own).forEach(n => {
+    const k = String(n || '').trim().toUpperCase();
+    if (k && !seen.has(k)) { seen.add(k); out.push(String(n).trim()); }
+  });
+  return out;
+}
+function dsInit() {
+  if (!DS.rows) DS.rows = dsNames().map(n => ({ name: n, amount: '', custom: false }));
+}
+function dsTotal() { return (DS.rows || []).reduce((a, r) => a + (parseInt(String(r.amount).replace(/[^0-9]/g, '')) || 0), 0); }
+function dsRender() { dsvcRender(); }
+function dsvcRender() {
+  const box = document.getElementById('dsvcBox');
+  if (!box || !DC.data) return;
+  dsInit();
+  const saved = DC.data.day_svc || [];
+  const savedSum = saved.reduce((a, r) => a + (r.total || 0), 0);
+  const rows = DS.rows.map((r, i) => `<div class="ds-row">
+      ${r.custom ? `<input class="ds-name" placeholder="${escapeHtml(T.ts_own_ph)}" value="${escapeHtml(r.name)}" oninput="DS.rows[${i}].name = this.value; dsErr('')">`
+                 : `<span class="ds-name">${escapeHtml(r.name)}</span>`}
+      <input class="ds-sum" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="${escapeHtml(String(r.amount))}" aria-label="${escapeHtml(r.name || T.ts_own_ph)}" oninput="DS.rows[${i}].amount = this.value.replace(/[^0-9]/g, ''); dsErr(''); dsSyncTotal()">
+    </div>`).join('');
+  const list = saved.length ? `<div class="ds-saved"><div class="dc-lbl" style="margin-top:12px;">${escapeHtml(T.ds_saved)}: ${dcMoney(savedSum)} ${escapeHtml(T.currency)}</div>` + saved.map(r =>
+    `<div class="ds-srow"><span>${escapeHtml(r.items.map(it => it.name + ' ' + dcMoney(it.total)).join(', '))}</span><button type="button" onclick="dsDelete(${r.id})" aria-label="${escapeHtml(T.af_remove)}">✕</button></div>`).join('') + `</div>` : '';
+  box.innerHTML = `<div class="dc-card ds-card">
+    <div class="ds-h"><i class="fa-solid fa-life-ring"></i><div><b>${escapeHtml(T.ds_title)}</b><span>${escapeHtml(T.ds_hint)}</span></div></div>
+    ${rows}
+    <button type="button" class="ds-add" onclick="DS.rows.push({ name: '', amount: '', custom: true }); dsvcRender()"><i class="fa-solid fa-plus"></i> ${escapeHtml(T.ds_add_own)}</button>
+    <div class="ds-tot"><span>${escapeHtml(T.ds_total)}</span><b id="dsTot">${dcMoney(dsTotal())}</b></div>
+    <div class="ds-err" id="dsErr">${escapeHtml(DS.err)}</div>
+    <button type="button" class="ds-go" onclick="dsSave()"${DS.busy ? ' disabled' : ''}>${escapeHtml(T.ds_save)}</button>
+    ${saved.length ? `<div class="dc-hint" style="margin:8px 0 0;">${escapeHtml(T.ds_adds_note)}</div>` : ''}
+    ${list}
+  </div>`;
+}
+function dsSyncTotal() { const el = document.getElementById('dsTot'); if (el) el.textContent = dcMoney(dsTotal()); }
+function dsErr(t) { DS.err = t; const el = document.getElementById('dsErr'); if (el) el.textContent = t; }
+async function dsSave() {
+  if (DS.busy) return;
+  const items = DS.rows.map(r => ({ name: String(r.name || '').replace(/\\s+/g, ' ').trim(), total: parseInt(String(r.amount).replace(/[^0-9]/g, '')) || 0 }))
+    .filter(r => r.total > 0);
+  if (!items.length) { dsErr(T.ds_err_empty); return; }
+  if (items.some(r => !r.name)) { dsErr(T.ts_need_name); return; }
+  if (!DS.token) DS.token = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+  DS.busy = true; dsvcRender();
+  let data = null;
+  try {
+    data = await (await fetch('/api/walkin', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'day_svc', day: DC.day, token: DS.token,
+        items: items.map(r => ({ key: 'tire_svc', name: r.name, total: r.total, unit_price: r.total, qty: 1, dir: 'tire' })) }) })).json();
+  } catch (e) { data = null; }
+  DS.busy = false;
+  if (!data || !data.ok) { dsErr((data && data.error) || T.dc_err_net); dsvcRender(); return; }
+  // свои названия запоминаем на этом телефоне
+  try {
+    const own = DS.rows.filter(r => r.custom && String(r.name || '').trim()).map(r => String(r.name).trim());
+    if (own.length) {
+      const prev = JSON.parse(localStorage.getItem(DS_NAMES_KEY) || '[]') || [];
+      localStorage.setItem(DS_NAMES_KEY, JSON.stringify(prev.concat(own).slice(-20)));
+    }
+  } catch (e) {}
+  DS.rows = null; DS.err = ''; DS.token = null;
+  showMsg(T.ds_saved_msg.replace('{sum}', dcMoney(data.total)), true);
+  dcLoad(DC.day);
+}
+async function dsDelete(id) {
+  if (!confirm(T.ds_del_confirm)) return;
+  let data = null;
+  try { data = await (await fetch('/api/oil_change/' + id, { method: 'DELETE', credentials: 'same-origin' })).json(); } catch (e) {}
+  if (!data || !data.ok) { showMsg(T.msg_error + ' ' + ((data && data.error) || ''), false); return; }
+  dcLoad(DC.day);
+}
+
+// ---- «Продажа без машины»: покупатель просто купил товар со склада ----
+const WS = { q: '', cart: [], pay: 'cash', cash: '', card: '', busy: false, token: null, err: '' };
+function wsMoney(v) { return (Math.round(Number(v) || 0)).toLocaleString('ru-RU'); }
+function wsOpen() { showTab('sale'); }
+function wsRender() {
+  const box = document.getElementById('wsBody');
+  if (!box) return;
+  const words = String(WS.q || '').trim().split(' ').map(pickNorm).filter(Boolean);
+  const prods = productsCache.filter(p => !words.length || words.every(w => pickNorm(p.name).includes(w) || pickNorm(T[p.category] || '').includes(w)))
+    .slice().sort((a, b) => ((wsAvail(b) > 0) - (wsAvail(a) > 0)) || String(a.name).localeCompare(String(b.name)));
+  const unitOf = p => p.unit === 'pc' ? T.unit_pc : T.unit_l;
+  const inCart = new Set(WS.cart.map(c => c.pid));
+  const list = prods.slice(0, 40).map(p => {
+    const q = wsAvail(p);
+    return `<button type="button" class="ps-item${inCart.has(p.id) ? ' on' : ''}${!(q > 0) ? ' out' : ''}" onclick="wsAdd(${p.id})">
+      <div><b>${escapeHtml(p.name)}</b><small class="${q > 0 ? '' : 'none'}">${q > 0 ? T.psh_instock + ' ' + whQty(q) + ' ' + unitOf(p) : T.psh_out}</small></div><em>${p.sell_price ? wsMoney(p.sell_price) : '—'}</em></button>`;
+  }).join('') || `<div class="pick-note">${T.pick_nothing}</div>`;
+  const total = wsTotal();
+  const cart = WS.cart.length ? WS.cart.map((c, i) => `<div class="ws-line">
+      <div class="ws-ln"><b>${escapeHtml(c.name)}</b><a onclick="wsPrice(${i})">${wsMoney(c.price)} × ${String(c.qty).replace('.', ',')}</a></div>
+      <span class="ir-step"><button type="button" onclick="wsStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="wsStep(${i}, 1)" aria-label="+">+</button></span>
+      <b class="ws-sum">${wsMoney(c.price * c.qty)}</b>
+    </div>`).join('') : `<div class="pr-empty" style="padding:12px;">${escapeHtml(T.ws_empty)}</div>`;
+  box.innerHTML = `
+    <div class="pr-search"><i class="fa-solid fa-magnifying-glass"></i><input id="wsQ" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${escapeHtml(T.ws_search_ph)}" aria-label="${escapeHtml(T.ws_search_ph)}" value="${escapeHtml(WS.q)}" oninput="WS.q = this.value; wsRenderList()"></div>
+    <div id="wsList" class="ws-list">${list}</div>
+    <div class="ws-cart">
+      <div class="dc-lbl">${escapeHtml(T.rcpt_title)}</div>
+      ${cart}
+      <div class="ws-pay">
+        <button type="button" class="${WS.pay === 'cash' ? 'on' : ''}" onclick="WS.pay = 'cash'; wsRender()">${escapeHtml(T.ws_pay_cash)}</button>
+        <button type="button" class="${WS.pay === 'card' ? 'on' : ''}" onclick="WS.pay = 'card'; wsRender()">${escapeHtml(T.ws_pay_card)}</button>
+        <button type="button" class="${WS.pay === 'mix' ? 'on' : ''}" onclick="WS.pay = 'mix'; WS.card = ''; wsRender()">${escapeHtml(T.ws_pay_mix)}</button>
+      </div>
+      ${WS.pay === 'mix' ? `<div class="ws-mix"><label>${escapeHtml(T.ws_pay_card)}<input id="wsCard" type="text" inputmode="numeric" placeholder="0" value="${escapeHtml(WS.card)}" oninput="WS.card = this.value.replace(/[^0-9]/g, ''); wsMixSync()"></label><span id="wsCashTxt">${escapeHtml(T.ws_pay_cash)}: ${wsMoney(Math.max(0, total - (parseInt(WS.card) || 0)))}</span></div>` : ''}
+      <div class="ds-tot"><span>${escapeHtml(T.ds_total)}</span><b>${wsMoney(total)} ${escapeHtml(T.currency)}</b></div>
+      <div class="ds-err" id="wsErr">${escapeHtml(WS.err)}</div>
+      <button type="button" class="ds-go" onclick="wsSave()"${WS.busy ? ' disabled' : ''}>${escapeHtml(T.ws_sold)}</button>
+    </div>`;
+}
+function wsRenderList() {
+  const keep = document.activeElement && document.activeElement.id === 'wsQ';
+  wsRender();
+  if (keep) { const q = document.getElementById('wsQ'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+}
+// в магазине + на основном складе (если магазина не хватит, остальное берётся с основного)
+function wsAvail(p) { return (sellQty(p) || 0) + (STORE_ENABLED ? (mainQtyOf(p) || 0) : 0); }
+function wsTotal() { return WS.cart.reduce((a, c) => a + Math.round(c.price * c.qty), 0); }
+function wsMixSync() {
+  const el = document.getElementById('wsCashTxt');
+  if (el) el.textContent = T.ws_pay_cash + ': ' + wsMoney(Math.max(0, wsTotal() - (parseInt(WS.card) || 0)));
+}
+function wsAdd(pid) {
+  const p = productsCache.find(x => x.id === pid);
+  if (!p) return;
+  const ex = WS.cart.find(c => c.pid === pid);
+  if (ex) ex.qty = Math.round((ex.qty + 1) * 10) / 10;
+  else WS.cart.push({ pid, name: p.name, cat: p.category, price: Number(p.sell_price) || 0, qty: 1 });
+  WS.err = '';
+  wsRender();
+}
+function wsStep(i, d) {
+  const c = WS.cart[i];
+  if (!c) return;
+  const p = productsCache.find(x => x.id === c.pid);
+  const step = p && p.unit !== 'pc' ? 0.5 : 1;
+  c.qty = Math.round((c.qty + d * step) * 10) / 10;
+  if (c.qty <= 0) WS.cart.splice(i, 1);
+  wsRender();
+}
+function wsPrice(i) {
+  const c = WS.cart[i];
+  if (!c) return;
+  const raw = prompt(T.rc_price_prompt + ' ' + c.name, c.price || '');
+  if (raw === null) return;
+  const v = parseInt(String(raw).replace(/[^0-9]/g, ''));
+  if (!(v >= 0)) return;
+  c.price = v;
+  wsRender();
+}
+async function wsSave() {
+  if (WS.busy) return;
+  if (!WS.cart.length) { WS.err = T.ws_err_empty; wsRender(); return; }
+  const total = wsTotal();
+  const card = WS.pay === 'card' ? total : (WS.pay === 'mix' ? Math.min(total, parseInt(WS.card) || 0) : 0);
+  const items = WS.cart.map(c => {
+    const other = c.cat === 'other';
+    return { key: other ? 'other_stock' : c.cat, name: other ? c.name : (T[c.cat] || c.name), brand: other ? null : c.name,
+             product_id: c.pid, unit_price: c.price, qty: c.qty, total: Math.round(c.price * c.qty) };
+  });
+  if (!WS.token) WS.token = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+  WS.busy = true; WS.err = ''; wsRender();
+  let data = null;
+  try {
+    data = await (await fetch('/api/walkin', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'sale', items, cash_amount: total - card, card_amount: card, token: WS.token }) })).json();
+  } catch (e) { data = null; }
+  WS.busy = false;
+  if (!data || !data.ok) { WS.err = (data && data.error) || T.dc_err_net; wsRender(); return; }
+  Object.assign(WS, { cart: [], q: '', card: '', pay: 'cash', token: null, err: '' });
+  showMsg(T.ws_done.replace('{sum}', wsMoney(data.total)), true);
+  try { ITEM_CATALOG_OK = false; await loadItemCatalog(); } catch (e) {}
+  wsRender();
 }
 
 // ===== «Цена»: за секунду назвать клиенту цену товара и всей замены =====

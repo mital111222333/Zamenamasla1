@@ -45,7 +45,7 @@ def _login(env, employee=False):
 def test_texts_exist_in_both_languages():
     import panel_template
     src = open(panel_template.__file__, encoding="utf-8").read()
-    keys = set(re.findall(r"\bT\.(dir_[a-z]+|ts_[a-z_]+|st_dirs_[a-z_]+|cat_tire[a-z_]*|cat_parts|wh_cat_tires|wh_cat_parts|wh_dir_label)\b", src))
+    keys = set(re.findall(r"\bT\.(dir_[a-z]+|ds_[a-z_]+|ws_[a-z_]+|ts_[a-z_]+|st_dirs_[a-z_]+|cat_tire[a-z_]*|cat_parts|wh_cat_tires|wh_cat_parts|wh_dir_label)\b", src))
     assert len(keys) > 15
     missing = [k for k in keys if not i18n.RU.get(k) or not i18n.UZ.get(k)]
     assert not missing, missing
@@ -148,3 +148,88 @@ def test_admin_toggle_requires_admin(env):
     c = _login(env)
     r = c.post(f"/api/admin/shops/{env['hid']}/toggle_dir", json={"dir": "tire", "enabled": False})
     assert r.status_code in (302, 401, 403)
+
+
+# ---------- «Мелкие услуги за день» и «Продажа без машины» ----------
+
+def _today():
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def test_day_services_go_to_revenue_cash_and_tire(env):
+    db = env["db"]
+    c = _login(env)
+    before = db.get_revenue_range(env["hid"], _today(), _today())["total"]
+    r = c.post("/api/walkin", json={"kind": "day_svc", "day": _today(), "token": "ds-1",
+                                    "items": [{"key": "tire_svc", "name": "Podkachka", "total": 200000},
+                                              {"key": "tire_svc", "name": "Bosim", "total": 0}]})
+    assert r.get_json()["ok"], r.get_data(as_text=True)
+    # повтор той же отправки (плохой интернет) — второй раз не пишется
+    assert c.post("/api/walkin", json={"kind": "day_svc", "day": _today(), "token": "ds-1",
+                                       "items": [{"key": "tire_svc", "name": "Podkachka", "total": 200000}]}).get_json()["duplicate"]
+    rev = db.get_revenue_range(env["hid"], _today(), _today())
+    assert rev["total"] == before + 200000
+    d = db.get_direction_range(env["hid"], _today(), _today())
+    assert d["tire"]["total"] >= 200000
+    dc = c.get("/api/day_close").get_json()
+    assert [x["total"] for x in dc["day_svc"]] == [200000]
+    assert dc["totals"]["cash"] >= 200000
+
+
+def test_day_services_never_take_products_or_odd_days(env):
+    db = env["db"]
+    c = _login(env)
+    prod = db.create_product(env["hid"], "other", "Vent", "pc", 5000, 2000, 10, dir="tire")
+    r = c.post("/api/walkin", json={"kind": "day_svc", "day": _today(), "items": [
+        {"key": "other_stock", "name": "Vent", "product_id": prod["id"], "qty": 5, "total": 25000}]})
+    assert r.get_json()["ok"]
+    assert db.get_product(prod["id"], env["hid"])["stock_qty"] == 10  # со склада ничего не ушло
+    assert c.post("/api/walkin", json={"kind": "day_svc", "day": "2001-01-01",
+                                       "items": [{"name": "X", "total": 1000}]}).status_code == 400
+    assert c.post("/api/walkin", json={"kind": "day_svc", "day": _today(), "items": []}).status_code == 400
+
+
+def test_counter_sale_takes_stock_and_stays_out_of_base(env):
+    db = env["db"]
+    c = _login(env)
+    prod = db.create_product(env["hid"], "other", "Kolodka zad", "pc", 150000, 100000, 4, dir="part")
+    r = c.post("/api/walkin", json={"kind": "sale", "cash_amount": 100000, "card_amount": 200000, "items": [
+        {"key": "other_stock", "name": "Kolodka zad", "product_id": prod["id"], "unit_price": 150000, "qty": 2, "total": 300000}]})
+    j = r.get_json()
+    assert j["ok"] and j["total"] == 300000
+    assert db.get_product(prod["id"], env["hid"])["stock_qty"] == 2
+    rec = db.get_oil_change_for_shop(j["id"], env["hid"])
+    assert rec["service_type"] == "sale" and rec["card_amount"] == 200000 and rec["cash_amount"] == 100000
+    assert db.get_profit_breakdown(env["hid"], _today(), _today())["goods_profit"] >= 100000
+    plates = [x["plate_number"] for x in db.get_all_cars_overview(env["hid"])]
+    assert db.WALKIN_PLATE not in plates
+    day = db.get_day_details(env["hid"], _today())
+    sale = next(s for s in day["services"] if s["id"] == j["id"])
+    assert sale["walkin"] == "sale" and sale["plate"] == "" and sale["owner_name"] is None
+
+
+def test_walkin_needs_enabled_directions(env):
+    db = env["db"]
+    db.set_shop_dir_enabled(env["hid"], "tire", False)
+    db.set_shop_dir_enabled(env["hid"], "part", False)
+    try:
+        c = _login(env)
+        assert c.post("/api/walkin", json={"kind": "day_svc", "day": _today(),
+                                           "items": [{"name": "X", "total": 1000}]}).status_code == 403
+        assert c.post("/api/walkin", json={"kind": "sale", "items": [{"name": "X", "total": 1000}]}).status_code == 403
+        assert 'id="view-sale"' not in c.get("/").get_data(as_text=True)
+    finally:
+        db.set_shop_dir_enabled(env["hid"], "tire", True)
+        db.set_shop_dir_enabled(env["hid"], "part", True)
+
+
+def test_employee_day_services_go_to_his_cash(env):
+    db = env["db"]
+    c = _login(env, employee=True)
+    r = c.post("/api/walkin", json={"kind": "day_svc", "day": _today(), "items": [{"name": "Podkachka", "total": 30000}]})
+    j = r.get_json()
+    assert j["ok"]
+    emp_id = db.get_active_employee("dir_emp", env["hid"])["id"]
+    assert db.get_oil_change_for_shop(j["id"], env["hid"])["employee_id"] == emp_id
+    mine = c.get("/api/day_close").get_json()["day_svc"]
+    assert [x["total"] for x in mine] == [30000]  # чужие суммы сотрудник не видит

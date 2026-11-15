@@ -1774,6 +1774,7 @@ def index():
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         store_enabled=_store_on(shop),
         dirs=db.shop_dirs(shop),
+        sale_on=bool(shop and shop.get("warehouse_enabled") and any(db.shop_dirs(shop).values())),
         is_employee=g.is_employee,
         has_staff=_has_staff,
         team_on=g.is_employee or _has_staff or ((not g.is_branch) and bool(db.get_branches(g.shop_id))),
@@ -4919,18 +4920,74 @@ def api_day_close_get():
     day = _day_close_day(request.args.get("day"))
     if not day:
         return jsonify({"ok": False, "error": g.T["dc_err_day"]}), 400
+    day_svc = None
+    if db.shop_dirs(db.get_shop(g.shop_id)).get("tire"):
+        day_svc = db.list_walkin(g.shop_id, day, "day_svc")
+        if g.is_employee:
+            # сотрудник видит только то, что вписал сам
+            day_svc = [r for r in day_svc if r["employee_id"] == g.employee_id]
     if g.is_employee:
         done = db.get_day_closing(g.shop_id, day)
         return jsonify({"ok": True, "day": day, "blind": True, "closed": bool(done),
                         "closed_at": done["updated_at"] if done else None,
-                        "owner_closed": bool(done and not done["by_employee"])})
+                        "owner_closed": bool(done and not done["by_employee"]), "day_svc": day_svc})
     out = db.day_close_summary(g.shop_id, day)
+    out["day_svc"] = day_svc
     out.update({"ok": True, "blind": False, "history": db.list_day_closings(g.shop_id, 14)})
     if not g.is_branch:
         out["profit"] = db.get_profit_breakdown(g.shop_id, day, day)["profit"]
     shop = db.get_shop(g.shop_id) or {}
     out["has_tg"] = bool(shop.get("notify_telegram_id"))
     return jsonify(out)
+
+
+@app.route("/api/walkin", methods=["POST"])
+@login_required
+def api_walkin():
+    """Продажа без машины (kind=sale) и «Мелкие услуги за день» одной суммой
+    (kind=day_svc, только у точек с шиномонтажом). Оплата — нал/карта, без долга."""
+    data = request.get_json(force=True) or {}
+    kind = data.get("kind")
+    shop = db.get_shop(g.shop_id) or {}
+    dirs = db.shop_dirs(shop)
+    if kind == "sale":
+        if not (shop.get("warehouse_enabled") and (dirs["tire"] or dirs["part"])):
+            return jsonify({"ok": False, "error": "not enabled"}), 403
+    elif kind == "day_svc":
+        if not dirs["tire"]:
+            return jsonify({"ok": False, "error": "not enabled"}), 403
+    else:
+        return jsonify({"ok": False, "error": "bad kind"}), 400
+    try:
+        items = db.sanitize_items(data.get("items") or [])
+        cash = int(data["cash_amount"]) if data.get("cash_amount") not in (None, "") else None
+        card = int(data["card_amount"]) if data.get("card_amount") not in (None, "") else None
+    except (ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    day = None
+    if kind == "day_svc":
+        day = _day_close_day(data.get("day"))
+        if not day:
+            return jsonify({"ok": False, "error": g.T["dc_err_day"]}), 400
+        # только суммы услуг шиномонтажа: без товаров склада и без количеств
+        items = [{"key": "tire_svc", "name": it["name"], "unit_price": int(it.get("total") or 0), "qty": 1,
+                  "total": int(it.get("total") or 0), "dir": "tire"}
+                 for it in items if int(it.get("total") or 0) > 0]
+        cash, card = sum(i["total"] for i in items), 0
+    if not items or not (sum(i.get("total") or 0 for i in items) > 0 or any(i.get("product_id") for i in items)):
+        return jsonify({"ok": False, "error": g.T["ws_err_empty"]}), 400
+    token = str(data.get("token") or "")[:64] or None
+    with db.WRITE_LOCK:
+        prev = db.get_add_token_result(g.shop_id, token)
+        if prev is not None:
+            prev.update({"ok": True, "duplicate": True})
+            return jsonify(prev)
+        oc_id = db.add_walkin(g.shop_id, kind, items, cash_amount=cash, card_amount=card,
+                              employee_id=g.employee_id, day=day)
+        rec = db.get_oil_change_for_shop(oc_id, g.shop_id) or {}
+        result = {"ok": True, "id": oc_id, "total": rec.get("cost") or 0}
+        db.save_add_token_result(g.shop_id, token, result)
+    return jsonify(result)
 
 
 @app.route("/api/day_close", methods=["POST"])
