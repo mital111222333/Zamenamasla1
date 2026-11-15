@@ -259,6 +259,39 @@ if ('serviceWorker' in navigator) {
   .pr-tag { font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; background:#DCFCE7; color:#166534; white-space:nowrap; }
   .pr-set-name { font-size:15px; font-weight:700; margin:8px 0 2px; overflow-wrap:anywhere; }
   .pr-model { width:100%; min-height:48px; padding:0 14px; border-radius:12px; border:1.5px solid var(--border); font:inherit; font-size:16px; background:#fff; color:#0F172A; margin-bottom:8px; }
+  .dc-head h2 { margin:0 0 2px; font-size:20px; }
+  .dc-hint { font-size:13px; color:var(--hint); margin-bottom:10px; line-height:1.45; }
+  .dc-days { display:flex; gap:6px; margin-bottom:10px; }
+  .dc-days button, .dc-days input { min-height:44px; border-radius:12px; border:1.5px solid var(--border); background:#fff; font:inherit; font-size:14px; font-weight:700; color:#0F172A; padding:0 12px; cursor:pointer; }
+  .dc-days button.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .dc-days input { flex:1; min-width:0; font-weight:600; }
+  .dc-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:10px; }
+  .dc-lbl { font-size:13px; color:var(--hint); }
+  .dc-big { font-family:var(--font-mono); font-size:32px; font-weight:700; letter-spacing:-.5px; margin:2px 0 8px; }
+  .dc-big small { font-family:inherit; font-size:15px; font-weight:600; color:var(--hint); letter-spacing:0; }
+  .dc-row { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:40px; font-size:15px; border-top:1px solid #EEF2F6; }
+  .dc-row:first-of-type { border-top:0; }
+  .dc-row > span:first-child { color:#475569; min-width:0; }
+  .dc-row b { font-family:var(--font-mono); font-size:16px; white-space:nowrap; }
+  .dc-row b.minus { color:#B42318; }
+  .dc-row b.info { color:var(--hint); font-weight:600; }
+  .dc-row label { display:flex; align-items:center; gap:8px; margin:0; font-size:14px; font-weight:600; color:#475569; text-transform:none; letter-spacing:0; min-height:44px; cursor:pointer; }
+  .dc-row input[type=checkbox] { width:20px; height:20px; flex:none; accent-color:var(--blue); }
+  .dc-row input[type=number] { width:130px; min-height:40px; border-radius:10px; border:1.5px solid var(--border); font-family:var(--font-mono); font-weight:700; font-size:15px; text-align:right; padding:0 8px; background:#fff; color:#0F172A; }
+  .dc-in { width:100%; min-height:56px; border-radius:14px; border:2px solid var(--blue); font-family:var(--font-mono); font-size:24px; font-weight:700; padding:0 14px; background:#fff; color:#0F172A; margin:6px 0 8px; }
+  .dc-pill { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; padding:6px 12px; border-radius:999px; }
+  .dc-pill.ok { background:#DCFCE7; color:#166534; }
+  .dc-pill.bad { background:#FEE2E2; color:#991B1B; }
+  .dc-pill.over { background:#FEF3C7; color:#92400E; }
+  .dc-note { width:100%; min-height:44px; border-radius:12px; border:1.5px solid var(--border); font:inherit; font-size:15px; padding:10px 12px; margin-top:10px; background:#fff; color:#0F172A; }
+  .dc-go { width:100%; min-height:54px; border:0; border-radius:14px; background:var(--blue); color:#fff; font:inherit; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px; }
+  .dc-done { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; background:#F0FDF4; border:1px solid #BBF7D0; color:#166534; font-size:14px; font-weight:600; margin-bottom:10px; line-height:1.4; }
+  .dc-done.bad { background:#FEF2F2; border-color:#FECACA; color:#991B1B; }
+  .dc-rc-top { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+  .dc-rc-top b { font-size:17px; }
+  .dc-hist { padding:2px 14px; }
+  .dc-hist .dc-row span:first-child { color:#0F172A; font-weight:600; }
+  .dc-err { color:#B42318; font-size:13px; font-weight:600; margin-top:4px; }
   .bb-item { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; min-height:50px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
   .bb-item i { font-size:19px; }
   .bb-item span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1695,6 +1728,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     <div class="side-item" id="tab-price" data-tab="price" onclick="showTab('price')"><i class="fa-solid fa-tags"></i><span>{{ T.tab_price }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
+    <div class="side-item" id="tab-dayclose" data-tab="dayclose" onclick="showTab('dayclose')"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
     {% if is_employee or has_staff %}<div class="side-item" id="tab-cash" data-tab="cash" onclick="showTab('cash')"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
     {% if team_on %}<div class="side-item" id="tab-team" data-tab="team" onclick="showTab('team')"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
@@ -1746,6 +1780,7 @@ if ('serviceWorker' in navigator) {
 <div class="more-sheet" id="moreSheet" data-bar="table,price,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
   <div class="more-list">
+      <div class="more-item" data-tab="dayclose" data-more-slot="dayclose" onclick="showTab('dayclose'); closeMore();"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
       {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
       {% if team_on %}<div class="more-item" data-tab="team" data-more-slot="team" onclick="showTab('team'); closeMore();"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
       {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
@@ -2080,6 +2115,16 @@ if ('serviceWorker' in navigator) {
         <button type="button" class="sv-undo" id="svUndo" onclick="undoSaved()"></button>
       </div>
     </div>
+  </div>
+
+  <div id="view-dayclose" style="display:none;">
+    <div class="dc-head"><h2>{{ T.tab_dayclose }}</h2><div class="dc-hint">{{ T.dc_hint_emp if is_employee else T.dc_hint }}</div></div>
+    <div class="dc-days">
+      <button type="button" id="dcToday" class="on" onclick="dcPickDay(0)">{{ T.dc_today }}</button>
+      <button type="button" id="dcYday" onclick="dcPickDay(1)">{{ T.dc_yesterday }}</button>
+      <input type="date" id="dcDate" onchange="dcPickDate(this.value)" aria-label="{{ T.dc_date }}">
+    </div>
+    <div id="dcBody"></div>
   </div>
 
   <div id="view-price" style="display:none;">
@@ -3192,6 +3237,9 @@ function showTab(t, keepScroll) {
   const priceView = document.getElementById('view-price');
   if (priceView) priceView.style.display = t === 'price' ? 'block' : 'none';
   if (t === 'price') prOpen();
+  const dcView = document.getElementById('view-dayclose');
+  if (dcView) dcView.style.display = t === 'dayclose' ? 'block' : 'none';
+  if (t === 'dayclose') dcOpen();
   if (t === 'table') { loadCars(); loadBaseDue(); }
   if (t === 'debts') loadDebts();
   if (t === 'expenses') loadExpensesTab();
@@ -9387,6 +9435,183 @@ function repeatLastVisit(itemsArg, doneMsg) {
   if (mileageEl) { mileageEl.focus(); mileageEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
 }
 
+// ===== «Закрытие дня»: сверка денег в кассе с программой за минуту =====
+// Владелец видит «должно быть в кассе» и вводит, сколько насчитал — сразу
+// видно «сходится» / недостача / лишние. Сотрудник закрывает «вслепую»:
+// вводит только сумму, цифр программы не видит. Итог уходит в Telegram.
+const DC = { day: null, today: null, data: null, seq: 0, counted: '', note: '', justClosed: null };
+function dcMoney(v) { return (Math.round(Number(v) || 0)).toLocaleString('ru-RU'); }
+function dcShift(day, n) {
+  const p = day.split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2] - n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function dcDayLabel(day) { const p = day.split('-'); return p[2] + '.' + p[1]; }
+function dcOpen() { DC.justClosed = null; dcLoad(DC.day); }
+function dcPickDay(n) {
+  if (!DC.today) return dcLoad(null);
+  DC.justClosed = null; DC.counted = ''; DC.note = '';
+  dcLoad(dcShift(DC.today, n));
+}
+function dcPickDate(v) { if (!v) return; DC.justClosed = null; DC.counted = ''; DC.note = ''; dcLoad(v); }
+function dcMarkDays() {
+  const t = DC.today, d = DC.day;
+  document.getElementById('dcToday').classList.toggle('on', d === t);
+  document.getElementById('dcYday').classList.toggle('on', t && d === dcShift(t, 1));
+  const inp = document.getElementById('dcDate');
+  if (t) { inp.max = t; inp.min = dcShift(t, 7); }
+  inp.value = d || '';
+}
+async function dcLoad(day) {
+  const seq = ++DC.seq;
+  const body = document.getElementById('dcBody');
+  if (!DC.data) body.innerHTML = `<div class="pr-empty">…</div>`;
+  let data;
+  try { data = await (await fetch('/api/day_close' + (day ? '?day=' + encodeURIComponent(day) : ''), { credentials: 'same-origin' })).json(); }
+  catch (e) { if (seq === DC.seq) body.innerHTML = `<div class="pr-empty">${escapeHtml(T.dc_err_net)}</div>`; return; }
+  if (seq !== DC.seq) return;
+  if (!data.ok) { body.innerHTML = `<div class="pr-empty">${escapeHtml(data.error || T.dc_err_net)}</div>`; return; }
+  if (!DC.today || !day) DC.today = data.day;
+  if (day !== data.day) { DC.counted = ''; DC.note = ''; }
+  DC.day = data.day; DC.data = data;
+  dcMarkDays();
+  dcRender();
+}
+function dcExpected() {
+  const d = DC.data, t = d.totals, st = d.settings;
+  return (Number(st.float_start) || 0) + t.cash + t.repaid - (st.expenses_from_cash ? t.expenses : 0) - (st.suppliers_from_cash ? t.suppliers : 0);
+}
+function dcPillHtml(diff) {
+  if (diff === 0) return `<span class="dc-pill ok"><i class="fa-solid fa-check"></i>${escapeHtml(T.dc_ok)}</span>`;
+  if (diff < 0) return `<span class="dc-pill bad"><i class="fa-solid fa-triangle-exclamation"></i>${escapeHtml(T.dc_short)} ${dcMoney(-diff)}</span>`;
+  return `<span class="dc-pill over"><i class="fa-solid fa-plus"></i>${escapeHtml(T.dc_over)} ${dcMoney(diff)}</span>`;
+}
+function dcRender() {
+  const d = DC.data, body = document.getElementById('dcBody');
+  if (d.blind) return dcRenderBlind();
+  if (DC.justClosed) return dcRenderReceipt(DC.justClosed);
+  const t = d.totals, st = d.settings, c = d.closing;
+  const exp = dcExpected();
+  let html = '';
+  if (c) {
+    const who = c.by_employee ? `${escapeHtml(c.closed_by || '')} (${escapeHtml(T.role_employee)})` : escapeHtml(T.dc_owner);
+    html += `<div class="dc-done${c.diff ? ' bad' : ''}"><i class="fa-solid fa-lock"></i><div>${escapeHtml(T.dc_closed_at)} ${escapeHtml((c.updated_at || '').slice(11, 16))} · ${who}<br>${escapeHtml(T.dc_counted)}: <b>${dcMoney(c.counted)}</b> · ${c.diff ? (c.diff > 0 ? '+' : '−') + dcMoney(Math.abs(c.diff)) : escapeHtml(T.dc_ok)}</div></div>`;
+  }
+  html += `<div class="dc-card">
+    <div class="dc-lbl">${escapeHtml(T.dc_expected)}</div>
+    <div class="dc-big" id="dcExp">${dcMoney(exp)} <small>${escapeHtml(T.currency)}</small></div>
+    <div class="dc-row"><span>${escapeHtml(T.dc_float)}</span><input type="number" inputmode="numeric" min="0" step="1000" id="dcFloat" value="${Number(st.float_start) || 0}" oninput="dcSet('float', this.value)"></div>
+    <div class="dc-row"><span>${escapeHtml(T.dc_cash)}</span><b>+ ${dcMoney(t.cash)}</b></div>
+    ${t.repaid ? `<div class="dc-row"><span>${escapeHtml(T.dc_repaid)}</span><b>+ ${dcMoney(t.repaid)}</b></div>` : ''}
+    ${t.expenses ? `<div class="dc-row"><label><input type="checkbox" ${st.expenses_from_cash ? 'checked' : ''} onchange="dcSet('exp', this.checked)">${escapeHtml(T.dc_exp_from_cash)}</label><b class="${st.expenses_from_cash ? 'minus' : 'info'}">− ${dcMoney(t.expenses)}</b></div>` : ''}
+    ${t.suppliers ? `<div class="dc-row"><label><input type="checkbox" ${st.suppliers_from_cash ? 'checked' : ''} onchange="dcSet('sup', this.checked)">${escapeHtml(T.dc_sup_from_cash)}</label><b class="${st.suppliers_from_cash ? 'minus' : 'info'}">− ${dcMoney(t.suppliers)}</b></div>` : ''}
+    <div class="dc-row"><span>${escapeHtml(T.dc_card)}</span><b class="info">${dcMoney(t.card)}</b></div>
+    ${t.debt_out ? `<div class="dc-row"><span>${escapeHtml(T.dc_debt_out)}</span><b class="info">${dcMoney(t.debt_out)}</b></div>` : ''}
+    ${d.staff_cash ? `<div class="dc-hint" style="margin:8px 0 0;">${escapeHtml(T.dc_staff_cash.replace('{sum}', dcMoney(d.staff_cash)))}</div>` : ''}
+  </div>
+  <div class="dc-card">
+    <label for="dcCounted" class="dc-lbl" style="display:block; text-transform:none; letter-spacing:0; margin:0;">${escapeHtml(T.dc_counted_q)}</label>
+    <input class="dc-in" id="dcCounted" type="number" inputmode="numeric" min="0" step="1000" placeholder="${Math.round(exp)}" value="${escapeHtml(DC.counted)}" oninput="dcSet('counted', this.value)">
+    <div id="dcPill"></div>
+    <div id="dcNoteWrap"></div>
+    <div class="dc-err" id="dcErr"></div>
+    <button type="button" class="dc-go" onclick="dcSubmit()"><i class="fa-solid ${d.has_tg ? 'fa-paper-plane' : 'fa-lock'}"></i>${escapeHtml(c ? T.dc_reclose : (d.has_tg ? T.dc_close_tg : T.dc_close))}</button>
+    ${d.has_tg ? '' : `<div class="dc-hint" style="margin:8px 0 0;">${escapeHtml(T.dc_no_tg)}</div>`}
+  </div>`;
+  const hist = (d.history || []).filter(h => h.day !== DC.day);
+  if (hist.length) {
+    html += `<div class="dc-lbl" style="margin:4px 2px 6px;">${escapeHtml(T.dc_hist)}</div><div class="dc-card dc-hist">` + hist.map(h =>
+      `<div class="dc-row"><span>${dcDayLabel(h.day)} · ${dcMoney(h.counted)}</span>${h.diff ? `<span class="dc-pill ${h.diff < 0 ? 'bad' : 'over'}">${h.diff > 0 ? '+' : '−'}${dcMoney(Math.abs(h.diff))}</span>` : `<span class="dc-pill ok"><i class="fa-solid fa-check"></i></span>`}</div>`
+    ).join('') + `</div>`;
+  }
+  body.innerHTML = html;
+  dcLive();
+}
+function dcSet(what, v) {
+  const st = DC.data.settings;
+  if (what === 'float') st.float_start = Math.max(0, Math.round(Number(v) || 0));
+  else if (what === 'exp') st.expenses_from_cash = v;
+  else if (what === 'sup') st.suppliers_from_cash = v;
+  else if (what === 'counted') DC.counted = v;
+  if (what === 'exp' || what === 'sup') { dcRender(); return; }
+  const e = document.getElementById('dcExp');
+  if (e) e.innerHTML = `${dcMoney(dcExpected())} <small>${escapeHtml(T.currency)}</small>`;
+  dcLive();
+}
+function dcLive() {
+  const pill = document.getElementById('dcPill'), wrap = document.getElementById('dcNoteWrap');
+  const err = document.getElementById('dcErr');
+  if (err) err.textContent = '';
+  if (!pill) return;
+  if (DC.counted === '' || DC.counted === null) { pill.innerHTML = ''; wrap.innerHTML = ''; return; }
+  const diff = Math.round(Number(DC.counted) || 0) - dcExpected();
+  pill.innerHTML = dcPillHtml(diff);
+  if (diff !== 0 && !document.getElementById('dcNote')) {
+    wrap.innerHTML = `<input class="dc-note" id="dcNote" maxlength="300" placeholder="${escapeHtml(T.dc_note_ph)}" value="${escapeHtml(DC.note)}" oninput="DC.note = this.value">`;
+  } else if (diff === 0) wrap.innerHTML = '';
+}
+async function dcSubmit() {
+  const d = DC.data, err = document.getElementById('dcErr');
+  const raw = String(DC.counted).trim();
+  if (raw === '' || !(Number(raw) >= 0)) {
+    if (err) err.textContent = T.dc_err_empty;
+    const inp = document.getElementById('dcCounted'); if (inp) inp.focus();
+    return;
+  }
+  const payload = { day: DC.day, counted: Math.round(Number(raw)), note: DC.note || '' };
+  if (!d.blind) Object.assign(payload, { float_start: d.settings.float_start || 0,
+    expenses_from_cash: !!d.settings.expenses_from_cash, suppliers_from_cash: !!d.settings.suppliers_from_cash,
+    expected_seen: dcExpected() });
+  let res, r;
+  try {
+    r = await fetch('/api/day_close', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    res = await r.json();
+  } catch (e) { if (err) err.textContent = T.dc_err_net; return; }
+  if (res.error === 'changed') {
+    const keep = DC.counted, note = DC.note;
+    await dcLoad(DC.day);
+    DC.counted = keep; DC.note = note; dcRender();
+    const e2 = document.getElementById('dcErr'); if (e2) e2.textContent = res.message || T.dc_err_changed;
+    return;
+  }
+  if (!res.ok) { const e3 = document.getElementById('dcErr'); if (e3) e3.textContent = res.error || T.dc_err_net; return; }
+  DC.counted = ''; DC.note = '';
+  if (res.blind) { DC.data.closed = true; DC.data.justSent = res.sent; DC.data.closed_at = null; dcRenderBlind(true); return; }
+  DC.justClosed = Object.assign({}, res.closing, { sent: res.sent });
+  await dcLoad(DC.day);
+}
+function dcRenderReceipt(c) {
+  const d = DC.data, body = document.getElementById('dcBody');
+  const profit = d.profit;
+  body.innerHTML = `<div class="dc-card">
+    <div class="dc-rc-top"><div><b>${escapeHtml(T.dc_rc_title)}</b><div class="dc-lbl">${dcDayLabel(c.day)}</div></div>${dcPillHtml(c.diff)}</div>
+    <div class="dc-row"><span>${escapeHtml(T.dc_rc_services)}</span><b>${c.services}</b></div>
+    <div class="dc-row"><span>${escapeHtml(T.dc_rc_revenue)}</span><b>${dcMoney(c.revenue)}</b></div>
+    ${c.expenses ? `<div class="dc-row"><span>${escapeHtml(T.dc_rc_expenses)}</span><b class="minus">− ${dcMoney(c.expenses)}</b></div>` : ''}
+    ${profit !== undefined && profit !== null && profit > 0 ? `<div class="dc-row"><span>${escapeHtml(T.dc_rc_profit)}</span><b style="color:#166534;">+ ${dcMoney(profit)}</b></div>` : ''}
+    <div class="dc-row"><span>${escapeHtml(T.dc_expected)}</span><b>${dcMoney(c.expected)}</b></div>
+    <div class="dc-row"><span>${escapeHtml(T.dc_rc_handed)}</span><b>${dcMoney(c.counted)}</b></div>
+    ${c.note ? `<div class="dc-hint" style="margin:8px 0 0;">${escapeHtml(T.dc_note_lbl)}: ${escapeHtml(c.note)}</div>` : ''}
+  </div>
+  <div class="dc-done${c.sent ? '' : ' bad'}"><i class="fa-brands fa-telegram"></i><div>${escapeHtml(c.sent ? T.dc_sent : T.dc_not_sent)}</div></div>
+  <button type="button" class="dc-go" style="background:#E2E8F0; color:#0F172A;" onclick="DC.justClosed = null; dcRender();">${escapeHtml(T.dc_back)}</button>`;
+}
+function dcRenderBlind(justNow) {
+  const d = DC.data, body = document.getElementById('dcBody');
+  if (d.owner_closed) { body.innerHTML = `<div class="dc-done"><i class="fa-solid fa-lock"></i><div>${escapeHtml(T.dc_emp_owner_closed)}</div></div>`; return; }
+  let html = '';
+  if (d.closed) html += `<div class="dc-done"><i class="fa-solid fa-check"></i><div>${escapeHtml(justNow ? T.dc_emp_done : T.dc_emp_already)}</div></div>`;
+  html += `<div class="dc-card">
+    <label for="dcCounted" class="dc-lbl" style="display:block; text-transform:none; letter-spacing:0; margin:0;">${escapeHtml(T.dc_counted_q)}</label>
+    <input class="dc-in" id="dcCounted" type="number" inputmode="numeric" min="0" step="1000" value="${escapeHtml(DC.counted)}" oninput="DC.counted = this.value; document.getElementById('dcErr').textContent = '';">
+    <input class="dc-note" id="dcNote" maxlength="300" placeholder="${escapeHtml(T.dc_note_emp_ph)}" value="${escapeHtml(DC.note)}" oninput="DC.note = this.value">
+    <div class="dc-err" id="dcErr"></div>
+    <button type="button" class="dc-go" onclick="dcSubmit()"><i class="fa-solid fa-paper-plane"></i>${escapeHtml(d.closed ? T.dc_emp_resend : T.dc_emp_send)}</button>
+  </div>`;
+  body.innerHTML = html;
+}
+
 // ===== «Цена»: за секунду назвать клиенту цену товара и всей замены =====
 // Только цены продажи (закупки здесь нет ни для кого) — экран можно
 // открывать при клиенте. Данные — те же, что уже есть в панели: товары
@@ -11774,7 +11999,7 @@ guardOnce(['submitCar', 'sendPassportTg', 'saveEdit', 'saveCarEdit', 'deleteEntr
   'saveSupplier', 'deleteSupplierBtn', 'saveSupplierProducts', 'saveOrderDraft', 'sendOrder', 'receiveFromDraft',
   'cancelOrderBtn', 'submitReceive', 'submitDistribute', 'keepAllOrder', 'sendOrderBot', 'unlinkSupplierTg', 'saveSupPayment', 'cancelSupPayment', 'restoreSupplier', 'saveOrderNewProduct',
   'createStaff', 'staffResetPw', 'staffToggle', 'staffDelete', 'submitCashAccept', 'cancelCashHandover',
-  'submitTeamPay', 'submitTeamAdjust', 'cancelTeamOp', 'saveTeamPaySettings', 'saveTeamSettings']);
+  'submitTeamPay', 'submitTeamAdjust', 'cancelTeamOp', 'saveTeamPaySettings', 'saveTeamSettings', 'dcSubmit']);
 </script>
 </body>
 </html>
