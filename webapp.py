@@ -5991,6 +5991,7 @@ from subscription import (  # noqa: E402,F401  (нужны остальной п
     _admin_sub_summary, _sub_owner_link, _sub_ro_ctx, notify_sub_decision, sub_decide,
 )
 import admin_routes  # noqa: E402,F401
+import queue_routes  # noqa: E402,F401  («Машина готова» и живая очередь)
 
 
 if __name__ == "__main__":

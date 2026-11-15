@@ -316,6 +316,7 @@ def init_db():
         _migrate_digest(conn)
         _migrate_calls(conn)
         _migrate_day_close(conn)
+        _migrate_car_queue(conn)
         _bootstrap_accounts(conn)
 
 
@@ -10383,3 +10384,196 @@ def list_day_closings(shop_id: int, limit: int = 14) -> list:
         rows = conn.execute("SELECT day, expected, counted, diff, closed_by, by_employee, times_closed, updated_at "
                             "FROM day_closings WHERE shop_id=? ORDER BY day DESC LIMIT ?", (shop_id, limit)).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------- «Машина готова» и живая очередь ----------
+# Машина ставится в очередь: ждёт → в работе → готово → забрали (gone).
+# У каждой — свой токен: клиент по ссылке /q/<токен> видит своё место и
+# примерное время; на табло в зале — вся очередь (только номера).
+QUEUE_STATUSES = ("wait", "work", "done", "gone")
+QUEUE_DEFAULT_MIN = 20     # сколько минут на машину, пока нет своей истории
+QUEUE_KEEP_DONE_H = 3      # «Готово» висит на доске и табло 3 часа
+
+
+def _migrate_car_queue(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS car_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        plate TEXT NOT NULL,
+        what TEXT,
+        car_label TEXT,
+        owner_name TEXT,
+        owner_phone TEXT,
+        telegram_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'wait',
+        token TEXT UNIQUE NOT NULL,
+        employee_id INTEGER,
+        created_at TEXT NOT NULL,
+        started_at TEXT,
+        done_at TEXT,
+        gone_at TEXT
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_car_queue_shop ON car_queue(shop_id, status)")
+
+
+def _now_s():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _queue_live_sql():
+    # активные + «готово» за последние часы; вчерашние «ждут/в работе» тоже
+    # остаются, пока их не уберут (вдруг машина ночует на точке)
+    since = (datetime.now() - timedelta(hours=QUEUE_KEEP_DONE_H)).strftime("%Y-%m-%d %H:%M:%S")
+    return "(status IN ('wait', 'work') OR (status='done' AND done_at >= ?))", since
+
+
+@_serialized
+def queue_add(shop_id: int, plate: str, what: str = "", employee_id=None) -> dict:
+    plate = normalize_plate(plate or "")[:20]
+    if not plate or plate == WALKIN_PLATE:
+        raise ValueError("plate")
+    what = " ".join(str(what or "").split())[:80]
+    with get_conn() as conn:
+        ex = conn.execute("SELECT id FROM car_queue WHERE shop_id=? AND plate=? AND status IN ('wait', 'work')",
+                          (shop_id, plate)).fetchone()
+        if ex:
+            return {"duplicate": True, **queue_get(shop_id, ex["id"])}
+        car = conn.execute("""
+            SELECT c.car_brand, c.car_model, cl.full_name, cl.phone, cl.telegram_id
+            FROM cars c JOIN clients cl ON cl.id = c.client_id WHERE c.shop_id=? AND c.plate_number=?
+        """, (shop_id, plate)).fetchone()
+        car = dict(car) if car else {}
+        label = " ".join(x for x in (car.get("car_brand"), car.get("car_model")) if x) or None
+        cur = conn.execute("""
+            INSERT INTO car_queue (shop_id, plate, what, car_label, owner_name, owner_phone, telegram_id,
+                                   status, token, employee_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?, ?)
+        """, (shop_id, plate, what or None, label, car.get("full_name"), car.get("phone"),
+              car.get("telegram_id"), secrets.token_urlsafe(9), employee_id, _now_s()))
+        conn.commit()
+        return queue_get(shop_id, cur.lastrowid)
+
+
+def queue_get(shop_id: int, qid: int):
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM car_queue WHERE id=? AND shop_id=?", (qid, shop_id)).fetchone()
+    return dict(r) if r else None
+
+
+@_serialized
+def queue_set_status(shop_id: int, qid: int, status: str):
+    """Возвращает запись после изменения или None. Повторно «готово» не
+    перезаписывает время (сообщение клиенту уходит только один раз)."""
+    if status not in QUEUE_STATUSES:
+        raise ValueError("status")
+    row = queue_get(shop_id, qid)
+    if not row:
+        return None
+    now = _now_s()
+    sets = {"status": status}
+    if status == "work" and not row.get("started_at"):
+        sets["started_at"] = now
+    if status == "done" and row["status"] != "done":
+        sets["done_at"] = now
+        if not row.get("started_at"):
+            sets["started_at"] = row["created_at"]
+    if status == "gone":
+        sets["gone_at"] = now
+    if status in ("wait", "work"):
+        sets["done_at"] = None
+    with get_conn() as conn:
+        conn.execute(f"UPDATE car_queue SET {', '.join(k + '=?' for k in sets)} WHERE id=? AND shop_id=?",
+                     (*sets.values(), qid, shop_id))
+        conn.commit()
+    out = queue_get(shop_id, qid)
+    out["just_done"] = status == "done" and row["status"] != "done"
+    return out
+
+
+@_serialized
+def queue_delete(shop_id: int, qid: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM car_queue WHERE id=? AND shop_id=?", (qid, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def queue_avg_minutes(shop_id: int) -> int:
+    """Сколько в среднем минут машина в работе у этой точки (за 30 дней).
+    Слишком короткие/долгие (забыли нажать) не считаем."""
+    since = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        rows = conn.execute("""SELECT started_at, done_at FROM car_queue WHERE shop_id=? AND done_at >= ?
+                               AND started_at IS NOT NULL""", (shop_id, since)).fetchall()
+    mins = []
+    for r in rows:
+        try:
+            m = (datetime.strptime(r["done_at"], "%Y-%m-%d %H:%M:%S")
+                 - datetime.strptime(r["started_at"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
+        except (TypeError, ValueError):
+            continue
+        if 5 <= m <= 180:
+            mins.append(m)
+    if len(mins) < 3:
+        return QUEUE_DEFAULT_MIN
+    mins.sort()
+    return int(round(mins[len(mins) // 2]))
+
+
+def queue_list(shop_id: int) -> list:
+    live, since = _queue_live_sql()
+    with get_conn() as conn:
+        rows = conn.execute(f"SELECT * FROM car_queue WHERE shop_id=? AND {live} ORDER BY created_at, id",
+                            (shop_id, since)).fetchall()
+    rows = [dict(r) for r in rows]
+    avg = queue_avg_minutes(shop_id)
+    _queue_positions(rows, avg)
+    return rows
+
+
+def _queue_positions(rows: list, avg: int):
+    """Место и примерное ожидание у «ждут»: впереди все «в работе» и «ждут»
+    раньше. Сколько мастеров работает одновременно — по числу машин «в работе»
+    (минимум 1). Машина «в работе» — осталось avg минус уже прошедшее."""
+    now = datetime.now()
+    work = [r for r in rows if r["status"] == "work"]
+    lanes = max(1, len(work))
+    left = []
+    for r in work:
+        try:
+            spent = (now - datetime.strptime(r["started_at"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
+        except (TypeError, ValueError):
+            spent = 0
+        r["eta_min"] = max(5, int(round(avg - spent)))
+        left.append(r["eta_min"])
+    # простая модель: у каждого «места» своё время освобождения; следующая
+    # ждущая машина встаёт на место, которое освободится раньше всех
+    free = sorted(left) if left else [0] * lanes
+    pos = 0
+    for r in rows:
+        if r["status"] != "wait":
+            continue
+        pos += 1
+        r["position"] = pos
+        t = free.pop(0)
+        r["eta_min"] = int(round(t + avg))
+        free.append(t + avg)
+        free.sort()
+
+
+def queue_by_token(token: str):
+    """Для страницы клиента: его машина, место, время, точка. Без имён и
+    номеров других машин."""
+    if not token or len(token) > 40:
+        return None
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM car_queue WHERE token=?", (token,)).fetchone()
+    if not r:
+        return None
+    r = dict(r)
+    rows = queue_list(r["shop_id"])
+    me = next((x for x in rows if x["id"] == r["id"]), r)
+    return {"shop_id": r["shop_id"], "plate": r["plate"], "status": me["status"],
+            "position": me.get("position"), "eta_min": me.get("eta_min"), "what": r.get("what"),
+            "done_at": r.get("done_at")}
