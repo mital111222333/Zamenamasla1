@@ -147,3 +147,35 @@ def test_miniapp_page_and_garage(world):
     assert "wallet" in page and "Mening garajim" in page
     g = c.get("/api/m/garage", headers={"X-Telegram-Init-Data": _init_data(TG_OWNER)}).get_json()
     assert g["ok"] and g["cars"][0]["plate"] == "01G777AA"
+
+
+def test_widget_html_fits_limits():
+    import widgets
+    assert widgets.html_fits("ru") and widgets.html_fits("uz")
+
+
+def test_widget_query_reaches_handler(world, monkeypatch):
+    """PTB 21 не знает widget_query — он должен лежать в api_kwargs, а
+    нажатие «через неделю» — выполняться только для своего клиента."""
+    import asyncio
+    from telegram import Bot, Update
+    import bot
+    import widgets
+    calls = []
+    monkeypatch.setattr(widgets, "_call", lambda token, method, payload: calls.append((method, payload)) or (True, {}))
+    oc = _last(world["car_a"])
+    raw = {"update_id": 1, "widget_query": {"id": "q1", "from": {"id": TG_OTHER}, "chat": {"id": TG_OTHER},
+                                             "message_id": 5, "data": f"snooze:{oc['id']}:o", "type": {"type": "data"}}}
+    upd = Update.de_json(raw, Bot("123456:TEST"))
+    assert upd.api_kwargs["widget_query"]["id"] == "q1"
+    asyncio.run(bot.widget_query_handler(upd, None))
+    assert [m for m, _ in calls] == ["answerWidgetQuery"]          # чужой — только ответ
+    calls.clear()
+    raw["widget_query"]["from"]["id"] = TG_OWNER
+    raw["widget_query"]["chat"]["id"] = TG_OWNER
+    before = _last(world["car_a"])["reminder_count"]
+    asyncio.run(bot.widget_query_handler(Update.de_json(raw, Bot("123456:TEST")), None))
+    assert [m for m, _ in calls] == ["answerWidgetQuery", "editMessageWidgetData"]
+    assert json.loads(calls[1][1]["chat_data"])["st"] == "snooze"
+    after = _last(world["car_a"])
+    assert after["last_reminder_date"] and after["reminder_count"] >= max(1, before or 0)

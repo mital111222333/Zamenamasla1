@@ -9113,6 +9113,50 @@ def snooze_reminder(oil_change_id: int, kinds: str = "o", days: int = 7):
         conn.commit()
 
 
+def reminder_item(oil_change_id: int):
+    """Запись в том же виде, что строка get_due_reminders — чтобы заново
+    собрать карточку-напоминание после нажатия в ней."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT oc.*, c.plate_number, c.shop_id, c.car_brand, c.car_model, cl.full_name as owner_name,
+                   cl.telegram_id, cl.phone as owner_phone, s.shop_name, s.notify_telegram_id, s.language
+            FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            JOIN clients cl ON cl.id = c.client_id
+            JOIN shops s ON s.id = c.shop_id
+            WHERE oc.id=?
+        """, (oil_change_id,)).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    nd = _day(item.get("next_change_date"))
+    item["days_left"] = (nd - datetime.now().date()).days if nd else None
+    return item
+
+
+def latest_client_change(telegram_id: int):
+    """Последняя запись самой «срочной» машины клиента — для показа примера
+    карточки-напоминания (/demo)."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT oc.id FROM oil_changes oc
+            JOIN cars c ON c.id = oc.car_id
+            JOIN clients cl ON cl.id = c.client_id
+            JOIN shops s ON s.id = c.shop_id
+            WHERE cl.telegram_id=? AND s.is_active=1 AND c.plate_number <> '#SALE'
+              AND oc.id = (SELECT MAX(o2.id) FROM oil_changes o2 WHERE o2.car_id = c.id)
+            ORDER BY COALESCE(oc.next_change_date, '9999') ASC LIMIT 1
+        """, (telegram_id,)).fetchone()
+    return row["id"] if row else None
+
+
+def shop_owner_telegram(telegram_id: int) -> bool:
+    """Этот Telegram — владелец (уведомления) какой-то активной точки."""
+    with get_conn() as conn:
+        return conn.execute("SELECT 1 FROM shops WHERE notify_telegram_id=? AND is_active=1 LIMIT 1",
+                            (str(telegram_id),)).fetchone() is not None
+
+
 def reminder_card(item: dict, today=None) -> dict:
     """Данные для «живой» карточки напоминания: доля срока (0..1+), сколько
     км примерно осталось, прошлая замена и что заливали."""
@@ -9139,6 +9183,7 @@ def reminder_card(item: dict, today=None) -> dict:
     elif item.get("oil_brand"):
         oil_text = item["oil_brand"]
     return {"ratio": ratio, "est_km": est_km, "km_left": km_left, "oil": oil_text or None,
+            "days_left": (next_day - today).days if next_day else None,
             "last_date": item.get("change_date"), "last_mileage": item.get("mileage")}
 
 

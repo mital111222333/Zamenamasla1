@@ -35,10 +35,11 @@ from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyK
 from telegram.error import Forbidden
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes,
-    ConversationHandler, filters, CallbackQueryHandler
+    ConversationHandler, filters, CallbackQueryHandler, TypeHandler
 )
 
 import database as db
+import widgets
 import backup_store
 import digest
 import webapp
@@ -75,6 +76,27 @@ def miniapp_url():
     https — без PUBLIC_URL на https кнопки просто не показываем."""
     base = (webapp.PUBLIC_URL or "").rstrip("/")
     return f"{base}/m" if base.startswith("https://") else None
+
+
+def garage_link(plate=None):
+    """«Мой гараж» в Mini App, сразу на нужной машине."""
+    url = miniapp_url()
+    if url and plate:
+        url += f"?car={urllib.parse.quote(db.normalize_plate(plate or ''))}"
+    return url
+
+
+async def set_client_menu(bot, chat_id, lang):
+    """Кнопка слева от поля ввода у клиента — «Мой гараж», а не панель точки
+    (у кого раньше была панель после /panel — меняем на гараж)."""
+    url = miniapp_url()
+    if not url:
+        return
+    try:
+        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=MenuButtonWebApp(
+            text=i18n.t("menu_btn_garage", lang), web_app=WebAppInfo(url=url)))
+    except Exception as e:
+        logger.warning(f"Не удалось поставить кнопку «Мой гараж» в чате {chat_id}: {e}")
 
 
 def app_button(lang: str):
@@ -114,9 +136,17 @@ async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_app_intro(update: Update, lang: str):
+    """Сообщение с кнопкой «Открыть OilBook» — закрепляем его вверху чата,
+    чтобы кнопка не уезжала вверх при переписке; и ставим «Мой гараж» в
+    кнопку меню слева от поля ввода."""
+    await set_client_menu(update.get_bot(), update.effective_chat.id, lang)
     markup = app_button(lang)
     if markup:
-        await update.message.reply_text(i18n.t("bot_app_intro", lang), reply_markup=markup)
+        msg = await update.message.reply_text(i18n.t("bot_app_intro", lang), reply_markup=markup)
+        try:
+            await msg.pin(disable_notification=True)
+        except Exception as e:
+            logger.info(f"Не удалось закрепить сообщение с гаражом: {e}")
 
 
 def get_client_lang(telegram_id: int) -> str:
@@ -754,11 +784,10 @@ async def _send_one_reminder(context, item, sms_creds):
                 InlineKeyboardButton(i18n.t("btn_shop", lang), callback_data=f"shop:{item['id']}:{kinds}"),
             ],
         ]
-        garage = miniapp_url()
+        garage = garage_link(item["plate_number"])
         if garage:
             # кнопка открывает «Мой гараж» сразу на этой машине
-            rows.append([InlineKeyboardButton(i18n.t("btn_open_garage", lang), web_app=WebAppInfo(
-                url=f"{garage}?car={urllib.parse.quote(db.normalize_plate(item['plate_number'] or ''))}"))])
+            rows.append([InlineKeyboardButton(i18n.t("btn_open_garage", lang), web_app=WebAppInfo(url=garage))])
         keyboard = InlineKeyboardMarkup(rows)
         if kinds != "o":
             key = "bot_reminder_any_followup" if is_followup else "bot_reminder_any_first"
@@ -768,6 +797,14 @@ async def _send_one_reminder(context, item, sms_creds):
         else:
             service = item.get('service_type') or i18n.t("history_service_fallback", lang)
             text = i18n.t("bot_reminder_first", lang, plate=item['plate_number'], service=service, shop=shop_name)
+        # сначала — интерактивная карточка (Bot API 10.4); не принял Telegram —
+        # обычное сообщение с кнопками, как раньше
+        sent, _err = await asyncio.to_thread(
+            widgets.send_reminder_widget, BOT_TOKEN, item["telegram_id"], lang,
+            widgets.reminder_data(item, db.reminder_card(item), kinds), text, garage_link(item["plate_number"]))
+        if sent:
+            mark()
+            return
         text += reminder_card_text(item, lang)
         try:
             await context.bot.send_message(chat_id=item["telegram_id"], text=text, reply_markup=keyboard)
@@ -798,6 +835,77 @@ async def _send_one_reminder(context, item, sms_creds):
             logger.warning(f"Не удалось отправить SMS-напоминание {item['id']}: {err}")
     # иначе — ни Telegram, ни SMS недоступны для этого клиента, пропускаем
     # (не отмечаем как отправленное — вдруг клиент привяжет Telegram позже)
+
+
+async def widget_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Нажатие внутри карточки-напоминания (update «widget_query» из Bot API
+    10.4 — python-telegram-bot 21 кладёт его в api_kwargs). Делаем то же, что
+    кнопки под обычным напоминанием, и меняем карточку на «готово»."""
+    q = (getattr(update, "api_kwargs", None) or {}).get("widget_query")
+    if not isinstance(q, dict):
+        return
+    qid = q.get("id")
+    uid = (q.get("from") or {}).get("id")
+    chat_id = (q.get("chat") or {}).get("id") or uid
+    message_id = q.get("message_id")
+    parts = str(q.get("data") or "").split(":")
+    try:
+        action, oc_id = parts[0], int(parts[1])
+    except (IndexError, ValueError):
+        await asyncio.to_thread(widgets.answer_query, BOT_TOKEN, qid)
+        return
+    kinds = parts[2] if len(parts) > 2 and parts[2] in ("o", "a", "oa") else "o"
+    demo = len(parts) > 3 and parts[3] == "d"
+    item = await asyncio.to_thread(db.reminder_item, oc_id)
+    # нажать может только сам клиент этой записи
+    if action not in ("book", "changed", "snooze") or not item or str(item.get("telegram_id") or "") != str(uid):
+        await asyncio.to_thread(widgets.answer_query, BOT_TOKEN, qid)
+        return
+    lang = item.get("language") or "ru"
+    card = db.reminder_card(item)    # карточку собираем ДО изменения сроков
+    if not demo:
+        if action in ("changed", "book") and "a" in kinds:
+            db.close_atf_reminder(oc_id)
+        if action == "changed" and "o" in kinds:
+            db.mark_already_changed_elsewhere(oc_id)
+        elif action == "book":
+            if "o" in kinds:
+                db.mark_booked(oc_id)
+            if item.get("notify_telegram_id"):
+                try:
+                    await context.bot.send_message(
+                        chat_id=int(item["notify_telegram_id"]),
+                        text=i18n.t("bot_booked_notify", lang, plate=item["plate_number"], owner=item.get("owner_name") or "—")
+                        + (f"\n{i18n.t('bot_shop_phone_label', lang)} {item['owner_phone']}" if item.get("owner_phone") else ""))
+                except Exception as e:
+                    logger.warning(f"Не удалось уведомить точку о записи из карточки: {e}")
+        elif action == "snooze":
+            db.snooze_reminder(oc_id, kinds, days=7)
+    await asyncio.to_thread(widgets.answer_query, BOT_TOKEN, qid, "ok")
+    data = widgets.reminder_data(item, card, kinds, demo=demo)
+    data["st"] = action
+    if chat_id and message_id:
+        ok, err = await asyncio.to_thread(widgets.set_state, BOT_TOKEN, chat_id, message_id, data)
+        if not ok:
+            logger.warning(f"Карточка-напоминание не обновлена: {err}")
+
+
+async def demo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/demo — пример карточки-напоминания по своей машине. Нажатия в примере
+    только меняют вид карточки: запись не трогается, точке ничего не уходит."""
+    user = update.effective_user
+    lang = get_client_lang(user.id)
+    oc_id = await asyncio.to_thread(db.latest_client_change, user.id)
+    item = oc_id and await asyncio.to_thread(db.reminder_item, oc_id)
+    if not item:
+        await update.message.reply_text(i18n.t("bot_demo_no_car", lang))
+        return
+    caption = i18n.t("bot_demo_caption", lang, plate=item["plate_number"])
+    sent, err = await asyncio.to_thread(
+        widgets.send_reminder_widget, BOT_TOKEN, user.id, lang,
+        widgets.reminder_data(item, db.reminder_card(item), "o", demo=True), caption, garage_link(item["plate_number"]))
+    if not sent:
+        await update.message.reply_text(i18n.t("bot_demo_failed", lang, err=err or "—"))
 
 
 def _fmt_km(n):
@@ -1311,6 +1419,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("myid", myid))
     app.add_handler(CommandHandler("panel", panel_command))
+    app.add_handler(CommandHandler("demo", demo_command))
+    # нажатия в карточках-напоминаниях (widget_query) — до остальных обработчиков
+    app.add_handler(TypeHandler(Update, widget_query_handler, block=False), group=-1)
     app.add_handler(CommandHandler("info", shop_info_button))  # то же, что кнопка «О пункте», если кнопок нет
     app.add_handler(add_conv)
     app.add_handler(find_conv)
@@ -1348,7 +1459,8 @@ def main():
     app.add_error_handler(on_error)
 
     logger.info("Бот и веб-панель запущены...")
-    app.run_polling()
+    # widget_query (Bot API 10.4) нужно запросить явно, иначе Telegram его не пришлёт
+    app.run_polling(allowed_updates=list(Update.ALL_TYPES) + ["widget_query"])
 
 
 if __name__ == "__main__":

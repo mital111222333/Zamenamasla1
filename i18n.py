@@ -4764,3 +4764,37 @@ UZ.update({
     "pp_copied": "Havola nusxalandi",
     "pp_footer": "Yozuvlar OilBook shoxobchalari ustalari tomonidan avtomobilga xizmat ko'rsatish vaqtida kiritilgan.",
 })
+
+# Интерактивная карточка-напоминание (Bot API 10.4) и кнопка «Мой гараж»
+RU.update({
+    "menu_btn_garage": "Мой гараж",
+    "wg_until": "До замены масла",
+    "wg_now": "Пора менять!",
+    "wg_days": "дн.",
+    "wg_book": "Записаться",
+    "wg_changed": "Уже заменил",
+    "wg_snooze": "Через неделю",
+    "wg_s_book": "✓ Вы записаны — ждём вас в {shop}",
+    "wg_s_changed": "✓ Отметили. Хорошей дороги! 🚗",
+    "wg_s_snooze": "⏰ Хорошо, напомним через неделю",
+    "bot_demo_caption": "Пример напоминания OilBook для {plate}",
+    "bot_demo_no_car": "Пока нет машин с заменой масла — пример показать не на чем.",
+    "bot_demo_failed": "Telegram не принял интерактивное сообщение. Обновите приложение Telegram и попробуйте ещё раз.\n\nОтвет Telegram: {err}",
+    "ma_owner_panel": "Панель точки",
+})
+UZ.update({
+    "menu_btn_garage": "Garajim",
+    "wg_until": "Moy almashtirishgacha",
+    "wg_now": "Almashtirish vaqti!",
+    "wg_days": "kun",
+    "wg_book": "Yozilish",
+    "wg_changed": "Almashtirdim",
+    "wg_snooze": "Bir haftadan keyin",
+    "wg_s_book": "✓ Siz yozildingiz — {shop}da kutamiz",
+    "wg_s_changed": "✓ Belgiladik. Yaxshi yo'l! 🚗",
+    "wg_s_snooze": "⏰ Yaxshi, bir haftadan keyin eslatamiz",
+    "bot_demo_caption": "{plate} uchun OilBook eslatma namunasi",
+    "bot_demo_no_car": "Hozircha moy almashtirilgan mashina yo'q — namuna ko'rsatib bo'lmaydi.",
+    "bot_demo_failed": "Telegram interaktiv xabarni qabul qilmadi. Telegram ilovasini yangilab, qayta urinib ko'ring.\n\nTelegram javobi: {err}",
+    "ma_owner_panel": "Shoxobcha paneli",
+})
