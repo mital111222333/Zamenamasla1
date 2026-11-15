@@ -1480,7 +1480,7 @@ if ('serviceWorker' in navigator) {
   <!-- уже установлено -->
   <div class="card state" id="stInstalled">
     <div class="ok"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>{{ T.inst_installed }}</b></div>
-    <a class="btn btn-blue" href="/" style="margin-top:14px;">{{ T.inst_open }}</a>
+    <a class="btn btn-blue" href="/tg" style="margin-top:14px;">{{ T.inst_open }}</a>
   </div>
 
   <!-- Android Chrome: системная кнопка установки -->
@@ -1736,7 +1736,30 @@ assert PAGE.count(_SW_SNIPPET) == 1
 PAGE = PAGE.replace(_SW_SNIPPET, NET_GUARD_JS + _SW_SNIPPET, 1)
 
 
+KNOWN_COOKIE = "ob_known"  # «в этом браузере уже входили в OilBook»
+
+
+def welcome_for_guests(view):
+    """Главный адрес сайта для нового человека — рекламная страница /welcome
+    (воронка из Instagram), а не форма входа. Кто уже пользуется OilBook,
+    попадает как раньше: вошедший — в панель, а тот, у кого вход истёк, — на
+    страницу входа (его браузер помечен после первого входа)."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        logged_in = session.get("role") in ("shop", "branch", "admin") and session.get("shop_id")
+        if not logged_in and not request.cookies.get(KNOWN_COOKIE):
+            qs = request.query_string.decode("utf-8", "ignore")
+            return redirect("/welcome" + ("?" + qs if qs else ""))
+        resp = make_response(view(*args, **kwargs))
+        if logged_in and not request.cookies.get(KNOWN_COOKIE) and resp.status_code < 400:
+            resp.set_cookie(KNOWN_COOKIE, "1", max_age=2 * 365 * 24 * 3600, samesite="Lax",
+                            secure=request.is_secure, httponly=True)
+        return resp
+    return wrapped
+
+
 @app.route("/")
+@welcome_for_guests
 @login_required
 def index():
     import json as _json

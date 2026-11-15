@@ -2,7 +2,7 @@
   "name": "OilBook — учёт для пунктов замены масла",
   "short_name": "OilBook",
   "description": "Платформа учёта для пунктов замены масла: клиенты, история, склад, расходы",
-  "start_url": "/",
+  "start_url": "/tg",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0A2540",
