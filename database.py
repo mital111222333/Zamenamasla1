@@ -10704,9 +10704,9 @@ def stats_analytics(shop_id: int, today=None) -> dict:
             continue
         if day >= d(today - timedelta(days=89)):
             week[dt.weekday()] += 1
-            if r["created_at"]:
-                h = int(r["created_at"][11:13])
-                key = f"{dt.weekday()}-{h}"
+            hh = str(r["created_at"] or "")[11:13]
+            if hh.isdigit():
+                key = f"{dt.weekday()}-{int(hh)}"
                 hours[key] = hours.get(key, 0) + 1
         if day < d(t30):
             continue
@@ -10743,7 +10743,7 @@ def stats_analytics(shop_id: int, today=None) -> dict:
         "month": month, "prev_month_same": pmonth,
         "plan": {"amount": plan, "days_in_month": dim, "days_passed": days_passed,
                  "per_day": int(round(per_day)), "forecast": forecast,
-                 "need_per_day": int(round(max(0, (plan or 0) - month) / max(1, dim - days_passed + 1))) if plan else None},
+                 "need_per_day": int(round(max(0, (plan or 0) - month) / max(1, dim - days_passed))) if plan else None},
         "viscosity": sorted(({"name": k, "liters": round(v, 1)} for k, v in visc.items()), key=lambda x: -x["liters"])[:6],
         "liters": round(liters, 1),
         "clients": {"visits": visits30, "unique": len(clients30), "returning": returning,
