@@ -17,6 +17,27 @@ TEXT = {
         "weekdays": ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"],
         "currency": "сум",
         "owner": "владелец",
+        "dc_title": "🔒 Закрытие дня — {shop} · {date}",
+        "dc_counts": "Замен: {count} · Выручка: {revenue} сум",
+        "dc_none": "Замен не было.",
+        "dc_float": "Размен утром: {sum} сум",
+        "dc_exp_cash": "Расходы из кассы: {sum} сум",
+        "dc_exp_other": "Расходы (не из кассы): {sum} сум",
+        "dc_sup_cash": "Поставщикам из кассы: {sum} сум",
+        "dc_profit": "Прибыль: {sum} сум",
+        "dc_expected": "💵 Должно быть в кассе: {sum} сум",
+        "dc_counted": "Посчитали в кассе: {sum} сум",
+        "dc_ok": "✅ Сходится",
+        "dc_short": "⚠️ Недостача: {sum} сум",
+        "dc_over": "➕ Лишние: {sum} сум",
+        "dc_note": "Причина: {text}",
+        "dc_by": "Закрыл: {name} · {time}",
+        "dc_by_emp": "{name} (сотрудник)",
+        "dc_again": "✏️ День закрыт повторно — это исправленный итог.",
+        "dc_branch": "Филиал: {name}",
+        "eve_closed_ok": "🔒 День закрыт, касса сходится: {sum} сум",
+        "eve_closed_diff": "🔒 День закрыт, расхождение в кассе: {diff} сум",
+        "eve_not_closed": "🔓 Касса сегодня не сверена — «Ещё» → «Закрыть день».",
         "eve_title": "🌙 Итоги дня — {shop} · {date}",
         "eve_none": "Сегодня замен не было.",
         "eve_counts": "Замен: {count} · Выручка: {revenue} сум",
@@ -87,6 +108,27 @@ TEXT = {
         "weekdays": ["dushanba", "seshanba", "chorshanba", "payshanba", "juma", "shanba", "yakshanba"],
         "currency": "so'm",
         "owner": "egasi",
+        "dc_title": "🔒 Kunni yopish — {shop} · {date}",
+        "dc_counts": "Almashtirish: {count} · Tushum: {revenue} so'm",
+        "dc_none": "Almashtirish bo'lmadi.",
+        "dc_float": "Ertalabki mayda pul: {sum} so'm",
+        "dc_exp_cash": "Kassadan xarajat: {sum} so'm",
+        "dc_exp_other": "Xarajat (kassadan emas): {sum} so'm",
+        "dc_sup_cash": "Kassadan yetkazib beruvchilarga: {sum} so'm",
+        "dc_profit": "Foyda: {sum} so'm",
+        "dc_expected": "💵 Kassada bo'lishi kerak: {sum} so'm",
+        "dc_counted": "Kassada sanaldi: {sum} so'm",
+        "dc_ok": "✅ To'g'ri keldi",
+        "dc_short": "⚠️ Kamomad: {sum} so'm",
+        "dc_over": "➕ Ortiqcha: {sum} so'm",
+        "dc_note": "Sababi: {text}",
+        "dc_by": "Yopdi: {name} · {time}",
+        "dc_by_emp": "{name} (xodim)",
+        "dc_again": "✏️ Kun qayta yopildi — bu tuzatilgan yakun.",
+        "dc_branch": "Filial: {name}",
+        "eve_closed_ok": "🔒 Kun yopildi, kassa to'g'ri: {sum} so'm",
+        "eve_closed_diff": "🔒 Kun yopildi, kassada farq: {diff} so'm",
+        "eve_not_closed": "🔓 Bugun kassa tekshirilmadi — «Yana» → «Kunni yopish».",
         "eve_title": "🌙 Kun yakuni — {shop} · {date}",
         "eve_none": "Bugun almashtirish bo'lmadi.",
         "eve_counts": "Almashtirishlar: {count} · Tushum: {revenue} so'm",
@@ -200,6 +242,7 @@ def collect_evening(shop: dict, day: date) -> dict:
         "rates_month": db.digest_item_rates(sid, _ymd(day - timedelta(days=29)), d),
         "wh": db.get_warehouse_overview(sid) if shop.get("warehouse_enabled") else None,
         "calls": db.calls_summary(sid, d),
+        "closing": db.get_day_closing(sid, d),
     }
 
 
@@ -294,6 +337,12 @@ def render_evening(shop: dict, f: dict, lang: str) -> str:
         lines.append(T["eve_repaid"].format(sum=money(t["repaid"])))
     if t["expenses"]:
         lines.append(T["eve_expenses"].format(sum=money(t["expenses"])))
+    dc = f.get("closing")
+    if dc:
+        lines.append(T["eve_closed_ok"].format(sum=money(dc["counted"])) if not dc["diff"]
+                     else T["eve_closed_diff"].format(diff=("+" if dc["diff"] > 0 else "−") + money(abs(dc["diff"]))))
+    elif t["cash"] or t["repaid"]:
+        lines.append(T["eve_not_closed"])
     tips = evening_tips(f, lang)
     if tips:
         lines += ["", T["tips_title"]] + [f"{i}. {x}" for i, x in enumerate(tips, 1)]
@@ -355,6 +404,51 @@ def render_morning(shop: dict, f: dict, lang: str) -> str:
         pool = T["tip_pool"]
         task = pool[(f["day"].timetuple().tm_yday + 5) % len(pool)]
     lines.extend(["", T["m_task"].format(text=task)])
+    return "\n".join(lines)
+
+
+def render_day_close(shop: dict, c: dict, lang: str, profit=None, branch_name: str = None) -> str:
+    """Чек «Закрытие дня» для Telegram. profit=None — прибыль не показываем
+    (чек филиала в его собственный чат: филиал прибыль не видит)."""
+    T = _t(lang)
+    day = datetime.strptime(c["day"], "%Y-%m-%d")
+    lines = [T["dc_title"].format(shop=shop.get("shop_name") or shop.get("username") or "",
+                                  date=day.strftime("%d.%m"))]
+    if branch_name:
+        lines.append(T["dc_branch"].format(name=branch_name))
+    lines.append("")
+    if c["services"]:
+        lines.append(T["dc_counts"].format(count=c["services"], revenue=money(c["revenue"])))
+        pay = [T[k].format(sum=money(c[v])) for k, v in (("eve_cash", "cash"), ("eve_card", "card"),
+                                                          ("eve_debt_out", "debt_out")) if c[v]]
+        if pay:
+            lines.append(" · ".join(pay))
+    else:
+        lines.append(T["dc_none"])
+    if c["repaid"]:
+        lines.append(T["eve_repaid"].format(sum=money(c["repaid"])))
+    if c["expenses"]:
+        lines.append(T["dc_exp_cash" if c["expenses_from_cash"] else "dc_exp_other"].format(sum=money(c["expenses"])))
+    if c["suppliers"] and c["suppliers_from_cash"]:
+        lines.append(T["dc_sup_cash"].format(sum=money(c["suppliers"])))
+    if profit is not None and profit > 0:
+        lines.append(T["dc_profit"].format(sum=money(profit)))
+    lines.append("")
+    if c["float_start"]:
+        lines.append(T["dc_float"].format(sum=money(c["float_start"])))
+    lines.append(T["dc_expected"].format(sum=money(c["expected"])))
+    lines.append(T["dc_counted"].format(sum=money(c["counted"])))
+    d = c["diff"]
+    lines.append(T["dc_ok"] if not d else (T["dc_over"] if d > 0 else T["dc_short"]).format(sum=money(abs(d))))
+    if c.get("note"):
+        lines.append(T["dc_note"].format(text=c["note"]))
+    name = c.get("closed_by") or T["owner"]
+    if c.get("by_employee"):
+        name = T["dc_by_emp"].format(name=name)
+    lines.append("")
+    lines.append(T["dc_by"].format(name=name, time=(c.get("updated_at") or "")[11:16]))
+    if (c.get("times_closed") or 1) > 1:
+        lines.append(T["dc_again"])
     return "\n".join(lines)
 
 

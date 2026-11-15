@@ -4863,6 +4863,107 @@ def api_cash_accept(employee_id):
     return jsonify(res)
 
 
+# ---------- Закрытие дня: сверка кассы с программой + чек в Telegram ----------
+# Владелец (главная, самостоятельная точка, филиал) видит, сколько должно
+# быть в кассе, и вводит, сколько насчитал. Сотрудник закрывает «вслепую»:
+# вводит только сумму, цифр программы и расхождения не видит — итог уходит
+# владельцу в Telegram. Прибыль в чеке — только для тех, кто её видит.
+
+def _day_close_day(raw):
+    day = (raw or "").strip() or datetime.now().strftime("%Y-%m-%d")
+    return day if db._day_close_ok(day) else None
+
+
+def _day_close_send(closing: dict):
+    """Чек в чат точки; для филиала — ещё и главной точке (она видит прибыль филиала)."""
+    import digest
+    shop = db.get_shop(g.shop_id) or {}
+    profit = db.get_profit_breakdown(g.shop_id, closing["day"], closing["day"])["profit"]
+    sent = False
+    chat = shop.get("notify_telegram_id")
+    if chat:
+        lang = shop.get("language") if shop.get("language") in digest.TEXT else "ru"
+        text = digest.render_day_close(shop, closing, lang, profit=None if g.is_branch else profit)
+        sent = _send_telegram_message(chat, text)
+    if g.is_branch and g.parent_shop_id:
+        head = db.get_shop(g.parent_shop_id) or {}
+        hchat = head.get("notify_telegram_id")
+        if hchat and str(hchat) != str(chat or ""):
+            hlang = head.get("language") if head.get("language") in digest.TEXT else "ru"
+            text = digest.render_day_close(head, closing, hlang, profit=profit,
+                                           branch_name=shop.get("shop_name") or shop.get("username"))
+            sent = _send_telegram_message(hchat, text) or sent
+    return sent
+
+
+@app.route("/api/day_close")
+@login_required
+def api_day_close_get():
+    day = _day_close_day(request.args.get("day"))
+    if not day:
+        return jsonify({"ok": False, "error": g.T["dc_err_day"]}), 400
+    if g.is_employee:
+        done = db.get_day_closing(g.shop_id, day)
+        return jsonify({"ok": True, "day": day, "blind": True, "closed": bool(done),
+                        "closed_at": done["updated_at"] if done else None,
+                        "owner_closed": bool(done and not done["by_employee"])})
+    out = db.day_close_summary(g.shop_id, day)
+    out.update({"ok": True, "blind": False, "history": db.list_day_closings(g.shop_id, 14)})
+    if not g.is_branch:
+        out["profit"] = db.get_profit_breakdown(g.shop_id, day, day)["profit"]
+    shop = db.get_shop(g.shop_id) or {}
+    out["has_tg"] = bool(shop.get("notify_telegram_id"))
+    return jsonify(out)
+
+
+@app.route("/api/day_close", methods=["POST"])
+@login_required
+def api_day_close_post():
+    data = request.get_json(force=True, silent=True) or {}
+    day = _day_close_day(data.get("day"))
+    if not day:
+        return jsonify({"ok": False, "error": g.T["dc_err_day"]}), 400
+    try:
+        counted = int(data.get("counted"))
+        float_start = int(data.get("float_start") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": g.T["dc_err_amount"]}), 400
+    if g.is_employee:
+        done = db.get_day_closing(g.shop_id, day)
+        if done and not done["by_employee"]:
+            # владелец уже сверил кассу — сотрудник его итог не перезаписывает
+            return jsonify({"ok": False, "error": g.T["dc_err_owner_closed"]}), 409
+        emp = next((e for e in db.list_shop_employees(g.shop_id) if e["id"] == g.employee_id), None) or {}
+        # сотрудник не видит и не меняет настройки — берём прошлые (размен, галочки)
+        st = db.day_close_summary(g.shop_id, day)["settings"]
+        res = db.close_day(g.shop_id, day, counted, st["float_start"], st["expenses_from_cash"],
+                           st["suppliers_from_cash"], data.get("note"),
+                           closed_by=emp.get("full_name") or emp.get("username") or session.get("username"),
+                           by_employee=True)
+    else:
+        expected_seen = data.get("expected_seen")
+        try:
+            expected_seen = int(expected_seen) if expected_seen is not None else None
+        except (TypeError, ValueError):
+            expected_seen = None
+        res = db.close_day(g.shop_id, day, counted, float_start, bool(data.get("expenses_from_cash", True)),
+                           bool(data.get("suppliers_from_cash", False)), data.get("note"),
+                           closed_by=None, by_employee=False, expected_seen=expected_seen)
+    err = res.get("error")
+    if err == "changed":
+        return jsonify({"ok": False, "error": "changed", "message": g.T["dc_err_changed"],
+                        "expected": res["expected"]}), 409
+    if err == "day":
+        return jsonify({"ok": False, "error": g.T["dc_err_day"]}), 400
+    if err:
+        return jsonify({"ok": False, "error": g.T["dc_err_amount"]}), 400
+    c = res["closing"]
+    sent = _day_close_send(c)
+    if g.is_employee:
+        return jsonify({"ok": True, "blind": True, "sent": sent})
+    return jsonify({"ok": True, "closing": c, "reclosed": res["reclosed"], "sent": sent})
+
+
 @app.route("/api/cash/handover/<int:handover_id>/cancel", methods=["POST"])
 @login_required
 @employee_blocked

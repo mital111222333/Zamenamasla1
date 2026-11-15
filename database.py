@@ -315,6 +315,7 @@ def init_db():
         _migrate_action_log(conn)
         _migrate_digest(conn)
         _migrate_calls(conn)
+        _migrate_day_close(conn)
         _bootstrap_accounts(conn)
 
 
@@ -4579,6 +4580,7 @@ def delete_branch_with_data(branch_id: int) -> bool:
             conn.execute("DELETE FROM broadcasts WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM shop_users WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM cash_handovers WHERE shop_id=?", (branch_id,))
+            conn.execute("DELETE FROM day_closings WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM salary_ops WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM team_settings WHERE shop_id=?", (branch_id,))
             conn.execute("DELETE FROM team_terms WHERE shop_id=?", (branch_id,))
@@ -10058,3 +10060,144 @@ def bot_reminded_today(shop_id: int, car_id: int) -> bool:
     with get_conn() as conn:
         return conn.execute("SELECT 1 FROM call_log WHERE shop_id=? AND car_id=? AND result='bot' "
                             "AND created_at >= ?", (shop_id, car_id, today)).fetchone() is not None
+
+
+
+# ---------- Закрытие дня: сверка денег в кассе с программой ----------
+# «Должно быть в кассе» всегда считается заново из записей дня (как и касса
+# сотрудника): размен утром + наличные из замен + погашения долгов
+# − расходы и оплаты поставщикам, если их брали из кассы. В таблице хранится
+# только то, что ввели при закрытии (сколько насчитали, размен, галочки) и
+# снимок цифр на тот момент — для истории и честного чека в Telegram.
+# Один день — одна запись: повторное закрытие обновляет её (times_closed + 1).
+
+DAY_CLOSE_BACK_DAYS = 7   # закрыть можно сегодня и до недели назад (забыли вечером)
+
+
+def _migrate_day_close(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS day_closings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        float_start INTEGER NOT NULL DEFAULT 0,
+        cash INTEGER NOT NULL DEFAULT 0,
+        card INTEGER NOT NULL DEFAULT 0,
+        repaid INTEGER NOT NULL DEFAULT 0,
+        expenses INTEGER NOT NULL DEFAULT 0,
+        expenses_from_cash INTEGER NOT NULL DEFAULT 1,
+        suppliers INTEGER NOT NULL DEFAULT 0,
+        suppliers_from_cash INTEGER NOT NULL DEFAULT 0,
+        expected INTEGER NOT NULL DEFAULT 0,
+        counted INTEGER NOT NULL DEFAULT 0,
+        diff INTEGER NOT NULL DEFAULT 0,
+        revenue INTEGER NOT NULL DEFAULT 0,
+        services INTEGER NOT NULL DEFAULT 0,
+        debt_out INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        closed_by TEXT,
+        by_employee INTEGER NOT NULL DEFAULT 0,
+        times_closed INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(shop_id, day)
+    )
+    """)
+    conn.commit()
+
+
+def _day_close_ok(day: str) -> bool:
+    try:
+        d = datetime.strptime(day, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return False
+    today = _today()
+    return today - timedelta(days=DAY_CLOSE_BACK_DAYS) <= d <= today
+
+
+def day_close_expected(t: dict, float_start: int, exp_from_cash: bool, sup_from_cash: bool) -> int:
+    """Сколько наличных должно лежать в кассе в конце дня."""
+    return int(float_start + t["cash"] + t["repaid"]
+               - (t["expenses"] if exp_from_cash else 0)
+               - (t["suppliers"] if sup_from_cash else 0))
+
+
+def get_day_closing(shop_id: int, day: str):
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM day_closings WHERE shop_id=? AND day=?", (shop_id, day)).fetchone()
+    return dict(r) if r else None
+
+
+def day_close_summary(shop_id: int, day: str) -> dict:
+    """Всё для экрана «Закрытие дня»: цифры дня, настройки прошлого закрытия
+    (размен и галочки запоминаются) и уже сделанное закрытие, если есть."""
+    t = get_day_details(shop_id, day)["totals"]
+    done = get_day_closing(shop_id, day)
+    with get_conn() as conn:
+        prev = conn.execute("SELECT float_start, expenses_from_cash, suppliers_from_cash FROM day_closings "
+                            "WHERE shop_id=? AND day<? ORDER BY day DESC LIMIT 1", (shop_id, day)).fetchone()
+        staff_cash = conn.execute("""
+            SELECT COALESCE(SUM(oc.cash_amount), 0) FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date=? AND oc.employee_id IS NOT NULL
+        """, (shop_id, day)).fetchone()[0] or 0
+        staff_cash += conn.execute("""
+            SELECT COALESCE(SUM(p.amount), 0) FROM installment_payments p
+            JOIN installment_plans ip ON ip.id = p.plan_id
+            WHERE ip.shop_id=? AND p.paid_date=? AND p.status='active' AND p.employee_id IS NOT NULL
+        """, (shop_id, day)).fetchone()[0] or 0
+    src = done or (dict(prev) if prev else None)
+    settings = {
+        "float_start": int(src["float_start"]) if src else 0,
+        "expenses_from_cash": bool(src["expenses_from_cash"]) if src else True,
+        "suppliers_from_cash": bool(src["suppliers_from_cash"]) if src else False,
+    }
+    return {"day": day, "totals": t, "settings": settings, "staff_cash": int(staff_cash),
+            "expected": day_close_expected(t, settings["float_start"], settings["expenses_from_cash"],
+                                           settings["suppliers_from_cash"]),
+            "closing": done}
+
+
+@_serialized
+def close_day(shop_id: int, day: str, counted: int, float_start: int = 0, exp_from_cash: bool = True,
+              sup_from_cash: bool = False, note: str = None, closed_by: str = None,
+              by_employee: bool = False, expected_seen: int = None) -> dict:
+    """Закрывает (или закрывает заново) день. expected_seen — сумма «должно
+    быть», которую человек видел на экране: если за это время внесли ещё
+    замену или расход, ничего не сохраняем и просим обновить (как в кассе
+    сотрудника). Сотрудник закрывает «вслепую» и цифр не видит — для него
+    проверки нет."""
+    if not _day_close_ok(day):
+        return {"error": "day"}
+    if counted < 0 or counted > 10_000_000_000 or float_start < 0 or float_start > 10_000_000_000:
+        return {"error": "amount"}
+    t = get_day_details(shop_id, day)["totals"]
+    expected = day_close_expected(t, float_start, exp_from_cash, sup_from_cash)
+    if expected_seen is not None and int(expected_seen) != expected:
+        return {"error": "changed", "expected": expected}
+    now = _now_str()
+    note = (note or "").strip()[:300] or None
+    vals = (float_start, t["cash"], t["card"], t["repaid"], t["expenses"], 1 if exp_from_cash else 0,
+            t["suppliers"], 1 if sup_from_cash else 0, expected, counted, counted - expected,
+            t["revenue"], t["count"], t["debt_out"], note, (closed_by or "")[:80] or None,
+            1 if by_employee else 0)
+    with get_conn() as conn:
+        old = conn.execute("SELECT id FROM day_closings WHERE shop_id=? AND day=?", (shop_id, day)).fetchone()
+        if old:
+            conn.execute("""UPDATE day_closings SET float_start=?, cash=?, card=?, repaid=?, expenses=?,
+                expenses_from_cash=?, suppliers=?, suppliers_from_cash=?, expected=?, counted=?, diff=?,
+                revenue=?, services=?, debt_out=?, note=?, closed_by=?, by_employee=?,
+                times_closed=times_closed+1, updated_at=? WHERE id=?""", vals + (now, old["id"]))
+        else:
+            conn.execute("""INSERT INTO day_closings (float_start, cash, card, repaid, expenses,
+                expenses_from_cash, suppliers, suppliers_from_cash, expected, counted, diff,
+                revenue, services, debt_out, note, closed_by, by_employee, shop_id, day, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", vals + (shop_id, day, now, now))
+        conn.commit()
+    return {"ok": True, "closing": get_day_closing(shop_id, day), "reclosed": bool(old)}
+
+
+def list_day_closings(shop_id: int, limit: int = 14) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT day, expected, counted, diff, closed_by, by_employee, times_closed, updated_at "
+                            "FROM day_closings WHERE shop_id=? ORDER BY day DESC LIMIT ?", (shop_id, limit)).fetchall()
+    return [dict(r) for r in rows]
