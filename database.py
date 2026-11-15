@@ -317,6 +317,7 @@ def init_db():
         _migrate_calls(conn)
         _migrate_day_close(conn)
         _migrate_car_queue(conn)
+        _migrate_stats_next(conn)
         _bootstrap_accounts(conn)
 
 
@@ -2461,6 +2462,8 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
               cash_amount, card_amount, interval_value, interval_unit, next_date, next_mileage, items_json, notes,
               discount, discount_pct, employee_id, master_id, rem_count, rem_last,
               *[atf_row[k] for k in ATF_FIELDS]))
+        # время визита — для «загрузки по часам» в статистике
+        conn.execute("UPDATE oil_changes SET created_at=? WHERE id=?", (_now_s(), cur.lastrowid))
         conn.commit()
         return cur.lastrowid, next_date
 
@@ -10577,3 +10580,133 @@ def queue_by_token(token: str):
     return {"shop_id": r["shop_id"], "plate": r["plate"], "status": me["status"],
             "position": me.get("position"), "eta_min": me.get("eta_min"), "what": r.get("what"),
             "done_at": r.get("done_at")}
+
+
+# ---------- Статистика: новый уровень (аналитика для масла) ----------
+VISC_RE = re.compile(r"(\d{1,2})\s*W\s*-?\s*(\d{2})", re.I)
+
+
+def _migrate_stats_next(conn):
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(oil_changes)").fetchall()}
+    if "created_at" not in cols:
+        conn.execute("ALTER TABLE oil_changes ADD COLUMN created_at TEXT")
+    scols = {r[1] for r in conn.execute("PRAGMA table_info(shops)").fetchall()}
+    if "month_plan" not in scols:
+        conn.execute("ALTER TABLE shops ADD COLUMN month_plan INTEGER")
+
+
+@_serialized
+def set_month_plan(shop_id: int, amount) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE shops SET month_plan=? WHERE id=?", (int(amount) if amount else None, shop_id))
+        conn.commit()
+
+
+def stats_analytics(shop_id: int, today=None) -> dict:
+    """Аналитика для «Статистики»: план месяца и прогноз, выручка 30 дней
+    против прошлых 30, вязкости масла, клиенты (повторные / пора / пропали),
+    загрузка по дням недели и часам, фильтр к маслу. Только суммы продаж,
+    без закупки — можно и филиалу. Служебные записи (#SALE) не считаются
+    визитами машин, но их деньги входят в выручку."""
+    now = datetime.now()
+    today = today or now.date()
+    d = lambda x: x.strftime("%Y-%m-%d")
+    t30, t60 = today - timedelta(days=29), today - timedelta(days=59)
+    mstart = today.replace(day=1)
+    import calendar
+    dim = calendar.monthrange(today.year, today.month)[1]
+    pm_end = mstart - timedelta(days=1)
+    pm_same = pm_end.replace(day=min(today.day, pm_end.day))
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date, oc.cost, oc.items_json, oc.created_at, c.plate_number, c.client_id
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.change_date >= ? AND oc.cost IS NOT NULL
+        """, (shop_id, d(min(t60, pm_end.replace(day=1)) - timedelta(days=90)))).fetchall()
+        first_visit = {r["client_id"]: r["f"] for r in conn.execute("""
+            SELECT c.client_id, MIN(oc.change_date) AS f FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND c.plate_number <> '#SALE' GROUP BY c.client_id""", (shop_id,)).fetchall()}
+        plan = (conn.execute("SELECT month_plan FROM shops WHERE id=?", (shop_id,)).fetchone() or {"month_plan": None})["month_plan"]
+    cur = {}
+    prev = {}
+    month = pmonth = 0
+    visc = {}
+    liters = 0.0
+    oil_visits = no_filter = 0
+    filter_prices = []
+    week = [0] * 7
+    hours = {}
+    visits30 = 0
+    clients30 = set()
+    for r in rows:
+        day = r["change_date"]
+        cost = r["cost"] or 0
+        walkin = r["plate_number"] == WALKIN_PLATE
+        if day >= d(t30):
+            cur[day] = cur.get(day, 0) + cost
+        elif day >= d(t60):
+            prev[day] = prev.get(day, 0) + cost
+        if day >= d(mstart):
+            month += cost
+        if d(pm_end.replace(day=1)) <= day <= d(pm_same):
+            pmonth += cost
+        if walkin:
+            continue
+        try:
+            dt = datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if day >= d(today - timedelta(days=89)):
+            week[dt.weekday()] += 1
+            if r["created_at"]:
+                h = int(r["created_at"][11:13])
+                key = f"{dt.weekday()}-{h}"
+                hours[key] = hours.get(key, 0) + 1
+        if day < d(t30):
+            continue
+        visits30 += 1
+        clients30.add(r["client_id"])
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            items = []
+        keys = {i.get("key") for i in items}
+        if "fluid_0" in keys:
+            oil_visits += 1
+            if "filter_0" not in keys:
+                no_filter += 1
+        for i in items:
+            if i.get("key") == "filter_0" and i.get("unit_price"):
+                filter_prices.append(i["unit_price"])
+            if i.get("key") != "fluid_0":
+                continue
+            q = float(i.get("qty") or 0)
+            liters += q
+            m = VISC_RE.search(f"{i.get('brand') or ''} {i.get('name') or ''}")
+            v = f"{int(m.group(1))}W-{m.group(2)}" if m else "—"
+            visc[v] = visc.get(v, 0) + q
+    returning = sum(1 for c in clients30 if (first_visit.get(c) or "9999") < d(t30))
+    due = base_due(shop_id, today=today)
+    days_passed = today.day
+    per_day = month / days_passed if days_passed else 0
+    forecast = int(round(per_day * dim))
+    return {
+        "daily": [{"date": d(t30 + timedelta(days=i)), "total": cur.get(d(t30 + timedelta(days=i)), 0),
+                   "prev": prev.get(d(t60 + timedelta(days=i)), 0)} for i in range(30)],
+        "sum30": sum(cur.values()), "sum_prev30": sum(prev.values()),
+        "month": month, "prev_month_same": pmonth,
+        "plan": {"amount": plan, "days_in_month": dim, "days_passed": days_passed,
+                 "per_day": int(round(per_day)), "forecast": forecast,
+                 "need_per_day": int(round(max(0, (plan or 0) - month) / max(1, dim - days_passed + 1))) if plan else None},
+        "viscosity": sorted(({"name": k, "liters": round(v, 1)} for k, v in visc.items()), key=lambda x: -x["liters"])[:6],
+        "liters": round(liters, 1),
+        "clients": {"visits": visits30, "unique": len(clients30), "returning": returning,
+                    "new": len(clients30) - returning,
+                    "due": sum((due.get("counts") or {}).get(k, 0) for k in ("overdue", "today", "tomorrow", "week")),
+                    "lost": (due.get("counts") or {}).get("lost", 0)},
+        "filter": {"oil_visits": oil_visits, "no_filter": no_filter,
+                   "avg_price": int(sorted(filter_prices)[len(filter_prices) // 2]) if filter_prices else 0},
+        "week": week,
+        "hours": hours,
+    }
+
