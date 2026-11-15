@@ -292,6 +292,53 @@ if ('serviceWorker' in navigator) {
   .dc-hist { padding:2px 14px; }
   .dc-hist .dc-row span:first-child { color:#0F172A; font-weight:600; }
   .dc-err { color:#B42318; font-size:13px; font-weight:600; margin-top:4px; }
+  .uo-hero { background:#EFF6FF; border:1px solid #BFDBFE; border-radius:16px; padding:14px; margin-bottom:10px; }
+  .uo-hero .dc-lbl { color:#1D4ED8; }
+  .uo-hero .dc-big { color:#1E3A8A; margin-bottom:2px; }
+  .uo-hero-sub { font-size:12px; color:#1D4ED8; }
+  .uo-tiles { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-bottom:10px; }
+  .uo-tile { background:#fff; border:1px solid var(--border); border-radius:14px; padding:10px 12px; }
+  .uo-tile span { display:block; font-size:12px; color:var(--hint); }
+  .uo-tile b { display:block; font-family:var(--font-mono); font-size:20px; margin-top:2px; }
+  .uo-tile small { display:block; font-size:12px; color:var(--hint); margin-top:1px; }
+  .uo-btns { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-bottom:10px; }
+  .uo-btn { min-height:52px; border-radius:14px; border:1.5px solid var(--border); background:#fff; color:#0F172A; font:inherit; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; padding:0 8px; }
+  .uo-btn.main { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .uo-btn.ghost { min-height:44px; font-size:14px; font-weight:600; width:100%; margin-bottom:10px; }
+  .uo-f label { display:block; font-size:13px; color:var(--hint); margin:10px 0 4px; text-transform:none; letter-spacing:0; }
+  .uo-f input { width:100%; min-height:48px; border-radius:12px; border:1.5px solid var(--border); font:inherit; font-size:17px; padding:0 12px; background:#fff; color:#0F172A; }
+  .uo-f input.num { font-family:var(--font-mono); font-weight:700; }
+  .uo-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .uo-chip { min-height:36px; border-radius:999px; border:1.5px solid var(--border); background:#fff; color:#0F172A; font:inherit; font-size:13px; font-weight:600; padding:0 12px; cursor:pointer; }
+  .uo-chip.on { background:#DBEAFE; border-color:#93C5FD; color:#1E3A8A; }
+  .uo-sum { display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; font-size:14px; color:#475569; }
+  .uo-sum b { font-family:var(--font-mono); font-size:22px; color:#0F172A; }
+  .uo-warn { font-size:13px; color:#92400E; background:#FEF3C7; border-radius:10px; padding:8px 10px; margin-top:8px; line-height:1.4; }
+  .uo-row { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:44px; border-top:1px solid #EEF2F6; font-size:14px; }
+  .uo-row:first-of-type { border-top:0; }
+  .uo-row > span:first-child { min-width:0; color:#0F172A; }
+  .uo-row small { display:block; font-size:12px; color:var(--hint); }
+  .uo-row b { font-family:var(--font-mono); white-space:nowrap; }
+  .uo-row b.plus { color:#15803D; }
+  .uo-row b.minus { color:#B42318; }
+  .uo-x { width:36px; height:36px; flex:none; border-radius:10px; border:1px solid var(--border); background:#fff; color:#64748B; cursor:pointer; font-size:14px; }
+  .uo-bars { display:flex; align-items:flex-end; gap:3px; height:70px; margin:8px 0 4px; }
+  .uo-bars div { flex:1; display:flex; align-items:flex-end; gap:1px; height:100%; }
+  .uo-bars i { display:block; flex:1; border-radius:3px 3px 0 0; min-height:2px; }
+  .uo-bars i.c { background:#93C5FD; }
+  .uo-bars i.s { background:#15803D; }
+  .uo-leg { display:flex; gap:12px; font-size:12px; color:var(--hint); }
+  .uo-leg span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; background:#93C5FD; }
+  .uo-leg span.s::before { background:#15803D; }
+  .uo-cmp { font-size:12px; font-weight:700; }
+  .uo-cmp.up { color:#15803D; }
+  .uo-cmp.down { color:#B42318; }
+  .uo-pct { display:flex; gap:8px; align-items:center; margin-top:6px; }
+  .uo-pct input { width:90px; min-height:44px; border-radius:12px; border:1.5px solid var(--border); font-family:var(--font-mono); font-size:17px; font-weight:700; text-align:center; background:#fff; color:#0F172A; }
+  .uo-pct button { min-height:44px; border-radius:12px; border:0; background:var(--blue); color:#fff; font:inherit; font-weight:700; padding:0 16px; cursor:pointer; }
+  .uo-period { display:flex; gap:6px; margin:6px 0 10px; flex-wrap:wrap; }
+  .uo-period button { min-height:34px; border-radius:999px; border:1.5px solid var(--border); background:#fff; color:#334155; font:inherit; font-size:13px; font-weight:600; padding:0 12px; cursor:pointer; }
+  .uo-period button.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .bb-item { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; min-height:50px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
   .bb-item i { font-size:19px; }
   .bb-item span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1875,6 +1922,7 @@ if ('serviceWorker' in navigator) {
     <div class="side-item" id="tab-table" data-tab="table" onclick="showTab('table')"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
     <div class="side-item" id="tab-debts" data-tab="debts" onclick="showTab('debts')"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
     <div class="side-item" id="tab-dayclose" data-tab="dayclose" onclick="showTab('dayclose')"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
+    <div class="side-item" id="tab-usedoil" data-tab="usedoil" onclick="showTab('usedoil')"><i class="fa-solid fa-fill-drip"></i><span>{{ T.tab_usedoil }}</span></div>
     {% if is_employee or has_staff %}<div class="side-item" id="tab-cash" data-tab="cash" onclick="showTab('cash')"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
     {% if team_on %}<div class="side-item" id="tab-team" data-tab="team" onclick="showTab('team')"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
     <div class="side-item" id="tab-broadcast" data-tab="broadcast" onclick="showTab('broadcast')"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
@@ -1936,6 +1984,7 @@ if ('serviceWorker' in navigator) {
   <div class="more-list">
       <div class="more-item" data-tab="queue" data-more-slot="queue" onclick="showTab('queue'); closeMore();"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b class="nav-badge" data-badge="queue"></b></div>
       <div class="more-item" data-tab="dayclose" data-more-slot="dayclose" onclick="showTab('dayclose'); closeMore();"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
+      <div class="more-item" data-tab="usedoil" data-more-slot="usedoil" onclick="showTab('usedoil'); closeMore();"><i class="fa-solid fa-fill-drip"></i><span>{{ T.tab_usedoil }}</span></div>
       {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
       {% if team_on %}<div class="more-item" data-tab="team" data-more-slot="team" onclick="showTab('team'); closeMore();"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
       {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
@@ -2272,6 +2321,11 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
 
+  <div id="view-usedoil" style="display:none;">
+    <div class="pr-head"><h2>{{ T.tab_usedoil }}</h2><div class="pr-hint">{{ T.uo_hint }}</div></div>
+    <div id="uoBody"></div>
+  </div>
+
   <div id="view-dayclose" style="display:none;">
     <div class="dc-head"><h2>{{ T.tab_dayclose }}</h2><div class="dc-hint">{{ T.dc_hint_emp if is_employee else T.dc_hint }}</div></div>
     <div class="dc-days">
@@ -2581,6 +2635,10 @@ if ('serviceWorker' in navigator) {
       <div id="stMainPane">
       <div id="statsGrid">{{ T.stats_loading }}</div>
       {% if not is_employee %}<div id="anBox" class="an-box"></div>{% endif %}
+      {% if not is_employee %}<div class="card" id="uoStatCard" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:4px;"><i class="fa-solid fa-fill-drip" style="color:#2563EB;"></i> {{ T.uo_stat_title }}</label>
+        <div id="uoStatBody">{{ T.stats_loading }}</div>
+      </div>{% endif %}
       {% if dirs.tire or dirs.part %}
       <div class="card dir-card" id="dirCard" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.st_dirs_title }}</label>
@@ -3454,6 +3512,9 @@ function showTab(t, keepScroll) {
   const dcView = document.getElementById('view-dayclose');
   if (dcView) dcView.style.display = t === 'dayclose' ? 'block' : 'none';
   if (t === 'dayclose') dcOpen();
+  const uoView = document.getElementById('view-usedoil');
+  if (uoView) uoView.style.display = t === 'usedoil' ? 'block' : 'none';
+  if (t === 'usedoil') uoOpen();
   if (t === 'table') { loadCars(); loadBaseDue(); }
   if (t === 'debts') loadDebts();
   if (t === 'expenses') loadExpensesTab();
@@ -7695,7 +7756,7 @@ function anRvCmp() {
 
 // ---- Доход по направлениям: масло / шиномонтаж / запчасти ----
 const DIRST = { period: 'month', seq: 0 };
-const DIR_COLORS = { oil: '#2563EB', tire: '#0F9F6E', part: '#C2410C' };
+const DIR_COLORS = { oil: '#2563EB', tire: '#0F9F6E', part: '#C2410C', used: '#64748B' };
 function dirRange(period) {
   const d = new Date(), f = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
   const to = f(d);
@@ -7719,11 +7780,11 @@ async function loadDirStats(period) {
   if (!data || !data.ok) { box.innerHTML = ''; return; }
   const keys = ['oil'].concat(DIRS.tire ? ['tire'] : [], DIRS.part ? ['part'] : []);
   // выключенное направление с продажами за период тоже показываем
-  ['tire', 'part'].forEach(k => { if (keys.indexOf(k) < 0 && data.dirs[k].total > 0) keys.push(k); });
+  ['tire', 'part', 'used'].forEach(k => { if (keys.indexOf(k) < 0 && data.dirs[k] && data.dirs[k].total > 0) keys.push(k); });
   const all = keys.reduce((a, k) => a + data.dirs[k].total, 0);
   const money = v => Math.round(v).toLocaleString('ru-RU');
-  const name = { oil: T.dir_oil, tire: T.dir_tire, part: T.dir_part };
-  const qtyTxt = (k, q) => q ? ' · ' + String(q).replace('.', ',') + ' ' + (k === 'oil' ? T.st_dirs_liters : (k === 'tire' ? T.st_dirs_tire_qty : T.st_dirs_part_qty)) : '';
+  const name = { oil: T.dir_oil, tire: T.dir_tire, part: T.dir_part, used: T.dir_used };
+  const qtyTxt = (k, q) => q ? ' · ' + String(q).replace('.', ',') + ' ' + ((k === 'oil' || k === 'used') ? T.st_dirs_liters : (k === 'tire' ? T.st_dirs_tire_qty : T.st_dirs_part_qty)) : '';
   const bar = all > 0 ? `<div class="dir-bar">${keys.map(k => data.dirs[k].total > 0
     ? `<span style="width:${data.dirs[k].total / all * 100}%; background:${DIR_COLORS[k]};"></span>` : '').join('')}</div>` : '';
   box.innerHTML = `<div class="dir-total"><b>${money(all)} ${T.currency}</b></div>` + bar
@@ -7857,6 +7918,7 @@ async function loadStats() {
   loadDashboard();
   loadAnalytics();
   if (DIRS_ON) loadDirStats();
+  uoStatLoad();
   loadBrandStats();  // для сотрудника карточки нет — функция сама выйдет
   const res = await fetch('/api/stats');
   const s = await res.json();
@@ -10088,6 +10150,260 @@ function repeatLastVisit(itemsArg, doneMsg) {
   if (mileageEl) { mileageEl.focus(); mileageEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
 }
 
+// ===== Учёт отработки =====
+// Слито — считается само по заменам (× процент слива), вносится только
+// продажа: разовая (1–2 л клиенту) или вечерняя сдача покупателю. Всегда
+// наличными — деньги сами попадают в кассу и «Закрыть день».
+const UO = { data: null, mode: null, f: { liters: '', price: '', buyer: '' }, err: '', busy: false, token: null, seq: 0,
+             checkVal: '', pctVal: '', stat: null, statPer: 'month' };
+function uoL(v) { const n = Math.round((Number(v) || 0) * 10) / 10; return String(n).replace('.', ','); }
+function uoNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) ? n : 0; }
+function uoDay(dd) { const p = String(dd || '').split('-'); return p.length === 3 ? p[2] + '.' + p[1] : ''; }
+function uoDcHint(d) {
+  const u = d && d.used_oil;
+  if (!u || !(u.collected > 0) || u.sold > 0) return '';
+  return `<div class="dc-card uo-hint-dc"><div class="dc-lbl" style="color:#475569; font-size:14px;"><i class="fa-solid fa-fill-drip" style="color:#2563EB;"></i> ${escapeHtml(T.uo_dc_hint.replace('{l}', uoL(u.collected)))}</div>
+    <button type="button" class="uo-btn ghost" style="margin:10px 0 0;" onclick="showTab('usedoil')">${escapeHtml(T.uo_dc_btn)}</button></div>`;
+}
+function uoOpen() { UO.mode = null; UO.err = ''; uoLoad(); }
+async function uoLoad() {
+  const body = document.getElementById('uoBody');
+  if (!body) return;
+  const seq = ++UO.seq;
+  if (!UO.data) body.innerHTML = `<div class="pr-empty">…</div>`;
+  let data = null;
+  try { data = await (await fetch('/api/used_oil', { credentials: 'same-origin', cache: 'no-store' })).json(); } catch (e) { data = null; }
+  if (seq !== UO.seq) return;
+  if (!data || !data.ok) { body.innerHTML = `<div class="pr-empty">${escapeHtml(T.dc_err_net)}</div>`; return; }
+  UO.data = data;
+  uoRender();
+}
+function uoStartSale(mode, buyer) {
+  const d = UO.data || {};
+  UO.mode = mode; UO.err = ''; UO.token = null;
+  if (mode === 'walk') UO.f = { liters: '', price: d.walk_price ? String(d.walk_price) : '', buyer: '' };
+  else {
+    const b = buyer != null ? (d.buyers || []).find(x => x.name === buyer) : (d.buyers || [])[0];
+    UO.f = { buyer: b ? b.name : '', price: b && b.last_price ? String(b.last_price) : '',
+             liters: d.balance > 0 ? uoL(d.balance) : '' };
+  }
+  uoRender();
+  const el = document.getElementById(mode === 'walk' ? 'uoLiters' : (UO.f.buyer ? 'uoLiters' : 'uoBuyer'));
+  if (el) { el.focus(); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+function uoPickBuyer(i) {
+  const b = (UO.data.buyers || [])[i];
+  if (!b) return;
+  UO.f.buyer = b.name;
+  if (b.last_price) UO.f.price = String(b.last_price);
+  uoRender();
+}
+function uoSetF(k, v) {
+  UO.f[k] = v; UO.err = '';
+  const e = document.getElementById('uoErr'); if (e) e.textContent = '';
+  const tot = document.getElementById('uoTot');
+  if (tot) tot.textContent = dcMoney(uoNum(UO.f.liters) * uoNum(UO.f.price));
+  const w = document.getElementById('uoOver');
+  if (w) w.innerHTML = uoOverHtml();
+}
+function uoOverHtml() {
+  const d = UO.data || {}, l = uoNum(UO.f.liters);
+  if (!(l > 0) || l <= (Number(d.balance) || 0) + 0.5) return '';
+  return `<div class="uo-warn">${escapeHtml(T.uo_more_than_balance.replace('{l}', uoL(d.balance)))}</div>`;
+}
+function uoFormHtml() {
+  const d = UO.data, f = UO.f, buyerMode = UO.mode === 'buyer';
+  const chips = buyerMode && (d.buyers || []).length ? `<div class="uo-chips">${d.buyers.map((b, i) =>
+    `<button type="button" class="uo-chip${b.name === f.buyer ? ' on' : ''}" onclick="uoPickBuyer(${i})">${escapeHtml(b.name)}</button>`).join('')}</div>` : '';
+  return `<div class="dc-card uo-f" id="uoForm">
+    <div class="dc-rc-top"><b>${escapeHtml(buyerMode ? T.uo_sell_buyer : T.uo_sell_walk)}</b><button type="button" class="uo-x" onclick="UO.mode = null; uoRender()" aria-label="${escapeHtml(T.uo_cancel)}">✕</button></div>
+    ${buyerMode ? `<label for="uoBuyer">${escapeHtml(T.uo_buyer)}</label>${chips}
+      <input id="uoBuyer" maxlength="80" autocomplete="off" placeholder="${escapeHtml(T.uo_buyer_ph)}" value="${escapeHtml(f.buyer)}" oninput="uoSetF('buyer', this.value)" style="margin-top:6px;">` : ''}
+    <label for="uoLiters">${escapeHtml(T.uo_liters)}</label>
+    <input id="uoLiters" class="num" type="text" inputmode="decimal" autocomplete="off" placeholder="${buyerMode ? '100' : '2'}" value="${escapeHtml(f.liters)}" oninput="uoSetF('liters', this.value)">
+    <div id="uoOver">${uoOverHtml()}</div>
+    <label for="uoPrice">${escapeHtml(T.uo_price)}</label>
+    <input id="uoPrice" class="num" type="text" inputmode="numeric" autocomplete="off" placeholder="6000" value="${escapeHtml(f.price)}" oninput="uoSetF('price', this.value)">
+    <div class="uo-sum"><span>${escapeHtml(T.uo_total)}</span><b><span id="uoTot">${dcMoney(uoNum(f.liters) * uoNum(f.price))}</span> <small style="font-size:13px; color:var(--hint);">${escapeHtml(T.currency)}</small></b></div>
+    <div class="dc-hint" style="margin:6px 0 0;">${escapeHtml(T.uo_cash_note)}</div>
+    <div class="dc-err" id="uoErr">${escapeHtml(UO.err)}</div>
+    <button type="button" class="dc-go" onclick="uoSave()"${UO.busy ? ' disabled' : ''}><i class="fa-solid fa-check"></i>${escapeHtml(T.uo_save)}</button>
+  </div>`;
+}
+async function uoSave() {
+  if (UO.busy) return;
+  const l = uoNum(UO.f.liters), p = Math.round(uoNum(UO.f.price));
+  const buyer = String(UO.f.buyer || '').trim();
+  const err = t => { UO.err = t; const e = document.getElementById('uoErr'); if (e) e.textContent = t; };
+  if (UO.mode === 'buyer' && !buyer) { err(T.uo_err_buyer); return; }
+  if (!(l > 0) || !(p > 0)) { err(T.uo_err_amount); return; }
+  if (!UO.token) UO.token = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+  UO.busy = true;
+  let data = null;
+  try {
+    data = await (await fetch('/api/used_oil/sale', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ liters: l, price: p, buyer: UO.mode === 'buyer' ? buyer : '', token: UO.token }) })).json();
+  } catch (e) { data = null; }
+  UO.busy = false;
+  if (!data || !data.ok) { err((data && data.error) || T.dc_err_net); return; }
+  UO.mode = null; UO.token = null;
+  showMsg(T.uo_saved.replace('{sum}', dcMoney(data.total)), true);
+  uoLoad();
+}
+async function uoDelSale(id) {
+  if (!confirm(T.uo_del_confirm)) return;
+  let data = null;
+  try { data = await (await fetch('/api/oil_change/' + id, { method: 'DELETE', credentials: 'same-origin' })).json(); } catch (e) {}
+  if (!data || !data.ok) { showMsg(T.msg_error + ' ' + ((data && data.error) || ''), false); return; }
+  uoLoad();
+}
+async function uoDelCheck(id) {
+  if (!confirm(T.uo_del_confirm)) return;
+  let data = null;
+  try { data = await (await fetch('/api/used_oil/check/' + id, { method: 'DELETE', credentials: 'same-origin' })).json(); } catch (e) {}
+  if (!data || !data.ok) { showMsg(T.msg_error, false); return; }
+  uoLoad();
+}
+async function uoSaveCheck() {
+  const raw = String(UO.checkVal || '').trim();
+  const e = document.getElementById('uoChkErr');
+  if (raw === '' || !(uoNum(raw) >= 0)) { if (e) e.textContent = T.uo_err_amount; return; }
+  let data = null;
+  try {
+    data = await (await fetch('/api/used_oil/check', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ measured: uoNum(raw) }) })).json();
+  } catch (x) { data = null; }
+  if (!data || !data.ok) { if (e) e.textContent = (data && data.error) || T.dc_err_net; return; }
+  UO.mode = null; UO.checkVal = '';
+  showMsg(T.uo_check_done.replace('{d}', (data.delta > 0 ? '+' : '') + uoL(data.delta)), true);
+  uoLoad();
+}
+async function uoSavePct() {
+  const v = Math.round(uoNum(UO.pctVal));
+  const e = document.getElementById('uoPctErr');
+  if (!(v >= 50 && v <= 100)) { if (e) e.textContent = T.uo_err_pct; return; }
+  let data = null;
+  try {
+    data = await (await fetch('/api/used_oil/pct', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pct: v }) })).json();
+  } catch (x) { data = null; }
+  if (!data || !data.ok) { if (e) e.textContent = (data && data.error) || T.dc_err_net; return; }
+  UO.mode = null;
+  showMsg(T.uo_pct_saved, true);
+  uoLoad();
+}
+function uoCmpHtml(cur, prev) {
+  if (!prev) return '';
+  const p = Math.round((cur - prev) / prev * 100);
+  return `<span class="uo-cmp ${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}% ${escapeHtml(T.uo_vs_prev)}</span>`;
+}
+function uoBarsHtml(daily) {
+  const max = Math.max(1, ...daily.map(x => Math.max(x.collected, x.sold)));
+  return `<div class="uo-bars" aria-hidden="true">${daily.map(x => `<div title="${uoDay(x.day)}"><i class="c" style="height:${x.collected / max * 100}%"></i><i class="s" style="height:${x.sold / max * 100}%"></i></div>`).join('')}</div>
+    <div class="uo-leg"><span>${escapeHtml(T.uo_m_col)}</span><span class="s">${escapeHtml(T.uo_m_sold)}</span></div>`;
+}
+function uoRender() {
+  const body = document.getElementById('uoBody'), d = UO.data;
+  if (!body || !d) return;
+  let html = `<div class="uo-hero">
+    <div class="dc-lbl">${escapeHtml(T.uo_balance)}</div>
+    <div class="dc-big">≈ ${uoL(d.balance)} <small>${escapeHtml(T.uo_l)}</small></div>
+    <div class="uo-hero-sub">${escapeHtml(T.uo_since.replace('{date}', uoDay(d.since)).replace('{pct}', d.pct))}</div>
+  </div>
+  <div class="uo-tiles">
+    <div class="uo-tile"><span>${escapeHtml(T.uo_today_col)}</span><b>${uoL(d.today.collected)} ${escapeHtml(T.uo_l)}</b><small>${d.today.cars} ${escapeHtml(T.uo_cars)}</small></div>
+    <div class="uo-tile"><span>${escapeHtml(T.uo_today_sold)}</span><b>${uoL(d.today.sold)} ${escapeHtml(T.uo_l)}</b><small>${d.today.sum != null ? dcMoney(d.today.sum) + ' ' + escapeHtml(T.currency) : '&nbsp;'}</small></div>
+  </div>
+  <div class="uo-btns">
+    <button type="button" class="uo-btn" onclick="uoStartSale('walk')"><i class="fa-solid fa-droplet"></i>${escapeHtml(T.uo_sell_walk)}</button>
+    <button type="button" class="uo-btn main" onclick="uoStartSale('buyer')"><i class="fa-solid fa-truck"></i>${escapeHtml(T.uo_sell_buyer)}</button>
+  </div>`;
+  if (UO.mode === 'walk' || UO.mode === 'buyer') html += uoFormHtml();
+  if (!d.full) {
+    const mine = d.my_sales || [];
+    html += `<div class="dc-lbl" style="margin:4px 2px 6px;">${escapeHtml(T.uo_my_today)}</div><div class="dc-card dc-hist">` + (mine.length ? mine.map(x =>
+      `<div class="uo-row"><span>${escapeHtml(x.time)} · ${escapeHtml(x.buyer || T.uo_walk)} · ${uoL(x.liters)} ${escapeHtml(T.uo_l)}<small>${dcMoney(x.price)} × ${uoL(x.liters)}</small></span><b class="plus">${dcMoney(x.total)}</b><button type="button" class="uo-x" onclick="uoDelSale(${x.id})" aria-label="${escapeHtml(T.af_remove)}">✕</button></div>`).join('')
+      : `<div class="uo-row"><span style="color:var(--hint);">${escapeHtml(T.uo_empty)}</span></div>`) + `</div>`;
+    body.innerHTML = html;
+    return;
+  }
+  // замер
+  if (UO.mode === 'check') {
+    html += `<div class="dc-card uo-f"><div class="dc-rc-top"><b>${escapeHtml(T.uo_check)}</b><button type="button" class="uo-x" onclick="UO.mode = null; uoRender()" aria-label="${escapeHtml(T.uo_cancel)}">✕</button></div>
+      <label for="uoChk">${escapeHtml(T.uo_check_q)}</label>
+      <input id="uoChk" class="num" type="text" inputmode="decimal" autocomplete="off" placeholder="${uoL(d.balance)}" value="${escapeHtml(UO.checkVal)}" oninput="UO.checkVal = this.value; document.getElementById('uoChkErr').textContent = ''">
+      <div class="dc-hint" style="margin:6px 0 0;">${escapeHtml(T.uo_check_hint)}</div>
+      <div class="dc-err" id="uoChkErr"></div>
+      <button type="button" class="dc-go" onclick="uoSaveCheck()"><i class="fa-solid fa-ruler-vertical"></i>${escapeHtml(T.uo_check_save)}</button></div>`;
+  } else if (UO.mode === 'pct') {
+    html += `<div class="dc-card uo-f"><div class="dc-rc-top"><b>${escapeHtml(T.uo_pct_label)}</b><button type="button" class="uo-x" onclick="UO.mode = null; uoRender()" aria-label="${escapeHtml(T.uo_cancel)}">✕</button></div>
+      <div class="dc-hint" style="margin:0;">${escapeHtml(T.uo_pct_hint)}</div>
+      <div class="uo-pct"><input id="uoPctIn" type="text" inputmode="numeric" maxlength="3" value="${escapeHtml(UO.pctVal)}" oninput="UO.pctVal = this.value; document.getElementById('uoPctErr').textContent = ''" aria-label="${escapeHtml(T.uo_pct_label)}"><span>%</span><button type="button" onclick="uoSavePct()">${escapeHtml(T.uo_pct_save)}</button></div>
+      <div class="dc-err" id="uoPctErr"></div></div>`;
+  } else {
+    html += `<div class="uo-btns">
+      <button type="button" class="uo-btn ghost" style="margin:0;" onclick="UO.mode = 'check'; UO.checkVal = ''; uoRender(); const el = document.getElementById('uoChk'); if (el) el.focus();"><i class="fa-solid fa-ruler-vertical"></i>${escapeHtml(T.uo_check)}</button>
+      <button type="button" class="uo-btn ghost" style="margin:0;" onclick="UO.mode = 'pct'; UO.pctVal = String(UO.data.pct); uoRender();"><i class="fa-solid fa-percent"></i>${escapeHtml(T.uo_pct_btn.replace('{pct}', d.pct))}</button>
+    </div>`;
+  }
+  // месяц
+  const m = d.periods.month, pm = d.periods.prev_month_same;
+  html += `<div class="dc-card">
+    <div class="dc-rc-top"><b>${escapeHtml(T.uo_month)}</b>${uoCmpHtml(m.sum, pm.sum)}</div>
+    <div class="uo-tiles" style="margin:6px 0 4px;">
+      <div class="uo-tile"><span>${escapeHtml(T.uo_m_sum)}</span><b>${dcMoney(m.sum)}</b><small>${escapeHtml(T.currency)}</small></div>
+      <div class="uo-tile"><span>${escapeHtml(T.uo_m_sold)}</span><b>${uoL(m.sold)} ${escapeHtml(T.uo_l)}</b><small>${escapeHtml(T.uo_m_col)}: ${uoL(m.collected)} ${escapeHtml(T.uo_l)}</small></div>
+    </div>
+    <div class="uo-row"><span>${escapeHtml(T.uo_m_avg)}</span><b>${m.avg_price ? dcMoney(m.avg_price) : '—'}</b></div>
+    <div class="uo-row"><span>${escapeHtml(T.uo_m_per_car)}</span><b>${m.per_car ? uoL(m.per_car) + ' ' + escapeHtml(T.uo_l) : '—'}</b></div>
+    ${m.shortage > 0 ? `<div class="uo-row"><span>${escapeHtml(T.uo_m_short)}</span><b class="minus">−${uoL(m.shortage)} ${escapeHtml(T.uo_l)}</b></div>` : ''}
+    <div class="dc-lbl" style="margin-top:10px;">${escapeHtml(T.uo_14)}</div>
+    ${uoBarsHtml(d.daily || [])}
+  </div>`;
+  // сеть
+  if (d.network && d.network.length > 1) {
+    html += `<div class="dc-lbl" style="margin:4px 2px 6px;">${escapeHtml(T.uo_net)}</div><div class="dc-card dc-hist">` + d.network.map(n =>
+      `<div class="uo-row"><span>${escapeHtml(n.name || '')}${n.head ? ' · ' + escapeHtml(T.uo_net_head) : ''}<small>≈ ${uoL(n.balance)} ${escapeHtml(T.uo_l)} · ${escapeHtml(T.uo_m_sold)} ${uoL(n.month_sold)} ${escapeHtml(T.uo_l)}</small></span><b class="plus">${dcMoney(n.month_sum)}</b></div>`).join('')
+      + `<div class="uo-row"><span><b style="font-family:inherit;">${escapeHtml(T.ds_total)}</b></span><b>${dcMoney(d.network.reduce((a, n) => a + n.month_sum, 0))}</b></div></div>`;
+  }
+  // покупатели
+  if ((d.buyers || []).length) {
+    html += `<div class="dc-lbl" style="margin:4px 2px 6px;">${escapeHtml(T.uo_buyers)}</div><div class="dc-card dc-hist">` + d.buyers.map(b =>
+      `<div class="uo-row"><span>${escapeHtml(b.name)}<small>${dcMoney(b.last_price)} / ${escapeHtml(T.uo_l)} · ${uoDay(b.last_day)} · ${uoL(b.liters)} ${escapeHtml(T.uo_l)}</small></span><button type="button" class="uo-chip" onclick="uoStartSale('buyer', ${escapeHtml(JSON.stringify(b.name))})">${escapeHtml(T.uo_sell_short)}</button></div>`).join('') + `</div>`;
+  }
+  // история
+  const hist = (d.history || []).map(x => ({ ...x, at: x.day + ' ' + (x.time || '') }))
+    .concat((d.checks || []).map(c => ({ kind: 'check', id: c.id, day: c.day, at: String(c.created_at || ''), delta: c.delta, measured: c.measured })))
+    .sort((a, b) => a.at < b.at ? 1 : (a.at > b.at ? -1 : 0)).slice(0, 40);
+  html += `<div class="dc-lbl" style="margin:4px 2px 6px;">${escapeHtml(T.uo_hist)}</div><div class="dc-card dc-hist">` + (hist.length ? hist.map(x => x.kind === 'check'
+    ? `<div class="uo-row"><span>${uoDay(x.day)} · ${escapeHtml(T.uo_check_row)} ${uoL(x.measured)} ${escapeHtml(T.uo_l)}</span><b class="${x.delta < 0 ? 'minus' : ''}">${x.delta > 0 ? '+' : ''}${uoL(x.delta)} ${escapeHtml(T.uo_l)}</b><button type="button" class="uo-x" onclick="uoDelCheck(${x.id})" aria-label="${escapeHtml(T.af_remove)}">✕</button></div>`
+    : `<div class="uo-row"><span>${uoDay(x.day)} · ${escapeHtml(x.buyer || T.uo_walk)} · ${uoL(x.liters)} ${escapeHtml(T.uo_l)}<small>${dcMoney(x.price)} × ${uoL(x.liters)}</small></span><b class="plus">${dcMoney(x.total)}</b><button type="button" class="uo-x" onclick="uoDelSale(${x.id})" aria-label="${escapeHtml(T.af_remove)}">✕</button></div>`).join('')
+    : `<div class="uo-row"><span style="color:var(--hint);">${escapeHtml(T.uo_empty)}</span></div>`) + `</div>`;
+  body.innerHTML = html;
+}
+// карточка в «Статистике»
+async function uoStatLoad(per) {
+  const box = document.getElementById('uoStatBody');
+  if (!box) return;
+  if (per) UO.statPer = per;
+  if (!per || !UO.stat) {
+    let data = null;
+    try { data = await (await fetch('/api/used_oil', { credentials: 'same-origin', cache: 'no-store' })).json(); } catch (e) { data = null; }
+    if (!data || !data.ok || !data.full) { box.innerHTML = ''; return; }
+    UO.stat = data;
+  }
+  const d = UO.stat, p = d.periods[UO.statPer];
+  const pers = [['today', T.stats_today], ['week', T.stats_week], ['month', T.stats_month], ['year', T.stats_year]];
+  box.innerHTML = `<div class="uo-period">${pers.map(([k, l]) => `<button type="button" class="${UO.statPer === k ? 'on' : ''}" onclick="uoStatLoad('${k}')">${escapeHtml(l)}</button>`).join('')}</div>
+    <div class="uo-tiles">
+      <div class="uo-tile"><span>${escapeHtml(T.uo_m_sum)}</span><b>${dcMoney(p.sum)}</b><small>${UO.statPer === 'month' ? uoCmpHtml(p.sum, d.periods.prev_month_same.sum) || escapeHtml(T.currency) : escapeHtml(T.currency)}</small></div>
+      <div class="uo-tile"><span>${escapeHtml(T.uo_m_sold)}</span><b>${uoL(p.sold)} ${escapeHtml(T.uo_l)}</b><small>${escapeHtml(T.uo_m_col)}: ${uoL(p.collected)} ${escapeHtml(T.uo_l)}</small></div>
+    </div>
+    <div class="uo-row"><span>${escapeHtml(T.uo_m_avg)}</span><b>${p.avg_price ? dcMoney(p.avg_price) : '—'}</b></div>
+    <div class="uo-row"><span>${escapeHtml(T.uo_balance)}</span><b>≈ ${uoL(d.balance)} ${escapeHtml(T.uo_l)}</b></div>
+    <button type="button" class="uo-btn ghost" style="margin:10px 0 0;" onclick="showTab('usedoil')">${escapeHtml(T.uo_open)}</button>`;
+}
+
 // ===== «Закрытие дня»: сверка денег в кассе с программой за минуту =====
 // Владелец видит «должно быть в кассе» и вводит, сколько насчитал — сразу
 // видно «сходится» / недостача / лишние. Сотрудник закрывает «вслепую»:
@@ -10156,6 +10472,7 @@ function dcRender() {
     <div class="dc-big" id="dcExp">${dcMoney(exp)} <small>${escapeHtml(T.currency)}</small></div>
     <div class="dc-row"><span>${escapeHtml(T.dc_float)}</span><input type="number" inputmode="numeric" min="0" step="1000" id="dcFloat" value="${Number(st.float_start) || 0}" oninput="dcSet('float', this.value)"></div>
     <div class="dc-row"><span>${escapeHtml(T.dc_cash)}</span><b>+ ${dcMoney(t.cash)}</b></div>
+    ${d.used_oil && d.used_oil.sum ? `<div class="dc-row"><span>${escapeHtml(T.uo_dc_row.replace('{l}', uoL(d.used_oil.sold)))}</span><b class="info">${dcMoney(d.used_oil.sum)}</b></div>` : ''}
     ${t.repaid ? `<div class="dc-row"><span>${escapeHtml(T.dc_repaid)}</span><b>+ ${dcMoney(t.repaid)}</b></div>` : ''}
     ${t.expenses ? `<div class="dc-row"><label><input type="checkbox" ${st.expenses_from_cash ? 'checked' : ''} onchange="dcSet('exp', this.checked)">${escapeHtml(T.dc_exp_from_cash)}</label><b class="${st.expenses_from_cash ? 'minus' : 'info'}">− ${dcMoney(t.expenses)}</b></div>` : ''}
     ${t.suppliers ? `<div class="dc-row"><label><input type="checkbox" ${st.suppliers_from_cash ? 'checked' : ''} onchange="dcSet('sup', this.checked)">${escapeHtml(T.dc_sup_from_cash)}</label><b class="${st.suppliers_from_cash ? 'minus' : 'info'}">− ${dcMoney(t.suppliers)}</b></div>` : ''}
@@ -10178,7 +10495,7 @@ function dcRender() {
       `<div class="dc-row"><span>${dcDayLabel(h.day)} · ${dcMoney(h.counted)}</span>${h.diff ? `<span class="dc-pill ${h.diff < 0 ? 'bad' : 'over'}">${h.diff > 0 ? '+' : '−'}${dcMoney(Math.abs(h.diff))}</span>` : `<span class="dc-pill ok"><i class="fa-solid fa-check"></i></span>`}</div>`
     ).join('') + `</div>`;
   }
-  body.innerHTML = html;
+  body.innerHTML = uoDcHint(d) + html;
   dcLive();
 }
 function dcSet(what, v) {
@@ -10263,7 +10580,7 @@ function dcRenderBlind(justNow) {
     <div class="dc-err" id="dcErr"></div>
     <button type="button" class="dc-go" onclick="dcSubmit()"><i class="fa-solid fa-paper-plane"></i>${escapeHtml(d.closed ? T.dc_emp_resend : T.dc_emp_send)}</button>
   </div>`;
-  body.innerHTML = html;
+  body.innerHTML = uoDcHint(d) + html;
 }
 
 

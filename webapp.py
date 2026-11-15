@@ -4935,6 +4935,7 @@ def _day_close_send(closing: dict):
     import digest
     shop = db.get_shop(g.shop_id) or {}
     profit = db.get_profit_breakdown(g.shop_id, closing["day"], closing["day"])["profit"]
+    closing = dict(closing, used_oil=db.used_oil_day(g.shop_id, closing["day"]))
     sent = False
     chat = shop.get("notify_telegram_id")
     if chat:
@@ -4964,13 +4965,16 @@ def api_day_close_get():
         if g.is_employee:
             # сотрудник видит только то, что вписал сам
             day_svc = [r for r in day_svc if r["employee_id"] == g.employee_id]
+    used_oil = db.used_oil_day(g.shop_id, day)
     if g.is_employee:
         done = db.get_day_closing(g.shop_id, day)
         return jsonify({"ok": True, "day": day, "blind": True, "closed": bool(done),
+                        "used_oil": {k: used_oil[k] for k in ("collected", "sold")},
                         "closed_at": done["updated_at"] if done else None,
                         "owner_closed": bool(done and not done["by_employee"]), "day_svc": day_svc})
     out = db.day_close_summary(g.shop_id, day)
     out["day_svc"] = day_svc
+    out["used_oil"] = used_oil
     out.update({"ok": True, "blind": False, "history": db.list_day_closings(g.shop_id, 14)})
     if not g.is_branch:
         out["profit"] = db.get_profit_breakdown(g.shop_id, day, day)["profit"]
@@ -5026,6 +5030,74 @@ def api_walkin():
         result = {"ok": True, "id": oc_id, "total": rec.get("cost") or 0}
         db.save_add_token_result(g.shop_id, token, result)
     return jsonify(result)
+
+
+# ---------- Учёт отработки ----------
+# Собрано считается само по заменам (× процент слива точки), продажа —
+# запись «без машины» kind used_oil (всегда наличными). Сотрудник продаёт и
+# видит остаток, но не видит итогов, истории и не делает замер.
+
+@app.route("/api/used_oil")
+@login_required
+def api_used_oil_get():
+    if g.is_employee:
+        return jsonify({"ok": True, "full": False,
+                        **db.used_oil_overview(g.shop_id, full=False, employee_id=g.employee_id)})
+    out = db.used_oil_overview(g.shop_id)
+    out.update({"ok": True, "full": True, "network": None})
+    if not g.is_branch and db.get_branches(g.shop_id):
+        out["network"] = db.used_oil_network(g.shop_id)
+    return jsonify(out)
+
+
+@app.route("/api/used_oil/sale", methods=["POST"])
+@login_required
+def api_used_oil_sale():
+    data = request.get_json(force=True, silent=True) or {}
+    token = str(data.get("token") or "")[:64] or None
+    with db.WRITE_LOCK:
+        prev = db.get_add_token_result(g.shop_id, token)
+        if prev is not None:
+            prev.update({"ok": True, "duplicate": True})
+            return jsonify(prev)
+        res = db.add_used_oil_sale(g.shop_id, data.get("liters"), data.get("price"), data.get("buyer"),
+                                   employee_id=g.employee_id)
+        if res.get("error"):
+            return jsonify({"ok": False, "error": g.T["uo_err_amount"]}), 400
+        db.save_add_token_result(g.shop_id, token, res)
+    _log_action("used_oil_sale", {"liters": data.get("liters"), "total": res["total"]})
+    return jsonify(res)
+
+
+@app.route("/api/used_oil/check", methods=["POST"])
+@login_required
+@employee_blocked
+def api_used_oil_check():
+    data = request.get_json(force=True, silent=True) or {}
+    res = db.add_used_oil_check(g.shop_id, data.get("measured"), data.get("note"),
+                                by_name=session.get("username"))
+    if res.get("error"):
+        return jsonify({"ok": False, "error": g.T["uo_err_amount"]}), 400
+    return jsonify(res)
+
+
+@app.route("/api/used_oil/check/<int:check_id>", methods=["DELETE"])
+@login_required
+@employee_blocked
+def api_used_oil_check_delete(check_id):
+    if not db.delete_used_oil_check(g.shop_id, check_id):
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/used_oil/pct", methods=["POST"])
+@login_required
+@employee_blocked
+def api_used_oil_pct():
+    data = request.get_json(force=True, silent=True) or {}
+    if not db.set_used_oil_pct(g.shop_id, data.get("pct")):
+        return jsonify({"ok": False, "error": g.T["uo_err_pct"]}), 400
+    return jsonify({"ok": True})
 
 
 @app.route("/api/day_close", methods=["POST"])
