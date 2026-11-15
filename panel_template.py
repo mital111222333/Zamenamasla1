@@ -543,6 +543,22 @@ if ('serviceWorker' in navigator) {
   .kc-more-btn.open i { transform:rotate(180deg); }
   .kc-last-line { margin-top:8px; font-size:12.5px; color:#334155; background:#F4F7FA; border-radius:10px; padding:7px 10px; line-height:1.4; }
   .kc-last-line b { font-family:var(--font-mono); }
+  .kc-st { margin-top:8px; display:grid; grid-template-columns:1fr; gap:6px; }
+  @media (min-width:560px) { .kc-st.two { grid-template-columns:1fr 1fr; } }
+  .kc-st-row { border-radius:12px; padding:9px 11px; background:#F4F7FA; border:1.5px solid #E2E8F0; }
+  .kc-st-row.ok { background:#F0FDF4; border-color:#BBE5CB; }
+  .kc-st-row.soon { background:#FFFBEB; border-color:#F3D98B; }
+  .kc-st-row.over { background:#FEF2F2; border-color:#F5B5B0; }
+  .kc-st-h { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; font-weight:700; color:#475569; }
+  .kc-st-h i { margin-right:5px; }
+  .kc-st-badge { font-size:11.5px; font-weight:800; border-radius:999px; padding:2px 8px; white-space:nowrap; background:#E2E8F0; color:#334155; }
+  .kc-st-row.ok .kc-st-badge { background:#CDEFD9; color:#166534; }
+  .kc-st-row.soon .kc-st-badge { background:#FBE7A8; color:#854D0E; }
+  .kc-st-row.over .kc-st-badge { background:#FAC9C5; color:#9F1D17; }
+  .kc-st-due { margin-top:3px; font-size:13px; color:#334155; line-height:1.3; }
+  .kc-st-due b { font-family:var(--font-mono); font-size:19px; color:#0F172A; letter-spacing:-.2px; }
+  .kc-st-sub { margin-top:2px; font-size:12px; color:#64748B; line-height:1.35; overflow-wrap:anywhere; }
+  .kc-st-none { font-size:12px; color:#64748B; padding:2px 2px 0; }
   .kc-notes-box { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
   .kc-note { margin-top:8px; font-size:12.5px; line-height:1.45; color:#78350F; background:#FFFBEB; border:1px solid #FCD34D; border-radius:10px; padding:7px 10px; white-space:pre-wrap; word-break:break-word; }
   .kc-notes-box .kc-note { margin-top:0; }
@@ -1822,6 +1838,7 @@ if ('serviceWorker' in navigator) {
           <input id="atf_interval" type="number" inputmode="numeric" min="1" max="60" value="6" style="flex:1;">
           <span>{{ T.unit_months }}</span>
         </div>
+        <div id="atfCompare"></div>
       </div>
     </div>
 
@@ -3029,15 +3046,24 @@ let carsCache = [];
 let lastKnownNextMileage = null;
 
 function checkMileageVsDue() {
-  const el = document.getElementById('mileageCompare');
-  if (!el) return;
   const entered = parseFloat(document.getElementById('mileage').value);
-  if (!lastKnownNextMileage || isNaN(entered)) { el.innerHTML = ''; return; }
-  const diff = entered - lastKnownNextMileage;
-  if (diff > 0) {
-    el.innerHTML = `<div class="mileage-compare over">⚠️ ${T.mileage_over_due} ${lastKnownNextMileage.toLocaleString('ru-RU')} ${T.km_short} — ${T.mileage_over_by} ${diff.toLocaleString('ru-RU')} ${T.km_short}</div>`;
-  } else {
-    el.innerHTML = `<div class="mileage-compare ok">${T.mileage_within_due} ${lastKnownNextMileage.toLocaleString('ru-RU')} ${T.km_short}</div>`;
+  if (typeof kcRenderStatus === 'function') kcRenderStatus();
+  const cmp = (el, due, okText) => {
+    if (!el) return;
+    if (!due || isNaN(entered)) { el.innerHTML = ''; return; }
+    const diff = entered - due;
+    el.innerHTML = diff > 0
+      ? `<div class="mileage-compare over">⚠️ ${T.mileage_over_due} ${due.toLocaleString('ru-RU')} ${T.km_short} — ${T.mileage_over_by} ${diff.toLocaleString('ru-RU')} ${T.km_short}</div>`
+      : `<div class="mileage-compare ok">${okText} ${due.toLocaleString('ru-RU')} ${T.km_short}</div>`;
+  };
+  cmp(document.getElementById('mileageCompare'), lastKnownNextMileage, T.mileage_within_due);
+  // то же для масла коробки — раньше при повторном визите этого не было видно
+  const atfEl = document.getElementById('atfCompare');
+  const atf = (typeof KC_STATUS !== 'undefined' && KC_STATUS) ? KC_STATUS.atf : null;
+  if (atfEl) {
+    if (atf && atf.dueKm && !isNaN(entered)) cmp(atfEl, atf.dueKm, T.mileage_within_due);
+    else if (atf && (atf.dueKm || atf.dueDate)) atfEl.innerHTML = `<div class="mileage-compare ok">${kcPlanText(atf)}</div>`;
+    else atfEl.innerHTML = '';
   }
 }
 
@@ -9594,6 +9620,7 @@ async function lookupPlate(force) {
   LAST_LOOKED_PLATE = plate;
   KNOWN_OWNER = null;
   NEW_OWNER = false;
+  KC_STATUS = null;
   if (!plate) { panel.innerHTML = ''; setKnownMode(false); lastKnownNextMileage = null; DK.last = null; applyDailyKm(); checkMileageVsDue(); return; }
   try {
     const res = await fetch('/api/history/' + encodeURIComponent(plate));
@@ -9662,7 +9689,7 @@ async function lookupPlate(force) {
       <div class="kc-last-visit">
         <div class="kc-lv-top">
           <div>
-            <div class="kc-lv-service">${escapeHtml(h.change_date || '')}</div>
+            <div class="kc-lv-service">${escapeHtml(kcDate(h.change_date))}</div>
             ${mp.length ? `<div class="kc-lv-date">${mp.join(' · ')}</div>` : ''}
           </div>
           <div class="kc-lv-cost">${h.cost ? h.cost.toLocaleString('ru-RU') + ' ' + T.currency : '—'}</div>
@@ -9685,15 +9712,15 @@ async function lookupPlate(force) {
       ...(data.cross_history || []).filter(h => h.notes).map(h => ({ date: h.change_date, text: h.notes, shop: h.shop_name || '' })),
     ].sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 2);
     const notesHtml = allNotes.length ? `<div class="kc-notes-box">${allNotes.map(n =>
-      `<div class="kc-note"><i class="fa-solid fa-note-sticky"></i> <b>${escapeHtml(n.date || '')}${n.shop ? ' · ' + escapeHtml(n.shop) : ''}:</b> ${escapeHtml(n.text)}</div>`).join('')}</div>` : '';
+      `<div class="kc-note"><i class="fa-solid fa-note-sticky"></i> <b>${escapeHtml(kcDate(n.date))}${n.shop ? ' · ' + escapeHtml(n.shop) : ''}:</b> ${escapeHtml(n.text)}</div>`).join('')}</div>` : '';
 
     // компактная карточка: имя + машина + одна строка «прошлый раз» +
     // быстрые кнопки; подробная история раскрывается по «История ›»
     const lastShort = last ? [
-        last.change_date,
+        T.kc_st_last_visit + ' ' + kcDate(last.change_date),
         last.mileage ? last.mileage.toLocaleString('ru-RU') + ' ' + T.km_short : '',
-        LAST_VISIT_ITEMS.map(it => (it.brand || it.name) + (it.qty && it.qty !== 1 ? ' ' + String(it.qty).replace('.', ',') + ' ' + T.unit_l : '')).join(' + '),
       ].filter(Boolean).join(' · ') : T.kc_no_history;
+    KC_STATUS = kcBuildStatus(data.history);
     panel.innerHTML = `
       <div class="known-client kc-compact">
         <div class="kc-top">
@@ -9704,7 +9731,8 @@ async function lookupPlate(force) {
           </div>
           <button type="button" class="kc-more-btn" onclick="toggleKcDetails(this)" aria-expanded="false">${T.kc_history_btn} <i class="fa-solid fa-chevron-down"></i></button>
         </div>
-        <div class="kc-last-line">${escapeHtml(lastShort)}${last && last.cost ? ` · <b>${last.cost.toLocaleString('ru-RU')}</b>` : ''}</div>
+        <div class="kc-last-line">${escapeHtml(lastShort)}${last && last.cost ? ` · <b>${last.cost.toLocaleString('ru-RU')}</b> ${T.currency}` : ''}</div>
+        <div id="kcStatus" class="kc-st"></div>
         ${notesHtml}
         ${LAST_VISIT_ITEMS.length ? `<div class="kc-quick"><button type="button" class="kc-repeat" onclick="repeatLastVisit()"><i class="fa-solid fa-rotate-right"></i> ${T.kc_repeat_short}<kbd class="af-kbd">F4</kbd></button><div id="kcPresets" class="kc-presets"></div></div>` : '<div class="kc-quick"><div id="kcPresets" class="kc-presets"></div></div>'}
         <div class="kc-details" hidden>
@@ -9718,6 +9746,7 @@ async function lookupPlate(force) {
       </div>
     ` + crossHtml;
     setKnownMode(!!(data.car.owner_name || '').trim());
+    checkMileageVsDue();
     if (typeof renderPresets === 'function') renderPresets();
   } catch (e) {
     LAST_LOOKED_PLATE = '';
@@ -9726,6 +9755,74 @@ async function lookupPlate(force) {
     lastKnownNextMileage = null;
     checkMileageVsDue();
   }
+}
+
+// «Что было в прошлый раз» — по моторному маслу и по маслу коробки отдельно:
+// когда и на каком пробеге меняли, что залили и на каком пробеге / до какой
+// даты менять снова. Плановые цифры берём из последней записи машины (они
+// переносятся из визита в визит), а «когда меняли» — из визита, где эта
+// позиция была в чеке.
+var KC_STATUS = null;
+function kcDate(d) {
+  const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(String(d || ''));
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : String(d || '');
+}
+function kcItems(h) {
+  try { const a = h.items_json ? JSON.parse(h.items_json) : []; return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function kcBuildStatus(history) {
+  const last = history && history[0];
+  if (!last) return null;
+  const find = key => {
+    for (const h of history) {
+      const its = kcItems(h);
+      // старые записи без списка позиций — это замена моторного масла
+      const it = its.find(i => i.key === key) || (key === 'fluid_0' && !h.items_json ? { name: h.oil_brand || '', brand: '' } : null);
+      if (it) return { date: h.change_date, km: h.mileage, what: [(it.brand || it.name || ''), (it.qty && it.qty !== 1 ? String(it.qty).replace('.', ',') + ' ' + T.unit_l : '')].filter(Boolean).join(' · ') };
+    }
+    return null;
+  };
+  return {
+    oil: { done: find('fluid_0'), dueKm: last.next_mileage || null, dueDate: last.next_change_date || null },
+    atf: { done: find('fluid_1'), dueKm: last.atf_next_mileage || null, dueDate: last.atf_next_date || null },
+  };
+}
+function kcPlanText(x) {
+  return [x.dueKm ? `${T.kc_st_due_km} ${x.dueKm.toLocaleString('ru-RU')} ${T.km_short}` : '', x.dueDate ? `${T.kc_st_due_date} ${kcDate(x.dueDate)}` : ''].filter(Boolean).join(' · ');
+}
+function kcRowHtml(icon, title, x, entered) {
+  if (!x.done && !x.dueKm && !x.dueDate) return '';
+  const today = fmtDate(new Date());
+  let cls = '', badge = '';
+  const fmt = n => Math.abs(n).toLocaleString('ru-RU') + ' ' + T.km_short;
+  if (x.dueKm && !isNaN(entered)) {
+    const left = x.dueKm - entered;
+    if (left < 0) { cls = 'over'; badge = `${T.kc_st_over} ${fmt(left)}`; }
+    else if (left <= 1000) { cls = 'soon'; badge = `${T.kc_st_left} ${fmt(left)}`; }
+    else { cls = 'ok'; badge = `${T.kc_st_left} ${fmt(left)}`; }
+  }
+  if (cls !== 'over' && x.dueDate && String(x.dueDate).slice(0, 10) < today) { cls = 'over'; badge = T.kc_st_date_over; }
+  const due = x.dueKm
+    ? `${T.kc_st_due_km} <b>${x.dueKm.toLocaleString('ru-RU')}</b> ${T.km_short}${x.dueDate ? ` · ${T.kc_st_due_date} ${kcDate(x.dueDate)}` : ''}`
+    : (x.dueDate ? `${T.kc_st_due_date} <b>${kcDate(x.dueDate)}</b>` : `<span style="color:#64748B;">${T.kc_st_no_plan}</span>`);
+  const done = x.done
+    ? `${T.kc_st_done} ${kcDate(x.done.date)}${x.done.km ? ` · ${x.done.km.toLocaleString('ru-RU')} ${T.km_short}` : ''}${x.done.what ? ` · ${escapeHtml(x.done.what)}` : ''}`
+    : '';
+  return `<div class="kc-st-row ${cls}">
+    <div class="kc-st-h"><span><i class="fa-solid ${icon}"></i>${title}</span>${badge ? `<span class="kc-st-badge">${badge}</span>` : ''}</div>
+    <div class="kc-st-due">${due}</div>
+    ${done ? `<div class="kc-st-sub">${done}</div>` : ''}
+  </div>`;
+}
+function kcRenderStatus() {
+  const el = document.getElementById('kcStatus');
+  if (!el) return;
+  if (!KC_STATUS) { el.innerHTML = ''; return; }
+  const entered = parseFloat(document.getElementById('mileage').value);
+  const oil = kcRowHtml('fa-oil-can', T.fluid_0, KC_STATUS.oil, entered);
+  const atf = kcRowHtml('fa-gears', T.fluid_1, KC_STATUS.atf, entered);
+  el.className = 'kc-st' + (oil && atf ? ' two' : '');
+  el.innerHTML = oil + atf + (atf ? '' : `<div class="kc-st-none"><i class="fa-solid fa-gears"></i> ${T.fluid_1}: ${T.kc_st_never}</div>`);
 }
 
 // Постоянный клиент: поля имени/телефона/модели уже заполнены — прячем их,
