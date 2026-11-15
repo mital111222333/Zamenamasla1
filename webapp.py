@@ -3387,6 +3387,30 @@ def api_stats_range():
     return jsonify(result)
 
 
+@app.route("/api/stats/analytics")
+@login_required
+@employee_blocked
+def api_stats_analytics():
+    """Новый уровень статистики: план и прогноз, сравнение 30 дней, вязкости,
+    клиенты, загрузка по дням и часам, фильтр к маслу. Без закупки."""
+    return jsonify({"ok": True, **db.stats_analytics(g.shop_id)})
+
+
+@app.route("/api/stats/plan", methods=["POST"])
+@login_required
+@employee_blocked
+def api_stats_plan():
+    data = request.get_json(force=True) or {}
+    try:
+        amount = int(float(data.get("amount") or 0))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad amount"}), 400
+    if amount < 0 or amount > 10 ** 13:
+        return jsonify({"ok": False, "error": "bad amount"}), 400
+    db.set_month_plan(g.shop_id, amount or None)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/stats/directions")
 @login_required
 @employee_blocked

@@ -599,6 +599,34 @@ if ('serviceWorker' in navigator) {
   .q-car .q-acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
   .q-empty { font-size:13px; color:var(--hint); padding:6px 0 8px; }
   .q-foot { font-size:13px; color:var(--hint); margin:6px 2px 20px; line-height:1.6; }
+  .an-box { display:flex; flex-direction:column; gap:14px; margin-top:16px; }
+  .an-card { background:#fff; border:1px solid var(--border); border-radius:18px; padding:14px 16px; opacity:0; transform:translateY(16px); transition:opacity .55s ease, transform .55s cubic-bezier(.2,.8,.2,1); }
+  .an-card.in { opacity:1; transform:none; }
+  .an-h { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .an-h b { font-size:15px; }
+  .an-h span { font-size:12.5px; color:var(--hint); }
+  .an-ins { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--border); font-size:14px; line-height:1.45; opacity:0; transform:translateX(-10px); transition:opacity .45s, transform .45s; }
+  .an-ins:first-of-type { border-top:0; }
+  .an-card.in .an-ins { opacity:1; transform:none; }
+  .an-ins i { font-size:17px; width:20px; text-align:center; margin-top:2px; flex:none; }
+  .an-ring { display:flex; align-items:center; gap:16px; }
+  .an-ring circle.p { transition:stroke-dashoffset 1.6s cubic-bezier(.2,.8,.2,1); }
+  .an-big { font-family:var(--font-mono); font-size:20px; font-weight:700; }
+  .an-sub { font-size:13px; color:var(--hint); margin-top:2px; }
+  .an-ok { color:#15803D; font-weight:600; font-size:13px; margin-top:4px; }
+  .an-bad { color:#B45309; font-weight:600; font-size:13px; margin-top:4px; }
+  .an-link { border:0; background:transparent; color:var(--blue); font:inherit; font-size:13.5px; font-weight:700; min-height:40px; padding:0; cursor:pointer; }
+  .an-bar { display:flex; align-items:center; gap:10px; margin:7px 0; font-size:13.5px; }
+  .an-bar .t { width:118px; flex:none; color:var(--hint); }
+  .an-bar .b { flex:1; height:22px; border-radius:7px; background:#F1F5F9; overflow:hidden; }
+  .an-bar .b i { display:block; height:100%; width:0; border-radius:7px; transition:width 1.3s cubic-bezier(.2,.8,.2,1); }
+  .an-bar .v { width:52px; flex:none; text-align:right; font-family:var(--font-mono); font-weight:700; }
+  .an-week { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:end; height:120px; }
+  .an-week div { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; font-size:12px; color:var(--hint); }
+  .an-week i { width:100%; height:0; border-radius:6px 6px 3px 3px; background:#85B7EB; transition:height 1.2s cubic-bezier(.2,.8,.2,1); }
+  .an-week i.top { background:#E24B4A; }
+  .an-heat { display:grid; grid-template-columns:26px repeat(12, minmax(0,1fr)); gap:3px; font-size:10.5px; color:var(--hint); margin-top:12px; }
+  .an-heat i { aspect-ratio:1; border-radius:3px; background:#378ADD; opacity:0; transition:opacity .6s; }
   .ds-card { border:1.5px solid #86EFAC; }
   .ds-h { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
   .ds-h i { color:#0F9F6E; font-size:20px; margin-top:2px; }
@@ -2497,6 +2525,7 @@ if ('serviceWorker' in navigator) {
 
     <div id="statsOwnView">
       <div id="statsGrid">{{ T.stats_loading }}</div>
+      {% if not is_employee %}<div id="anBox" class="an-box"></div>{% endif %}
       {% if dirs.tire or dirs.part %}
       <div class="card dir-card" id="dirCard" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.st_dirs_title }}</label>
@@ -7495,6 +7524,132 @@ async function loadNetworkCompare() {
   });
 }
 
+
+// ===== «Анализ бизнеса»: новый уровень статистики (масло) =====
+// Всё, что было в «Статистике», остаётся; эти карточки добавляются ниже
+// карточек периодов и появляются с анимацией, когда до них доходит экран.
+const AN = { data: null, seq: 0, chart: null, io: null };
+async function loadAnalytics() {
+  const box = document.getElementById('anBox');
+  if (!box) return;
+  const seq = ++AN.seq;
+  let d = null;
+  try { d = await (await fetch('/api/stats/analytics', { credentials: 'same-origin', cache: 'no-store' })).json(); } catch (e) { d = null; }
+  if (seq !== AN.seq || !d || !d.ok) return;
+  AN.data = d;
+  renderAnalytics();
+}
+function anPct(a, b) { return b > 0 ? Math.round((a - b) / b * 100) : null; }
+function anInsights(d) {
+  const out = [];
+  const wd = String(T.an_weekdays || '').split('|');
+  const p = anPct(d.month, d.prev_month_same);
+  if (p != null && Math.abs(p) >= 3) out.push(p > 0 ? ['fa-arrow-trend-up', '#15803D', T.an_in_up.replace('{pct}', p)] : ['fa-arrow-trend-down', '#B3241C', T.an_in_down.replace('{pct}', Math.abs(p))]);
+  const f = d.filter;
+  if (f.oil_visits >= 5 && f.no_filter / f.oil_visits >= 0.15) out.push(['fa-filter', '#B45309', T.an_in_filter.replace('{n}', f.no_filter).replace('{all}', f.oil_visits).replace('{sum}', fmtShort(f.no_filter * (f.avg_price || 0)) + ' ' + T.currency)]);
+  if (d.clients.due > 0) out.push(['fa-bell', '#2563EB', T.an_in_due.replace('{n}', d.clients.due)]);
+  if (d.clients.lost > 0) out.push(['fa-phone', '#B3241C', T.an_in_lost.replace('{n}', d.clients.lost)]);
+  const wsum = d.week.reduce((a, b) => a + b, 0);
+  if (wsum >= 14) { const i = d.week.indexOf(Math.max(...d.week)); out.push(['fa-calendar-day', '#7C3AED', T.an_in_busy.replace('{day}', wd[i] || '')]); }
+  if (d.viscosity.length && d.viscosity[0].name !== '—') out.push(['fa-oil-can', '#0F9F6E', T.an_in_visc.replace('{v}', d.viscosity[0].name)]);
+  if (d.clients.unique >= 10) out.push(['fa-heart', '#D4537E', T.an_in_regular.replace('{pct}', Math.round(d.clients.returning / d.clients.unique * 100))]);
+  return out.slice(0, 5);
+}
+function anPlanHtml(d) {
+  const pl = d.plan;
+  if (!pl.amount) return `<div class="an-sub" style="margin-bottom:8px;">${T.an_plan_none}</div><button type="button" class="an-link" onclick="anSetPlan()"><i class="fa-solid fa-bullseye"></i> ${T.an_plan_set}</button>`;
+  const pct = Math.min(100, Math.round(d.month / pl.amount * 100));
+  const ok = pl.forecast >= pl.amount;
+  const C = 2 * Math.PI * 36;
+  return `<div class="an-ring"><svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true"><circle cx="46" cy="46" r="36" fill="none" stroke="#E2E8F0" stroke-width="10"/><circle class="p" cx="46" cy="46" r="36" fill="none" stroke="${ok ? '#1D9E75' : '#EF9F27'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" data-o="${(C * (1 - pct / 100)).toFixed(1)}" transform="rotate(-90 46 46)"/><text x="46" y="52" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor">${pct}%</text></svg>
+    <div><div class="an-big">${escapeHtml(T.an_plan_of.replace('{done}', fmtShort(d.month)).replace('{plan}', fmtShort(pl.amount)))}</div>
+      <div class="an-sub">${escapeHtml(T.an_plan_forecast.replace('{sum}', fmtShort(pl.forecast)))}</div>
+      <div class="an-sub">${escapeHtml(T.an_plan_need.replace('{need}', fmtShort(pl.need_per_day || 0)).replace('{now}', fmtShort(pl.per_day)))}</div>
+      <div class="${ok ? 'an-ok' : 'an-bad'}">${escapeHtml(ok ? T.an_plan_ok : T.an_plan_bad.replace('{sum}', fmtShort(Math.max(0, (pl.need_per_day || 0) - pl.per_day))))}</div>
+      <button type="button" class="an-link" onclick="anSetPlan()">${T.an_plan_edit}</button></div></div>`;
+}
+async function anSetPlan() {
+  const cur = (AN.data && AN.data.plan.amount) || '';
+  const raw = prompt(T.an_plan_prompt, cur);
+  if (raw === null) return;
+  const v = parseInt(String(raw).replace(/[^0-9]/g, '')) || 0;
+  try { await fetch('/api/stats/plan', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: v }) }); } catch (e) {}
+  loadAnalytics();
+}
+function renderAnalytics() {
+  const d = AN.data, box = document.getElementById('anBox');
+  if (!d || !box) return;
+  const ins = anInsights(d);
+  const wd = String(T.an_weekdays || '').split('|');
+  const cl = d.clients, clMax = Math.max(1, cl.unique, cl.due, cl.lost);
+  const clRows = [[T.an_cl_unique, cl.unique, '#378ADD'], [T.an_cl_returning, cl.returning, '#1D9E75'], [T.an_cl_new, cl.new, '#7F77DD'], [T.an_cl_due, cl.due, '#EF9F27'], [T.an_cl_lost, cl.lost, '#E24B4A']];
+  const vMax = Math.max(1, ...d.viscosity.map(v => v.liters));
+  const vCol = ['#378ADD', '#85B7EB', '#85B7EB', '#B5D4F4', '#B5D4F4', '#B5D4F4'];
+  const wMax = Math.max(1, ...d.week);
+  const hasHours = Object.values(d.hours).reduce((a, b) => a + b, 0) >= 20;
+  let heat = '';
+  if (hasHours) {
+    const hMax = Math.max(1, ...Object.values(d.hours));
+    heat = '<div class="an-heat"><span></span>' + Array.from({ length: 12 }, (_, i) => `<span style="text-align:center">${i + 8}</span>`).join('');
+    for (let w = 0; w < 7; w++) {
+      heat += `<span>${escapeHtml(wd[w] || '')}</span>`;
+      for (let h = 8; h < 20; h++) heat += `<i data-o="${(0.08 + 0.92 * ((d.hours[w + '-' + h] || 0) / hMax)).toFixed(2)}"></i>`;
+    }
+    heat += '</div>';
+  }
+  const sp = anPct(d.sum30, d.sum_prev30);
+  box.innerHTML = `
+    <div class="an-card"><div class="an-h"><b><i class="fa-solid fa-wand-magic-sparkles" style="color:#7C3AED"></i> ${T.an_noticed}</b></div>
+      ${ins.length ? ins.map(x => `<div class="an-ins"><i class="fa-solid ${x[0]}" style="color:${x[1]}"></i><span>${escapeHtml(x[2])}</span></div>`).join('') : `<div class="an-sub">${T.an_in_none}</div>`}</div>
+    <div class="an-card"><div class="an-h"><b><i class="fa-solid fa-bullseye" style="color:#1D9E75"></i> ${T.an_plan}</b></div>${anPlanHtml(d)}</div>
+    <div class="an-card"><div class="an-h"><b>${T.an_cmp_title}</b>${sp != null ? `<span style="color:${sp >= 0 ? '#15803D' : '#B3241C'}; font-weight:700;">${sp >= 0 ? '▲' : '▼'} ${Math.abs(sp)}%</span>` : ''}</div>
+      <div style="position:relative; height:170px;"><canvas id="anCmp"></canvas></div><div class="an-sub">${T.an_cmp_legend}</div></div>
+    <div class="an-card"><div class="an-h"><b>${T.an_visc_title}</b><span>${escapeHtml(T.an_visc_sub.replace('{l}', String(d.liters).replace('.', ',')))}</span></div>
+      ${d.viscosity.length ? d.viscosity.map((v, i) => `<div class="an-bar"><span class="t">${escapeHtml(v.name)}</span><span class="b"><i style="background:${vCol[i]}" data-w="${(v.liters / vMax * 100).toFixed(1)}"></i></span><span class="v">${String(v.liters).replace('.', ',')}</span></div>`).join('') : `<div class="an-sub">${T.an_in_none}</div>`}</div>
+    <div class="an-card"><div class="an-h"><b>${T.an_clients_title}</b></div>
+      ${clRows.map(r => `<div class="an-bar"><span class="t">${escapeHtml(r[0])}</span><span class="b"><i style="background:${r[2]}" data-w="${(r[1] / clMax * 100).toFixed(1)}"></i></span><span class="v">${r[1]}</span></div>`).join('')}
+      <button type="button" class="an-link" onclick="showTab('table')"><i class="fa-solid fa-car"></i> ${T.an_cl_call}</button></div>
+    <div class="an-card"><div class="an-h"><b>${T.an_load_title}</b><span>${hasHours ? T.an_load_hours : T.an_load_week}</span></div>
+      <div class="an-week">${d.week.map((v, i) => `<div><i class="${v === wMax && v > 0 ? 'top' : ''}" data-h="${(v / wMax * 100).toFixed(1)}"></i><span>${escapeHtml(wd[i] || '')}</span></div>`).join('')}</div>
+      ${heat || `<div class="an-sub" style="margin-top:8px;">${T.an_load_hours_soon}</div>`}</div>`;
+  if (AN.io) AN.io.disconnect();
+  const reveal = c => {
+    c.classList.add('in');
+    setTimeout(() => {
+      c.querySelectorAll('[data-w]').forEach(x => { x.style.width = x.dataset.w + '%'; });
+      c.querySelectorAll('[data-h]').forEach(x => { x.style.height = x.dataset.h + '%'; });
+      c.querySelectorAll('circle.p').forEach(x => { x.style.strokeDashoffset = x.dataset.o; });
+      c.querySelectorAll('.an-heat i').forEach((x, i) => setTimeout(() => { x.style.opacity = x.dataset.o; }, i * 6));
+      c.querySelectorAll('.an-ins').forEach((x, i) => { x.style.transitionDelay = (i * 0.09) + 's'; });
+    }, 80);
+  };
+  const cards = box.querySelectorAll('.an-card');
+  if ('IntersectionObserver' in window) {
+    AN.io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { reveal(e.target); AN.io.unobserve(e.target); } }), { threshold: 0.12 });
+    cards.forEach(c => AN.io.observe(c));
+  } else cards.forEach(reveal);
+  anDrawCmp(d);
+}
+function anDrawCmp(d) {
+  const el = document.getElementById('anCmp');
+  if (!el || typeof Chart === 'undefined') return;
+  if (AN.chart) { try { AN.chart.destroy(); } catch (e) {} }
+  const col = c => (window.glColor ? glColor(c) : c);
+  AN.chart = new Chart(el, {
+    type: 'line',
+    data: { labels: d.daily.map(x => x.date.slice(8, 10) + '.' + x.date.slice(5, 7)),
+      datasets: [
+        { data: d.daily.map(x => x.total), borderColor: col('#0F52BA'), backgroundColor: 'rgba(55,138,221,.16)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+        { data: d.daily.map(x => x.prev), borderColor: col('#94A3B8'), borderDash: [5, 5], fill: false, tension: 0.4, pointRadius: 0, borderWidth: 1.5 },
+      ] },
+    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      animation: { duration: 1800, easing: 'easeOutQuart' },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + Math.round(c.raw).toLocaleString('ru-RU') + ' ' + T.currency } } },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, color: col('#64748B'), font: { size: 11 } } },
+                y: { grid: { color: col('#F1F5F9') }, ticks: { color: col('#64748B'), font: { size: 11 }, callback: v => fmtShort(v) } } } },
+  });
+}
+
 // ---- Доход по направлениям: масло / шиномонтаж / запчасти ----
 const DIRST = { period: 'month', seq: 0 };
 const DIR_COLORS = { oil: '#2563EB', tire: '#0F9F6E', part: '#C2410C' };
@@ -7538,6 +7693,7 @@ async function loadDirStats(period) {
 
 async function loadStats() {
   loadDashboard();
+  loadAnalytics();
   if (DIRS_ON) loadDirStats();
   loadBrandStats();  // для сотрудника карточки нет — функция сама выйдет
   const res = await fetch('/api/stats');
