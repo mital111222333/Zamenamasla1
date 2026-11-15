@@ -575,6 +575,15 @@ if ('serviceWorker' in navigator) {
   .km-chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
   .add-form { max-width:760px; }
   .af-title { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-style:italic; font-size:18px; text-transform:uppercase; letter-spacing:.3px; color:var(--darkblue, #0A2540); margin:2px 4px 10px; }
+  .dir-bar { display:flex; height:12px; border-radius:6px; overflow:hidden; margin:4px 0 12px; background:#E2E8F0; }
+  .dir-bar span { display:block; height:100%; }
+  .dir-total { display:flex; justify-content:flex-end; margin-top:10px; }
+  .dir-total b { font-family:var(--font-mono); font-size:22px; }
+  .dir-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0 10px 12px; border-left:4px solid; margin-top:8px; }
+  .dir-row b { display:block; font-size:15px; }
+  .dir-row span { font-size:12.5px; color:var(--hint); }
+  .dir-sum { text-align:right; flex:none; }
+  .dir-sum b { font-family:var(--font-mono); white-space:nowrap; }
   .af-price { margin-left:auto; display:inline-flex; align-items:center; gap:7px; min-height:40px; padding:0 14px; border-radius:999px; border:1.5px solid var(--blue); background:#fff; color:var(--blue); font-family:var(--font-body); font-style:normal; font-size:14px; font-weight:700; text-transform:none; letter-spacing:0; cursor:pointer; }
   .af-price:active { transform:scale(.97); }
   .pr-back-entry { display:inline-flex; align-items:center; gap:6px; margin:0 0 4px; }
@@ -2395,6 +2404,13 @@ if ('serviceWorker' in navigator) {
 
     <div id="statsOwnView">
       <div id="statsGrid">{{ T.stats_loading }}</div>
+      {% if dirs.tire or dirs.part %}
+      <div class="card dir-card" id="dirCard" style="margin-top:16px;">
+        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.st_dirs_title }}</label>
+        <div class="brand-period" id="dirPeriod"></div>
+        <div id="dirBody">{{ T.stats_loading }}</div>
+      </div>
+      {% endif %}
 
       <div class="modal-overlay" id="dayDetailsModal" onclick="if (event.target === this) closeWhModal('dayDetailsModal')">
         <div class="modal modal-wide" style="text-align:left;">
@@ -2890,6 +2906,14 @@ if ('serviceWorker' in navigator) {
             <label>{{ T.wh_product_name }}</label>
             <input id="ep_name">
           </div>
+          <div class="field" id="ep_dir_wrap" style="display:none;">
+            <label>{{ T.wh_dir_label }}</label>
+            <select id="ep_dir">
+              <option value="">{{ T.cat_goods }}</option>
+              {% if dirs.tire %}<option value="tire">{{ T.cat_tires }}</option>{% endif %}
+              {% if dirs.part %}<option value="part">{{ T.cat_parts }}</option>{% endif %}
+            </select>
+          </div>
           <div class="row2">
             <div class="field">
               <label>{{ T.wh_sell_price }}</label>
@@ -3093,6 +3117,7 @@ MODAL_AND_SCRIPT = """
     <div id="svcOtherStockRows"></div>
     <button type="button" class="submit" style="padding:8px; background:var(--border);" onclick="addOtherStockRow('svcOther')">{{ T.wh_add_row }}</button>
     {% endif %}
+    <div class="hint-text" id="svcKeepNote" style="display:none; margin-top:10px;"></div>
 
     <div class="field" style="margin-top:10px;">
       <label>{{ T.disc_title }}, {{ T.currency }}</label>
@@ -3146,7 +3171,10 @@ MODAL_AND_SCRIPT = """
 const T = {{ t_json|safe }};
 const LANG = {{ lang|tojson }};
 const WAREHOUSE_ENABLED = {{ warehouse_enabled|tojson }};
-const STORE_ENABLED = {{ store_enabled|tojson }};  // «Склад магазина»: основной склад + магазин
+const STORE_ENABLED = {{ store_enabled|tojson }};
+// Направления точки, кроме масла: шиномонтаж (tire) и автозапчасти (part)
+const DIRS = {{ dirs|tojson }};
+const DIRS_ON = !!(DIRS.tire || DIRS.part);  // «Склад магазина»: основной склад + магазин
 const IS_BRANCH = {{ is_branch|tojson }};
 const IS_EMP_TEAM = {{ is_employee|tojson }};
 const MY_EMP_ID = {{ my_employee_id|tojson }};
@@ -4256,13 +4284,23 @@ function renderWarehouseCategoryOptions() {
   if (!sel) return;
   const allKeys = FLUID_KEYS.concat(FILTER_KEYS);
   sel.innerHTML = allKeys.map(key => `<option value="${key}">${T[key]}</option>`).join('')
-    + `<option value="other">${T.wh_category_other}</option>`;
+    + `<option value="other">${T.wh_category_other}</option>`
+    + (DIRS.tire ? `<option value="other:tire">${T.wh_cat_tires}</option>` : '')
+    + (DIRS.part ? `<option value="other:part">${T.wh_cat_parts}</option>` : '');
+}
+// «Шины и диски» и «Запчасти» на складе — это «Прочие товары» с направлением
+function whSplitCat(v) {
+  const parts = String(v || '').split(':');
+  return { category: parts[0], dir: parts[1] || '' };
 }
 
 function onWhCategoryChanged() {
   const sel = document.getElementById('wh_new_category');
   const unitRow = document.getElementById('wh_new_unit_row');
-  if (unitRow) unitRow.style.display = sel.value === 'other' ? 'block' : 'none';
+  const c = whSplitCat(sel.value);
+  if (unitRow) unitRow.style.display = c.category === 'other' ? 'block' : 'none';
+  const unit = document.getElementById('wh_new_unit');
+  if (unit && c.dir) unit.value = 'pc';
 }
 
 // ---- Склад: одна логика отрисовки для своего склада (ctx 'own', элементы wh*)
@@ -5839,18 +5877,20 @@ function openOrderNewProduct() {
 }
 
 function onOnpCategoryChanged() {
-  document.getElementById('onp_unit_row').style.display = document.getElementById('onp_category').value === 'other' ? '' : 'none';
+  const c = whSplitCat(document.getElementById('onp_category').value);
+  document.getElementById('onp_unit_row').style.display = c.category === 'other' ? '' : 'none';
+  if (c.dir) document.getElementById('onp_unit').value = 'pc';
 }
 
 async function saveOrderNewProduct() {
-  const category = document.getElementById('onp_category').value;
+  const { category, dir } = whSplitCat(document.getElementById('onp_category').value);
   const name = document.getElementById('onp_name').value.replace(/\\s+/g, ' ').trim();
   if (!category || !name) { showMsg(T.wh_fill_required, false); return; }
   // такой товар уже есть на складе — просто добавляем его в заказ
   const same = WHCTX.own.products.find(p => p.category === category && p.name.replace(/\\s+/g, ' ').trim().toUpperCase() === name.toUpperCase());
   let product = same;
   if (!same) {
-    const d = await ordFetch('/api/products', 'POST', { category, name, unit: document.getElementById('onp_unit').value,
+    const d = await ordFetch('/api/products', 'POST', { category, dir, name, unit: document.getElementById('onp_unit').value,
       sell_price: document.getElementById('onp_sell').value || null, initial_stock: 0, supplier_id: ORD.cur.supplier_id || null });
     if (!d.ok) { showMsg(ordErr(d), false); return; }
     product = d.product;
@@ -6122,6 +6162,9 @@ function openEditProductModal(key, productId) {
   const canBuy = key === 'br' || !IS_BRANCH;
   document.getElementById('ep_category').textContent = (p.category === 'other' ? T.wh_category_other : (T[p.category] || p.category)) + ' · ' + whUnit(p.unit);
   document.getElementById('ep_name').value = p.name;
+  const showDir = DIRS_ON && p.category === 'other';
+  document.getElementById('ep_dir_wrap').style.display = showDir ? '' : 'none';
+  if (showDir) document.getElementById('ep_dir').value = p.dir || '';
   document.getElementById('ep_sell').value = p.sell_price ?? '';
   document.getElementById('ep_buy').value = canBuy ? (p.purchase_price ?? '') : '';
   const isUsd = canBuy && p.purchase_currency === 'USD' && p.purchase_usd_cents != null;
@@ -6166,6 +6209,10 @@ async function submitEditProduct() {
   // отправляем только то, что действительно изменили
   const payload = {};
   if (name !== p.name) payload.name = name;
+  if (DIRS_ON && p.category === 'other') {
+    const dv = document.getElementById('ep_dir').value;
+    if (dv !== (p.dir || '')) payload.dir = dv;
+  }
   if (sell !== String(p.sell_price ?? '')) payload.sell_price = sell;
   if (canBuy && buy !== String(p.purchase_price ?? '')) payload.purchase_price = buy;
   if (canBuy) {
@@ -6567,11 +6614,11 @@ async function createProduct() {
   const catEl = document.getElementById('wh_new_category');
   const nameEl = document.getElementById('wh_new_name');
   if (!catEl || !nameEl) return;  // вкладка "Склад" не отрисована (выключена для этой точки)
-  const category = catEl.value;
+  const { category, dir } = whSplitCat(catEl.value);
   const name = nameEl.value.trim();
   if (!category || !name) { showMsg(T.wh_fill_required, false); return; }
   const payload = {
-    category, name,
+    category, dir, name,
     unit: document.getElementById('wh_new_unit').value,
     sell_price: document.getElementById('wh_new_sell_price').value || null,
     purchase_price: document.getElementById('wh_new_purchase_price').value || null,
@@ -7337,8 +7384,50 @@ async function loadNetworkCompare() {
   });
 }
 
+// ---- Доход по направлениям: масло / шиномонтаж / запчасти ----
+const DIRST = { period: 'month', seq: 0 };
+const DIR_COLORS = { oil: '#2563EB', tire: '#0F9F6E', part: '#C2410C' };
+function dirRange(period) {
+  const d = new Date(), f = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const to = f(d);
+  if (period === 'today') return [to, to];
+  if (period === 'week') { const a = new Date(d); a.setDate(a.getDate() - 6); return [f(a), to]; }
+  if (period === 'year') return [`${d.getFullYear()}-01-01`, to];
+  return [f(new Date(d.getFullYear(), d.getMonth(), 1)), to];
+}
+async function loadDirStats(period) {
+  const box = document.getElementById('dirBody');
+  if (!box) return;
+  if (period) DIRST.period = period;
+  const per = [['today', T.stats_today], ['week', T.stats_week], ['month', T.stats_month], ['year', T.stats_year]];
+  document.getElementById('dirPeriod').innerHTML = per.map(([k, l]) =>
+    `<button type="button" class="${DIRST.period === k ? 'active' : ''}" onclick="loadDirStats('${k}')">${escapeHtml(l)}</button>`).join('');
+  const [from, to] = dirRange(DIRST.period);
+  const seq = ++DIRST.seq;
+  let data = null;
+  try { data = await (await fetch(`/api/stats/directions?from=${from}&to=${to}`)).json(); } catch (e) { data = null; }
+  if (seq !== DIRST.seq) return;
+  if (!data || !data.ok) { box.innerHTML = ''; return; }
+  const keys = ['oil'].concat(DIRS.tire ? ['tire'] : [], DIRS.part ? ['part'] : []);
+  // выключенное направление с продажами за период тоже показываем
+  ['tire', 'part'].forEach(k => { if (keys.indexOf(k) < 0 && data.dirs[k].total > 0) keys.push(k); });
+  const all = keys.reduce((a, k) => a + data.dirs[k].total, 0);
+  const money = v => Math.round(v).toLocaleString('ru-RU');
+  const name = { oil: T.dir_oil, tire: T.dir_tire, part: T.dir_part };
+  const qtyTxt = (k, q) => q ? ' · ' + String(q).replace('.', ',') + ' ' + (k === 'oil' ? T.st_dirs_liters : (k === 'tire' ? T.st_dirs_tire_qty : T.st_dirs_part_qty)) : '';
+  const bar = all > 0 ? `<div class="dir-bar">${keys.map(k => data.dirs[k].total > 0
+    ? `<span style="width:${data.dirs[k].total / all * 100}%; background:${DIR_COLORS[k]};"></span>` : '').join('')}</div>` : '';
+  box.innerHTML = `<div class="dir-total"><b>${money(all)} ${T.currency}</b></div>` + bar
+    + keys.map(k => {
+      const d = data.dirs[k];
+      const pct = all > 0 ? Math.round(d.total / all * 100) : 0;
+      return `<div class="dir-row" style="border-left-color:${DIR_COLORS[k]};"><div><b>${escapeHtml(name[k])}</b><span>${d.visits} ${T.st_dirs_visits}${qtyTxt(k, d.qty)}</span></div><div class="dir-sum"><b>${money(d.total)}</b><span>${pct}%</span></div></div>`;
+    }).join('');
+}
+
 async function loadStats() {
   loadDashboard();
+  if (DIRS_ON) loadDirStats();
   loadBrandStats();  // для сотрудника карточки нет — функция сама выйдет
   const res = await fetch('/api/stats');
   const s = await res.json();
@@ -8239,18 +8328,50 @@ const CATS = [
   { id: 'f2', keys: ['filter_2'], ic: 'fa-fan', cls: 'g' },
   { id: 'f3', keys: ['filter_3'], ic: 'fa-gas-pump', cls: 'g' },
   { id: 'fl', keys: ['fluid_1', 'fluid_2', 'fluid_3', 'fluid_4'], ic: 'fa-flask', cls: 'v' },
-  { id: 'os', keys: ['other_stock'], ic: 'fa-box-open', cls: 'v' },
+  { id: 'ts', keys: ['tire_svc'], ic: 'fa-life-ring', cls: 'y' },
+  { id: 'ty', keys: ['other_stock'], gdir: 'tire', ic: 'fa-circle-dot', cls: 'g' },
+  { id: 'pt', keys: ['other_stock'], gdir: 'part', ic: 'fa-gears', cls: 'v' },
+  { id: 'os', keys: ['other_stock'], gdir: '', ic: 'fa-box-open', cls: 'v' },
   { id: 'wk', keys: ['other'], ic: 'fa-screwdriver-wrench', cls: 'y' },
 ];
+// Направление товара склада («Прочие товары»): '' / tire / part
+function productDir(pid) {
+  const p = pid ? productsCache.find(x => x.id === pid) : null;
+  return (p && p.dir) || '';
+}
+// Товары «Прочее» нужного направления; dir == null — все
+function goodsOf(dir) {
+  const all = productsForCategory('other');
+  return dir == null ? all : all.filter(p => (p.dir || '') === dir);
+}
+function itemInCat(it, c) {
+  if (c.keys.indexOf(it.key) < 0) return false;
+  if (it.key !== 'other_stock' || c.gdir == null) return true;
+  // направление включили, а потом выключили — товар остаётся в «Других товарах»
+  const d = productDir(it.product_id);
+  const shown = d && DIRS[d] ? d : '';
+  return shown === c.gdir;
+}
+function catOfItem(it) { return CATS.find(c => itemInCat(it, c)) || catOfKey(it.key); }
 const CS = { cat: '', key: '', pid: '', qty: 0, manual: null };
 function catTitle(c) {
+  if (c.id === 'ts') return T.cat_tire_svc;
+  if (c.id === 'ty') return T.cat_tires;
+  if (c.id === 'pt') return T.cat_parts;
   if (c.id === 'fl') return T.cat_fluids;
   if (c.id === 'os') return T.cat_goods;
   if (c.id === 'wk') return T.cat_work;
   return T[c.keys[0]] || '';
 }
 function catVisible(c) {
-  return c.id !== 'os' || (WAREHOUSE_ENABLED && productsForCategory('other').length > 0);
+  if (c.id === 'ts') return !!DIRS.tire;
+  if (c.id === 'ty') return !!DIRS.tire && WAREHOUSE_ENABLED;
+  if (c.id === 'pt') return !!DIRS.part && WAREHOUSE_ENABLED;
+  if (c.id === 'os') {
+    const own = productsForCategory('other').filter(p => !(p.dir && DIRS[p.dir]));
+    return WAREHOUSE_ENABLED && own.length > 0;
+  }
+  return true;
 }
 function catOfKey(key) { return CATS.find(c => c.keys.indexOf(key) >= 0); }
 function isFluidKey(k) { return FLUID_KEYS.indexOf(k) >= 0; }
@@ -8262,14 +8383,20 @@ function renderCatTiles() {
   if (!box) return;
   const items = collectItems();
   box.innerHTML = CATS.filter(catVisible).map(c => {
-    const mine = items.filter(it => c.keys.indexOf(it.key) >= 0);
+    const mine = items.filter(it => itemInCat(it, c));
     let sub;
     if (mine.length) {
       sub = mine.map(it => (it.key === 'other' ? String(it.name || '').replace(T.other_prefix + ': ', '') : (it.brand || it.name))
+        + (it.key === 'tire_svc' && it.qty > 1 ? ' × ' + csQty(it.qty) : '')
         + (isFluidKey(it.key) && it.qty ? ' · ' + csQty(it.qty) + ' ' + T.unit_l : '')
         + (FILTER_KEYS.indexOf(it.key) >= 0 && it.qty > 1 ? ' × ' + it.qty : '')).join(', ');
     } else if (c.id === 'wk') {
       sub = T.cat_work_sub;
+    } else if (c.id === 'ts') {
+      sub = T.cat_tire_svc_sub;
+    } else if (c.gdir) {
+      const n = goodsOf(c.gdir).length;
+      sub = n ? n + ' ' + T.cat_in_stock : T.cat_manual;
     } else {
       const n = c.keys.reduce((a, k) => a + productsForCategory(k === 'other_stock' ? 'other' : k).length, 0);
       sub = n ? n + ' ' + T.cat_in_stock : (c.id === 'fl' ? T.cat_fluids_sub : T.cat_manual);
@@ -8287,12 +8414,12 @@ function renderItRcpt(items, subtotal) {
   const head = `<div class="ir-h"><span>${T.rcpt_title}</span><b>${escapeHtml(plate)}</b></div>`;
   if (!items.length) { box.innerHTML = head + `<div class="ir-empty">${T.cat_rcpt_empty}</div>`; return; }
   const lines = items.map((it, i) => {
-    const c = catOfKey(it.key);
+    const c = catOfItem(it);
     const title = it.key === 'other' ? String(it.name || '').replace(T.other_prefix + ': ', '') : (it.brand || it.name);
-    const catName = it.key === 'other_stock' ? T.cat_goods : (it.key === 'other' ? T.cat_work : (T[it.key] || ''));
+    const catName = it.key === 'other_stock' ? (c ? catTitle(c) : T.cat_goods) : (it.key === 'other' ? T.cat_work : (it.key === 'tire_svc' ? T.cat_tire_svc : (T[it.key] || '')));
     const fluid = isFluidKey(it.key);
     const qtyTxt = (it.qty && it.qty !== 1) || fluid ? csQty(it.qty) + (fluid ? ' ' + T.unit_l : '') + ' × ' + csMoney(it.unit_price) : '';
-    const step = fluid || it.key === 'other_stock' || FILTER_KEYS.indexOf(it.key) >= 0
+    const step = fluid || it.key === 'other_stock' || it.key === 'tire_svc' || FILTER_KEYS.indexOf(it.key) >= 0
       ? `<span class="ir-step"><button type="button" onclick="irStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="irStep(${i}, 1)" aria-label="+">+</button></span>` : '';
     return `<div class="ir-line"><div class="ir-main" onclick="openCatSheet('${c ? c.id : ''}', '${it.key}')"><b>${escapeHtml(title || '')}</b><span>${escapeHtml(catName)}${qtyTxt ? ' · ' + qtyTxt : ''}</span></div>${step}<button type="button" class="ir-sum rc-sum" onclick="rcTotal(${i})" title="${T.rc_total_hint}">${csMoney(it.total)}${rcExtraHtml(it)}</button><button type="button" class="ir-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button></div>`;
   }).join('');
@@ -8313,6 +8440,15 @@ function irStep(i, dir) {
     stepFilterQty(ti, dir, '');
     return;
   }
+  if (it.key === 'tire_svc') {
+    const t = TSV[it._ts];
+    if (!t) return;
+    t.qty = Math.round((t.qty + dir) * 10) / 10;
+    if (t.qty <= 0) TSV.splice(it._ts, 1);
+    paymentSplitTouched = false;
+    updateTotal();
+    return;
+  }
   if (it.key === 'other_stock' && it._row) {
     const el = document.getElementById(`other_stock_qty_${it._row}`);
     if (!el) return;
@@ -8329,6 +8465,7 @@ function openCatSheet(catId, key) {
   const c = CATS.find(x => x.id === catId);
   if (!c) return;
   CS.cat = c.id;
+  CS.tsQty = null;
   if (!key || c.keys.indexOf(key) < 0) {
     // жидкости: открываем первую выбранную, иначе АКПП
     key = c.keys.find(k => isFluidKey(k) && rowHasValue(k)) || c.keys[0];
@@ -8380,6 +8517,7 @@ function renderCatSheet() {
   const body = document.getElementById('cs_body');
   const foot = document.getElementById('cs_foot');
   if (key === 'other') { searchEl.style.display = 'none'; renderCsWork(body, foot); return; }
+  if (key === 'tire_svc') { searchEl.style.display = 'none'; renderCsTire(body, foot); return; }
   if (key === 'other_stock') { searchEl.style.display = ''; renderCsGoods(body, foot); return; }
   if (!csHasProducts(key)) { searchEl.style.display = 'none'; renderCsManual(body, foot); return; }
   searchEl.style.display = '';
@@ -8604,7 +8742,10 @@ function csWorkApply() {
 // прочие товары со склада: можно несколько, у каждого своё количество
 function renderCsGoods(body, foot) {
   const words = (document.getElementById('cs_search').value || '').trim().split(' ').map(pickNorm).filter(Boolean);
-  const all = productsForCategory('other');
+  const gc = CATS.find(x => x.id === CS.cat);
+  const gdir = gc && gc.gdir != null ? gc.gdir : null;
+  // «Другие товары» показывают и товары выключенного направления
+  const all = gdir === '' ? productsForCategory('other').filter(p => !(p.dir && DIRS[p.dir])) : goodsOf(gdir);
   const prods = all.filter(p => !words.length || words.every(w => pickNorm(p.name).includes(w)));
   const inR = new Set(collectOtherStockItems('other').map(it => String(it.product_id)));
   const unitOf = p => p.unit === 'pc' ? T.unit_pc : T.unit_l;
@@ -8629,6 +8770,60 @@ function renderCsGoods(body, foot) {
     foot.innerHTML = '';
   }
 }
+// ---- Шиномонтаж: услуги с ценой точки (у каждой своя) и количеством ----
+let TSV = [];  // [{name, price, qty}] — уходят в чек позициями key tire_svc
+function tsPresets() {
+  const seen = new Set(), out = [];
+  const add = (name, price) => {
+    const n = String(name || '').trim();
+    const k = n.toUpperCase();
+    if (!n || seen.has(k)) return;
+    seen.add(k); out.push({ name: n, price: Number(price) || 0 });
+  };
+  ((FREQ || {}).tire_svc || []).forEach(f => add(f.label, f.price));
+  String(T.ts_defaults || '').split('|').forEach(n => add(n, 0));
+  return out;
+}
+function tsPick(i) {
+  const p = tsPresets()[i];
+  if (!p) return;
+  CS.tsName = p.name;
+  const inCheck = TSV.find(t => t.name.toUpperCase() === p.name.toUpperCase());
+  CS.tsPrice = inCheck ? inCheck.price : (p.price || '');
+  CS.tsQty = inCheck ? inCheck.qty : 1;
+  renderCatSheet();
+}
+function renderCsTire(body, foot) {
+  if (CS.tsQty == null) { CS.tsName = ''; CS.tsPrice = ''; CS.tsQty = 1; }
+  const list = tsPresets();
+  const nameUp = String(CS.tsName || '').toUpperCase();
+  body.innerHTML = `<div class="cs-freq">` + list.map((p, i) =>
+    `<button type="button" class="${p.name.toUpperCase() === nameUp ? 'on' : ''}" onclick="tsPick(${i})">${escapeHtml(p.name)}${p.price ? `<em>${csMoney(p.price)}</em>` : ''}</button>`).join('') + `</div>
+    <div class="field" style="margin-top:12px;"><input id="tsName" autocomplete="off" placeholder="${T.ts_own_ph}" value="${escapeHtml(CS.tsName || '')}" oninput="CS.tsName = this.value; tsErr('')"></div>
+    <div class="row2">
+      <div class="field"><label>${T.ts_price}</label><input id="tsPrice" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="${CS.tsPrice || ''}" oninput="CS.tsPrice = parseInt(this.value.replace(/[^0-9]/g, '')) || ''; tsErr('')"></div>
+      <div class="field"><label>${T.ts_qty}</label><div class="cs-qty" style="margin:0;"><button type="button" onclick="CS.tsQty = Math.max(1, (CS.tsQty || 1) - 1); renderCatSheet()">−</button><label><input type="text" inputmode="numeric" autocomplete="off" value="${CS.tsQty || 1}" onfocus="this.select()" oninput="CS.tsQty = Math.max(1, parseInt(this.value.replace(/[^0-9]/g, '')) || 1)"></label><button type="button" onclick="CS.tsQty = (CS.tsQty || 1) + 1; renderCatSheet()">+</button></div></div>
+    </div>
+    <div class="hint-text">${T.ts_hint}</div>
+    <div id="tsErr" style="color:#DC2626; font-size:13px; font-weight:600; margin-top:6px;"></div>`;
+  foot.innerHTML = `<button type="button" class="ps-go" onclick="tsApply()">${T.ts_add}</button>`;
+}
+function tsErr(t) { const el = document.getElementById('tsErr'); if (el) el.textContent = t; }
+function tsApply() {
+  const name = String(CS.tsName || '').replace(/\\s+/g, ' ').trim();
+  const price = Math.round(Number(CS.tsPrice) || 0);
+  const qty = Math.max(1, Math.round(Number(CS.tsQty) || 1));
+  if (!name) { tsErr(T.ts_need_name); return; }
+  if (!(price > 0)) { tsErr(T.ts_need_price); document.getElementById('tsPrice').focus(); return; }
+  const ex = TSV.find(t => t.name.toUpperCase() === name.toUpperCase());
+  if (ex) { ex.price = price; ex.qty = qty; } else TSV.push({ name, price, qty });
+  CS.tsQty = null;
+  paymentSplitTouched = false;
+  updateTotal();
+  closeObSheets();
+  if (typeof scheduleAddDraft === 'function') scheduleAddDraft();
+}
+
 function csGoodsApply() {
   const p = productsForCategory('other').find(x => String(x.id) === String(CS.pid));
   if (!p) return;
@@ -8800,7 +8995,7 @@ function renderReceiptSheet() {
     const title = it.brand || it.name;
     const q = it.qty && it.qty !== 1 ? `${String(it.qty).replace('.', ',')} × ${money(it.unit_price)}` : `1 × ${money(it.unit_price)}`;
     const canEdit = it.key !== 'other_stock';
-    const step = FILTER_KEYS.indexOf(it.key) >= 0
+    const step = FILTER_KEYS.indexOf(it.key) >= 0 || it.key === 'tire_svc'
       ? `<span class="ir-step"><button type="button" onclick="rcStep(${i}, -1)" aria-label="−">−</button><button type="button" onclick="rcStep(${i}, 1)" aria-label="+">+</button></span>` : '';
     return `<div class="rc-line"><div><b>${escapeHtml(title)}</b><span>${it.brand ? escapeHtml(it.name) + ' · ' : ''}${q}${canEdit ? ` · <a onclick="rcPrice(${i})">${T.rc_price}</a>` : ''}</span></div>${step}<button type="button" class="rc-sum" onclick="rcTotal(${i})" title="${T.rc_total_hint}">${money(it.total)}${rcExtraHtml(it)}</button>${canEdit ? `<button type="button" class="rc-x" onclick="rcRemove(${i})" aria-label="${T.af_remove}">✕</button>` : ''}</div>`;
   }).join('') + (() => {
@@ -8818,6 +9013,17 @@ function rcPriceField(it) {
 }
 function rcPrice(i) {
   const it = collectItems()[i];
+  if (it && it.key === 'tire_svc') {
+    const raw = prompt(T.rc_price_prompt + ' ' + it.name, it.unit_price || '');
+    if (raw === null) return;
+    const v = parseInt(String(raw).replace(/\\D/g, ''));
+    if (!(v >= 0) || !TSV[it._ts]) return;
+    TSV[it._ts].price = v;
+    paymentSplitTouched = false;
+    updateTotal();
+    renderReceiptSheet();
+    return;
+  }
   const el = it && rcPriceField(it);
   if (!el) return;
   const raw = prompt(T.rc_price_prompt + ' ' + (it.brand || it.name), el.value || '');
@@ -8836,7 +9042,10 @@ function rcStep(i, dir) {
 function rcRemove(i) {
   const it = collectItems()[i];
   if (!it) return;
-  if (it.key === 'other_stock') {
+  if (it.key === 'tire_svc') {
+    TSV.splice(it._ts, 1);
+    updateTotal();
+  } else if (it.key === 'other_stock') {
     if (it._row) removeOtherStockRow('other', it._row);
   } else if (it.key === 'other') {
     document.getElementById('other_name').value = '';
@@ -9017,6 +9226,8 @@ function collectItems() {
     items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
   items.push(...collectOtherStockItems('other'));
+  TSV.forEach((t, i) => items.push({ key: 'tire_svc', name: t.name, unit_price: t.price, qty: t.qty,
+    total: Math.round(t.price * t.qty), dir: 'tire', _ts: i }));
   return withListPrice(items);
 }
 
@@ -9132,6 +9343,13 @@ function rcTotal(i) {
   const total = parseInt(String(raw).replace(/\\D/g, ''));
   if (!(total >= 0)) return;
   const unit = it.qty ? Math.round(total / it.qty * 100) / 100 : total;
+  if (it.key === 'tire_svc') {
+    if (TSV[it._ts]) TSV[it._ts].price = unit;
+    paymentSplitTouched = false;
+    updateTotal();
+    if (document.getElementById('rcSheet') && document.getElementById('rcSheet').classList.contains('open')) renderReceiptSheet();
+    return;
+  }
   let el = null;
   if (it.key === 'other_stock' && it._row) el = document.getElementById(`other_stock_price_${it._row}`);
   else if (it.key === 'other') el = document.getElementById('other_price');
@@ -9392,6 +9610,8 @@ function repeatLastVisit(itemsArg, doneMsg) {
   document.getElementById('other_price').value = '';
   otherStockRows = [];
   renderOtherStockRows('other');
+  TSV = items.filter(it => it.key === 'tire_svc' && it.name).map(it => ({
+    name: String(it.name), price: Math.round(Number(it.unit_price) || Number(it.total) || 0), qty: Number(it.qty) || 1 }));
 
   const missing = [];
   const pickBrand = (el, it) => {
@@ -10106,6 +10326,7 @@ function resetItemInputs() {
   document.getElementById('other_price').value = '';
   document.getElementById('knownClientPanel').innerHTML = '';
   otherStockRows = [];
+  TSV = [];
   renderOtherStockRows('other');
   clearPick('main');
   ROW_OPEN = new Set(ROW_DEFAULT);
@@ -10543,7 +10764,7 @@ function saveAddDraft() {
     const items = collectItems();
     if (!plate.trim() && !items.length) { localStorage.removeItem(ADD_DRAFT_KEY); return; }
     localStorage.setItem(ADD_DRAFT_KEY, JSON.stringify({
-      at: Date.now(), f, stock: collectOtherStockItems('other'), pay: typeof PAY_MODE !== 'undefined' ? PAY_MODE : 'cash', disc: DISC,
+      at: Date.now(), f, stock: collectOtherStockItems('other'), ts: TSV, pay: typeof PAY_MODE !== 'undefined' ? PAY_MODE : 'cash', disc: DISC,
       touched: !!paymentSplitTouched,
     }));
   } catch (e) { /* память телефона недоступна — просто без черновика */ }
@@ -10594,6 +10815,7 @@ function restoreAddDraft() {
     renderOtherStockRows('other');
     fillOtherStockRowsFrom('other', d.stock);
   }
+  if (Array.isArray(d.ts)) TSV = d.ts.filter(t => t && t.name).map(t => ({ name: String(t.name), price: Number(t.price) || 0, qty: Number(t.qty) || 1 }));
   updateTotal();
   if (d.pay && d.pay !== 'cash') setPayMode(d.pay);
   if (payF.debt_enabled) {
@@ -11687,6 +11909,8 @@ function collectSvcItems() {
     items.push({key: 'other', name: `${T.other_prefix}: ${otherName || T.other_unnamed}`, unit_price: otherPrice, qty: 1, total: Math.round(otherPrice)});
   }
   items.push(...collectOtherStockItems('svcOther'));
+  SVC_KEEP.forEach(it => items.push({ key: 'tire_svc', name: it.name, unit_price: it.unit_price, qty: it.qty,
+    total: Math.round(Number(it.total) || 0), dir: 'tire' }));
   return items;
 }
 
@@ -11775,13 +11999,26 @@ function resetSvcItemInputs() {
   svcDiscPctVal = null;
   svcOtherStockRows = [];
   renderOtherStockRows('svcOther');
+  SVC_KEEP = [];
+  renderSvcKeep();
   clearPick('svc');
   updateSvcTotal();
 }
 
+// Позиции, которых нет в окне исправления (шиномонтаж) — сохраняются как есть
+let SVC_KEEP = [];
+function renderSvcKeep() {
+  const el = document.getElementById('svcKeepNote');
+  if (!el) return;
+  el.style.display = SVC_KEEP.length ? '' : 'none';
+  el.textContent = SVC_KEEP.length ? T.ts_in_edit + ' ' + SVC_KEEP.map(it =>
+    it.name + (it.qty > 1 ? ' × ' + it.qty : '') + ' — ' + Math.round(it.total || 0).toLocaleString('ru-RU')).join(', ') : '';
+}
 function fillSvcItemsFrom(items) {
   // подставляет уже сохранённые позиции в поля модалки (режим редактирования)
   const otherStockItems = [];
+  SVC_KEEP = (items || []).filter(it => it && it.key === 'tire_svc');
+  renderSvcKeep();
   (items || []).forEach(it => {
     if (!it.key) return;
     if (it.key === 'other') {

@@ -1773,6 +1773,7 @@ def index():
         eskiz_email=(shop.get("eskiz_email") or "") if shop else "",
         warehouse_enabled=bool(shop.get("warehouse_enabled")) if shop else False,
         store_enabled=_store_on(shop),
+        dirs=db.shop_dirs(shop),
         is_employee=g.is_employee,
         has_staff=_has_staff,
         team_on=g.is_employee or _has_staff or ((not g.is_branch) and bool(db.get_branches(g.shop_id))),
@@ -3385,6 +3386,19 @@ def api_stats_range():
     return jsonify(result)
 
 
+@app.route("/api/stats/directions")
+@login_required
+@employee_blocked
+def api_stats_directions():
+    """Выручка по направлениям: масло / шиномонтаж / запчасти. Только суммы
+    продаж, без закупки — можно и филиалу."""
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_from) or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_to):
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+    return jsonify({"ok": True, "dirs": db.get_direction_range(g.shop_id, date_from, date_to)})
+
+
 @app.route("/api/sms_settings", methods=["POST"])
 @login_required
 @employee_blocked
@@ -3541,7 +3555,8 @@ def api_create_product():
     except (KeyError, ValueError, TypeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     product = db.create_product(g.shop_id, category, name, unit, sell_price, purchase_price, initial_stock,
-                                purchase_currency=purchase_currency, purchase_usd=purchase_usd)
+                                purchase_currency=purchase_currency, purchase_usd=purchase_usd,
+                                dir=str(data.get("dir") or ""))
     # новинка, заведённая прямо из заказа поставщику, сразу закрепляется за ним
     if data.get("supplier_id") not in (None, "") and not g.is_branch:
         try:
@@ -3582,6 +3597,8 @@ def _apply_product_edit(shop_id: int, product_id: int, data: dict, allow_purchas
                                 purchase_currency=currency, purchase_usd=purchase_usd)
     if not ok:
         return jsonify({"ok": False, "error": PRODUCT_EDIT_ERRORS.get(err, err)}), (404 if err == "not_found" else 400)
+    if "dir" in data:
+        db.set_product_dir(product_id, shop_id, str(data.get("dir") or ""))
     if stock_qty is not None:
         ok, err = db.set_stock_count(product_id, shop_id, stock_qty, data.get("stock_reason"))
         if not ok:

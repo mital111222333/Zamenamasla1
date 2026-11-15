@@ -1818,6 +1818,8 @@ function renderShopsTable(shops) {
         <span>SMS<button class="sw ${s.sms_enabled ? 'on' : ''}" title="${s.sms_enabled ? 'выключить' : 'включить'}" onclick="toggleSms(${s.id}, ${s.sms_enabled ? 0 : 1})"></button></span>
         <span>Склад<button class="sw ${s.warehouse_enabled ? 'on' : ''}" title="${s.warehouse_enabled ? 'выключить' : 'включить'}" onclick="toggleWarehouse(${s.id}, ${s.warehouse_enabled ? 0 : 1})"></button></span>
         <span title="Склад магазина: основной склад + магазин в одном аккаунте. Сотрудники видят только магазин.">Магазин<button class="sw ${s.store_enabled && s.warehouse_enabled ? 'on' : ''}" title="${s.store_enabled && s.warehouse_enabled ? 'выключить склад магазина' : 'включить склад магазина'}" onclick="toggleStore(${s.id}, ${s.store_enabled && s.warehouse_enabled ? 0 : 1})"></button></span>
+        <span title="Шиномонтаж: услуги шиномонтажа, шины и диски, доход отдельно от масла">Шиномонтаж<button class="sw ${s.tire_enabled ? 'on' : ''}" title="${s.tire_enabled ? 'выключить' : 'включить'}" onclick="toggleDir(${s.id}, 'tire', ${s.tire_enabled ? 0 : 1})"></button></span>
+        <span title="Автозапчасти: товары-запчасти, доход отдельно от масла">Запчасти<button class="sw ${s.parts_enabled ? 'on' : ''}" title="${s.parts_enabled ? 'выключить' : 'включить'}" onclick="toggleDir(${s.id}, 'part', ${s.parts_enabled ? 0 : 1})"></button></span>
         <span class="grp-chip">🏷<input value="${escapeHtml(s.client_group || '')}" list="clientGroupsList" placeholder="без группы" onchange="setClientGroup(${s.id}, this.value)"></span>
       </div>
 
@@ -2142,6 +2144,13 @@ async function toggleStore(id, makeEnabled) {
 async function toggleWarehouse(id, makeEnabled) {
   await fetch(`/api/admin/shops/${id}/toggle_warehouse`, {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: !!makeEnabled})
+  });
+  loadShops();
+}
+
+async function toggleDir(id, dir, makeEnabled) {
+  await fetch(`/api/admin/shops/${id}/toggle_dir`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({dir, enabled: !!makeEnabled})
   });
   loadShops();
 }
