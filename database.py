@@ -365,6 +365,9 @@ def _migrate(conn):
         "offer_pct": "INTEGER DEFAULT 0",
         # «Склад магазина»: основной склад + витрина/магазин в одном аккаунте
         "store_enabled": "INTEGER DEFAULT 0",
+        # направления точки, кроме масла: шиномонтаж и автозапчасти
+        "tire_enabled": "INTEGER DEFAULT 0",
+        "parts_enabled": "INTEGER DEFAULT 0",
     }
     for col, ddl in new_shop_cols.items():
         if col not in shop_cols:
@@ -439,6 +442,10 @@ def _migrate(conn):
     prod_cols = {r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()}
     if "shop_qty" not in prod_cols:
         conn.execute("ALTER TABLE products ADD COLUMN shop_qty REAL NOT NULL DEFAULT 0")
+    # направление товара из «Прочих товаров»: '' — масло/общее, tire — шины
+    # и диски, part — автозапчасти. Тип товара (category) не меняется.
+    if "dir" not in prod_cols:
+        conn.execute("ALTER TABLE products ADD COLUMN dir TEXT NOT NULL DEFAULT ''")
     conn.execute("""
     CREATE TABLE IF NOT EXISTS store_moves (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -875,6 +882,29 @@ def normalize_plate(plate: str) -> str:
     return plate.strip().upper().replace(" ", "")
 
 
+# Направления точки, кроме масла (масло — без пометки): шиномонтаж и запчасти.
+# Направление позиции чека: у товара — от товара на складе, у услуги
+# шиномонтажа (key tire_svc) — tire.
+ITEM_DIRS = ("tire", "part")
+
+
+def item_dir(item: dict) -> str:
+    """oil / tire / part — к какому направлению относится позиция."""
+    d = (item or {}).get("dir")
+    if d in ITEM_DIRS:
+        return d
+    return "tire" if (item or {}).get("key") == "tire_svc" else "oil"
+
+
+def _stamp_item_dir(item: dict, product) -> None:
+    """Позиция со склада получает направление своего товара."""
+    pd = (product or {}).get("dir") or ""
+    if pd in ITEM_DIRS:
+        item["dir"] = pd
+    else:
+        item.pop("dir", None)
+
+
 _ITEM_STR_LIMITS = {"key": 40, "name": 120, "brand": 80, "unit": 20}
 # list_price — обычная цена позиции (для товара со склада сервер ставит её сам
 # по цене продажи на складе); разница с unit_price — наценка в «Статистике»
@@ -921,6 +951,8 @@ def sanitize_items(items):
             if not math.isfinite(num) or num < 0 or num > limit:
                 raise ValueError("неверное число в позиции")
             clean[k] = int(num) if num.is_integer() else round(num, 3)
+        if it.get("dir") in ITEM_DIRS:
+            clean["dir"] = it["dir"]
         pid = it.get("product_id")
         if pid not in (None, ""):
             if isinstance(pid, bool):
@@ -1290,6 +1322,26 @@ def set_shop_warehouse_enabled(shop_id: int, enabled: bool):
 
 
 @_serialized
+def set_shop_dir_enabled(shop_id: int, which: str, enabled: bool):
+    """Платформенный админ включает точке направление: tire — шиномонтаж,
+    part — автозапчасти."""
+    col = {"tire": "tire_enabled", "part": "parts_enabled"}[which]
+    with get_conn() as conn:
+        conn.execute(f"UPDATE shops SET {col}=? WHERE id=?", (1 if enabled else 0, shop_id))
+        conn.commit()
+
+
+def shop_dirs(shop) -> dict:
+    """Какие направления включены точке. Филиал получает их и от главной."""
+    out = {"tire": bool((shop or {}).get("tire_enabled")), "part": bool((shop or {}).get("parts_enabled"))}
+    if shop and shop.get("parent_shop_id") and not all(out.values()):
+        head = get_shop(shop["parent_shop_id"]) or {}
+        out["tire"] = out["tire"] or bool(head.get("tire_enabled"))
+        out["part"] = out["part"] or bool(head.get("parts_enabled"))
+    return out
+
+
+@_serialized
 def set_shop_store_enabled(shop_id: int, enabled: bool):
     """Платформенный админ включает/выключает «Склад магазина» (основной
     склад + магазин в одном аккаунте). При выключении остатки магазина
@@ -1374,16 +1426,29 @@ def set_store_count(product_id: int, shop_id: int, new_qty: float, reason: str =
 @_serialized
 def create_product(shop_id: int, category: str, name: str, unit: str = "l",
                     sell_price=None, purchase_price=None, initial_stock: float = 0,
-                    purchase_currency=None, purchase_usd=None) -> dict:
+                    purchase_currency=None, purchase_usd=None, dir: str = "") -> dict:
+    dir = dir if category == "other" and dir in ITEM_DIRS else ""
     with get_conn() as conn:
         cur = conn.execute("""
-            INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-        """, (shop_id, category, name, unit, initial_stock, sell_price, purchase_price))
+            INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active, dir)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (shop_id, category, name, unit, initial_stock, sell_price, purchase_price, dir))
         if purchase_currency == "USD":
             set_product_currency(conn, cur.lastrowid, shop_id, "USD", purchase_usd, purchase_price)
         conn.commit()
         return get_product(cur.lastrowid, shop_id)
+
+
+@_serialized
+def set_product_dir(product_id: int, shop_id: int, dir: str) -> bool:
+    """Направление товара («Прочие товары»): '' / tire / part. Прошлые
+    продажи не меняются — направление в них записано на момент продажи."""
+    dir = dir if dir in ITEM_DIRS else ""
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE products SET dir=? WHERE id=? AND shop_id=? AND category='other'",
+                           (dir, product_id, shop_id))
+        conn.commit()
+        return cur.rowcount > 0
 
 
 def get_product(product_id: int, shop_id: int, active_only: bool = True):
@@ -2315,6 +2380,7 @@ def add_oil_change(car_id: int, mileage, service_type: str, oil_brand: str, filt
                 if product:
                     # цена закупки — всегда со склада на момент продажи, не из запроса
                     item["cost_price"] = product.get("purchase_price")
+                    _stamp_item_dir(item, product)
                     # обычная цена — со склада; продали дороже — это наценка
                     if product.get("sell_price"):
                         item["list_price"] = product["sell_price"]
@@ -2464,6 +2530,14 @@ def update_oil_change(oc_id: int, shop_id: int, change_date=None, mileage=None, 
                 product = get_product(pid, shop_id, active_only=pid not in old_pids)
                 if product:
                     item["cost_price"] = old_cost[pid] if pid in old_cost else product.get("purchase_price")
+                    old_dir = next((o.get("dir") for o in old_items if o.get("product_id") == pid), None)
+                    if pid in old_pids:
+                        if old_dir in ITEM_DIRS:
+                            item["dir"] = old_dir
+                        else:
+                            item.pop("dir", None)
+                    else:
+                        _stamp_item_dir(item, product)
                     # обычная цена — та, что была при продаже (или текущая на складе)
                     old_list = next((o.get("list_price") for o in old_items
                                      if o.get("product_id") == pid and o.get("list_price") is not None), None)
@@ -3781,6 +3855,44 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
         return result
 
 
+def get_direction_range(shop_id: int, date_from: str, date_to: str) -> dict:
+    """Выручка по направлениям (масло / шиномонтаж / запчасти) за период.
+    Оплаченная сумма записи (cost, уже со скидкой) делится между
+    направлениями пропорционально позициям. Записи без позиций — масло.
+    Ещё: визиты по направлению, литры масла, услуги шиномонтажа (шт),
+    проданные запчасти (шт)."""
+    out = {d: {"total": 0, "visits": 0, "qty": 0} for d in ("oil", "tire", "part")}
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.cost, oc.items_json FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ? AND oc.change_date <= ?
+        """, (shop_id, date_from, date_to)).fetchall()
+    for r in rows:
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            items = []
+        cost = r["cost"] or 0
+        sums = {}
+        for it in items:
+            d = item_dir(it)
+            sums[d] = sums.get(d, 0) + (it.get("total") or 0)
+            q = it.get("qty") or 0
+            if (d == "oil" and str(it.get("key") or "").startswith("fluid_")) or d in ("tire", "part"):
+                out[d]["qty"] += q
+        sub = sum(sums.values())
+        if not sums or sub <= 0:
+            sums = {"oil": 1}
+            sub = 1
+        for d, v in sums.items():
+            out[d]["total"] += cost * v / sub
+            out[d]["visits"] += 1
+    for d in out.values():
+        d["total"] = int(round(d["total"]))
+        d["qty"] = round(d["qty"], 1)
+    return out
+
+
 def _row_profit_parts(items, discount=0):
     """Одна запись замены → (прибыль по товарам, работа/услуги, непосчитанная
     выручка, на сколько скидка уменьшила прибыль). Скидка делится
@@ -4432,9 +4544,10 @@ def transfer_stock(parent_shop_id: int, from_shop_id: int, product_id: int, to_s
     with get_conn() as conn:
         if not dst:
             cur = conn.execute("""
-                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
-                VALUES (?, ?, ?, ?, 0, ?, ?, 1)
-            """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
+                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active, dir)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?)
+            """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"],
+                  dict(src).get("dir") or ""))
             dst_id = cur.lastrowid
             _copy_currency(conn, src, dst_id)
         else:
@@ -4629,9 +4742,9 @@ def copy_catalog_to_branch(parent_shop_id: int, branch_id: int, categories=None)
                 skipped += 1
                 continue
             conn.execute("""
-                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
-                VALUES (?, ?, ?, ?, 0, ?, ?, 1)
-            """, (branch_id, p["category"], p["name"], p["unit"], p["sell_price"], p["purchase_price"]))
+                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active, dir)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?)
+            """, (branch_id, p["category"], p["name"], p["unit"], p["sell_price"], p["purchase_price"], dict(p).get("dir") or ""))
             _copy_currency(conn, p, conn.execute("SELECT last_insert_rowid()").fetchone()[0])
             have.add(key)
             created += 1
@@ -4726,9 +4839,10 @@ def _transfer_lines(conn, parent_shop_id: int, from_shop_id: int, to_shop_id: in
         dst = dst_by_key.get(key)
         if not dst:
             cur = conn.execute("""
-                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active)
-                VALUES (?, ?, ?, ?, 0, ?, ?, 1)
-            """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"]))
+                INSERT INTO products (shop_id, category, name, unit, stock_qty, sell_price, purchase_price, is_active, dir)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?)
+            """, (to_shop_id, src["category"], src["name"], src["unit"], src["sell_price"], src["purchase_price"],
+                  dict(src).get("dir") or ""))
             _copy_currency(conn, dict(src), cur.lastrowid)
             dst = {"id": cur.lastrowid, "purchase_price": src["purchase_price"], "_new": True}
             dst_by_key[key] = dst

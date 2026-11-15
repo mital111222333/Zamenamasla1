@@ -285,6 +285,18 @@ def api_admin_toggle_warehouse(shop_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/shops/<int:shop_id>/toggle_dir", methods=["POST"])
+@admin_required
+def api_admin_toggle_dir(shop_id):
+    """Направления точки: tire — шиномонтаж, part — автозапчасти."""
+    data = request.get_json(force=True)
+    which = data.get("dir")
+    if which not in ("tire", "part"):
+        return jsonify({"ok": False, "error": "bad dir"}), 400
+    db.set_shop_dir_enabled(shop_id, which, bool(data.get("enabled")))
+    return jsonify({"ok": True})
+
+
 @app.route("/api/admin/shops/<int:shop_id>/toggle_store", methods=["POST"])
 @admin_required
 def api_admin_toggle_store(shop_id):
