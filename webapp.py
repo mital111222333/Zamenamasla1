@@ -212,6 +212,21 @@ def _csrf_origin_check():
                        path=request.path, source=(source_host or str(source))[:120])
     return jsonify({"ok": False, "error": "запрос с чужого сайта отклонён"}), 403
 
+@app.before_request
+def _json_body_must_be_object():
+    """Все разделы ждут в теле запроса объект {…}. Если пришёл список или
+    строка (сбой в приложении, чужая программа) — раньше сервер падал с
+    ошибкой 500; теперь отвечает понятным отказом и ничего не делает."""
+    if request.method in ("GET", "HEAD", "OPTIONS") or not request.path.startswith("/api/"):
+        return None
+    if request.path.startswith(_CSRF_EXEMPT_PREFIXES) or not request.is_json:
+        return None
+    body = request.get_json(silent=True)
+    if body is not None and not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "неверный формат запроса"}), 400
+    return None
+
+
 # ---------- Защита от дублей при плохом интернете ----------
 # Приложение отправляет каждое изменение (замена, оплата, склад…) с ключом
 # X-Request-Id. Если связь оборвалась уже ПОСЛЕ того, как сервер всё
@@ -1214,9 +1229,20 @@ LOGIN_WINDOW_SEC = 15 * 60
 
 
 def _client_ip():
-    # Render дописывает настоящий адрес клиента В КОНЕЦ X-Forwarded-For;
-    # первые значения присылает сам клиент и может подделать (раньше так
-    # можно было обойти ограничение на подбор пароля, меняя заголовок)
+    # Render дописывает адрес В КОНЕЦ X-Forwarded-For; первые значения
+    # присылает сам клиент и может подделать (раньше так можно было обойти
+    # ограничение на подбор пароля, меняя заголовок).
+    # Но перед Render стоит Cloudflare, и «последний адрес» — это адрес
+    # сервера Cloudflare, общий для множества людей: ограничение частоты
+    # запросов и журнал безопасности считали разных клиентов одним адресом.
+    # На Render настоящий адрес клиента Cloudflare передаёт в
+    # CF-Connecting-IP (клиент подделать его не может — Cloudflare заменяет
+    # заголовок своим). На другом хостинге (без Cloudflare) заголовок не
+    # используем: там его мог бы прислать кто угодно.
+    if os.environ.get("RENDER") or os.environ.get("TRUST_CF_CONNECTING_IP") == "1":
+        cf = (request.headers.get("CF-Connecting-IP") or "").strip()
+        if cf and len(cf) <= 45 and re.fullmatch(r"[0-9A-Fa-f:.]+", cf):
+            return cf
     fwd = request.headers.get("X-Forwarded-For", "")
     return (fwd.split(",")[-1].strip() if fwd else request.remote_addr) or "?"
 
@@ -2670,6 +2696,10 @@ def api_update_oil_change(oc_id):
     if denied:
         return denied
     try:
+        _check_entry_basics(
+            None,
+            int(data["mileage"]) if data.get("mileage") not in (None, "") else None,
+            int(data["next_mileage"]) if data.get("next_mileage") not in (None, "") else None)
         ok = db.update_oil_change(
             oc_id, g.shop_id,
             mileage=int(data["mileage"]) if data.get("mileage") not in (None, "") else None,
@@ -2807,6 +2837,23 @@ def _send_service_receipt(shop, plate, items, cash_amount, card_amount, next_dat
     _send_telegram_message(telegram_id, text)
 
 
+MAX_MILEAGE = 9_999_999
+MAX_PLATE_LEN = 20
+
+
+def _check_entry_basics(plate, mileage, next_mileage):
+    """Госномер и пробег приходят из браузера — отсекаем явный мусор (сбой
+    формы, опечатка с лишними нулями, отрицательное число), чтобы он не
+    попадал в базу, напоминания и сервисный паспорт. Бросает ValueError."""
+    if plate is not None:
+        p = db.normalize_plate(str(plate))
+        if not p or len(p) > MAX_PLATE_LEN:
+            raise ValueError("проверьте госномер")
+    for v in (mileage, next_mileage):
+        if v is not None and not (0 <= v <= MAX_MILEAGE):
+            raise ValueError("проверьте пробег")
+
+
 @app.route("/api/add", methods=["POST"])
 @login_required
 def api_add():
@@ -2820,6 +2867,7 @@ def api_add():
         vin = db.normalize_vin(data.get("vin"))
         mileage = int(data["mileage"]) if data.get("mileage") else None
         next_mileage = int(data["next_mileage"]) if data.get("next_mileage") else None
+        _check_entry_basics(plate, mileage, next_mileage)
         # проверяем позиции ДО того, как создадим клиента/машину — иначе при
         # ошибке в позициях остались бы пустые записи
         items = db.sanitize_items(data.get("items") or [])
