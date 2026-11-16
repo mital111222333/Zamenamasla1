@@ -10946,6 +10946,128 @@ def stats_analytics(shop_id: int, today=None) -> dict:
 
 
 
+# ---------- Статистика: блок «Сегодня» (пульс дня) и график периода ----------
+PULSE_MIX_KEYS = ("oil", "fluids", "filters", "work", "goods", "tire", "part", "used")
+
+
+def _pulse_mix_key(item: dict) -> str:
+    """К какой части «из чего выручка» относится позиция чека."""
+    d = item_dir(item)
+    if d in ("tire", "part", "used"):
+        return d
+    key = str(item.get("key") or "")
+    if key == "fluid_0":
+        return "oil"
+    if key.startswith("fluid_"):
+        return "fluids"
+    if key.startswith("filter_"):
+        return "filters"
+    if item.get("product_id") or item.get("cost_price") is not None or key == "other_stock":
+        return "goods"
+    return "work"
+
+
+def stats_pulse(shop_id: int, now=None) -> dict:
+    """Блок «Сегодня» в «Статистике»: выручка по часам нарастающим итогом
+    сегодня и вчера (вчера — до этого же часа для честного сравнения), из чего
+    сложилась выручка дня, мастера дня; плюс столбики для карточки
+    «Неделя / Месяц / Год». Только суммы продаж — без закупки и прибыли,
+    поэтому можно и филиалу. Час берётся из времени внесения записи
+    (created_at); у старых записей без времени — в первый час графика."""
+    import calendar
+    now = now or datetime.now()
+    today = now.date()
+    d = lambda x: x.strftime("%Y-%m-%d")
+    yday = today - timedelta(days=1)
+    week_start = today - timedelta(days=today.weekday())
+    ystart = today.replace(month=1, day=1)
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT oc.change_date, oc.cost, oc.items_json, oc.created_at, oc.service_type,
+                   COALESCE(oc.master_id, oc.employee_id, 0) AS eid
+            FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
+            WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ?
+        """, (shop_id, d(min(ystart, yday)))).fetchall()
+        names = {r["id"]: r["name"] for r in conn.execute(
+            "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM shop_users WHERE shop_id=?",
+            (shop_id,)).fetchall()}
+
+    def hour_of(r):
+        hh = str(r["created_at"] or "")[11:13]
+        return int(hh) if hh.isdigit() else None
+
+    h_from, h_to = 8, max(20, now.hour)
+    for r in rows:
+        if r["change_date"] in (d(today), d(yday)):
+            h = hour_of(r)
+            if h is not None:
+                h_from, h_to = min(h_from, h), max(h_to, h)
+    n_h = h_to - h_from + 1
+    per = {"t": [0] * n_h, "y": [0] * n_h}
+    mix = {}
+    masters = {}
+    by_day = {}
+    by_month = [0] * 12
+    yday_same = 0
+    for r in rows:
+        day = r["change_date"]
+        cost = r["cost"] or 0
+        if day >= d(ystart):
+            try:
+                by_month[int(day[5:7]) - 1] += cost
+            except ValueError:
+                pass
+        by_day[day] = by_day.get(day, 0) + cost
+        if day not in (d(today), d(yday)):
+            continue
+        h = hour_of(r)
+        idx = 0 if h is None else h - h_from
+        per["t" if day == d(today) else "y"][idx] += cost
+        if day == d(yday) and (h is None or h <= now.hour):
+            yday_same += cost
+        if day != d(today):
+            continue
+        try:
+            items = [i for i in (json.loads(r["items_json"] or "[]") or []) if isinstance(i, dict)]
+        except (TypeError, ValueError):
+            items = []
+        if r["service_type"] == USED_OIL_KEY and not items:
+            items = [{"key": USED_OIL_KEY, "total": cost}]
+        sub = sum((i.get("total") or 0) for i in items)
+        if items and sub > 0:
+            for i in items:  # доля позиции в оплаченной сумме (скидка делится поровну)
+                k = _pulse_mix_key(i)
+                mix[k] = mix.get(k, 0) + cost * (i.get("total") or 0) / sub
+        elif cost:
+            mix["oil"] = mix.get("oil", 0) + cost  # старые записи без разбивки — замена масла
+        if r["eid"] and r["service_type"] != USED_OIL_KEY:
+            m = masters.setdefault(r["eid"], {"name": names.get(r["eid"]) or "—", "count": 0, "total": 0})
+            m["count"] += 1
+            m["total"] += cost
+
+    def cum(a):
+        s, out = 0, []
+        for v in a:
+            s += v
+            out.append(s)
+        return out
+
+    dim = calendar.monthrange(today.year, today.month)[1]
+    return {
+        "hours": {"from": h_from, "to": h_to, "now": now.hour,
+                  "today": cum(per["t"]), "yesterday": cum(per["y"])},
+        "yesterday_same_time": yday_same,
+        "mix": sorted(({"k": k, "v": int(round(v))} for k, v in mix.items() if round(v) > 0), key=lambda x: -x["v"]),
+        "masters": sorted(masters.values(), key=lambda m: (-m["total"], -m["count"])),
+        "series": {
+            "week": {"v": [by_day.get(d(week_start + timedelta(days=i)), 0) for i in range(7)], "cur": today.weekday()},
+            "month": {"v": [by_day.get(d(today.replace(day=i + 1)), 0) for i in range(dim)], "cur": today.day - 1},
+            "year": {"v": by_month, "cur": today.month - 1},
+        },
+    }
+
+
+
 # ---------- Статистика: вкладки «Шиномонтаж» и «Запчасти» ----------
 def _dir_part_of(cost, items, dr):
     """Сколько из оплаченной суммы записи (уже со скидкой) приходится на

@@ -513,6 +513,25 @@ html.gl .st-split{background:rgba(255,255,255,.07);}
 html.gl .st-card{border-radius:22px;transition:border-color .25s;}
 html.gl .st-card:hover{border-color:rgba(77,155,255,.35);}
 html.gl .rv-box{background:rgba(255,255,255,.05);border:1px solid var(--gl-line);}
+/* «Сегодня» (пульс дня) и карточка «Неделя / Месяц / Год» */
+html.gl .dp{--dp-blue:#6fa6ff;--dp-yday:rgba(226,232,255,.45);--dp-grid:rgba(255,255,255,.07);--dp-soft:rgba(0,0,0,.22);--dp-dot:#0c1330;
+  border-radius:26px;position:relative;overflow:hidden;
+  background-color:var(--gl-surface);background-image:linear-gradient(180deg,rgba(77,155,255,.16),rgba(255,255,255,.02) 60%);
+  border:1px solid rgba(143,176,255,.22);box-shadow:var(--gl-shadow);}
+html.gl .dp-tile{background:rgba(255,255,255,.05);}
+html.gl .dp-tile.good{background:linear-gradient(135deg,rgba(52,211,153,.16),rgba(52,211,153,.04));}
+html.gl .dp-tile.good .v{color:#6ee7a0;}
+html.gl .dp-mixbar, html.gl .dp-ms-bar{background:rgba(255,255,255,.07);}
+html.gl .dp-ms-av{background:rgba(77,155,255,.18);color:#9cc2ff;}
+html.gl .dp-ms-bar i{background:linear-gradient(90deg,#2f6bff,#6fa6ff);}
+html.gl .pc-tabs{background:rgba(0,0,0,.28);}
+html.gl .pc-tabs button{color:var(--gl-muted);}
+html.gl .pc-tabs button.on{background:linear-gradient(180deg,#4f7dff,#3159f0);color:#fff;box-shadow:0 4px 14px rgba(79,125,255,.45);}
+html.gl .st-card.orange .pc-tabs button.on{background:linear-gradient(180deg,#ff8a4c,#e8590c);box-shadow:0 4px 14px rgba(255,120,60,.4);}
+html.gl .pc-chart{background:rgba(0,0,0,.2);}
+html.gl .pc-b i{background:rgba(127,162,255,.38);}
+html.gl .pc-b.cur i{background:linear-gradient(180deg,#8fb0ff,#4f7dff);}
+html.gl .pc-b.fut i{background:rgba(255,255,255,.07);}
 html.gl .rv-box.best{background:linear-gradient(135deg,rgba(255,90,95,.2),rgba(255,90,95,.06));border-color:rgba(255,90,95,.3);}
 
 /* --- Склад --- */
