@@ -3448,6 +3448,15 @@ def api_stats_analytics():
     return jsonify({"ok": True, **db.stats_analytics(g.shop_id)})
 
 
+@app.route("/api/stats/pulse")
+@login_required
+@employee_blocked
+def api_stats_pulse():
+    """Блок «Сегодня» (выручка по часам против вчера, из чего выручка,
+    мастера дня) и столбики карточки «Неделя / Месяц / Год». Без закупки."""
+    return jsonify({"ok": True, **db.stats_pulse(g.shop_id)})
+
+
 @app.route("/api/stats/plan", methods=["POST"])
 @login_required
 @employee_blocked

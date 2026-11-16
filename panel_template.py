@@ -1285,6 +1285,77 @@ if ('serviceWorker' in navigator) {
   .st-card.orange .st-money > div { background:#FFF7ED; }
   .st-card.orange .st-money-v.rev { color:#9A3412; }
   .st-money-note { font-size:12px; color:#92400E; background:#FEF3C7; border-radius:10px; padding:6px 9px; margin-bottom:6px; line-height:1.35; }
+  /* «Сегодня» — пульс дня */
+  .dp { --dp-blue:#0F52BA; --dp-yday:#94A3B8; --dp-grid:#E2E8F0; --dp-soft:#F8FAFC; --dp-dot:#FFFFFF;
+        background:#fff; border:1px solid var(--border); border-radius:20px; padding:16px; margin-bottom:12px; display:flex; flex-direction:column; gap:14px; }
+  .dp-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px; }
+  .dp-label { font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:.05em; }
+  .dp-amount { font-size:32px; font-weight:800; font-family:var(--font-display); color:var(--text); line-height:1.15; font-variant-numeric:tabular-nums; white-space:nowrap; min-width:0; }
+  .dp-amount small { font-size:.45em; font-weight:600; color:#64748B; margin-left:4px; }
+  .dp-cmp { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:#64748B; min-height:22px; }
+  .dp-chart { background:var(--dp-soft); border-radius:16px; padding:10px 10px 6px; }
+  .dp-leg { display:flex; gap:14px; font-size:12px; color:#64748B; margin:0 2px 4px; }
+  .dp-leg i { display:inline-block; width:14px; height:0; border-top:3px solid var(--dp-blue); vertical-align:middle; margin-right:5px; border-radius:2px; }
+  .dp-leg i.y { border-top:2px dashed var(--dp-yday); }
+  .dp-plot { position:relative; height:120px; }
+  .dp-plot svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  .dp-plot .gl0 { stroke:var(--dp-grid); stroke-width:1; }
+  .dp-plot .yd { fill:none; stroke:var(--dp-yday); stroke-width:2; stroke-dasharray:5 5; }
+  .dp-plot .ln { fill:none; stroke:var(--dp-blue); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+  .dp-plot .g1 { stop-color:var(--dp-blue); stop-opacity:.32; }
+  .dp-plot .g2 { stop-color:var(--dp-blue); stop-opacity:0; }
+  .dp-dot { position:absolute; width:12px; height:12px; margin:-6px 0 0 -6px; border-radius:50%; background:var(--dp-dot); border:3px solid var(--dp-blue); box-sizing:border-box; }
+  .dp-hx { position:relative; height:14px; font-size:10.5px; color:#94A3B8; margin-top:4px; }
+  .dp-hx span { position:absolute; transform:translateX(-50%); }
+  .dp-skel { height:150px; border-radius:16px; background:var(--dp-soft); }
+  .dp-tiles { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  @media (min-width:900px) { .dp-tiles { grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+  .dp-tile { background:var(--dp-soft); border-radius:16px; padding:10px 12px; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .dp-tile.good { background:#F0FDF4; }
+  .dp-tile .k { font-size:12px; font-weight:600; color:#64748B; }
+  .dp-tile .v { font-size:20px; font-weight:800; font-family:var(--font-display); color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dp-tile.good .v { color:#15803D; }
+  .dp-tile .s { font-size:11.5px; color:#64748B; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+  .dp-tile .st-badge { padding:1px 7px; font-size:11px; }
+  .dp-sec { font-size:13px; font-weight:700; color:#64748B; margin-bottom:8px; display:flex; justify-content:space-between; gap:8px; }
+  .dp-sec small { font-weight:600; }
+  .dp-mixbar { display:flex; height:14px; border-radius:7px; overflow:hidden; gap:2px; background:#F1F5F9; }
+  .dp-mixbar i { display:block; height:100%; transform-origin:left; animation:dpGrowX .8s cubic-bezier(.22,1,.36,1) both; }
+  .dp-mixleg { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 14px; margin-top:9px; font-size:12.5px; color:#475569; }
+  .dp-mixleg div { display:flex; justify-content:space-between; gap:6px; min-width:0; }
+  .dp-mixleg span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dp-mixleg span::before { content:''; display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:var(--dot); }
+  .dp-mixleg b { color:var(--text); white-space:nowrap; }
+  .dp-ms { display:flex; align-items:center; gap:10px; padding:6px 0; }
+  .dp-ms-av { flex:none; width:32px; height:32px; border-radius:50%; background:#EFF6FF; color:#0F52BA; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .dp-ms-main { flex:1; min-width:0; }
+  .dp-ms-row { display:flex; justify-content:space-between; gap:8px; font-size:13.5px; }
+  .dp-ms-row span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dp-ms-row small { color:#64748B; }
+  .dp-ms-bar { height:6px; border-radius:3px; background:#F1F5F9; margin-top:5px; overflow:hidden; }
+  .dp-ms-bar i { display:block; height:100%; background:#0F52BA; border-radius:3px; transform-origin:left; animation:dpGrowX .8s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes dpGrowX { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+  @keyframes dpReveal { from { clip-path:inset(0 100% 0 0); } to { clip-path:inset(0 0 0 0); } }
+  @keyframes dpFade { from { opacity:0; } to { opacity:1; } }
+  .dp-plot .ln { animation:dpReveal 1.1s cubic-bezier(.22,1,.36,1) both; }
+  .dp-plot .ar, .dp-dot { animation:dpFade .8s ease .3s both; }
+  /* одна карточка «Неделя / Месяц / Год» */
+  .pc-tabs { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; padding:4px; border-radius:14px; background:#F1F5F9; margin-bottom:10px; }
+  .pc-tabs button { height:40px; border:0; border-radius:11px; background:transparent; color:#475569; font-family:inherit; font-size:14.5px; font-weight:700; cursor:pointer; transition:background .2s, color .2s; }
+  .pc-tabs button.on { background:#0F52BA; color:#fff; box-shadow:0 4px 12px rgba(15,82,186,.28); }
+  .st-card.orange .pc-tabs button.on { background:#C2410C; }
+  .pc-body { animation:dpFade .35s ease both; }
+  .pc-chart { background:#F8FAFC; border-radius:14px; padding:10px 10px 6px; margin:4px 0 8px; }
+  .pc-chart-h { display:flex; justify-content:space-between; gap:8px; font-size:12px; color:#64748B; margin-bottom:6px; }
+  .pc-bars { height:90px; display:flex; align-items:flex-end; gap:6px; }
+  .pc-bars.month { gap:2px; }
+  .pc-b { flex:1; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:3px; }
+  .pc-b i { display:block; width:100%; max-width:26px; min-height:3px; border-radius:5px 5px 2px 2px; background:#BFD3F2; transform-origin:bottom; animation:pcGrow .6s cubic-bezier(.22,1,.36,1) both; }
+  .pc-b.cur i { background:#0F52BA; }
+  .pc-b.fut i { background:#EEF2F7; }
+  .pc-b span { font-size:10px; color:#94A3B8; height:12px; line-height:12px; white-space:nowrap; }
+  @keyframes pcGrow { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) { .dp *, .pc-body, .pc-b i { animation:none !important; } }
   .dsum { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px; }
   .dsum > div { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px 10px; min-width:0; }
   .dsum .k { font-size:11px; color:var(--hint); font-weight:600; }
@@ -7597,14 +7668,16 @@ function renderStatCard(o) {
   const empty = !d.count;
   const note = stMoneyNote(d);
   return `
-    <div class="st-card ${o.orange ? 'orange' : ''}">
-      <div class="st-label">${o.label}</div>
+    <div class="st-card ${o.orange ? 'orange' : ''}"${o.id ? ` id="${o.id}"` : ''}>
+      ${o.head || `<div class="st-label">${o.label}</div>`}
+      <div class="${o.head ? 'pc-body' : ''}">
       <div class="st-money">
         <div><div class="st-money-k">${T.st_m_revenue}</div><div class="st-money-v rev">${fmtNum(d.total)}<small>${T.currency}</small></div></div>
         <div><div class="st-money-k">${T.st_m_received}</div><div class="st-money-v got">${fmtNum(received)}<small>${T.currency}</small></div></div>
       </div>
       ${badgeLine ? `<div class="st-badge-line" style="min-height:0;">${badgeLine}</div>` : ''}
       ${note ? `<div class="st-money-note">${note}</div>` : ''}
+      ${o.chart || ''}
       ${empty ? `<div class="st-empty">${T.st_no_visits}</div>` : `
       <div class="st-row"><span>${T.st_services}</span><b>${d.count}</b></div>
       ${d.paid_count ? `<div class="st-row"><span>${T.st_avg}</span><b>${fmtNum(d.avg)} ${T.currency}${cmp ? stBadge(cmp.avg_pct) : ''}</b></div>` : ''}
@@ -7622,6 +7695,7 @@ function renderStatCard(o) {
       </div>` : ''}
       ${o.profit !== null && o.profit !== undefined ? `<div class="st-row profit"><span>${T.st_profit}</span><b>${fmtNum(o.profit)} ${T.currency}${o.profitUsd != null ? `<small style="display:block; font-weight:500; color:var(--hint); font-size:11.5px;">${usdApprox(o.profitUsd)}</small>` : ''}</b></div>` : ''}
       `}
+      </div>
     </div>`;
 }
 
@@ -7654,6 +7728,221 @@ const ST_PERIODS = () => [
   ['year', T.stats_year, T.st_vs_year],
 ];
 
+// ---------- «Сегодня» (пульс дня) + одна карточка «Неделя / Месяц / Год» ----------
+const STP = { pulse: null, cards: {}, seq: 0 };
+const DP_MIX_COLORS = { oil: '#0F52BA', fluids: '#6366F1', filters: '#14B8A6', work: '#F59E0B',
+  goods: '#8B5CF6', tire: '#475569', part: '#DB2777', used: '#A16207' };
+
+function stPct(cur, prev) {
+  if (!prev) return null;
+  return Math.round((cur - prev) / prev * 1000) / 10;
+}
+
+function stSavedPeriod() {
+  try { const v = localStorage.getItem('st_period'); return ['week', 'month', 'year'].includes(v) ? v : 'week'; } catch (e) { return 'week'; }
+}
+
+function stBestLabel(k, i) {
+  if (k === 'week') return T.st_wd_full.split(',')[i] || '';
+  if (k === 'year') return T.st_mon_full.split(',')[i] || '';
+  return T.st_best_day.replace('{n}', i + 1);
+}
+
+function renderPeriodBars(k, ser) {
+  if (!ser || !ser.v || !ser.v.length) return '';
+  const max = Math.max(...ser.v);
+  if (!max) return '';
+  const n = ser.v.length;
+  const lab = k === 'week' ? T.st_wd.split(',') : (k === 'year' ? T.st_mon.split(',') : null);
+  const bi = ser.v.indexOf(max);
+  const bars = ser.v.map((v, i) => {
+    const l = lab ? (lab[i] || '') : ((i === 0 || (i + 1) % 5 === 0) ? String(i + 1) : '');
+    const cls = i === ser.cur ? 'cur' : (i > ser.cur ? 'fut' : '');
+    const h = i > ser.cur ? 4 : Math.max(4, Math.round(v / max * 100));
+    const name = lab ? (k === 'week' ? T.st_wd_full.split(',')[i] : T.st_mon_full.split(',')[i]) : T.st_best_day.replace('{n}', i + 1);
+    return `<div class="pc-b ${cls}" title="${escapeHtml(name || '')}: ${fmtNum(v)} ${T.currency}"><i style="height:${h}%; animation-delay:${Math.min(i * 30, 600)}ms;"></i><span>${l}</span></div>`;
+  }).join('');
+  return `<div class="pc-chart">
+    <div class="pc-chart-h"><span>${k === 'year' ? T.st_by_months : T.st_by_days}</span><span>${T.st_best}: <b>${escapeHtml(stBestLabel(k, bi))}</b></span></div>
+    <div class="pc-bars ${k}">${bars}</div>
+  </div>`;
+}
+
+function renderPeriodCard(id) {
+  const c = STP.cards[id];
+  if (!c) return '';
+  const k = c.period;
+  const per = ST_PERIODS().find(x => x[0] === k) || ST_PERIODS()[0];
+  const tabs = `<div class="pc-tabs" role="tablist">${ST_PERIODS().map(([key]) =>
+    `<button type="button" role="tab" aria-selected="${key === k}" class="${key === k ? 'on' : ''}" onclick="setStPeriod('${id}', '${key}')">${T['st_tab_' + key]}</button>`).join('')}</div>`;
+  return renderStatCard({
+    id, head: tabs, label: per[1], d: c.stats[k], cmp: c.cmp && c.cmp[k], cmpNote: per[2],
+    chart: renderPeriodBars(k, c.series ? c.series[k] : null),
+    profit: c.profit ? c.profit[k] : null, profitUsd: c.profit && c.profit.usd ? c.profit.usd[k] : null,
+    orange: c.orange,
+  });
+}
+
+function setStPeriod(id, k) {
+  const c = STP.cards[id];
+  if (!c || c.period === k) return;
+  c.period = k;
+  try { localStorage.setItem('st_period', k); } catch (e) {}
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.outerHTML = renderPeriodCard(id);
+  if (window.glCount) glCount(document.getElementById(id));
+}
+
+function spTodayDate() {
+  const d = new Date();
+  const wd = T.st_wd_full.split(',')[(d.getDay() + 6) % 7] || '';
+  const mon = (T.st_mon_gen || T.st_mon_full).split(',')[d.getMonth()] || '';
+  return `${d.getDate()} ${mon}, ${wd}`;
+}
+
+function renderTodayPulse(s, profit) {
+  const d = s.today || {}, y = s.yesterday || {};
+  const cl = d.clients || { total: 0, new: 0, returning: 0 };
+  const pT = profit ? profit.today : null, pY = profit ? profit.yesterday : null;
+  const cash = d.cash || 0, card = d.card || 0, debtOut = d.debt_out || 0;
+  const paySum = (cash + card + debtOut) || 1;
+  const note = stMoneyNote(d);
+  const ySub = v => `<span>${T.dp_yday}: ${v}</span>`;
+  const diffCnt = (d.count || 0) - (y.count || 0);
+  const tiles = [
+    `<div class="dp-tile"><span class="k">${T.st_services}</span><span class="v">${d.count || 0}</span>
+      <span class="s">${diffCnt ? `<span class="st-badge ${diffCnt > 0 ? 'up' : 'down'}">${diffCnt > 0 ? '↑ +' : '↓ '}${diffCnt}</span>` : ''}${ySub(y.count || 0)}</span></div>`,
+    `<div class="dp-tile"><span class="k">${T.st_avg}</span><span class="v">${d.paid_count ? fmtShort(d.avg) : '—'}</span>
+      <span class="s">${d.paid_count && y.paid_count ? stBadge(stPct(d.avg, y.avg)) : ''}${ySub(y.paid_count ? fmtShort(y.avg) : '—')}</span></div>`,
+    `<div class="dp-tile"><span class="k">${T.st_clients}</span><span class="v">${cl.total}</span>
+      <span class="s"><span>${cl.new} ${T.st_new} · ${cl.returning} ${T.st_returning}</span></span></div>`,
+    pT !== null && pT !== undefined
+      ? `<div class="dp-tile good"><span class="k">${T.st_profit}</span><span class="v">${fmtShort(pT)}</span>
+        <span class="s">${pY ? stBadge(stPct(pT, pY)) : ''}<span>${profit.usd && profit.usd.today != null ? usdApprox(profit.usd.today) : ySub(fmtShort(pY || 0))}</span></span></div>`
+      : `<div class="dp-tile good"><span class="k">${T.st_m_received}</span><span class="v">${fmtShort(cash + card + (d.repaid || 0))}</span>
+        <span class="s">${ySub(fmtShort((y.cash || 0) + (y.card || 0) + (y.repaid || 0)))}</span></div>`,
+  ].join('');
+  return `
+    <div class="dp" id="stPulse">
+      <div>
+        <div class="dp-label">${T.stats_today} · ${escapeHtml(spTodayDate())}</div>
+        <div class="dp-head">
+          <div class="dp-amount st-today-amount">${fmtNum(d.total)}<small>${T.currency}</small></div>
+          <button type="button" class="st-day-btn" onclick="openDayDetails()"><i class="fa-solid fa-list-ul"></i> ${T.dd_btn}</button>
+        </div>
+      </div>
+      <div class="dp-cmp" id="dpCmp"></div>
+      <div id="dpChart"><div class="dp-skel"></div></div>
+      <div class="dp-tiles">${tiles}</div>
+      <div id="dpMix"></div>
+      ${(cash || card || debtOut) ? `
+      <div>
+        <div class="dp-sec"><span>${T.st_payment}</span></div>
+        <div class="st-split" style="height:10px; border-radius:5px;"><i style="width:${cash / paySum * 100}%; background:#22C55E;"></i><i style="width:${card / paySum * 100}%; background:#6366F1;"></i>${debtOut ? `<i style="width:${debtOut / paySum * 100}%; background:#F59E0B;"></i>` : ''}</div>
+        <div class="st-legend" style="font-size:12.5px; margin-top:7px;"><span style="--dot:#22C55E;">${T.st_cash} ${fmtShort(cash)}</span><span style="--dot:#6366F1;">${T.st_card} ${fmtShort(card)}</span>${debtOut ? `<span style="--dot:#F59E0B;">${T.st_debt_part} ${fmtShort(debtOut)}</span>` : ''}</div>
+      </div>` : ''}
+      ${note ? `<div class="st-money-note" style="margin:0;">${note}</div>` : ''}
+      <div id="dpMasters"></div>
+    </div>`;
+}
+
+function spChartHtml(h) {
+  const n = (h.today || []).length;
+  if (!n) return '';
+  const W = 300, H = 110;
+  // линия «сегодня» — до текущего часа (или до последней записи, если она позже, например после офлайна)
+  let lastIdx = 0;
+  h.today.forEach((v, i) => { if (v > (i ? h.today[i - 1] : 0)) lastIdx = i; });
+  const nowIdx = Math.min(n - 1, Math.max(0, h.now - h.from, lastIdx));
+  const max = Math.max(1, h.today[n - 1], h.yesterday[n - 1]) * 1.12;
+  const x = i => (n > 1 ? i / (n - 1) * W : 0);
+  const yv = v => H - v / max * (H - 4);
+  const path = arr => arr.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${yv(v).toFixed(1)}`).join(' ');
+  const tod = h.today.slice(0, nowIdx + 1);
+  const line = tod.length > 1 ? path(tod) : `M0 ${yv(tod[0]).toFixed(1)} L${Math.max(2, x(nowIdx)).toFixed(1)} ${yv(tod[0]).toFixed(1)}`;
+  const area = `${line} L${x(nowIdx).toFixed(1)} ${H} L0 ${H} Z`;
+  const ticks = [];
+  for (let hr = h.from; hr <= h.to; hr += 2) ticks.push(`<span style="left:${x(hr - h.from) / W * 100}%;">${String(hr).padStart(2, '0')}</span>`);
+  return `<div class="dp-chart">
+    <div class="dp-leg"><span><i></i>${T.stats_today}</span><span><i class="y"></i>${T.dp_yday_cap}</span></div>
+    <div class="dp-plot" role="img" aria-label="${escapeHtml(T.dp_chart_aria)}">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <defs><linearGradient id="dpGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="g1"></stop><stop offset="1" class="g2"></stop></linearGradient></defs>
+        <line class="gl0" x1="0" x2="${W}" y1="${(H * .33).toFixed(1)}" y2="${(H * .33).toFixed(1)}" vector-effect="non-scaling-stroke"></line>
+        <line class="gl0" x1="0" x2="${W}" y1="${(H * .66).toFixed(1)}" y2="${(H * .66).toFixed(1)}" vector-effect="non-scaling-stroke"></line>
+        <path class="ar" d="${area}" fill="url(#dpGrad)"></path>
+        <path class="yd" d="${path(h.yesterday)}" vector-effect="non-scaling-stroke"></path>
+        <path class="ln" d="${line}" vector-effect="non-scaling-stroke"></path>
+      </svg>
+      <div class="dp-dot" style="left:${x(nowIdx) / W * 100}%; top:${yv(tod[tod.length - 1]) / H * 100}%;"></div>
+    </div>
+    <div class="dp-hx">${ticks.join('')}</div>
+  </div>`;
+}
+
+function spMixHtml(mix) {
+  const tot = mix.reduce((a, m) => a + m.v, 0);
+  if (!tot) return '';
+  const col = k => DP_MIX_COLORS[k] || '#94A3B8';
+  return `<div>
+    <div class="dp-sec"><span>${T.dp_mix_title}</span></div>
+    <div class="dp-mixbar">${mix.map((m, i) => `<i style="width:${m.v / tot * 100}%; background:${col(m.k)}; animation-delay:${i * 90}ms;"></i>`).join('')}</div>
+    <div class="dp-mixleg">${mix.map(m => `<div><span style="--dot:${col(m.k)};">${T['dp_mix_' + m.k] || m.k} ${Math.round(m.v / tot * 100)}%</span><b>${fmtShort(m.v)}</b></div>`).join('')}</div>
+  </div>`;
+}
+
+function spMastersHtml(ms) {
+  if (!ms || ms.length < 2) return '';  // один мастер — рейтинг не нужен
+  const top = Math.max(1, ...ms.map(m => m.total));
+  return `<div>
+    <div class="dp-sec"><span>${T.dp_masters}</span></div>
+    ${ms.slice(0, 6).map((m, i) => `<div class="dp-ms">
+      <span class="dp-ms-av">${escapeHtml((m.name || '?').trim().charAt(0).toUpperCase())}</span>
+      <div class="dp-ms-main">
+        <div class="dp-ms-row"><span>${escapeHtml(m.name)} <small>· ${m.count} ${T.dp_cars}</small></span><b>${fmtShort(m.total)}</b></div>
+        <div class="dp-ms-bar"><i style="width:${m.total / top * 100}%; animation-delay:${i * 90}ms;"></i></div>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function fillPulse(p, todayTotal) {
+  const cmp = document.getElementById('dpCmp');
+  if (cmp) {
+    const ys = p.yesterday_same_time || 0;
+    cmp.innerHTML = ys
+      ? `${stBadge(stPct(todayTotal || 0, ys))}<span>${T.dp_vs_yday.replace('{sum}', fmtShort(ys))}</span>`
+      : (todayTotal ? `<span>${T.dp_yday_zero}</span>` : `<span>${T.st_today_empty}</span>`);
+  }
+  const ch = document.getElementById('dpChart');
+  if (ch) ch.innerHTML = spChartHtml(p.hours || {});
+  const mx = document.getElementById('dpMix');
+  if (mx) mx.innerHTML = spMixHtml(p.mix || []);
+  const ms = document.getElementById('dpMasters');
+  if (ms) ms.innerHTML = spMastersHtml(p.masters || []);
+}
+
+async function loadPulse(todayTotal) {
+  const seq = ++STP.seq;
+  let p;
+  try { p = await (await fetch('/api/stats/pulse', { credentials: 'same-origin', cache: 'no-store' })).json(); } catch (e) { p = null; }
+  if (seq !== STP.seq) return;
+  if (!p || !p.ok) {
+    const ch = document.getElementById('dpChart');
+    if (ch) ch.innerHTML = '';
+    return;
+  }
+  STP.pulse = p;
+  fillPulse(p, todayTotal);
+  const c = STP.cards.stPeriodCard;
+  if (c && !c.series) {
+    c.series = p.series;
+    const el = document.getElementById('stPeriodCard');
+    if (el) el.outerHTML = renderPeriodCard('stPeriodCard');
+  }
+}
+
 const NET = { scope: 'all', period: 'month', shops: [], revChart: null, cmpChart: null };
 
 function setNetScope(scope) {
@@ -7681,12 +7970,11 @@ async function loadNetwork() {
       .concat(NET.shops.map(sh => `<div class="brand-chip ${NET.scope === String(sh.id) ? 'active' : ''}" onclick="setNetScope('${sh.id}')">${escapeHtml(sh.name)}${sh.is_head ? `<span class="bc-sub">${T.branch_head_label}</span>` : ''}</div>`))
       .join('');
 
-  grid.innerHTML =
-    renderTodayStrip(data.stats.today, data.profit.today) +
-    `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
-      label, d: data.stats[key], cmp: data.comparison[key], cmpNote: note,
-      profit: data.profit[key], profitUsd: data.profit_usd ? data.profit_usd[key] : null, orange: isAll,
-    })).join('')}</div>`;
+  const prevNet = STP.cards.netPeriodCard;
+  STP.cards.netPeriodCard = { stats: data.stats, cmp: data.comparison, orange: isAll, series: null,
+    profit: Object.assign({}, data.profit, { usd: data.profit_usd || null }),
+    period: prevNet ? prevNet.period : stSavedPeriod() };
+  grid.innerHTML = renderTodayStrip(data.stats.today, data.profit.today) + renderPeriodCard('netPeriodCard');
 
   document.getElementById('netNetProfit').innerHTML = renderNetProfitHtml(data.net_profit);
   NET.revChart = drawRevenueBars('netRevenueChart', 'netRevenueSummary', data.daily_revenue, NET.revChart);
@@ -8093,13 +8381,12 @@ async function loadStats() {
     const pRes = await fetch('/api/profit_stats');
     profit = await pRes.json();
   }
-  document.getElementById('statsGrid').innerHTML =
-    renderTodayStrip(s.today, profit ? profit.today : null, true) +
-    `<div class="st-grid">${ST_PERIODS().map(([key, label, note]) => renderStatCard({
-      label, d: s[key], cmp: s.comparison && s.comparison[key], cmpNote: note,
-      profit: profit ? profit[key] : null, profitUsd: profit && profit.usd ? profit.usd[key] : null,
-    })).join('')}</div>`;
+  const prevCard = STP.cards.stPeriodCard;
+  STP.cards.stPeriodCard = { stats: s, cmp: s.comparison, profit, orange: false,
+    series: null, period: prevCard ? prevCard.period : stSavedPeriod() };
+  document.getElementById('statsGrid').innerHTML = renderTodayPulse(s, profit) + renderPeriodCard('stPeriodCard');
   if (window.glCount) glCount(document.getElementById('statsGrid'));
+  loadPulse((s.today || {}).total || 0);
 
   if (!IS_BRANCH) {
     try {

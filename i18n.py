@@ -4798,3 +4798,41 @@ UZ.update({
     "bot_demo_failed": "Telegram interaktiv xabarni qabul qilmadi. Telegram ilovasini yangilab, qayta urinib ko'ring.\n\nTelegram javobi: {err}",
     "ma_owner_panel": "Shoxobcha paneli",
 })
+
+# «Статистика»: блок «Сегодня» (пульс дня) и одна карточка «Неделя / Месяц / Год»
+RU.update({
+    "st_tab_week": "Неделя", "st_tab_month": "Месяц", "st_tab_year": "Год",
+    "st_wd": "Пн,Вт,Ср,Чт,Пт,Сб,Вс",
+    "st_wd_full": "понедельник,вторник,среда,четверг,пятница,суббота,воскресенье",
+    "st_mon": "Я,Ф,М,А,М,И,И,А,С,О,Н,Д",
+    "st_mon_full": "январь,февраль,март,апрель,май,июнь,июль,август,сентябрь,октябрь,ноябрь,декабрь",
+    "st_mon_gen": "января,февраля,марта,апреля,мая,июня,июля,августа,сентября,октября,ноября,декабря",
+    "st_best_day": "{n}-е число", "st_by_days": "По дням", "st_by_months": "По месяцам", "st_best": "лучший",
+    "dp_yday": "вчера", "dp_yday_cap": "Вчера",
+    "dp_vs_yday": "к вчера на это же время ({sum})",
+    "dp_yday_zero": "вчера к этому часу выручки не было",
+    "dp_chart_aria": "Выручка по часам нарастающим итогом: сегодня и вчера",
+    "dp_mix_title": "Из чего выручка",
+    "dp_mix_oil": "Масло", "dp_mix_fluids": "Жидкости", "dp_mix_filters": "Фильтры",
+    "dp_mix_work": "Работа", "dp_mix_goods": "Товары", "dp_mix_tire": "Шиномонтаж",
+    "dp_mix_part": "Запчасти", "dp_mix_used": "Отработка",
+    "dp_masters": "Мастера сегодня", "dp_cars": "маш.",
+})
+UZ.update({
+    "st_tab_week": "Hafta", "st_tab_month": "Oy", "st_tab_year": "Yil",
+    "st_wd": "Du,Se,Ch,Pa,Ju,Sh,Ya",
+    "st_wd_full": "dushanba,seshanba,chorshanba,payshanba,juma,shanba,yakshanba",
+    "st_mon": "Ya,F,M,A,M,I,I,A,S,O,N,D",
+    "st_mon_full": "yanvar,fevral,mart,aprel,may,iyun,iyul,avgust,sentabr,oktabr,noyabr,dekabr",
+    "st_mon_gen": "yanvar,fevral,mart,aprel,may,iyun,iyul,avgust,sentabr,oktabr,noyabr,dekabr",
+    "st_best_day": "{n}-kun", "st_by_days": "Kunlar bo'yicha", "st_by_months": "Oylar bo'yicha", "st_best": "eng yaxshi",
+    "dp_yday": "kecha", "dp_yday_cap": "Kecha",
+    "dp_vs_yday": "kechaning shu vaqtiga nisbatan ({sum})",
+    "dp_yday_zero": "kecha shu soatgacha tushum bo'lmagan",
+    "dp_chart_aria": "Soatlar bo'yicha jamlangan tushum: bugun va kecha",
+    "dp_mix_title": "Tushum nimadan",
+    "dp_mix_oil": "Moy", "dp_mix_fluids": "Suyuqliklar", "dp_mix_filters": "Filtrlar",
+    "dp_mix_work": "Ish haqi", "dp_mix_goods": "Tovarlar", "dp_mix_tire": "Shinomontaj",
+    "dp_mix_part": "Ehtiyot qismlar", "dp_mix_used": "Otrabotka",
+    "dp_masters": "Bugungi ustalar", "dp_cars": "mashina",
+})
