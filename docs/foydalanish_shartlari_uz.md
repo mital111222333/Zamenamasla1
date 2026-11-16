@@ -1,10 +1,10 @@
 # OILBOOK XIZMATIDAN FOYDALANISH SHARTNOMASI
 ## (ommaviy oferta) va ma'lumotlar maxfiyligi kafolati
 
-**Tahrir:** 1.0 · **Kuchga kirgan sana:** [__.__.2026]
+**Tahrir:** 1.1 · **Kuchga kirgan sana:** 16.11.2026
 
-**Xizmat egasi (Ijrochi):** [F.I.Sh. yoki tashkilot nomi], STIR: [_________],
-manzil: [_________], telefon: [_________], Telegram: [@_________]
+**Xizmat egasi (Ijrochi):** Saidmuratov Saidbonur Jaxongir o'g'li (jismoniy shaxs), STIR: 550110220,
+manzil: Toshkent shahri, Mirzo Ulug'bek tumani, telefon: +998 99 777 70 11, Telegram: @Saidbonur405
 (bundan buyon — **«OilBook»** yoki **«Ijrochi»**).
 
 **Mijoz:** OilBook dasturida ro'yxatdan o'tgan va obunani to'lagan avtoservis,
@@ -51,7 +51,7 @@ talab qilinmaydi — elektron rozilik imzo bilan teng kuchga ega.
 1.3. Rozilik berilgan sana, vaqt, Shartnoma tahriri va Mijoz logini tizimda
 saqlanadi. Mijoz ularni istalgan vaqtda ko'ra oladi.
 
-1.4. Shartnomaning amaldagi tahriri doim dasturda va **[sayt manzili]/oferta**
+1.4. Shartnomaning amaldagi tahriri doim dasturda va **oilbook.uz/oferta**
 sahifasida e'lon qilinadi.
 
 ## 2. ATAMALAR
@@ -315,7 +315,7 @@ muvofiq Ijrochi joylashgan joydagi vakolatli sudda ko'rib chiqiladi.
 ## 15. ALOQA
 
 Maxfiylik, ma'lumotlarni o'chirish yoki boshqa savollar bo'yicha:
-telefon [_________], Telegram [@_________], e-pochta [_________].
+telefon +998 99 777 70 11, Telegram @Saidbonur405, e-pochta muhammadbonur@gmail.com.
 
 <!-- ILOVA: quyidagi matnlar dastur ichida ishlatiladi, /oferta sahifasida ko'rsatilmaydi -->
 
@@ -336,4 +336,4 @@ telefon [_________], Telegram [@_________], e-pochta [_________].
 > Respublikasi qonuni oldida ham, shariat bo'yicha omonat sifatida
 > Alloh oldida ham javob beramiz.
 >
-> Shartnoma matni: [sayt manzili]/oferta · Rozilik sanasi: [sana, vaqt]
+> Shartnoma matni: oilbook.uz/oferta · Rozilik sanasi: (to'lov tasdiqlangan sana va vaqt)
