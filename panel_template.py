@@ -2759,12 +2759,6 @@ if ('serviceWorker' in navigator) {
       {% endif %}
 
       <div class="card" style="margin-top:16px;">
-        <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_revenue_chart_title }}</label>
-        <div id="revenueSummary" class="rv-summary"></div>
-        <div class="rv-chart-wrap"><canvas id="revenueChart"></canvas></div>
-      </div>
-
-      <div class="card" style="margin-top:16px;">
         <label style="font-size:15px; color:var(--text); font-weight:600; display:block; margin-bottom:10px;">{{ T.dash_debt_summary_title }}</label>
         <div id="dashDebtSummary">{{ T.stats_loading }}</div>
       </div>
@@ -7226,6 +7220,8 @@ function renderMovements(el, moves, showPrice) {
 let revenueChartInstance = null;
 
 function renderRevenueChart(dailyData) {
+  // карточка «Выручка за 30 дней» убрана из «Статистики» — то же есть выше в анализе
+  if (!document.getElementById('revenueChart')) return;
   revenueChartInstance = drawRevenueBars('revenueChart', 'revenueSummary', dailyData, revenueChartInstance);
   anRvCmp();
 }
