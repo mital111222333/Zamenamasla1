@@ -1,9 +1,9 @@
 # OILBOOK XIZMATIDAN FOYDALANISH SHARTNOMASI
 ## (ommaviy oferta) va ma'lumotlar maxfiyligi kafolati
 
-**Tahrir:** 1.1 · **Kuchga kirgan sana:** 16.11.2026
+**Tahrir:** 1.2 · **Kuchga kirgan sana:** 16.11.2026
 
-**Xizmat egasi (Ijrochi):** Saidmuratov Saidbonur Jaxongir o'g'li (jismoniy shaxs), STIR: 550110220,
+**Xizmat egasi (Ijrochi):** Saidmuratov Saidbonur Jaxongir o'g'li (o'zini o'zi band qilgan shaxs), STIR: 550110220,
 manzil: Toshkent shahri, Mirzo Ulug'bek tumani, telefon: +998 99 777 70 11, Telegram: @Saidbonur405
 (bundan buyon — **«OilBook»** yoki **«Ijrochi»**).
 

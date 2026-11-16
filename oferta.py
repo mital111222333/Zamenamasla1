@@ -22,7 +22,7 @@ import database as db
 import i18n
 from webapp import _client_ip, app
 
-OFERTA_VERSION = "1.1"
+OFERTA_VERSION = "1.2"
 OFERTA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "foydalanish_shartlari_uz.md")
 _APPENDIX_MARK = "<!-- ILOVA"  # дальше — служебные тексты для программы, на странице не показываем
 
