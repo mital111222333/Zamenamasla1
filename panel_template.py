@@ -3591,7 +3591,7 @@ async function obSync(manual) {
       try { data = await res.json(); } catch (e) { data = null; }
     } catch (e) { stopped = true; break; }  // связи всё ещё нет — попробуем позже
     try { localStorage.setItem(OB_KEY + '_lock', String(Date.now())); } catch (e) {}
-    if (res.status === 402 || res.status >= 500 || !data) { stopped = true; break; }  // подписка / сервер занят — позже
+    if (res.status === 402 || res.status === 429 || res.status >= 500 || !data) { stopped = true; break; }  // подписка / сервер занят — позже
     if (data.ok) { obUpdate(it.token, () => null); sent++; continue; }
     obUpdate(it.token, x => Object.assign(x, { status: 'error', error: String(data.error || res.status).slice(0, 300) }));
   }
@@ -13829,6 +13829,7 @@ NET_GUARD_JS = """<style>
     timeout: {{ T.net_timeout|tojson }},
     unsure: {{ T.net_unsure|tojson }},
     server: {{ T.net_server|tojson }},
+    busy: {{ T.net_busy|tojson }},
     session: {{ T.net_session|tojson }},
     bar: {{ T.net_offline_bar|tojson }},
     back: {{ T.net_back_online|tojson }}
@@ -13950,6 +13951,12 @@ NET_GUARD_JS = """<style>
       // подписка закончилась, пока панель была открыта
       location.href = '/subscription';
       throw netError('session', NT.session, true);
+    }
+    if (res.status === 429 && !write) {
+      // сервер просит подождать (слишком много запросов с одного адреса):
+      // раньше раздел молча оставался пустым — теперь говорим, что случилось
+      toast(NT.busy, 'err');
+      throw netError('server', NT.busy, true);
     }
     const ct = res.headers.get('Content-Type') || '';
     if (!res.ok && ct.indexOf('json') === -1) {
