@@ -188,6 +188,7 @@ RATE_RULES = (
     ("/api/register", "register", 60, 60),
     ("/api/hamyon/", "hamyon", 120, 60),
     ("/api/anpr/", "anpr", 240, 60),
+    ("/api/jumavoy/", "jumavoy", 120, 60),
     ("/api/display_state/", "display", 400, 60),
     ("/passport/", "passport", 60, 60),
     ("/display/", "pages", 60, 60),
