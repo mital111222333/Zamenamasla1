@@ -77,7 +77,7 @@ def _rate_limit():
         return None
     # в журнал — один раз за окно, а не каждый лишний запрос
     if not security.rate_hit("rl_log", (ip, over), 1, 300):
-        security.log_event("rate_limited", security.HIGH if over in ("login", "forgot", "anpr", "hamyon") else
+        security.log_event("rate_limited", security.HIGH if over in ("login", "forgot", "anpr", "hamyon", "jumavoy") else
                            security.MEDIUM, ip=ip, path=path, bucket=over)
     resp = jsonify({"ok": False, "error": "слишком много запросов — подождите минуту"})
     resp.status_code = 429
@@ -168,7 +168,7 @@ def _security_headers(resp):
 
 # Камера ANPR шлёт номера со своего устройства, а не из браузера — её не проверяем
 # (там защита — секретный токен в адресе).
-_CSRF_EXEMPT_PREFIXES = ("/api/anpr/", "/api/hamyon/")
+_CSRF_EXEMPT_PREFIXES = ("/api/anpr/", "/api/hamyon/", "/api/jumavoy/")  # jumavoy: сервер JUMAVOY, вход по токену
 
 
 # Общий предел MAX_CONTENT_LENGTH (300 МБ) нужен только восстановлению базы.
@@ -6308,6 +6308,7 @@ from subscription import (  # noqa: E402,F401  (нужны остальной п
     _admin_sub_summary, _sub_owner_link, _sub_ro_ctx, notify_sub_decision, sub_decide,
 )
 import admin_routes  # noqa: E402,F401
+import jumavoy_api  # noqa: E402,F401  (вход для ИИ-ассистента JUMAVOY по токену)
 import queue_routes  # noqa: E402,F401  («Машина готова» и живая очередь)
 
 
