@@ -25,7 +25,6 @@ LEGACY_ADMIN_SHOP_ID = 1
 import os
 import urllib.parse
 import re
-import sqlite3
 import asyncio
 import logging
 from datetime import datetime, time as dtime, timedelta, timezone

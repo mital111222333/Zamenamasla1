@@ -317,7 +317,7 @@ def render_evening(shop: dict, f: dict, lang: str) -> str:
     if not t["count"]:
         lines.append(T["eve_none"])
     else:
-        lines.append(T["eve_counts"].format(count=t["count"], revenue=money(t["revenue"])))
+        lines.append(T["eve_counts"].format(count=t.get("cars", t["count"]), revenue=money(t["revenue"])))
         pay = [T[k].format(sum=money(t[v])) for k, v in (("eve_cash", "cash"), ("eve_card", "card"),
                                                           ("eve_debt_out", "debt_out")) if t[v]]
         if pay:
@@ -330,8 +330,9 @@ def render_evening(shop: dict, f: dict, lang: str) -> str:
         if pct is not None:
             key = "eve_cmp_up" if pct >= 3 else ("eve_cmp_down" if pct <= -3 else "eve_cmp_same")
             lines.append(T[key].format(pct=abs(pct), wd=wd))
-        if f["staff"] and (len(f["staff"]) > 1 or f["staff"][0]["name"]):
-            items = [T["eve_staff_item"].format(name=s["name"] or T["owner"], count=s["count"]) for s in f["staff"]]
+        staff = [s for s in f["staff"] if s["count"]]  # только продажи без машины — не «замены»
+        if staff and (len(staff) > 1 or staff[0]["name"]):
+            items = [T["eve_staff_item"].format(name=s["name"] or T["owner"], count=s["count"]) for s in staff]
             lines.append(T["eve_staff"].format(list=", ".join(items)))
     cs = f.get("calls") or {}
     if cs.get("calls"):
@@ -359,7 +360,7 @@ def render_morning(shop: dict, f: dict, lang: str) -> str:
                                        wd=T["weekdays"][f["day"].weekday()], date=f["day"].strftime("%d.%m")), ""]
     y = f["y"]
     if y["count"]:
-        s = T["m_yesterday"].format(count=y["count"], revenue=money(y["revenue"]))
+        s = T["m_yesterday"].format(count=y.get("cars", y["count"]), revenue=money(y["revenue"]))
         if f["y_profit"]["profit"] > 0:
             s += T["m_yesterday_profit"].format(profit=money(f["y_profit"]["profit"]))
         lines.append(s)
