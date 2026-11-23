@@ -168,6 +168,50 @@ def test_admin_login_is_logged(app):
     assert c.get("/api/admin/security_events").status_code == 200
 
 
+def _alerts_sent(monkeypatch):
+    sent = []
+    monkeypatch.setattr(security, "_alert", lambda *a, **k: sent.append(a))
+    return sent
+
+
+def test_admin_login_alert_only_from_new_device(app, monkeypatch):
+    name = _admin(app)
+    sent = _alerts_sent(monkeypatch)
+    phone = app.test_client()
+    assert _login(phone, name).status_code == 302          # новое устройство — тревога
+    assert len(sent) == 1
+    phone.get("/logout")
+    assert _login(phone, name).status_code == 302          # то же устройство — тишина
+    assert _login(phone, name).status_code == 302
+    assert len(sent) == 1
+    other = app.test_client()
+    assert _login(other, name).status_code == 302          # чужое устройство — тревога
+    assert len(sent) == 2
+
+
+def test_admin_device_forgotten_after_password_change(app, monkeypatch):
+    name = _admin(app)
+    sent = _alerts_sent(monkeypatch)
+    phone = app.test_client()
+    _login(phone, name)
+    assert len(sent) == 1
+    with sqlite3.connect(db.DB_PATH) as conn:
+        aid = conn.execute("SELECT id FROM shops WHERE role='admin' LIMIT 1").fetchone()[0]
+    db.reset_shop_password(aid, GOOD_PW + "-2")
+    assert _login(phone, name, GOOD_PW + "-2").status_code == 302   # пароль сменили — снова тревога
+    assert len(sent) == 2
+
+
+def test_admin_device_cookie_cannot_be_forged(app, monkeypatch):
+    import webapp
+    name = _admin(app)
+    sent = _alerts_sent(monkeypatch)
+    c = app.test_client()
+    c.set_cookie(webapp.ADMIN_DEVICE_COOKIE, "fake-token")
+    _login(c, name)
+    assert len(sent) == 1
+
+
 def test_admin_session_expires(app):
     name = _admin(app)
     c = app.test_client()
