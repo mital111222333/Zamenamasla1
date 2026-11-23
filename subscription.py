@@ -20,6 +20,7 @@ import database as db
 import i18n
 import security
 import oferta
+import apple_theme
 from webapp import (
     ADMIN_TELEGRAM_ID, BOT_TOKEN, PUBLIC_URL, _client_ip, _fmt_day, _fmt_sum, _is_sub_owner,
     _send_telegram_message, _tg_api, admin_required, app, logger, login_required,
@@ -1729,3 +1730,6 @@ h1 { margin:0; font-size:26px; font-weight:800; }
 </body>
 </html>
 """
+
+# вид в стиле Apple — как у панели
+SUB_PAGE = apple_theme.style_subpage(SUB_PAGE)

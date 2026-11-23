@@ -29,6 +29,7 @@ import backup_store
 import i18n
 import help_content
 import glass_theme
+import apple_theme
 import security
 
 logger = logging.getLogger(__name__)
@@ -757,10 +758,11 @@ LOGIN_PAGE = """
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&display=swap"></noscript>
-<meta name="theme-color" content="#0A2540">
+<meta name="theme-color" content="#F2F2F7">
+<script>try{if(localStorage.getItem('ob_scheme')==='dark'){document.documentElement.classList.add('dk');document.querySelector('meta[name=theme-color]').setAttribute('content','#000000');}}catch(e){}</script>
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="OilBook">
 <script>
 if ('serviceWorker' in navigator) {
@@ -768,35 +770,47 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <style>
+  /* вход — в стиле Apple: светлый фон, значок приложения, поля «как в iOS» */
   * { box-sizing: border-box; }
+  :root { --bg:#F2F2F7; --card:#fff; --label:#1D1D1F; --l2:#6E6E73; --l3:#8E8E93; --fill:#F2F2F7; --sep:rgba(60,60,67,.18); --accent:#007AFF; }
+  html.dk { --bg:#000; --card:#1C1C1E; --label:#F5F5F7; --l2:rgba(235,235,245,.6); --l3:rgba(235,235,245,.45); --fill:#2C2C2E; --sep:rgba(84,84,88,.6); --accent:#0A84FF; color-scheme:dark; }
   body {
-    margin:0; background:#0f1115; color:#f2f2f2; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-    height:100vh; display:flex; align-items:center; justify-content:center;
+    margin:0; background:var(--bg); color:var(--label);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased; letter-spacing:-.01em;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; min-height:100dvh;
+    padding:32px 16px calc(28px + env(safe-area-inset-bottom, 0px));
   }
-  .box { background:#1a1d24; border:1px solid #2a2e37; border-radius:14px; padding:28px; width:90%; max-width:340px; }
-  h1 { font-size:20px; margin:0 0 20px; text-align:center; }
-  body { flex-direction:column; min-height:100vh; height:auto; padding:28px 16px; box-sizing:border-box; }
-  .login-brand { display:flex; flex-direction:column; align-items:center; gap:10px; margin:0 0 22px; }
-  .login-brand .drop { width:58px; height:58px; border-radius:18px; background:#0B1B3A; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px rgba(14,165,233,.25); transform:rotate(-8deg); }
-  .login-brand .drop svg { transform:rotate(8deg); }
-  .login-brand .wordmark { font-family:'Sora', -apple-system, sans-serif; font-weight:800; font-size:38px; letter-spacing:-1px; line-height:1; }
-  .login-brand .wm-oil { background:linear-gradient(135deg, #38BDF8 0%, #3B82F6 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .login-brand .wm-book { color:#fff; }
-  .login-brand .tagline { font-size:12.5px; color:#8b93a3; letter-spacing:.3px; }
-  label { display:block; font-size:13px; color:#9a9a9a; margin-bottom:4px; }
-  input { width:100%; padding:11px; border-radius:8px; border:1px solid #2a2e37; background:#11141a; color:#fff; font-size:15px; margin-bottom:14px; }
-  button { width:100%; padding:12px; border:none; border-radius:10px; background:#3a86ff; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
-  .error { background:#3a1e1e; color:#dc6f6f; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
-  .ok-msg { background:#1e3a24; color:#6fdc86; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; }
-  .lang-link { display:block; text-align:center; margin-top:14px; color:#9a9a9a; font-size:12px; text-decoration:none; }
-  .forgot-link { display:block; text-align:center; margin-top:12px; color:#3a86ff; font-size:13px; background:none; border:none; cursor:pointer; padding:0; }
-  .hint { font-size:12px; color:#7a7a7a; margin:-8px 0 14px; }
-  .reg-link { display:block; text-align:center; margin-top:16px; padding:11px; border:1px solid #2a2e37; border-radius:10px; color:#e6e6e6; font-size:14px; text-decoration:none; }
-  .app-link { display:block; text-align:center; margin-top:16px; padding:10px 18px; border-radius:22px; background:rgba(56,189,248,.10); border:1px solid rgba(56,189,248,.30); color:#7DD3FC; font-size:14px; font-weight:600; text-decoration:none; }
+  .box { background:var(--card); border-radius:18px; padding:24px 20px 18px; width:100%; max-width:380px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  h1 { font-size:22px; font-weight:700; letter-spacing:-.02em; margin:0 0 18px; text-align:center; }
+  .login-brand { display:flex; flex-direction:column; align-items:center; gap:12px; margin:0 0 26px; }
+  .login-brand .drop { width:76px; height:76px; border-radius:18px; background:linear-gradient(180deg,#3D9BFF 0%,#007AFF 55%,#0062E0 100%);
+    display:flex; align-items:center; justify-content:center; box-shadow:0 10px 26px rgba(0,122,255,.28), inset 0 0 0 .5px rgba(0,0,0,.1); }
+  .login-brand .drop svg { width:30px; height:35px; }
+  .login-brand .drop svg path { fill:#fff; }
+  .login-brand .drop svg ellipse { fill:#9CCBFF; }
+  .login-brand .wordmark { font-family:'Sora', -apple-system, sans-serif; font-weight:800; font-size:34px; letter-spacing:-1px; line-height:1; }
+  .login-brand .wm-oil { color:var(--accent); }
+  .login-brand .wm-book { color:var(--label); }
+  .login-brand .tagline { font-size:15px; color:var(--l2); }
+  label { display:block; font-size:13px; font-weight:500; color:var(--l2); margin:0 0 6px 4px; }
+  input { width:100%; padding:13px 14px; border-radius:12px; border:1px solid transparent; background:var(--fill); color:var(--label);
+    font:inherit; font-size:17px; margin-bottom:14px; outline:none; transition:border-color .15s, box-shadow .15s, background .15s; }
+  input:focus { border-color:var(--accent); background:var(--card); box-shadow:0 0 0 3px rgba(0,122,255,.18); }
+  button { width:100%; min-height:50px; padding:12px; border:none; border-radius:12px; background:var(--accent); color:#fff; font:inherit; font-size:17px; font-weight:600; cursor:pointer; transition:transform .25s cubic-bezier(.34,1.4,.64,1), filter .15s; }
+  button:active { transform:scale(.97); filter:brightness(.92); }
+  .error { background:#FFECEB; color:#D70015; padding:11px 12px; border-radius:12px; margin-bottom:14px; font-size:15px; }
+  .ok-msg { background:#E8F8EC; color:#248A3D; padding:11px 12px; border-radius:12px; margin-bottom:14px; font-size:15px; }
+  html.dk .error { background:rgba(255,69,58,.16); color:#FF6961; } html.dk .ok-msg { background:rgba(48,209,88,.16); color:#30D158; }
+  .lang-link { display:block; text-align:center; margin-top:14px; color:var(--l3); font-size:14px; text-decoration:none; }
+  .forgot-link { display:block; width:auto; min-height:44px; margin:4px auto 0; color:var(--accent); font-size:15px; font-weight:500; background:none; border:none; cursor:pointer; padding:0 8px; }
+  .forgot-link:active { transform:none; filter:none; opacity:.6; }
+  .hint { font-size:13px; color:var(--l3); margin:-8px 4px 14px; }
+  .reg-link { display:block; text-align:center; margin-top:6px; padding:14px; border-radius:12px; background:rgba(0,122,255,.1); color:var(--accent); font-size:16px; font-weight:600; text-decoration:none; }
+  .app-link, .video-link { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; max-width:380px; margin-top:14px; padding:14px 18px; border-radius:14px; background:var(--card); color:var(--label); font-size:15px; font-weight:500; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .video-link { margin-top:10px; }
   @media (display-mode: standalone) { .app-link { display:none; } }
-  .video-link { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:10px; padding:10px 18px; border-radius:22px; background:rgba(255,0,51,.10); border:1px solid rgba(255,0,51,.35); color:#FF8A9B; font-size:14px; font-weight:600; text-decoration:none; }
-  .video-link i { font-style:normal; width:22px; height:16px; border-radius:5px; background:#FF0033; color:#fff; font-size:9px; display:flex; align-items:center; justify-content:center; }
-  .video-link:hover { background:rgba(255,0,51,.16); }
+  .video-link i { font-style:normal; width:24px; height:17px; border-radius:5px; background:#FF0033; color:#fff; font-size:9px; display:flex; align-items:center; justify-content:center; }
 </style>
 </head>
 <body>
@@ -822,7 +836,7 @@ if ('serviceWorker' in navigator) {
   <a class="video-link" href="https://youtu.be/4p436_6TxIM" target="_blank" rel="noopener"><i>▶</i>{{ T.login_video_link }}</a>
 
   <div class="box" id="forgotBox" style="display:none;">
-    <h1>🔑 {{ T.forgot_title }}</h1>
+    <h1>{{ T.forgot_title }}</h1>
     <div id="forgotMsg"></div>
     <div id="forgotStep1">
       <label>{{ T.login_username }}</label>
@@ -865,8 +879,14 @@ if ('serviceWorker' in navigator) {
         document.getElementById('forgotStep1').style.display = 'none';
         document.getElementById('forgotStep2').style.display = 'block';
       } else {
-        msg.innerHTML = `<div class="error">${data.error}</div>`;
+        showMsg('error', data.error);
       }
+    }
+    function showMsg(cls, text) {
+      const msg = document.getElementById('forgotMsg');
+      msg.innerHTML = '';
+      const d = document.createElement('div'); d.className = cls; d.textContent = text || '';
+      msg.appendChild(d);
     }
     async function confirmResetCode() {
       const username = document.getElementById('forgot_username').value.trim();
@@ -881,7 +901,7 @@ if ('serviceWorker' in navigator) {
         msg.innerHTML = `<div class="ok-msg">{{ T.forgot_success }}</div>`;
         setTimeout(() => { window.location.href = '/login'; }, 1800);
       } else {
-        msg.innerHTML = `<div class="error">${data.error}</div>`;
+        showMsg('error', data.error);
       }
     }
   </script>
@@ -2320,8 +2340,12 @@ _VIN_WMI = {
 PAGE = PAGE.replace("__VIN_WMI__", json.dumps(sorted(_VIN_WMI)), 1)
 # тема «Тёмное стекло»: стили строятся из уже собранной страницы (все вкладки
 # и окна), отдаются отдельным файлом /ui/glass.css с версией в адресе
+# тема Apple (по умолчанию, светлая) строится по исходным стилям страницы; тёмный
+# режим Apple = автоматический слой glass_theme (html.gl) + тёмная палитра из
+# apple_theme поверх него
+APPLE = apple_theme.Theme(PAGE)
 GLASS = glass_theme.Theme(PAGE)
-PAGE = GLASS.install(PAGE)
+PAGE = APPLE.install(GLASS.install(PAGE, boot=False))
 
 
 def _glass_asset(body, mimetype):
@@ -2339,6 +2363,16 @@ def glass_css():
 @app.route("/ui/glass.js")
 def glass_js():
     return _glass_asset(GLASS.js, "application/javascript")
+
+
+@app.route("/ui/apple.css")
+def apple_css():
+    return _glass_asset(APPLE.css, "text/css")
+
+
+@app.route("/ui/apple.js")
+def apple_js():
+    return _glass_asset(APPLE.js, "application/javascript")
 _VIN_YEAR_CODES = "ABCDEFGHJKLMNPRSTVWXY123456789"
 _VIN_TRANSLIT = {**{c: i + 1 for i, c in enumerate("ABCDEFGH")}, **{c: i + 1 for i, c in enumerate("JKLMN")},
                  "P": 7, "R": 9, **{c: i + 2 for i, c in enumerate("STUVWXYZ")}}

@@ -608,7 +608,7 @@ GLASS_JS = r"""
   var root = document.documentElement;
   function on(){ return root.classList.contains('gl'); }
   function calm(){
-    return !on() || root.classList.contains('gl-lite') ||
+    return !(on() || root.classList.contains('ap')) || root.classList.contains('gl-lite') ||
       (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
   // появление раздела: только transform/opacity, один раз при открытии
@@ -644,11 +644,11 @@ GLASS_JS = r"""
              '#e2e8f0':'rgba(255,255,255,.08)','#8e44ad':'#b583ff','#2a9d8f':'#34d3b8'};
   function mc(c){ return (typeof c === 'string' && MAP[c.toLowerCase()]) || c; }
   function mArr(v){ return Array.isArray(v) ? v.map(mc) : mc(v); }
-  window.glColor = function(c){ return on() ? mc(c) : c; };
+  window.glColor = function(c){ return on() ? mc(c) : (window.apColor ? apColor(c) : c); };
   window.glChartTheme = function(){
     if (typeof Chart === 'undefined' || Chart._glDone) return;
     Chart._glDone = true;
-    if (!on()) return;
+    if (!on()) { if (window.apChartTheme) apChartTheme(); return; }
     Chart.register({ id: 'glTheme', beforeInit: function(chart){
       var o = chart.options, d = chart.config.data;
       (d.datasets || []).forEach(function(ds){
@@ -668,8 +668,9 @@ GLASS_JS = r"""
     Chart.defaults.animation.easing = 'easeOutQuart';
   };
   // переключатель темы (Стекло / Классика)
+  // переключатель: светлая (Apple) / тёмная (Apple Dark)
   window.glToggle = function(){
-    try { localStorage.setItem('ob_theme', on() ? 'classic' : 'glass'); } catch (e) {}
+    try { localStorage.setItem('ob_scheme', on() ? 'light' : 'dark'); } catch (e) {}
     location.reload();
   };
 })();
@@ -691,12 +692,20 @@ class Theme:
         self.css_v = hashlib.sha1(self.css).hexdigest()[:10]
         self.js_v = hashlib.sha1(self.js).hexdigest()[:10]
 
-    def install(self, page):
+    def install(self, page, boot=True):
         """Вставить в страницу ранний скрипт (класс темы — сразу после
         theme-color), а стили и скрипт темы — последними в <head>, после всех
-        встроенных <style>, чтобы перекрывать их."""
+        встроенных <style>, чтобы перекрывать их. boot=False — ранний скрипт
+        ставит тема Apple (apple_theme.HEAD_BOOT): она решает, светлая или тёмная."""
         meta = '<meta name="theme-color" content="#0A2540">'
-        page = page.replace(meta, meta + HEAD_BOOT, 1)
-        tail = ('<link rel="stylesheet" href="/ui/glass.css?v=%s">' % self.css_v
-                + '<script src="/ui/glass.js?v=%s" defer></script>' % self.js_v)
+        if boot:
+            page = page.replace(meta, meta + HEAD_BOOT, 1)
+        if boot:
+            css = '<link rel="stylesheet" href="/ui/glass.css?v=%s">' % self.css_v
+        else:
+            # тёмные стили нужны только тем, кто выбрал тёмную тему: светлая
+            # (по умолчанию) их не скачивает и не разбирает — страница быстрее
+            css = ("<script>if(document.documentElement.classList.contains('gl'))"
+                   "document.write('<link rel=\"stylesheet\" href=\"/ui/glass.css?v=%s\">');</script>" % self.css_v)
+        tail = css + '<script src="/ui/glass.js?v=%s" defer></script>' % self.js_v
         return page.replace("</head>", tail + "</head>", 1)
