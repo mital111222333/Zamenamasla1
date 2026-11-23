@@ -592,7 +592,7 @@ html.ap:not(.gl) .af-bar{background:rgba(255,255,255,.92);box-shadow:0 0 0 .5px 
 
 html.ap.ap .ig-health-h, html.ap.ap .ig-wd-h{text-transform:none;letter-spacing:-.005em;font-size:13px;font-weight:600;}
 html.ap.ap .ig-health, html.ap.ap .ig-wd-wrap{border:0;}
-html.ap.gl .af-bar{background:rgba(28,28,30,.94);border:0;box-shadow:0 0 0 .5px rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.5);}
+html.ap.gl .af-bar{background:#1C1C1E;border:0;box-shadow:0 0 0 .5px rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.5);}
 
 /* --- «База»: кому пора на замену --- */
 html.ap.ap .bd-card{border:0;border-radius:18px;padding:16px;}
@@ -627,7 +627,6 @@ html.ap.gl{--gl-bg:#000; --gl-surface:#1C1C1E; --gl-line:rgba(84,84,88,.36); --g
   --gl-text:#F5F5F7; --gl-muted:rgba(235,235,245,.6); --gl-accent:#0A84FF; --gl-red:#FF453A;
   --gl-spec:none; --gl-shadow:none; --blue:#0A84FF; --btn:#FF453A; --accent2:#0A84FF; --card:#1C1C1E;
   --ok:#30D158; --danger:#FF6961; background:#000;}
-html.ap.gl body::before{background:#000;}
 html.ap.gl .card, html.ap.gl .af-sec, html.ap.gl .af-rcpt, html.ap.gl .st-card, html.ap.gl .st-today,
 html.ap.gl .known-client, html.ap.gl .cross-network-card, html.ap.gl .dp{background:#1C1C1E;background-image:none;border:0;box-shadow:none;}
 html.ap.gl .st-today::after{display:none;}
@@ -683,11 +682,144 @@ html.ap.gl .modal{background:#1C1C1E;border:0;}
 html.ap.gl th{background:#1C1C1E;}
 html.ap.gl .speedline{display:none;}
 
+/* ================== «Жидкое стекло» Apple (iOS 26 / macOS) ==================
+   Правила, чтобы прозрачность не мешала работе с данными:
+   1) Размытие (backdrop-filter) — ТОЛЬКО у «рамки» приложения: шапка, панель
+      вкладок, боковое меню, шторки, окна, полоса «Итого». Под ними двигается
+      содержимое — стекло там уместно и почти ничего не стоит.
+   2) Карточки с данными — «матовые»: белые на 76% без размытия. Фон за ними
+      неподвижный и мягкий, поэтому цифры всегда на почти белом.
+   3) Списки, таблицы, выпадающие подсказки, меню и полоса «Итого» — сплошные
+      (100%): там читают строки и цифры, и ничего не должно просвечивать.
+   4) Текст на стекле — темнее обычного серого (#3A3A3C вместо #8E8E93), чтобы
+      контраст не падал, когда под стеклом что-то яркое.
+   5) Слабый телефон и «Уменьшить прозрачность» в системе — всё сплошное. */
+html.ap{--gx-card:rgba(255,255,255,.76);--gx-card-edge:rgba(255,255,255,.75);
+  --gx-chrome:rgba(250,250,253,.72);--gx-blur:saturate(190%) blur(30px);
+  --gx-shadow:0 1px 1px rgba(0,0,0,.03),0 10px 30px rgba(28,39,72,.07);
+  --gx-hl:inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 0 .5px rgba(255,255,255,.55);}
+html.ap:not(.gl), html.ap:not(.gl) body{background:#EDF0F7;}
+html.ap:not(.gl) body{background:transparent;}
+/* фон — неподвижные мягкие пятна (обычные градиенты: без анимации и без filter) */
+html.ap body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;}
+html.ap:not(.gl) body::before{background:
+  radial-gradient(55vmax 45vmax at 0% 0%, rgba(122,184,255,.42), transparent 62%),
+  radial-gradient(45vmax 40vmax at 100% 18%, rgba(120,226,222,.30), transparent 64%),
+  radial-gradient(50vmax 42vmax at 85% 100%, rgba(255,196,168,.32), transparent 62%),
+  radial-gradient(42vmax 38vmax at 8% 82%, rgba(196,182,255,.30), transparent 64%),
+  #EDF0F7;}
+
+/* матовые карточки с данными */
+html.ap:not(.gl) :is(.card,.af-sec,.af-rcpt,.dp,.st-card,.st-today,.bd-card,.car-card,.debt-card,.pr-card,.dc-card,
+  .uo-tile,.known-client,.cross-network-card,.q-col,.q-add,.an-card,.ws-cart,.whc,.sp-list,.sp-orders,.sp-det,.sp-form,
+  .cash-card,.tm-card,.tm-tile,.sv-card,.oc-list){
+  background-color:var(--gx-card);background-image:none;border:1px solid var(--gx-card-edge);
+  box-shadow:var(--gx-shadow),var(--gx-hl);}
+/* то, что читают строками, — сплошное */
+html.ap:not(.gl) :is(.table-wrap,.plate-suggest,.sup-menu,.ps-list,.pick-results .pick-item){background-color:#fff;}
+html.ap:not(.gl) .table-wrap{box-shadow:var(--gx-shadow);}
+html.ap:not(.gl) th{background:#F7F8FB;}
+
+/* «рамка» приложения — настоящее стекло */
+@media (max-width:899px){
+  html.ap:not(.gl) .topbar{background:rgba(237,240,247,.66);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+    box-shadow:0 .5px 0 rgba(0,0,0,.08);}
+  /* панель вкладок — плавающая «капсула», как в iOS 26 */
+  html.ap.ap .bottom-bar{left:12px;right:12px;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:30px;
+    padding:6px 6px;grid-template-columns:repeat(5,minmax(0,1fr));}
+  html.ap:not(.gl) .bottom-bar{background:var(--gx-chrome);border:.5px solid rgba(255,255,255,.7);
+    -webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+    box-shadow:0 10px 34px rgba(28,39,72,.16),0 1px 2px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.85);}
+  html.ap.ap .bb-item{border-radius:22px;min-height:50px;}
+  html.ap:not(.gl) .bb-item{color:#3A3A3C;}
+  /* выбранная вкладка — «линза» за значком */
+  html.ap:not(.gl) .bb-item.active:not(.bb-add){color:#007AFF;background:rgba(118,118,128,.13);}
+  html.ap.ap .bb-plus{margin-top:0;width:34px;height:34px;font-size:16px;border-radius:12px;}
+  html.ap.ap .bb-plus i{font-size:16px;}
+  html.ap:not(.gl) .bb-plus{background:linear-gradient(180deg,#FF5F55,#FF3B30);box-shadow:0 4px 12px rgba(255,59,48,.35),inset 0 1px 0 rgba(255,255,255,.35);}
+  html.ap.ap .container{padding-bottom:calc(108px + env(safe-area-inset-bottom,0px));}
+  html.ap.ap .af-bar{bottom:calc(84px + env(safe-area-inset-bottom,0px));}
+}
+@media (min-width:600px) and (max-width:899px){
+  html.ap.ap .bottom-bar{left:50%;right:auto;width:min(520px,calc(100% - 48px));transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));}
+  html.ap.ap .af-bar{bottom:calc(92px + env(safe-area-inset-bottom,0px));}
+}
+html.ap:not(.gl) .af-bar{background:#fff;border:.5px solid rgba(255,255,255,.8);
+  -webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+  box-shadow:0 10px 30px rgba(28,39,72,.14),inset 0 1px 0 rgba(255,255,255,.9);}
+/* шторки и окна: стекло, но плотное — под ними не видно текста страницы */
+html.ap:not(.gl) .more-sheet{background:rgba(242,242,247,.86);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+  box-shadow:0 -12px 40px rgba(28,39,72,.16),inset 0 1px 0 rgba(255,255,255,.8);}
+html.ap:not(.gl) .more-head, html.ap:not(.gl) .more-gl{background:rgba(255,255,255,.9);}
+html.ap:not(.gl) .more-backdrop, html.ap:not(.gl) .modal-overlay{background:rgba(20,24,40,.22);}
+html.ap:not(.gl) .modal{background:rgba(255,255,255,.92);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+  border:.5px solid rgba(255,255,255,.8);box-shadow:0 30px 80px rgba(28,39,72,.25),inset 0 1px 0 rgba(255,255,255,.9);}
+/* сегменты — стеклянная дорожка */
+html.ap:not(.gl) :is(.subtabs,.pc-tabs){background:rgba(118,118,128,.12);box-shadow:inset 0 .5px 0 rgba(0,0,0,.04);}
+html.ap:not(.gl) .subtab.active, html.ap:not(.gl) .pc-tabs button.on{background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.1),0 0 0 .5px rgba(0,0,0,.04);}
+/* кнопки-«стёкла» (Цена, Очередь, язык) */
+html.ap:not(.gl) .af-price, html.ap:not(.gl) .lang-btn{background:rgba(255,255,255,.6);color:#007AFF;
+  box-shadow:0 1px 3px rgba(0,0,0,.06),inset 0 0 0 .5px rgba(255,255,255,.8);}
+/* поля ввода на матовых карточках — светлая заливка с тонкой рамкой (видно границы) */
+html.ap:not(.gl) :is(.card,.af-sec,.dc-card,.pr-card,.sp-form) :is(input,select,textarea):not([type=checkbox]):not([type=radio]){
+  background-color:rgba(255,255,255,.85);border-color:rgba(60,60,67,.14);}
+html.ap:not(.gl) :is(.card,.af-sec,.dc-card,.pr-card,.sp-form) :is(input,select,textarea):focus{background-color:#fff;border-color:#007AFF;}
+
+/* компьютер: боковое меню — плавающая стеклянная панель */
+@media (min-width:900px){
+  html.ap.ap .side-nav{top:12px;left:12px;bottom:12px;width:256px;border-radius:24px;}
+  html.ap.ap .container{margin-left:280px;}
+  html.ap:not(.gl) .side-nav{background:rgba(250,250,253,.6);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+    border:.5px solid rgba(255,255,255,.75);box-shadow:0 14px 44px rgba(28,39,72,.12),inset 0 1px 0 rgba(255,255,255,.85);}
+  html.ap:not(.gl) .side-item:hover{background:rgba(118,118,128,.12);}
+  html.ap:not(.gl) .side-item.active{box-shadow:0 4px 12px rgba(0,122,255,.3);}
+  html.ap.ap .side-foot .lang-btn{box-shadow:none;}
+}
+
+/* --- тёмное стекло --- */
+html.ap.gl{--gx-card:rgba(30,30,34,.74);--gx-card-edge:rgba(255,255,255,.07);}
+html.ap.gl body::before{background:
+  radial-gradient(55vmax 45vmax at 0% 0%, rgba(10,132,255,.22), transparent 62%),
+  radial-gradient(45vmax 40vmax at 100% 25%, rgba(100,210,255,.12), transparent 64%),
+  radial-gradient(48vmax 40vmax at 80% 100%, rgba(255,120,90,.12), transparent 62%),
+  radial-gradient(42vmax 38vmax at 6% 85%, rgba(140,110,255,.16), transparent 64%),
+  #000;}
+html.ap.gl :is(.card,.af-sec,.af-rcpt,.dp,.st-card,.st-today,.bd-card,.car-card,.debt-card,.pr-card,.dc-card,
+  .uo-tile,.known-client,.cross-network-card,.q-col,.q-add,.an-card,.ws-cart,.whc,.sp-list,.sp-orders,.sp-det,.sp-form,
+  .cash-card,.tm-card,.tm-tile,.sv-card,.oc-list){
+  background-color:var(--gx-card);background-image:none;border:1px solid var(--gx-card-edge);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);}
+html.ap.gl :is(.table-wrap,.plate-suggest){background-color:#1C1C1E;}
+@media (max-width:899px){
+  html.ap.gl .topbar{background:rgba(0,0,0,.5);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);}
+  html.ap.gl .bottom-bar{background:rgba(36,36,40,.72);border:.5px solid rgba(255,255,255,.1);
+    -webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);
+    box-shadow:0 10px 34px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);}
+  html.ap.gl .bb-item{color:rgba(235,235,245,.75);}
+  html.ap.gl .bb-item.active:not(.bb-add){color:#0A84FF;background:rgba(118,118,128,.26);}
+}
+@media (min-width:600px) and (max-width:899px){
+  html.ap.gl .bottom-bar{left:50%;right:auto;}
+}
+@media (min-width:900px){
+  html.ap.gl .side-nav{top:12px;left:12px;bottom:12px;border-radius:24px;background:rgba(30,30,34,.6);
+    -webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);border:.5px solid rgba(255,255,255,.1);}
+  html.ap.gl .container{margin-left:280px;}
+}
+html.ap.gl .more-sheet{background:rgba(18,18,20,.86);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);}
+html.ap.gl .modal{background:rgba(36,36,40,.92);-webkit-backdrop-filter:var(--gx-blur);backdrop-filter:var(--gx-blur);}
+
+/* «Уменьшить прозрачность» в системе — всё сплошное */
+@media (prefers-reduced-transparency:reduce){
+  html.ap:not(.gl) :is(.topbar,.bottom-bar,.side-nav,.more-sheet,.modal,.af-bar){background:#F9F9FB;-webkit-backdrop-filter:none;backdrop-filter:none;}
+  html.ap:not(.gl) :is(.card,.af-sec,.dp,.st-card,.st-today,.bd-card,.car-card){background-color:#fff;}
+}
+
 /* слабый телефон: без размытия */
-html.ap.gl-lite .topbar, html.ap.gl-lite .bottom-bar, html.ap.gl-lite .side-nav, html.ap.gl-lite .modal-overlay{-webkit-backdrop-filter:none;backdrop-filter:none;}
-html.ap.gl-lite:not(.gl) .topbar{background:#F2F2F7;}
-html.ap.gl-lite:not(.gl) .bottom-bar{background:#F9F9F9;}
-html.ap.gl-lite:not(.gl) .side-nav{background:#F6F6F8;}
+html.ap.gl-lite :is(.topbar,.bottom-bar,.side-nav,.modal-overlay,.modal,.more-sheet,.af-bar){-webkit-backdrop-filter:none;backdrop-filter:none;}
+html.ap.gl-lite:not(.gl) .topbar{background:rgba(237,240,247,.97);}
+html.ap.gl-lite:not(.gl) :is(.bottom-bar,.side-nav,.modal){background:rgba(252,252,254,.97);}
+html.ap.gl-lite:not(.gl) .more-sheet{background:#F2F2F7;}
+html.ap.gl-lite.gl :is(.topbar,.bottom-bar,.side-nav,.more-sheet,.modal){background:#1C1C1E;}
 html.ap.gl-lite *, html.ap.gl-lite *::before, html.ap.gl-lite *::after{animation:none!important;}
 @media (prefers-reduced-motion:reduce){
   html.ap *, html.ap *::before, html.ap *::after{animation:none!important;transition-duration:.01s!important;}
@@ -733,9 +865,34 @@ var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('cont
 </script>"""
 
 
+def _shared_from_glass():
+    """Инфографика (.ig-*) и переключатель подписей темы (.gl-on-only) лежат в
+    glass_theme и нужны ОБЕИМ темам. glass.css теперь грузится только в тёмной
+    теме, поэтому эти правила (без html.gl) берём оттуда и кладём сюда."""
+    import glass_theme
+    src = glass_theme.MANUAL_CSS
+    a = src.index("/* ======================= инфографика (обе темы)")
+    b = src.index("/* ================================ движение")
+    out = []
+    for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", _COMMENT_RE.sub("", src[a:b])):
+        sels = [x.strip() for x in m.group(1).split(",") if x.strip() and "html.gl" not in x]
+        if sels:
+            out.append("%s{%s}" % (",".join(sels), m.group(2).strip()))
+    out.append("@keyframes glGrowX{from{transform:scaleX(0)}to{transform:none}}")
+    out.append("@keyframes glGrowY{from{transform:scaleY(0)}to{transform:none}}")
+    out.append(".ig-bar i{animation:glGrowX .9s cubic-bezier(.22,1,.36,1) both;animation-delay:.15s;}")
+    out.append(".ig-wd i{animation:glGrowY .8s cubic-bezier(.34,1.4,.64,1) both;}")
+    out.append("".join(".ig-wd div:nth-child(%d) i{animation-delay:%.2fs}" % (n, (n - 1) * .04) for n in range(2, 8)))
+    out.append("@media (prefers-reduced-motion:reduce){.ig-wd i,.ig-bar i{animation:none!important}}")
+    out.append("html.gl-lite .ig-wd i, html.gl-lite .ig-bar i{animation:none!important}")
+    return "\n".join(out) + "\n"
+
+
 class Theme:
     def __init__(self, page):
-        self.css = (build_auto_css(page) + MANUAL_CSS).encode("utf-8")
+        shared = _shared_from_glass()
+        # общие правила тоже переводим в палитру Apple — вместе со стилями страницы
+        self.css = (shared + build_auto_css(page + "<style>" + shared + "</style>") + MANUAL_CSS).encode("utf-8")
         self.js = APPLE_JS.replace("__MAP__", json.dumps(js_color_map(page), sort_keys=True)).encode("utf-8")
         self.css_v = hashlib.sha1(self.css).hexdigest()[:10]
         self.js_v = hashlib.sha1(self.js).hexdigest()[:10]
@@ -759,10 +916,11 @@ SUBPAGE_CSS = """<style>
 :root{--line:#E5E5EA;--text:#1D1D1F;--muted:#6E6E73;--blue:#007AFF;--blue-bg:#E5F1FF;--green:#248A3D;--green-bg:#E8F8EC;
   --warn:#C93400;--warn-bg:#FFF3E3;--red:#D70015;--red-bg:#FFECEB;--mono:__FONT__;}
 body{font-family:__FONT__;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;font-variant-numeric:tabular-nums;background:#F2F2F7;}
-.top{background:rgba(242,242,247,.82);border-bottom:0;box-shadow:0 .5px 0 rgba(0,0,0,.12);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);}
+.top{background:rgba(237,240,247,.66);border-bottom:0;box-shadow:0 .5px 0 rgba(0,0,0,.12);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);}
 .back{color:#007AFF;}
 .ttl{font-size:17px;font-weight:600;}
-.card{border:0;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+body{background:radial-gradient(55vmax 45vmax at 0% 0%, rgba(122,184,255,.42), transparent 62%),radial-gradient(45vmax 40vmax at 100% 18%, rgba(120,226,222,.30), transparent 64%),radial-gradient(50vmax 42vmax at 85% 100%, rgba(255,196,168,.32), transparent 62%),radial-gradient(42vmax 38vmax at 8% 82%, rgba(196,182,255,.30), transparent 64%),#EDF0F7;background-attachment:fixed;}
+.card{border:1px solid rgba(255,255,255,.7);border-radius:18px;background:rgba(255,255,255,.78);box-shadow:0 1px 1px rgba(0,0,0,.03),0 10px 30px rgba(28,39,72,.07),inset 0 1px 0 rgba(255,255,255,.9);}
 .big{font-weight:700;letter-spacing:-.02em;}
 .opt{border-width:1.5px;border-radius:16px;}
 input,select,textarea{font-family:inherit;}
@@ -770,10 +928,11 @@ input,select,textarea{font-family:inherit;}
 
 REGISTER_CSS = """<style>
 :root{color-scheme:light;}
-body{background:#F2F2F7;color:#1D1D1F;font-family:__FONT__;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;}
+body{background:radial-gradient(55vmax 45vmax at 0% 0%, rgba(122,184,255,.42), transparent 62%),radial-gradient(45vmax 40vmax at 100% 18%, rgba(120,226,222,.30), transparent 64%),radial-gradient(50vmax 42vmax at 85% 100%, rgba(255,196,168,.32), transparent 62%),radial-gradient(42vmax 38vmax at 8% 82%, rgba(196,182,255,.30), transparent 64%),#EDF0F7;background-attachment:fixed;color:#1D1D1F;font-family:__FONT__;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;}
 .wm-oil{background:none;-webkit-background-clip:initial;background-clip:initial;color:#007AFF;}
 .wm-book{color:#1D1D1F;}
-.box{background:#fff;border:0;border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:24px 20px;}
+.box{background:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.7);border-radius:22px;box-shadow:0 12px 34px rgba(28,39,72,.08),inset 0 1px 0 rgba(255,255,255,.9);padding:24px 20px;}
+input{background:rgba(255,255,255,.9)!important;border:1px solid rgba(60,60,67,.14)!important;}input:focus{border-color:#007AFF!important;}
 h1{font-size:24px;font-weight:700;letter-spacing:-.02em;}
 .step{color:#007AFF;font-size:13px;}
 .intro{color:#6E6E73;font-size:15px;}

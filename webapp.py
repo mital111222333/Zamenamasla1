@@ -781,7 +781,12 @@ if ('serviceWorker' in navigator) {
     display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; min-height:100dvh;
     padding:32px 16px calc(28px + env(safe-area-inset-bottom, 0px));
   }
-  .box { background:var(--card); border-radius:18px; padding:24px 20px 18px; width:100%; max-width:380px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  /* «жидкое стекло»: мягкий неподвижный фон и матовые карточки */
+  html:not(.dk) body { background:radial-gradient(55vmax 45vmax at 0% 0%, rgba(122,184,255,.42), transparent 62%),radial-gradient(45vmax 40vmax at 100% 18%, rgba(120,226,222,.30), transparent 64%),radial-gradient(50vmax 42vmax at 85% 100%, rgba(255,196,168,.32), transparent 62%),radial-gradient(42vmax 38vmax at 8% 82%, rgba(196,182,255,.30), transparent 64%),#EDF0F7; background-attachment:fixed; }
+  .box { background:var(--card); border-radius:22px; padding:24px 20px 18px; width:100%; max-width:380px; box-shadow:0 1px 1px rgba(0,0,0,.03), 0 12px 34px rgba(28,39,72,.08), inset 0 1px 0 rgba(255,255,255,.9); border:1px solid rgba(255,255,255,.7); }
+  html:not(.dk) .box, html:not(.dk) .app-link, html:not(.dk) .video-link { background:rgba(255,255,255,.78); }
+  html:not(.dk) input { background:rgba(255,255,255,.9); border-color:rgba(60,60,67,.14); }
+  html.dk .box { border-color:rgba(255,255,255,.08); }
   h1 { font-size:22px; font-weight:700; letter-spacing:-.02em; margin:0 0 18px; text-align:center; }
   .login-brand { display:flex; flex-direction:column; align-items:center; gap:12px; margin:0 0 26px; }
   .login-brand .drop { width:76px; height:76px; border-radius:18px; background:linear-gradient(180deg,#3D9BFF 0%,#007AFF 55%,#0062E0 100%);
