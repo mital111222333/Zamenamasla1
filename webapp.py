@@ -1248,6 +1248,33 @@ def _client_ip():
 
 LOGIN_MAX_FAILS_PER_USER = 30  # с любых адресов вместе — на случай перебора с разных IP
 
+# «Доверенное устройство» администратора платформы: после входа браузер
+# получает подписанную метку (логин + отпечаток пароля). Следующие входы
+# с этого устройства не шлют тревогу в Telegram; новое устройство — шлёт.
+ADMIN_DEVICE_COOKIE = "ob_admin_device"
+ADMIN_DEVICE_MAX_AGE = 365 * 24 * 3600
+
+
+def _admin_device_signer():
+    from itsdangerous import URLSafeTimedSerializer
+    return URLSafeTimedSerializer(app.secret_key, salt="oilbook-admin-device")
+
+
+def _admin_device_token(username, pwf) -> str:
+    return _admin_device_signer().dumps({"u": (username or "").lower(), "p": pwf or ""})
+
+
+def _admin_device_trusted(username, pwf) -> bool:
+    raw = request.cookies.get(ADMIN_DEVICE_COOKIE)
+    if not raw:
+        return False
+    try:
+        data = _admin_device_signer().loads(raw, max_age=ADMIN_DEVICE_MAX_AGE)
+    except Exception:
+        return False
+    return (isinstance(data, dict) and data.get("u") == (username or "").lower()
+            and bool(pwf) and data.get("p") == pwf)
+
 
 def _login_blocked(key) -> bool:
     now = time.time()
@@ -1301,11 +1328,21 @@ def login_page():
             session["login_at"] = int(time.time())
             session.permanent = True
             if shop["role"] == "admin":
-                # каждый вход в админку — сообщение владельцу платформы: если
-                # пароль украли, это сразу станет видно
-                security.log_event("admin_login", security.HIGH, ip=fail_key[0], username=shop["username"],
-                                   path="/login", user_agent=(request.headers.get("User-Agent") or "")[:120])
-            return redirect(url_for("admin_page") if shop["role"] == "admin" else url_for("index"))
+                # вход в админку всегда пишется в журнал, но сообщение в Telegram
+                # приходит только с НОВОГО устройства: своё устройство после
+                # первого входа запоминается (подписанная cookie на год).
+                # Сменили пароль — все устройства снова считаются новыми.
+                trusted = _admin_device_trusted(shop["username"], session["pwf"])
+                security.log_event("admin_login", security.LOW if trusted else security.HIGH,
+                                   ip=fail_key[0], username=shop["username"], path="/login",
+                                   user_agent=(request.headers.get("User-Agent") or "")[:120],
+                                   device="known" if trusted else "new")
+                resp = redirect(url_for("admin_page"))
+                resp.set_cookie(ADMIN_DEVICE_COOKIE, _admin_device_token(shop["username"], session["pwf"]),
+                                max_age=ADMIN_DEVICE_MAX_AGE, httponly=True, samesite="Lax",
+                                secure=_COOKIE_SECURE)
+                return resp
+            return redirect(url_for("index"))
         employee = db.authenticate_shop_employee(username, password)
         if employee:
             parent_shop = db.get_shop(employee["shop_id"])
