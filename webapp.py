@@ -4806,6 +4806,19 @@ def _with_splash(page):
 LOGIN_PAGE = _with_splash(LOGIN_PAGE)
 PAGE = _with_splash(PAGE)
 ADMIN_PAGE = _with_splash(ADMIN_PAGE)
+# админ-панель — в том же стиле Apple, что и панель точки (свой файл стилей)
+APPLE_ADMIN = apple_theme.Theme(ADMIN_PAGE, name="apple-admin", extra_css=apple_theme.ADMIN_CSS, dark=False)
+ADMIN_PAGE = APPLE_ADMIN.install(ADMIN_PAGE)
+
+
+@app.route("/ui/apple-admin.css")
+def apple_admin_css():
+    return _glass_asset(APPLE_ADMIN.css, "text/css")
+
+
+@app.route("/ui/apple-admin.js")
+def apple_admin_js():
+    return _glass_asset(APPLE_ADMIN.js, "application/javascript")
 
 
 # Маршруты админ-панели (/admin, точки, филиалы, сотрудники, копии) —

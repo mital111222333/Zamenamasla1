@@ -888,11 +888,58 @@ def _shared_from_glass():
     return "\n".join(out) + "\n"
 
 
+ADMIN_CSS = r"""
+/* ============ админ-панель платформы — тот же «жидкий» стиль Apple ============ */
+html.ap .container{max-width:1180px;}
+html.ap:not(.gl) :is(.adm-stat,details.adm-sec,.shop-card,.map-kpi,.map-wrap,.map-list,.ana-card,.inc-kpi,.inc-card,
+  .ix-list,.ix-box,.snap-box,.new-creds){
+  background-color:var(--gx-card);background-image:none;border:1px solid var(--gx-card-edge);box-shadow:var(--gx-shadow),var(--gx-hl);}
+html.ap:not(.gl) .shop-card.off{background-color:rgba(255,255,255,.5);border:1px dashed rgba(60,60,67,.25);box-shadow:none;}
+html.ap:not(.gl) details.adm-sec.danger{border-color:rgba(255,59,48,.35);}
+html.ap.ap :is(.adm-stat,details.adm-sec,.shop-card,.ana-card,.inc-card,.inc-kpi,.map-kpi){border-radius:18px;}
+html.ap.ap .adm-stat b{font-size:26px;font-weight:700;letter-spacing:-.02em;}
+/* вкладки «Точки / Доходы / Карта / Аналитика» и прочие переключатели — сегменты iOS */
+html.ap.ap :is(.adm-tabs,.map-seg,.inc-seg,.ix-tabs){gap:0;padding:2px;border-radius:11px;border:0;}
+html.ap.ap :is(.adm-tabs,.map-seg,.inc-seg,.ix-tabs) button{border:0;border-radius:9px;font-weight:600;letter-spacing:-.01em;}
+html.ap:not(.gl) :is(.adm-tabs,.map-seg,.inc-seg,.ix-tabs){background:rgba(118,118,128,.12);}
+html.ap:not(.gl) :is(.adm-tabs,.map-seg,.inc-seg,.ix-tabs) button{background:transparent;color:#1D1D1F;box-shadow:none;}
+html.ap:not(.gl) :is(.adm-tabs,.map-seg,.inc-seg,.ix-tabs) button.on{background:#fff;color:#1D1D1F;box-shadow:0 3px 10px rgba(0,0,0,.1),0 0 0 .5px rgba(0,0,0,.04);}
+html.ap:not(.gl) .adm-tabs button.on i{color:#007AFF;}
+/* фильтры и чипсы — капсулы */
+html.ap.ap :is(.adm-filters,.ana-chips,.ix-chips) button{border:0;border-radius:999px;}
+html.ap:not(.gl) :is(.adm-filters,.ana-chips,.ix-chips) button{background:rgba(255,255,255,.7);color:#1D1D1F;box-shadow:inset 0 0 0 .5px rgba(60,60,67,.18);}
+html.ap:not(.gl) :is(.adm-filters,.ana-chips,.ix-chips) button.on{background:#007AFF;color:#fff;box-shadow:none;}
+/* плитки действий на карточке точки — стеклянные кнопки */
+html.ap.ap .sc-tile{border-radius:14px;}
+html.ap:not(.gl) .sc-tile{background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.75);box-shadow:0 1px 2px rgba(0,0,0,.04),inset 0 0 0 .5px rgba(60,60,67,.1);}
+html.ap:not(.gl) .sc-tile i{color:#007AFF;}
+html.ap:not(.gl) .sc-sub{background:rgba(242,242,247,.75);border:0;}
+html.ap:not(.gl) .logout{background:rgba(255,255,255,.6);box-shadow:0 1px 3px rgba(0,0,0,.06),inset 0 0 0 .5px rgba(255,255,255,.8);}
+html.ap:not(.gl) .logout[href="/admin/help"]{color:#007AFF;}
+html.ap:not(.gl) .logo-sub{color:#6E6E73;}
+/* поиск точек — как поле поиска iOS */
+html.ap:not(.gl) .container > input, html.ap:not(.gl) #admMain input[type=search]{background:rgba(255,255,255,.8);border-color:rgba(60,60,67,.14);}
+/* компьютер: точки в две колонки — меньше прокрутки */
+@media (min-width:1100px){
+  html.ap.ap #shops-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+  html.ap.ap #shops-body > *{margin-bottom:0;}
+  html.ap.ap #shops-body > :not(.shop-card){grid-column:1/-1;}
+}
+@media (min-width:900px){ html.ap.ap .container{margin-left:auto;margin-right:auto;padding:22px 32px 40px;} html.ap.ap .topbar{margin:6px 0 18px;} }
+/* тёмная */
+html.ap.gl :is(.adm-stat,details.adm-sec,.shop-card,.map-kpi,.map-wrap,.map-list,.ana-card,.inc-kpi,.inc-card,.ix-list,.ix-box,.snap-box){
+  background-color:var(--gx-card);background-image:none;border:1px solid var(--gx-card-edge);box-shadow:none;}
+"""
+
+
 class Theme:
-    def __init__(self, page):
+    def __init__(self, page, name="apple", extra_css="", dark=True):
+        """dark=False — страница без тёмного слоя (админка): всегда светлая."""
+        self.name = name
+        self.dark = dark
         shared = _shared_from_glass()
         # общие правила тоже переводим в палитру Apple — вместе со стилями страницы
-        self.css = (shared + build_auto_css(page + "<style>" + shared + "</style>") + MANUAL_CSS).encode("utf-8")
+        self.css = (shared + build_auto_css(page + "<style>" + shared + "</style>") + MANUAL_CSS + extra_css).encode("utf-8")
         self.js = APPLE_JS.replace("__MAP__", json.dumps(js_color_map(page), sort_keys=True)).encode("utf-8")
         self.css_v = hashlib.sha1(self.css).hexdigest()[:10]
         self.js_v = hashlib.sha1(self.js).hexdigest()[:10]
@@ -902,9 +949,10 @@ class Theme:
         в <head> (после glass.css), чтобы перекрывать встроенные стили."""
         meta = '<meta name="theme-color" content="#0A2540">'
         assert page.count(meta) == 1
-        page = page.replace(meta, '<meta name="theme-color" content="#F2F2F7">' + HEAD_BOOT, 1)
-        tail = ('<link rel="stylesheet" href="/ui/apple.css?v=%s">' % self.css_v
-                + '<script src="/ui/apple.js?v=%s" defer></script>' % self.js_v)
+        boot = HEAD_BOOT if self.dark else HEAD_BOOT.replace("if(t==='dark')", "if(false)").replace("t==='dark'?", "false?")
+        page = page.replace(meta, '<meta name="theme-color" content="#F2F2F7">' + boot, 1)
+        tail = ('<link rel="stylesheet" href="/ui/%s.css?v=%s">' % (self.name, self.css_v)
+                + '<script src="/ui/%s.js?v=%s" defer></script>' % (self.name, self.js_v))
         return page.replace("</head>", tail + "</head>", 1)
 
 
