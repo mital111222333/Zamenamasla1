@@ -231,7 +231,6 @@ def _sub_option_text(T, o, branch_part) -> str:
 @login_required
 @sub_exempt
 def subscription_page():
-    shop = db.get_shop(g.shop_id)
     st = g.sub
     T = g.T
     ctx = {"T": T, "lang": g.lang, "st": st, "mode": "owner" if _is_sub_owner() else "staff",

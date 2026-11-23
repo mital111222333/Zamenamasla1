@@ -3897,6 +3897,8 @@ def get_day_details(shop_id: int, day: str) -> dict:
     totals = {
         "revenue": sum(s["cost"] for s in services),
         "count": sum(1 for s in services if s["walkin"] != "used_oil"),
+        # «Замен» — только машины (без продажи без машины и мелких услуг за день)
+        "cars": sum(1 for s in services if not s["walkin"]),
         "cash": cash, "card": card, "debt_out": sum(s["debt"] for s in services),
         "repaid": repaid_sum, "income": cash + card + repaid_sum,
         "expenses": expenses_sum, "suppliers": suppliers_sum, "outcome": expenses_sum + suppliers_sum,
@@ -4152,7 +4154,6 @@ def get_profit_stats(shop_id: int) -> dict:
     week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
     month_start = now.strftime("%Y-%m-01")
     year_start = now.strftime("%Y-01-01")
-    far_past = "2000-01-01"
     return {
         "today": _compute_profit_for_range(shop_id, today, today),
         "yesterday": _compute_profit_for_range(shop_id, yesterday, yesterday),
@@ -4851,7 +4852,7 @@ def delete_branch_with_data(branch_id: int) -> bool:
     with get_conn() as conn:
         try:
             car_ids = "SELECT id FROM cars WHERE shop_id=?"
-            conn.execute(f"DELETE FROM installment_payments WHERE plan_id IN (SELECT id FROM installment_plans WHERE shop_id=?)", (branch_id,))
+            conn.execute("DELETE FROM installment_payments WHERE plan_id IN (SELECT id FROM installment_plans WHERE shop_id=?)", (branch_id,))
             conn.execute("DELETE FROM installment_plans WHERE shop_id=?", (branch_id,))
             conn.execute(f"DELETE FROM oil_changes WHERE car_id IN ({car_ids})", (branch_id,))
             conn.execute("DELETE FROM cars WHERE shop_id=?", (branch_id,))
@@ -9861,13 +9862,27 @@ def _team_month_data(conn, shop_ids, date_from: str, date_to: str) -> dict:
     rows = conn.execute(f"""
         SELECT COALESCE(oc.master_id, oc.employee_id) AS eid, oc.id, oc.car_id, oc.cost,
                COALESCE(oc.cash_amount, 0) + COALESCE(oc.card_amount, 0) AS paid,
-               oc.filter_changed, oc.items_json,
+               oc.filter_changed, oc.items_json, oc.service_type,
+               c.plate_number = '{WALKIN_PLATE}' AS walkin,
                EXISTS(SELECT 1 FROM oil_changes p WHERE p.car_id = oc.car_id AND p.id < oc.id) AS rep
         FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
         WHERE c.shop_id IN ({q}) AND COALESCE(oc.master_id, oc.employee_id, 0) > 0
           AND oc.change_date >= ? AND oc.change_date <= ?
     """, (*shop_ids, date_from, date_to)).fetchall()
     for r in rows:
+        if r["walkin"]:
+            # продажа без машины и «мелкие услуги за день» — не замена: ни замен,
+            # ни очков, ни «постоянного клиента»; деньги — в % от продаж/работы.
+            # Отработку сливают из машин клиентов — это доход точки, не мастера
+            if r["service_type"] == USED_OIL_KEY:
+                continue
+            s = slot(r["eid"])
+            s["revenue"] += r["cost"] or 0
+            share = _items_goods_share(r["items_json"])
+            paid = max(0, r["paid"] or 0)
+            s["goods_money"] += paid * share
+            s["work_money"] += paid * (1 - share)
+            continue
         s = slot(r["eid"])
         s["services"] += 1
         pts = TEAM_PTS_SERVICE
@@ -10071,8 +10086,9 @@ def team_badges(shop_id: int, employee_id: int) -> dict:
     """Значки: рубежи по числу замен и «Мастер месяца» за последние 12 месяцев."""
     with get_conn() as conn:
         total = conn.execute("""SELECT COUNT(*) FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-                                WHERE c.shop_id=? AND COALESCE(oc.master_id, oc.employee_id)=?""",
-                             (shop_id, employee_id)).fetchone()[0] or 0
+                                WHERE c.shop_id=? AND COALESCE(oc.master_id, oc.employee_id)=?
+                                  AND c.plate_number <> ?""",
+                             (shop_id, employee_id, WALKIN_PLATE)).fetchone()[0] or 0
         emps = _team_emp_rows(conn, [shop_id])
         months = []
         p = team_current_period()
@@ -10257,12 +10273,13 @@ def digest_staff_day(shop_id: int, day: str) -> list:
     мастер, иначе тот, кто внёс; замены владельца — отдельной строкой)."""
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT COALESCE(oc.master_id, oc.employee_id) AS uid, COUNT(*) AS cnt,
+            SELECT COALESCE(oc.master_id, oc.employee_id) AS uid,
+                   SUM(CASE WHEN c.plate_number <> ? THEN 1 ELSE 0 END) AS cnt,
                    COALESCE(SUM(oc.cost), 0) AS revenue
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
-            WHERE c.shop_id=? AND oc.change_date=?
+            WHERE c.shop_id=? AND oc.change_date=? AND COALESCE(oc.service_type, '') <> ?
             GROUP BY uid ORDER BY cnt DESC, revenue DESC
-        """, (shop_id, day)).fetchall()
+        """, (WALKIN_PLATE, shop_id, day, USED_OIL_KEY)).fetchall()
         names = {r["id"]: r["name"] for r in conn.execute(
             "SELECT id, COALESCE(full_name, username) AS name FROM shop_users WHERE shop_id=?", (shop_id,))}
     return [{"name": names.get(r["uid"]) if r["uid"] else None, "count": r["cnt"], "revenue": r["revenue"]}
@@ -11022,10 +11039,10 @@ def stats_pulse(shop_id: int, now=None) -> dict:
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT oc.change_date, oc.cost, oc.items_json, oc.created_at, oc.service_type,
-                   COALESCE(oc.master_id, oc.employee_id, 0) AS eid
+                   COALESCE(oc.master_id, oc.employee_id, 0) AS eid, c.plate_number = ? AS walkin
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ?
-        """, (shop_id, d(min(ystart, yday)))).fetchall()
+        """, (WALKIN_PLATE, shop_id, d(min(ystart, yday)))).fetchall()
         names = {r["id"]: r["name"] for r in conn.execute(
             "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM shop_users WHERE shop_id=?",
             (shop_id,)).fetchall()}
@@ -11082,7 +11099,8 @@ def stats_pulse(shop_id: int, now=None) -> dict:
             mix["oil"] = mix.get("oil", 0) + cost  # старые записи без разбивки — замена масла
         if r["eid"] and r["service_type"] != USED_OIL_KEY:
             m = masters.setdefault(r["eid"], {"name": names.get(r["eid"]) or "—", "count": 0, "total": 0})
-            m["count"] += 1
+            if not r["walkin"]:  # «маш.» — только машины, не продажа без машины
+                m["count"] += 1
             m["total"] += cost
 
     def cum(a):
