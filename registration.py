@@ -11,6 +11,7 @@ from urllib.parse import quote
 
 from flask import g, jsonify, make_response, redirect, render_template_string, request
 
+import apple_theme
 import database as db
 import i18n
 import security
@@ -516,6 +517,11 @@ body { margin:0; background:#F3F5F9; color:var(--text); font-family:'Plus Jakart
 </body>
 </html>
 """
+
+# вид в стиле Apple — как у панели
+REGISTER_PAGE = apple_theme.style_subpage(REGISTER_PAGE, apple_theme.REGISTER_CSS)
+REFERRAL_PAGE = apple_theme.style_subpage(REFERRAL_PAGE)
+
 
 
 # ---------- Самостоятельная регистрация точки ----------

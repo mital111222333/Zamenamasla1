@@ -479,6 +479,21 @@ def _migrate(conn):
     END
     """)
 
+    # остатки — дробные (литры): после сотен списаний 4.5 + 3.8 + … в базе
+    # копилась «хвостовая» ошибка (-419.30000000000024, 0.0000000001 вместо 0),
+    # и товар с остатком «почти ноль» не считался закончившимся. Округляем до
+    # тысячных при каждом изменении и один раз — всё, что уже накопилось.
+    conn.execute("""
+    CREATE TRIGGER IF NOT EXISTS trg_products_qty_round
+    AFTER UPDATE OF stock_qty, shop_qty ON products
+    WHEN NEW.stock_qty <> ROUND(NEW.stock_qty, 3) OR NEW.shop_qty <> ROUND(NEW.shop_qty, 3)
+    BEGIN
+        UPDATE products SET stock_qty = ROUND(NEW.stock_qty, 3), shop_qty = ROUND(NEW.shop_qty, 3) WHERE id = NEW.id;
+    END
+    """)
+    conn.execute("UPDATE products SET stock_qty = ROUND(stock_qty, 3) WHERE stock_qty <> ROUND(stock_qty, 3)")
+    conn.execute("UPDATE products SET shop_qty = ROUND(shop_qty, 3) WHERE shop_qty <> ROUND(shop_qty, 3)")
+
     tr_cols = [r[1] for r in conn.execute("PRAGMA table_info(stock_transfers)").fetchall()]
     if "batch" not in tr_cols:
         conn.execute("ALTER TABLE stock_transfers ADD COLUMN batch TEXT")
@@ -3738,7 +3753,10 @@ def _avg_check(total: int, paid_count: int) -> int:
 
 
 def _with_avg(d: dict) -> dict:
-    d["avg"] = _avg_check(d["total"], d.get("paid_count", 0))
+    # avg_base — выручка БЕЗ продажи отработки: её продажи не считаются
+    # визитами (paid_count), поэтому раньше они завышали средний чек
+    # (продали 100 л отработки — средний чек за день вырастал на сотни тысяч)
+    d["avg"] = _avg_check(d.get("avg_base", d["total"]), d.get("paid_count", 0))
     return d
 
 
@@ -3788,12 +3806,13 @@ def get_revenue_stats(shop_id: int) -> dict:
             row = conn.execute(f"""
                 SELECT COALESCE(SUM(oc.cost), 0) as total, COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END), 0) as cnt,
                        COALESCE(SUM(oc.cash_amount), 0) as cash, COALESCE(SUM(oc.card_amount), 0) as card,
-                       SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt
+                       SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt,
+                       COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN oc.cost ELSE 0 END), 0) as avg_base
                 FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
                 WHERE c.shop_id=? AND oc.cost IS NOT NULL AND {date_filter}
             """, (shop_id, param)).fetchone()
             return _with_avg({"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"],
-                              "paid_count": row["paid_cnt"] or 0})
+                              "paid_count": row["paid_cnt"] or 0, "avg_base": row["avg_base"]})
 
         result = {
             "today": agg("oc.change_date = ?", today),
@@ -3893,11 +3912,14 @@ def _pct_change(current, previous):
     return round((current - previous) / previous * 100, 1)
 
 
-def _pack_comparison(cur_total, cur_paid, prev_total, prev_paid) -> dict:
-    cur_avg = _avg_check(cur_total, cur_paid)
-    prev_avg = _avg_check(prev_total, prev_paid)
+def _pack_comparison(cur_total, cur_paid, prev_total, prev_paid, cur_base=None, prev_base=None) -> dict:
+    cur_base = cur_total if cur_base is None else cur_base
+    prev_base = prev_total if prev_base is None else prev_base
+    cur_avg = _avg_check(cur_base, cur_paid)
+    prev_avg = _avg_check(prev_base, prev_paid)
     return {"current": cur_total, "previous": prev_total, "pct": _pct_change(cur_total, prev_total),
             "paid_current": cur_paid, "paid_previous": prev_paid,
+            "base_current": cur_base, "base_previous": prev_base,
             "avg_current": cur_avg, "avg_previous": prev_avg,
             # если в текущем периоде ещё нет платных визитов — сравнивать нечего
             "avg_pct": _pct_change(cur_avg, prev_avg) if cur_avg else None}
@@ -3912,17 +3934,27 @@ def get_revenue_comparison(shop_id: int) -> dict:
     Так же для недели и года. Возвращает разницу в процентах (None, если
     в прошлом периоде было 0 — делить не на что)."""
     now = datetime.now()
+    # Текущий период заканчивается СЕЙЧАС, а не в конце дня. Раньше последний
+    # день прошлого периода брался целиком: в понедельник утром «неделя»
+    # сравнивалась со всем прошлым понедельником и всегда показывала большой
+    # минус. Теперь последний день прошлого периода считается до того же
+    # времени суток (по времени внесения записи).
+    cut = now.strftime("%H:%M:%S")
 
-    def total_for(date_from: str, date_to: str):
-        """Возвращает (выручка, средний чек) за диапазон."""
+    def total_for(date_from: str, date_to: str, cutoff: str = None):
+        """Возвращает (выручка, число платных визитов) за диапазон; cutoff —
+        последний день диапазона учитывается только до этого времени."""
         with get_conn() as conn:
             row = conn.execute("""
                 SELECT COALESCE(SUM(oc.cost), 0) as total,
-                       SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt
+                       SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt,
+                       COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN oc.cost ELSE 0 END), 0) as avg_base
                 FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
                 WHERE c.shop_id=? AND oc.cost IS NOT NULL AND oc.change_date >= ? AND oc.change_date <= ?
-            """, (shop_id, date_from, date_to)).fetchone()
-            return row["total"], row["paid_cnt"] or 0
+                  AND (? IS NULL OR oc.change_date < ? OR oc.created_at IS NULL
+                       OR length(oc.created_at) < 19 OR substr(oc.created_at, 12, 8) <= ?)
+            """, (shop_id, date_from, date_to, cutoff, date_to, cutoff)).fetchone()
+            return row["total"], row["paid_cnt"] or 0, row["avg_base"]
 
     def pct_change(current: int, previous: int):
         if not previous:
@@ -3936,7 +3968,7 @@ def get_revenue_comparison(shop_id: int) -> dict:
     prev_week_start = week_start - timedelta(days=7)
     prev_week_end = prev_week_start + timedelta(days=now.weekday())
     week_cur = total_for(week_start.strftime("%Y-%m-%d"), today_str)
-    week_prev = total_for(prev_week_start.strftime("%Y-%m-%d"), prev_week_end.strftime("%Y-%m-%d"))
+    week_prev = total_for(prev_week_start.strftime("%Y-%m-%d"), prev_week_end.strftime("%Y-%m-%d"), cut)
 
     # месяц (с 1-го по сегодняшнее число) vs то же число дней прошлого месяца
     month_start = now.replace(day=1)
@@ -3945,7 +3977,9 @@ def get_revenue_comparison(shop_id: int) -> dict:
     prev_month_day = min(now.day, prev_month_end_date.day)
     prev_month_end = prev_month_start.replace(day=prev_month_day)
     month_cur = total_for(month_start.strftime("%Y-%m-%d"), today_str)
-    month_prev = total_for(prev_month_start.strftime("%Y-%m-%d"), prev_month_end.strftime("%Y-%m-%d"))
+    # если прошлый месяц короче (31-е → 30-е), его последний день уже прошёл целиком
+    month_prev = total_for(prev_month_start.strftime("%Y-%m-%d"), prev_month_end.strftime("%Y-%m-%d"),
+                           cut if prev_month_day == now.day else None)
 
     # год (с 1 января по сегодня) vs тот же период прошлого года
     year_start = now.replace(month=1, day=1)
@@ -3955,11 +3989,11 @@ def get_revenue_comparison(shop_id: int) -> dict:
         prev_year_end = now.replace(year=now.year - 1, day=28)  # 29 февраля в невисокосном
     prev_year_start = year_start.replace(year=year_start.year - 1)
     year_cur = total_for(year_start.strftime("%Y-%m-%d"), today_str)
-    year_prev = total_for(prev_year_start.strftime("%Y-%m-%d"), prev_year_end.strftime("%Y-%m-%d"))
+    year_prev = total_for(prev_year_start.strftime("%Y-%m-%d"), prev_year_end.strftime("%Y-%m-%d"), cut)
 
     def pack(cur, prev):
-        (cur_total, cur_paid), (prev_total, prev_paid) = cur, prev
-        return _pack_comparison(cur_total, cur_paid, prev_total, prev_paid)
+        (cur_total, cur_paid, cur_base), (prev_total, prev_paid, prev_base) = cur, prev
+        return _pack_comparison(cur_total, cur_paid, prev_total, prev_paid, cur_base, prev_base)
 
     return {
         "week": pack(week_cur, week_prev),
@@ -3976,13 +4010,14 @@ def get_revenue_range(shop_id: int, date_from: str, date_to: str) -> dict:
             SELECT COALESCE(SUM(oc.cost), 0) as total,
                    COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END), 0) as cnt,
                    COALESCE(SUM(oc.cash_amount), 0) as cash, COALESCE(SUM(oc.card_amount), 0) as card,
-                   SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt
+                   SUM(CASE WHEN oc.cost > 0 AND COALESCE(oc.service_type, '') <> 'used_oil' THEN 1 ELSE 0 END) as paid_cnt,
+                   COALESCE(SUM(CASE WHEN COALESCE(oc.service_type, '') <> 'used_oil' THEN oc.cost ELSE 0 END), 0) as avg_base
             FROM oil_changes oc JOIN cars c ON c.id = oc.car_id
             WHERE c.shop_id=? AND oc.cost IS NOT NULL
               AND oc.change_date >= ? AND oc.change_date <= ?
         """, (shop_id, date_from, date_to)).fetchone()
         result = _with_avg({"total": row["total"], "count": row["cnt"], "cash": row["cash"], "card": row["card"],
-                            "paid_count": row["paid_cnt"] or 0})
+                            "paid_count": row["paid_cnt"] or 0, "avg_base": row["avg_base"]})
         result["clients"] = _client_split(conn, shop_id, date_from, date_to)
         result.update(_debt_flow(conn, shop_id, date_from, date_to))
         return result
@@ -4179,14 +4214,15 @@ def get_aggregated_revenue_stats(parent_shop_id: int) -> dict:
     """Выручка главного аккаунта, сложенная со всеми его филиалами — по тем
     же периодам, что и обычная статистика."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
-    combined = {p: {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0, "repaid": 0, "debt_out": 0}
+    combined = {p: {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0, "repaid": 0, "debt_out": 0,
+                    "avg_base": 0}
                 for p in ("today", "yesterday", "week", "month", "year")}
     client_parts = {p: [] for p in combined}
     for sid in shop_ids:
         stats = get_revenue_stats(sid)
         for period in combined:
-            for k in ("total", "count", "cash", "card", "paid_count", "repaid", "debt_out"):
-                combined[period][k] += stats[period][k]
+            for k in ("total", "count", "cash", "card", "paid_count", "repaid", "debt_out", "avg_base"):
+                combined[period][k] += stats[period].get(k) or 0
             client_parts[period].append(stats[period]["clients"])
     for period in combined:
         combined[period]["clients"] = _sum_client_splits(client_parts[period])
@@ -4231,7 +4267,7 @@ def get_aggregated_revenue_range(parent_shop_id: int, date_from: str, date_to: s
     """Выручка за произвольный период, сложенная по главному аккаунту и всем
     его филиалам вместе."""
     shop_ids = [parent_shop_id] + [b["id"] for b in get_branches(parent_shop_id)]
-    keys = ("total", "count", "cash", "card", "paid_count", "repaid", "debt_out")
+    keys = ("total", "count", "cash", "card", "paid_count", "repaid", "debt_out", "avg_base")
     result = {k: 0 for k in keys}
     client_parts = []
     for sid in shop_ids:
@@ -4408,7 +4444,7 @@ def network_shops(parent_shop_id: int):
 
 
 def _sum_revenue_period(parts) -> dict:
-    out = {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0, "repaid": 0, "debt_out": 0}
+    out = {"total": 0, "count": 0, "cash": 0, "card": 0, "paid_count": 0, "repaid": 0, "debt_out": 0, "avg_base": 0}
     for p in parts:
         for k in out:
             out[k] += p.get(k) or 0
@@ -4431,7 +4467,8 @@ def get_network_overview(shop_ids) -> dict:
     for p in ("week", "month", "year"):
         comparison[p] = _pack_comparison(
             sum(c[p]["current"] for c in cmp_parts), sum(c[p]["paid_current"] for c in cmp_parts),
-            sum(c[p]["previous"] for c in cmp_parts), sum(c[p]["paid_previous"] for c in cmp_parts))
+            sum(c[p]["previous"] for c in cmp_parts), sum(c[p]["paid_previous"] for c in cmp_parts),
+            sum(c[p]["base_current"] for c in cmp_parts), sum(c[p]["base_previous"] for c in cmp_parts))
     profit = {p: sum(x[p] for x in prof) for p in periods}
 
     net = {"oil_profit": 0, "services": 0, "unpriced": 0, "discounts": 0, "markups": 0, "expenses_total": 0,
@@ -4498,6 +4535,7 @@ def get_network_compare(parent_shop_id: int, period: str) -> dict:
         rows.append({
             **shop,
             "total": r["total"], "count": r["count"], "avg": r["avg"], "paid_count": r["paid_count"],
+            "avg_base": r.get("avg_base", r["total"]),
             "clients": r["clients"], "pct": cmp["pct"],
             "profit": profit, "goods_profit": pb["goods_profit"], "services": pb["services"],
             "unpriced": pb["unpriced"], "expenses": expenses, "net_profit": profit - expenses,
@@ -11023,7 +11061,9 @@ def stats_pulse(shop_id: int, now=None) -> dict:
         h = hour_of(r)
         idx = 0 if h is None else h - h_from
         per["t" if day == d(today) else "y"][idx] += cost
-        if day == d(yday) and (h is None or h <= now.hour):
+        # «вчера к этому часу» — до той же минуты, а не до конца текущего часа
+        # (в 10:05 раньше учитывалось всё вчерашнее до 10:59)
+        if day == d(yday) and (h is None or str(r["created_at"] or "")[11:16] <= now.strftime("%H:%M")):
             yday_same += cost
         if day != d(today):
             continue

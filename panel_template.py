@@ -133,7 +133,7 @@ PAGE = """
 <meta name="theme-color" content="#0A2540">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="OilBook">
 <script>
 if ('serviceWorker' in navigator) {
@@ -143,7 +143,7 @@ if ('serviceWorker' in navigator) {
 <!--__TG_PANEL_JS__-->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600;700&display=swap" crossorigin="anonymous" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Space+Grotesk:wght@600;700&family=Sora:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@200;300;400;500;600&display=swap"></noscript>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
@@ -364,16 +364,39 @@ if ('serviceWorker' in navigator) {
   .nav-badge.show { display:block; }
   .more-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.35); z-index:60; opacity:0; pointer-events:none; transition:opacity .2s; }
   .more-backdrop.open { opacity:1; pointer-events:auto; }
-  .more-sheet { position:fixed; left:0; right:0; bottom:0; z-index:61; background:#fff; border-radius:20px 20px 0 0; padding:8px 14px calc(14px + env(safe-area-inset-bottom, 0px)); transform:translateY(105%); transition:transform .25s ease; box-shadow:0 -10px 30px rgba(15,23,42,0.15); max-height:80vh; overflow-y:auto; }
+  .more-sheet { position:fixed; left:0; right:0; bottom:0; z-index:61; background:#F2F2F7; border-radius:14px 14px 0 0; padding:6px 16px calc(18px + env(safe-area-inset-bottom, 0px)); transform:translateY(105%); transition:transform .32s cubic-bezier(.32,.72,0,1); box-shadow:0 -1px 0 rgba(0,0,0,.04), 0 -12px 40px rgba(0,0,0,.18); max-height:88vh; overflow-y:auto; overscroll-behavior:contain; }
   .more-sheet:not(.open) { visibility:hidden; transition:transform .25s ease, visibility 0s .25s; }
   .more-sheet.open { transform:translateY(0); visibility:visible; }
-  .more-grab { width:40px; height:5px; border-radius:3px; background:#CBD5E1; margin:2px auto 10px; }
-  .more-item { position:relative; display:flex; align-items:center; gap:14px; padding:14px 6px; border-bottom:1px solid #F1F5F9; font-size:15px; font-weight:600; color:var(--text); cursor:pointer; text-decoration:none; }
-  .more-item i { width:22px; text-align:center; font-size:18px; color:#64748B; }
-  .more-item.active, .more-item.active i { color:var(--blue); }
+  .more-grab { width:36px; height:5px; border-radius:3px; background:#C7C7CC; margin:2px auto 8px; }
+  /* шапка шторки: как карточка профиля в «Настройках» iPhone */
+  .more-head { display:flex; align-items:center; gap:12px; background:#fff; border-radius:12px; padding:12px 12px 12px 14px; margin:4px 0 22px; }
+  .more-head .logo-badge { transform:none; width:44px; height:44px; border-radius:11px; font-size:19px; }
+  .more-head-t { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .more-head-t b { font-size:17px; font-weight:600; color:#1D1D1F; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .more-head-t > span { font-size:13px; color:#8E8E93; display:flex; align-items:baseline; gap:4px; }
+  .more-head .wordmark { font-size:13px; }
+  .more-x { flex:none; width:30px; height:30px; border-radius:50%; border:0; background:rgba(118,118,128,.12); color:#8E8E93; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  /* группы — как в «Настройках»: подпись серым и белый блок со скруглением */
+  .more-group { margin-bottom:22px; }
+  .more-group:not(:has(.more-item:not(.hidden-in-more))) { display:none; }
+  .more-gh { font-size:13px; font-weight:400; color:#6E6E73; padding:0 16px 7px; }
+  .more-gl { background:#fff; border-radius:12px; overflow:hidden; }
+  .more-item { position:relative; display:flex; align-items:center; gap:14px; min-height:48px; padding:6px 14px 6px 14px; font-size:17px; font-weight:400; color:#1D1D1F; cursor:pointer; text-decoration:none; -webkit-tap-highlight-color:transparent; }
+  .more-item::after { content:''; position:absolute; left:57px; right:0; bottom:0; height:.5px; background:rgba(60,60,67,.22); }
+  .more-item:active { background:#E5E5EA; }
+  .more-item.last-vis::after { display:none; }
+  .mi-ic { flex:none; width:29px; height:29px; border-radius:7px; display:flex; align-items:center; justify-content:center; background:var(--mi, #8E8E93); color:#fff; font-size:15px; }
+  .mi-ic i { color:#fff; }
+  .mi-t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mi-chev { flex:none; font-size:13px; color:#C4C4C7; }
+  .more-item.active .mi-t { color:#007AFF; font-weight:500; }
   .more-item.hidden-in-more { display:none; }
   .more-item .nav-badge { position:static; margin-left:auto; }
-  .more-logout, .more-logout i { color:var(--btn); border-bottom:none; }
+  .more-logout { justify-content:center; color:#FF3B30; }
+  .more-logout::after { display:none; }
+  .c-blue { --mi:#007AFF; } .c-indigo { --mi:#5856D6; } .c-purple { --mi:#AF52DE; } .c-pink { --mi:#FF2D55; }
+  .c-red { --mi:#FF3B30; } .c-orange { --mi:#FF9500; } .c-yellow { --mi:#FFCC00; } .c-green { --mi:#34C759; }
+  .c-teal { --mi:#30B0C7; } .c-cyan { --mi:#32ADE6; } .c-gray { --mi:#8E8E93; } .c-brown { --mi:#A2845E; } .c-dark { --mi:#3A3A3C; }
   @media (display-mode: standalone) { .more-install { display:none; } }
   /* ---- навигация: планшет и компьютер ---- */
   @media (min-width: 900px) {
@@ -2063,35 +2086,54 @@ if ('serviceWorker' in navigator) {
 </div>
 {% endif %}
 <div class="more-backdrop" id="moreBackdrop" onclick="closeMore()"></div>
-<div class="more-sheet" id="moreSheet" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
+<div class="more-sheet" id="moreSheet" role="dialog" aria-modal="true" aria-label="{{ T.nav_more }}" data-bar="table,{{ bar_slot2 }},add,{{ bar_slot4 }}">
   <div class="more-grab"></div>
+  <div class="more-head">
+    <div class="logo-badge"><i class="fa-solid fa-droplet"></i></div>
+    <div class="more-head-t"><b>{{ shop_name }}</b><span><span class="wordmark"><span class="wm-oil">Oil</span><span class="wm-book">Book</span></span>{% if is_employee %} · {{ T.role_employee }}{% elif is_branch %} · {{ T.role_branch }}{% endif %}</span></div>
+    <button type="button" class="more-x" onclick="closeMore()" aria-label="×"><i class="fa-solid fa-xmark"></i></button>
+  </div>
   <div class="more-list">
-      <div class="more-item" data-tab="queue" data-more-slot="queue" onclick="showTab('queue'); closeMore();"><i class="fa-solid fa-list-ol"></i><span>{{ T.tab_queue }}</span><b class="nav-badge" data-badge="queue"></b></div>
-      <div class="more-item" data-tab="dayclose" data-more-slot="dayclose" onclick="showTab('dayclose'); closeMore();"><i class="fa-solid fa-lock"></i><span>{{ T.tab_dayclose }}</span></div>
-      <div class="more-item" data-tab="usedoil" data-more-slot="usedoil" onclick="showTab('usedoil'); closeMore();"><i class="fa-solid fa-fill-drip"></i><span>{{ T.tab_usedoil }}</span></div>
-      {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><i class="fa-solid fa-cash-register"></i><span>{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span></div>{% endif %}
-      {% if team_on %}<div class="more-item" data-tab="team" data-more-slot="team" onclick="showTab('team'); closeMore();"><i class="fa-solid fa-trophy"></i><span>{{ T.tab_team }}</span></div>{% endif %}
-      {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><i class="fa-solid fa-truck-field"></i><span>{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b></div>{% endif %}
-      <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><i class="fa-solid fa-car"></i><span>{{ T.tab_table }}</span></div>
-      {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><i class="fa-solid fa-chart-column"></i><span>{{ T.tab_stats }}</span></div>{% endif %}
-      {% if warehouse_enabled and (not is_employee or store_enabled) %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><i class="fa-solid {{ 'fa-store' if is_employee else 'fa-boxes-stacked' }}"></i><span>{{ T.st_tab if is_employee else T.tab_warehouse }}</span></div>{% endif %}
-      <div class="more-item" data-tab="debts" data-more-slot="debts" onclick="showTab('debts'); closeMore();"><i class="fa-solid fa-hand-holding-dollar"></i><span>{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b></div>
-      {% if not is_employee %}<div class="more-item" data-tab="expenses" data-more-slot="expenses" onclick="showTab('expenses'); closeMore();"><i class="fa-solid fa-receipt"></i><span>{{ T.tab_expenses }}</span></div>{% endif %}
-      {% if not is_employee %}<div class="more-item" data-tab="rate" data-more-slot="rate" onclick="showTab('rate'); closeMore();"><i class="fa-solid fa-dollar-sign"></i><span>{{ T.usd_rate_title }}</span><b class="nav-badge" data-badge="rate"></b></div>{% endif %}
-      <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><i class="fa-solid fa-bullhorn"></i><span>{{ T.tab_broadcast }}</span></div>
-      {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><i class="fa-solid fa-comment-sms"></i><span>{{ T.tab_sms }}</span></div>{% endif %}
-      <div class="more-item" data-tab="course" data-more-slot="course" onclick="showTab('course'); closeMore();"><i class="fa-solid fa-graduation-cap"></i><span>{{ T.tab_course }}</span></div>
-      <div class="more-item" data-tab="help" data-more-slot="help" onclick="showTab('help'); closeMore();"><i class="fa-solid fa-circle-question"></i><span>{{ T.tab_help }}</span></div>
-      {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><i class="fa-solid fa-file-arrow-down"></i><span>{{ T.tab_export }}</span></div>{% endif %}
-      {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><i class="fa-solid fa-user-group"></i><span>{{ T.tab_staff }}</span></div>{% endif %}
-      {% if not is_employee %}<div class="more-item" data-tab="myshop" data-more-slot="myshop" onclick="showTab('myshop'); closeMore();"><i class="fa-solid fa-store"></i><span>{{ T.tab_myshop }}</span></div>{% endif %}
-      {% if is_sub_owner %}<a class="more-item" href="/subscription"><i class="fa-solid fa-credit-card"></i><span>{{ T.sub_menu }}</span></a>{% endif %}
-      {% if is_sub_owner %}<a class="more-item" href="/referral"><i class="fa-solid fa-gift"></i><span>{{ T.ref_menu }}</span></a>{% endif %}
-      <a class="more-item more-install" href="/app?lang={{ lang }}"><i class="fa-solid fa-mobile-screen-button"></i><span>{{ T.inst_menu }}</span></a>
-      {% if tg_bot_username %}<a class="more-item tg-only-out" href="https://t.me/{{ tg_bot_username }}?start=panel" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i><span>{{ T.tg_open_menu }}</span></a>{% endif %}
-      <div class="more-item" onclick="glToggle()"><i class="fa-solid fa-circle-half-stroke"></i><span class="gl-on-only">{{ T.theme_to_classic }}</span><span class="gl-off-only">{{ T.theme_to_glass }}</span></div>
-      <div class="more-item" onclick="switchLanguage()"><i class="fa-solid fa-language"></i><span>{{ T.lang_switch }}</span></div>
-      <a class="more-item more-logout" href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>{{ T.logout }}</span></a>
+    <div class="more-group"><div class="more-gh">{{ T.nav_grp_work }}</div><div class="more-gl">
+      <div class="more-item" data-tab="queue" data-more-slot="queue" onclick="showTab('queue'); closeMore();"><span class="mi-ic c-blue"><i class="fa-solid fa-list-ol"></i></span><span class="mi-t">{{ T.tab_queue }}</span><b class="nav-badge" data-badge="queue"></b><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <div class="more-item" data-tab="table" data-more-slot="table" onclick="showTab('table'); closeMore();"><span class="mi-ic c-blue"><i class="fa-solid fa-car"></i></span><span class="mi-t">{{ T.tab_table }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <div class="more-item" data-tab="debts" data-more-slot="debts" onclick="showTab('debts'); closeMore();"><span class="mi-ic c-red"><i class="fa-solid fa-hand-holding-dollar"></i></span><span class="mi-t">{{ T.tab_debts }}</span><b class="nav-badge" data-badge="debts"></b><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <div class="more-item" data-tab="dayclose" data-more-slot="dayclose" onclick="showTab('dayclose'); closeMore();"><span class="mi-ic c-indigo"><i class="fa-solid fa-lock"></i></span><span class="mi-t">{{ T.tab_dayclose }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <div class="more-item" data-tab="usedoil" data-more-slot="usedoil" onclick="showTab('usedoil'); closeMore();"><span class="mi-ic c-brown"><i class="fa-solid fa-fill-drip"></i></span><span class="mi-t">{{ T.tab_usedoil }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      {% if is_employee or has_staff %}<div class="more-item" data-tab="cash" data-more-slot="cash" onclick="showTab('cash'); closeMore();"><span class="mi-ic c-green"><i class="fa-solid fa-cash-register"></i></span><span class="mi-t">{{ T.tab_cash_my if is_employee else T.tab_cash_owner }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+    </div></div>
+    <div class="more-group"><div class="more-gh">{{ T.nav_grp_business }}</div><div class="more-gl">
+      {% if not is_employee %}<div class="more-item" data-tab="stats" data-more-slot="stats" onclick="showTab('stats'); closeMore();"><span class="mi-ic c-purple"><i class="fa-solid fa-chart-column"></i></span><span class="mi-t">{{ T.tab_stats }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if warehouse_enabled and (not is_employee or store_enabled) %}<div class="more-item" data-tab="warehouse" data-more-slot="warehouse" onclick="showTab('warehouse'); closeMore();"><span class="mi-ic c-orange"><i class="fa-solid {{ 'fa-store' if is_employee else 'fa-boxes-stacked' }}"></i></span><span class="mi-t">{{ T.st_tab if is_employee else T.tab_warehouse }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if warehouse_enabled and not is_employee and not is_branch %}<div class="more-item" data-tab="suppliers" onclick="showTab('suppliers'); closeMore();"><span class="mi-ic c-teal"><i class="fa-solid fa-truck-field"></i></span><span class="mi-t">{{ T.tab_suppliers }}</span><b class="nav-badge" data-badge="suppliers"></b><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="expenses" data-more-slot="expenses" onclick="showTab('expenses'); closeMore();"><span class="mi-ic c-pink"><i class="fa-solid fa-receipt"></i></span><span class="mi-t">{{ T.tab_expenses }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="rate" data-more-slot="rate" onclick="showTab('rate'); closeMore();"><span class="mi-ic c-green"><i class="fa-solid fa-dollar-sign"></i></span><span class="mi-t">{{ T.usd_rate_title }}</span><b class="nav-badge" data-badge="rate"></b><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="export" data-more-slot="export" onclick="showTab('export'); closeMore();"><span class="mi-ic c-gray"><i class="fa-solid fa-file-arrow-down"></i></span><span class="mi-t">{{ T.tab_export }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+    </div></div>
+    <div class="more-group"><div class="more-gh">{{ T.nav_grp_clients }}</div><div class="more-gl">
+      <div class="more-item" data-tab="broadcast" data-more-slot="broadcast" onclick="showTab('broadcast'); closeMore();"><span class="mi-ic c-blue"><i class="fa-solid fa-bullhorn"></i></span><span class="mi-t">{{ T.tab_broadcast }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      {% if sms_enabled %}<div class="more-item" data-tab="sms" data-more-slot="sms" onclick="showTab('sms'); closeMore();"><span class="mi-ic c-green"><i class="fa-solid fa-comment-sms"></i></span><span class="mi-t">{{ T.tab_sms }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+    </div></div>
+    {% if team_on or not is_employee %}
+    <div class="more-group"><div class="more-gh">{{ T.nav_grp_team }}</div><div class="more-gl">
+      {% if team_on %}<div class="more-item" data-tab="team" data-more-slot="team" onclick="showTab('team'); closeMore();"><span class="mi-ic c-yellow"><i class="fa-solid fa-trophy"></i></span><span class="mi-t">{{ T.tab_team }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="staff" data-more-slot="staff" onclick="showTab('staff'); closeMore();"><span class="mi-ic c-blue"><i class="fa-solid fa-user-group"></i></span><span class="mi-t">{{ T.tab_staff }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if not is_employee %}<div class="more-item" data-tab="myshop" data-more-slot="myshop" onclick="showTab('myshop'); closeMore();"><span class="mi-ic c-gray"><i class="fa-solid fa-store"></i></span><span class="mi-t">{{ T.tab_myshop }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>{% endif %}
+      {% if is_sub_owner %}<a class="more-item" href="/subscription"><span class="mi-ic c-indigo"><i class="fa-solid fa-credit-card"></i></span><span class="mi-t">{{ T.sub_menu }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></a>{% endif %}
+      {% if is_sub_owner %}<a class="more-item" href="/referral"><span class="mi-ic c-pink"><i class="fa-solid fa-gift"></i></span><span class="mi-t">{{ T.ref_menu }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></a>{% endif %}
+    </div></div>
+    {% endif %}
+    <div class="more-group"><div class="more-gh">{{ T.nav_grp_help }}</div><div class="more-gl">
+      <div class="more-item" data-tab="course" data-more-slot="course" onclick="showTab('course'); closeMore();"><span class="mi-ic c-indigo"><i class="fa-solid fa-graduation-cap"></i></span><span class="mi-t">{{ T.tab_course }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <div class="more-item" data-tab="help" data-more-slot="help" onclick="showTab('help'); closeMore();"><span class="mi-ic c-blue"><i class="fa-solid fa-circle-question"></i></span><span class="mi-t">{{ T.tab_help }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <a class="more-item more-install" href="/app?lang={{ lang }}"><span class="mi-ic c-gray"><i class="fa-solid fa-mobile-screen-button"></i></span><span class="mi-t">{{ T.inst_menu }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></a>
+      {% if tg_bot_username %}<a class="more-item tg-only-out" href="https://t.me/{{ tg_bot_username }}?start=panel" target="_blank" rel="noopener"><span class="mi-ic c-cyan"><i class="fa-brands fa-telegram"></i></span><span class="mi-t">{{ T.tg_open_menu }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></a>{% endif %}
+    </div></div>
+    <div class="more-group"><div class="more-gh">{{ T.nav_grp_app }}</div><div class="more-gl">
+      <div class="more-item" onclick="glToggle()"><span class="mi-ic c-dark"><i class="fa-solid fa-circle-half-stroke"></i></span><span class="mi-t"><span class="gl-on-only">{{ T.theme_to_classic }}</span><span class="gl-off-only">{{ T.theme_to_glass }}</span></span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+      <div class="more-item" onclick="switchLanguage()"><span class="mi-ic c-blue"><i class="fa-solid fa-language"></i></span><span class="mi-t">{{ T.lang_switch }}</span><i class="fa-solid fa-chevron-right mi-chev"></i></div>
+    </div></div>
+    <div class="more-group"><div class="more-gl"><a class="more-item more-logout" href="/logout"><span class="mi-t">{{ T.logout }}</span></a></div></div>
   </div>
 </div>
 
@@ -4699,6 +4741,11 @@ function closeMore() {
   const inBar = sheet.dataset.bar.split(',');
   sheet.querySelectorAll('[data-more-slot]').forEach(el => {
     if (inBar.includes(el.dataset.moreSlot)) el.classList.add('hidden-in-more');
+  });
+  // у последнего видимого пункта группы нет линии-разделителя снизу
+  sheet.querySelectorAll('.more-gl').forEach(gl => {
+    const vis = [...gl.querySelectorAll('.more-item')].filter(el => !el.classList.contains('hidden-in-more') && getComputedStyle(el).display !== 'none');
+    if (vis.length) vis[vis.length - 1].classList.add('last-vis');
   });
   // закрытие свайпом вниз
   let startY = null;
@@ -8021,7 +8068,8 @@ async function loadNetworkCompare() {
     clients: sum(r => r.clients.total), newc: sum(r => r.clients.new),
     profit: sum(r => r.profit), expenses: sum(r => r.expenses), net: sum(r => r.net_profit),
   };
-  const totAvg = totPaid ? Math.round(tot.total / totPaid) : 0;
+  // средний чек сети — без продаж отработки (они не визиты), как и у каждой точки
+  const totAvg = totPaid ? Math.round(sum(r => (r.avg_base ?? r.total)) / totPaid) : 0;
 
   body.innerHTML = `
     <div class="table-wrap"><table class="net-cmp">

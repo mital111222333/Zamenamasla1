@@ -59,7 +59,7 @@ def _events(kind):
 
 PUBLIC = {
     "/", "/login", "/logout", "/app", "/install", "/m", "/privacy", "/register", "/referral", "/welcome",
-    "/sw.js", "/ui/glass.css", "/ui/glass.js", "/static/<path:filename>", "/r/<code>", "/ocr/v1/<name>",
+    "/sw.js", "/ui/glass.css", "/ui/glass.js", "/ui/apple.css", "/ui/apple.js", "/ui/apple-admin.css", "/ui/apple-admin.js", "/static/<path:filename>", "/r/<code>", "/ocr/v1/<name>",
     "/passport/<token>", "/passport/<token>/pdf", "/display/<anpr_token>", "/scanner/<anpr_token>",
     "/api/display_state/<anpr_token>", "/api/display_queue/<anpr_token>", "/q/<token>", "/api/q/<token>",
     "/api/anpr/<anpr_token>", "/api/hamyon/complete",
