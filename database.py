@@ -7837,6 +7837,8 @@ def save_name_aliases(items: list) -> int:
     n = 0
     with get_conn() as conn:
         for it in items:
+            if not isinstance(it, dict):
+                continue
             raw = " ".join(str(it.get("raw") or "").split())
             if not raw:
                 continue
