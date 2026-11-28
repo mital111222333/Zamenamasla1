@@ -2390,8 +2390,8 @@ if ('serviceWorker' in navigator) {
           <button type="button" data-d="30" onclick="setDebtTerm(30)">{{ T.debt_1m }}</button>
         </div>
       </div>
-      {% if is_employee or has_staff %}<div class="af-sub" style="margin-top:14px;">{{ T.team_master }}</div>
-      <select id="master_id"></select>{% endif %}
+      {% if is_employee or has_staff %}<div id="master_row" style="display:none;"><div class="af-sub" style="margin-top:14px;">{{ T.team_master }}</div>
+      <select id="master_id"></select></div>{% endif %}
       <div class="af-sub" style="margin-top:14px;">{{ T.field_notes }}</div>
       <textarea id="notes" rows="2" placeholder="{{ T.notes_ph }}"></textarea>
       <div class="notes-shared-hint"><i class="fa-solid fa-eye"></i> {{ T.notes_shared_hint }}</div>
@@ -4185,6 +4185,12 @@ async function loadTeamMasters() {
   sel.innerHTML = opts.join('');
   if (keep && d.masters.some(m => String(m.id) === keep)) sel.value = keep;
   else if (IS_EMP_TEAM && MY_EMP_ID) sel.value = String(MY_EMP_ID);
+  // выбирать есть из кого, только если мастеров больше одного: единственному
+  // мастеру замена засчитывается сама (поле скрыто, но его значение уходит)
+  const one = d.masters.length <= 1;
+  if (d.masters.length === 1) sel.value = String(d.masters[0].id);
+  const row = document.getElementById('master_row');
+  if (row) row.style.display = one ? 'none' : '';
 }
 loadTeamMasters();
 function teamFillEditMaster(entry) {
