@@ -1409,6 +1409,8 @@ if ('serviceWorker' in navigator) {
   .pk-box .cur-switch { flex-wrap:wrap; }
   .pk-quick { margin:6px 0 0; }
   .pk-quick button { padding:4px 10px; font-size:12px; }
+  .row2.pk-row { flex-wrap:wrap; }
+  .row2.pk-row .field { flex:1 1 140px; }
   .pk-total { margin:-2px 0 10px; padding:8px 12px; border-radius:12px; background:#EEF4FF; color:#0F52BA; font-size:13.5px; }
   .usd-tag { display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:6px; background:#DBEAFE; color:#1E40AF; margin-left:4px; vertical-align:1px; }
   .dtabs button { font:inherit; font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
@@ -3087,6 +3089,7 @@ if ('serviceWorker' in navigator) {
               <option value="l">{{ T.unit_l }}</option>
             </select>
           </div>
+          <div class="pk-box" id="whnew_pk" style="display:none;"></div>
           <div class="row2">
             <div class="field">
               <label>{{ T.wh_sell_price }}</label>
@@ -3101,17 +3104,20 @@ if ('serviceWorker' in navigator) {
           <div class="cur-switch" id="wh_new_cur"><button type="button" data-cur="UZS" class="on" onclick="curSet('wh_new', 'UZS')">{{ T.usd_cur_uzs }}</button><button type="button" data-cur="USD" onclick="curSet('wh_new', 'USD')">{{ T.usd_cur_usd }}</button></div>
           <div class="hint-text" id="wh_new_cur_hint" style="margin:-2px 0 8px;">{{ T.usd_cur_hint_uzs }}</div>
           {% endif %}
-          <div class="row2" {% if is_branch %}style="display:none;"{% endif %}>
+          <div class="row2 pk-row" {% if is_branch %}style="display:none;"{% endif %}>
+            <div class="field" id="whnew_pkbuy_wrap" style="display:none;">
+              <label id="whnew_pkbuy_label"></label>
+              <input id="whnew_pkbuy" type="number" inputmode="numeric" min="0" oninput="packPriceFromCan('whnew')">
+            </div>
             <div class="field">
-              <label>{{ T.wh_purchase_price }}</label>
-              <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd')">
+              <label>{{ T.wh_purchase_price }}<span id="whnew_pk_perl" style="display:none;"> · {{ T.pk_per_l }}</span></label>
+              <input id="wh_new_purchase_price" type="number" placeholder="30000" oninput="onSumFieldEdited('wh_new_purchase_price', 'wh_new_purchase_usd'); packPriceFromLiter('whnew')">
             </div>
             <div class="field" id="wh_new_purchase_usd_wrap">
               <label>{{ T.usd_buy_label }}</label>
-              <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
+              <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price'); packPriceFromLiter('whnew')">
             </div>
           </div>
-          <div class="pk-box" id="whnew_pk" style="display:none;"></div>
           <div class="field">
             <label>{{ T.wh_initial_stock }}</label>
             <input id="wh_new_stock" type="number" placeholder="0">
@@ -3383,13 +3389,19 @@ MODAL_AND_SCRIPT = """
       <label>{{ T.wh_restock_qty }}</label>
       <input id="restock_qty" type="number">
     </div>
-    <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
-      <label>{{ T.wh_purchase_price }}</label>
-      <input id="restock_price" type="number" oninput="onSumFieldEdited('restock_price', 'restock_price_usd')">
+    <div class="row2 pk-row" {% if is_branch %}style="display:none;"{% endif %}>
+      <div class="field" id="restock_pkbuy_wrap" style="display:none;">
+        <label id="restock_pkbuy_label"></label>
+        <input id="restock_pkbuy" type="number" inputmode="numeric" min="0" oninput="packPriceFromCan('restock')">
+      </div>
+      <div class="field">
+        <label>{{ T.wh_purchase_price }}<span id="restock_pk_perl" style="display:none;"> · {{ T.pk_per_l }}</span></label>
+        <input id="restock_price" type="number" oninput="onSumFieldEdited('restock_price', 'restock_price_usd'); packPriceFromLiter('restock')">
+      </div>
     </div>
     <div class="field" {% if is_branch %}style="display:none;"{% endif %}>
       <label>{{ T.usd_price_label }}</label>
-      <input id="restock_price_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('restock_price_usd', 'restock_price')">
+      <input id="restock_price_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('restock_price_usd', 'restock_price'); packPriceFromLiter('restock')">
     </div>
     <div class="field">
       <label>{{ T.wh_restock_date }}</label>
@@ -4841,7 +4853,7 @@ const PACK_MAIN = [4, 5];               // кнопки «Канистра 4 л�
 const PACK_QUICK = [1, 20, 200, 208];   // быстрые объёмы для «Своя тара»
 const PACK = {};                         // префикс → { qtyId, mode: '0' | '4' | '5' | 'custom' }
 function packEl(p, s) { return document.getElementById(p + '_pk' + s); }
-function packInit(p, qtyId) {
+function packInit(p, qtyId, priceId, usdId) {
   const box = packEl(p, '');
   if (!box) return;
   if (!box.dataset.ready) {
@@ -4865,7 +4877,38 @@ function packInit(p, qtyId) {
       <div class="pk-total" id="${p}_pk_total" style="display:none;"></div>`;
     box.dataset.ready = '1';
   }
-  if (!PACK[p]) PACK[p] = { qtyId, mode: '0' };
+  if (!PACK[p]) PACK[p] = { qtyId, priceId, usdId, mode: '0' };
+}
+// закупка за канистру рядом с ценой за 1 л: главная — цена за литр (её и
+// сохраняем), цена канистры = за литр × объём тары, и наоборот
+function packPriceFromLiter(p) {
+  const st = PACK[p], can = packEl(p, 'buy');
+  if (!st || !st.priceId || !can || st.mode === '0') return;
+  const size = packSize(p), per = packNum(document.getElementById(st.priceId).value);
+  can.value = size > 0 && per >= 0 && !isNaN(per) ? Math.round(per * size) : '';
+}
+function packPriceFromCan(p) {
+  const st = PACK[p], can = packEl(p, 'buy');
+  if (!st || !st.priceId || !can) return;
+  const price = document.getElementById(st.priceId);
+  if (price.readOnly) { packPriceFromLiter(p); return; }  // закупка в $: источник — поле $
+  const size = packSize(p), c = packNum(can.value);
+  if (!(size > 0)) return;
+  price.value = c >= 0 && !isNaN(c) ? Math.round(c / size) : '';
+  onSumFieldEdited(st.priceId, st.usdId);
+}
+function packPriceShow(p) {
+  const st = PACK[p], wrap = packEl(p, 'buy_wrap');
+  if (!st || !wrap) return;
+  const on = st.mode !== '0';
+  wrap.style.display = on ? '' : 'none';
+  const perl = packEl(p, '_perl');
+  if (perl) perl.style.display = on ? '' : 'none';
+  const size = on ? packSize(p) : NaN;
+  packEl(p, 'buy_label').textContent = size > 0 ? T.pk_buy_can.replace('{n}', whQty(size)) : T.pk_buy_can_any;
+  const can = packEl(p, 'buy');
+  can.readOnly = document.getElementById(st.priceId).readOnly;
+  if (on) packPriceFromLiter(p); else can.value = '';
 }
 // показать/спрятать выбор тары (нужен только товарам в литрах)
 function packShow(p, show) {
@@ -4887,6 +4930,7 @@ function packMode(p, v, keep) {
   if (!on) {
     packEl(p, '_total').style.display = 'none';
     if (!keep) packEl(p, '_count').value = '';
+    packPriceShow(p);
     return;
   }
   if (!keep) (st.mode === 'custom' && !packEl(p, '_size').value ? packEl(p, '_size') : packEl(p, '_count')).focus();
@@ -4912,6 +4956,7 @@ function packCalc(p) {
     qty.value = '';
     total.style.display = 'none';
   }
+  packPriceShow(p);  // объём тары мог поменяться — пересчитать цену канистры
 }
 // перед отправкой: выбрана тара, но объём или число канистр не заполнены
 function packMissing(p) {
@@ -4944,7 +4989,7 @@ function onWhCategoryChanged() {
   if (unitRow) unitRow.style.display = c.category === 'other' ? 'block' : 'none';
   const unit = document.getElementById('wh_new_unit');
   if (unit && c.dir) unit.value = 'pc';
-  packInit('whnew', 'wh_new_stock');
+  packInit('whnew', 'wh_new_stock', 'wh_new_purchase_price', 'wh_new_purchase_usd');
   const liters = c.category.startsWith('fluid_') || (c.category === 'other' && !!unit && unit.value === 'l');
   packShow('whnew', liters);
 }
@@ -7246,6 +7291,7 @@ function curSet(prefix, cur) {
   if (sumEl) sumEl.readOnly = cur === 'USD';
   const hint = document.getElementById(prefix + '_cur_hint');
   if (hint) hint.textContent = cur === 'USD' ? T.usd_cur_hint_usd : T.usd_cur_hint_uzs;
+  if (prefix === 'wh_new') packPriceShow('whnew');  // закупка в $ — цену канистры не правим руками
 }
 function curUsdValue(prefix) {
   const usdEl = document.getElementById(prefix === 'ep' ? 'ep_buy_usd' : 'wh_new_purchase_usd');
@@ -7322,7 +7368,7 @@ function openRestockModal(id, name, shopId) {
   // тара — только для товаров в литрах (масла, жидкости)
   const prod = (productsCache || []).concat(WHCTX.br.products || []).find(x => x.id === id);
   const liters = !!prod && prod.unit !== 'pc';
-  packInit('restock', 'restock_qty');
+  packInit('restock', 'restock_qty', 'restock_price', 'restock_price_usd');
   packShow('restock', liters);
   if (liters) { packEl('restock', '_count').value = ''; packRestore(id, 'restock'); }
   document.getElementById('restockModal').classList.add('open');

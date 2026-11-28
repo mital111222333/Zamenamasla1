@@ -62,9 +62,21 @@ def test_texts_exist_in_both_languages():
 def test_picker_is_wired_into_both_forms():
     src = _src()
     assert 'id="whnew_pk"' in src and 'id="restock_pk"' in src
-    assert "packInit('whnew', 'wh_new_stock')" in src
-    assert "packInit('restock', 'restock_qty')" in src
+    assert "packInit('whnew', 'wh_new_stock', 'wh_new_purchase_price', 'wh_new_purchase_usd')" in src
+    assert "packInit('restock', 'restock_qty', 'restock_price', 'restock_price_usd')" in src
     assert "PACK_MAIN = [4, 5]" in src and "PACK_QUICK = [1, 20, 200, 208]" in src
+
+
+def test_canister_price_sits_next_to_liter_price():
+    """«За канистру» стоит в одном ряду с ценой закупки за 1 л в обоих окнах;
+    на сервер по-прежнему уходит только цена за литр."""
+    src = _src()
+    for p, price in (("whnew", "wh_new_purchase_price"), ("restock", "restock_price")):
+        row = src[src.index(f'id="{p}_pkbuy_wrap"'):]
+        row = row[:row.index("</div>\n", row.index(f'id="{price}"'))]
+        assert f'id="{price}"' in row and f"packPriceFromLiter('{p}')" in row
+    assert "purchase_price: document.getElementById('restock_price').value" in src
+    assert "_pkbuy" not in src[src.index("async function submitRestock"):src.index("async function loadRestockHistory")]
 
 
 def test_parse_counts_liters_from_canisters():
