@@ -3974,7 +3974,12 @@ IMPORT_HEADER_HINTS = {
     "sell_price": ("продаж", "sotish", "sell"),
     "purchase_price": ("закуп", "xarid", "purchase", "приход"),
     "quantity": ("колич", "остат", "miqdor", "qoldiq", "qty", "quantity"),
+    "pack_size": ("тара", "idish", "pack size"),
+    "packs": ("сколько канистр", "кол-во канистр", "nechta", "packs"),
 }
+
+# готовые объёмы тары в выпадающем списке шаблона (можно вписать и своё число)
+IMPORT_PACK_SIZES = [4, 5, 1, 20, 200, 208]
 
 
 @app.route("/api/products/import_template")
@@ -3987,53 +3992,89 @@ def api_import_template():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     from openpyxl.worksheet.datavalidation import DataValidation
+    from openpyxl.comments import Comment
+    from openpyxl.utils import get_column_letter
     T = g.T
+    # колонки: … | Тара, л | Сколько канистр | Количество (= канистры × тара)
     headers = [T["imp_col_type"], T["imp_col_name"], T["imp_col_unit"], T["imp_col_sell"]]
+    widths = [22, 34, 10, 16]
     if not g.is_branch:
         headers.append(T["imp_col_buy"])
-    headers.append(T["imp_col_qty"])
+        widths.append(16)
+    headers += [T["imp_col_pack"], T["imp_col_packs"], T["imp_col_qty"]]
+    widths += [16, 14, 16]
+    n = len(headers)
+    L_pack, L_packs, L_qty = (get_column_letter(n - 2), get_column_letter(n - 1), get_column_letter(n))
     type_names = [T[k] for k in IMPORT_CATEGORY_KEYS[:-1]] + [T["imp_type_other"]]
+    last_row = 2000
+
+    def qty_formula(r):
+        return f'=IF(AND(ISNUMBER({L_pack}{r}),ISNUMBER({L_packs}{r})),{L_pack}{r}*{L_packs}{r},"")'
+
+    def put_headers(sheet, styled):
+        for i, h in enumerate(headers, start=1):
+            c = sheet.cell(row=1, column=i, value=h)
+            c.font = Font(bold=True, color="FFFFFF") if styled else Font(bold=True)
+            if styled:
+                c.fill = fill
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        for i, w in enumerate(widths, start=1):
+            sheet.column_dimensions[get_column_letter(i)].width = w
+        sheet.row_dimensions[1].height = 32
 
     wb = Workbook()
     ws = wb.active
     ws.title = T["imp_sheet_goods"]
     fill = PatternFill(start_color="0F52BA", end_color="0F52BA", fill_type="solid")
-    for i, h in enumerate(headers, start=1):
-        c = ws.cell(row=1, column=i, value=h)
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = fill
-        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    widths = [22, 34, 10, 16, 16, 12]
-    for i, w in enumerate(widths[:len(headers)], start=1):
-        ws.column_dimensions[chr(64 + i)].width = w
+    auto_fill = PatternFill(start_color="EEF4FF", end_color="EEF4FF", fill_type="solid")
+    put_headers(ws, True)
     ws.freeze_panes = "A2"
+    ws[f"{L_pack}1"].comment = Comment(T["imp_note_pack"], "OilBook")
+    ws[f"{L_packs}1"].comment = Comment(T["imp_note_packs"], "OilBook")
+    ws[f"{L_qty}1"].comment = Comment(T["imp_note_qty"], "OilBook")
+    # «Количество» считается само: канистры × объём тары. Можно затереть формулу
+    # и вписать литры/штуки руками — сервер всё равно перепроверит
+    for r in range(2, last_row + 1):
+        c = ws[f"{L_qty}{r}"]
+        c.value = qty_formula(r)
+        c.fill = auto_fill
 
     lists = wb.create_sheet(T["imp_sheet_types"])
-    for i, n in enumerate(type_names, start=1):
-        lists.cell(row=i, column=1, value=n)
+    for i, nm in enumerate(type_names, start=1):
+        lists.cell(row=i, column=1, value=nm)
     lists.cell(row=1, column=3, value="л")
     lists.cell(row=2, column=3, value="шт")
+    for i, v in enumerate(IMPORT_PACK_SIZES, start=1):
+        lists.cell(row=i, column=5, value=v)
     lists.column_dimensions["A"].width = 26
     dv = DataValidation(type="list", formula1=f"='{T['imp_sheet_types']}'!$A$1:$A${len(type_names)}", allow_blank=True)
     dv_unit = DataValidation(type="list", formula1=f"='{T['imp_sheet_types']}'!$C$1:$C$2", allow_blank=True)
-    ws.add_data_validation(dv)
-    ws.add_data_validation(dv_unit)
-    dv.add("A2:A2000")
-    dv_unit.add("C2:C2000")
+    # тара: список 4 / 5 / 1 / 20 / 200 / 208, но своё число тоже принимаем
+    dv_pack = DataValidation(type="list", formula1=f"='{T['imp_sheet_types']}'!$E$1:$E${len(IMPORT_PACK_SIZES)}",
+                             allow_blank=True, showErrorMessage=False)
+    for v in (dv, dv_unit, dv_pack):
+        ws.add_data_validation(v)
+    dv.add(f"A2:A{last_row}")
+    dv_unit.add(f"C2:C{last_row}")
+    dv_pack.add(f"{L_pack}2:{L_pack}{last_row}")
 
     ex = wb.create_sheet(T["imp_sheet_example"])
-    for i, h in enumerate(headers, start=1):
-        ex.cell(row=1, column=i, value=h).font = Font(bold=True)
-    sample = [[T["fluid_0"], "MITANOL 5W-30 SL", "л", 100000, 80000, 200],
-              [T["filter_0"], "ECO FILTER Spark", "шт", 30000, 12000, 50],
-              [T["imp_type_other"], "Освежитель воздуха", "шт", 10000, 5000, 20]]
+    put_headers(ex, False)
+    # [тип, название, ед., продажа, закупка, тара, канистр, количество(None = формула)]
+    sample = [[T["fluid_0"], "MITANOL 5W-30 SL", "л", 100000, 80000, 4, 100, None],
+              [T["fluid_0"], "GOLDEN BOOSTER 10W-40", "л", 90000, 70000, 5, 100, None],
+              [T["fluid_0"], "LIMAN 15W-40", "л", 60000, 45000, 208, 2, None],
+              [T["fluid_0"], "DELPIN 5W-40", "л", 95000, 75000, None, None, 35],
+              [T["filter_0"], "ECO FILTER Spark", "шт", 30000, 12000, None, None, 50],
+              [T["imp_type_other"], "Освежитель воздуха", "шт", 10000, 5000, None, None, 20]]
     for r_i, row in enumerate(sample, start=2):
         if g.is_branch:
             row = row[:4] + row[5:]
         for c_i, v in enumerate(row, start=1):
             ex.cell(row=r_i, column=c_i, value=v)
-    for i, w in enumerate(widths[:len(headers)], start=1):
-        ex.column_dimensions[chr(64 + i)].width = w
+        if row[-1] is None:
+            ex[f"{L_qty}{r_i}"] = qty_formula(r_i)
+        ex[f"{L_qty}{r_i}"].fill = auto_fill
 
     buf = io.BytesIO()
     wb.save(buf)
