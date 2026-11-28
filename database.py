@@ -5071,10 +5071,18 @@ def parse_import_rows(raw_rows: list, category_names: dict) -> list:
             except ValueError:
                 row["errors"].append(field)
                 return None
+        qty = num(r.get("quantity"), "quantity", integer=False) or 0
+        # тара: «канистра 4 л × 100 шт» → 400 л. Если в Excel формула не
+        # пересчиталась (файл не открывали в Excel) — считаем сами
+        pack = num(r.get("pack_size"), "quantity", integer=False)
+        packs = num(r.get("packs"), "quantity", integer=False)
+        if pack and packs:
+            qty = round(pack * packs, 3)
+            row.update({"pack_size": pack, "packs": packs})
         row.update({"category": cat, "unit": unit,
                     "sell_price": num(r.get("sell_price"), "sell_price"),
                     "purchase_price": num(r.get("purchase_price"), "purchase_price"),
-                    "quantity": num(r.get("quantity"), "quantity", integer=False) or 0})
+                    "quantity": qty})
         out.append(row)
     return out
 

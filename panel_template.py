@@ -1405,6 +1405,11 @@ if ('serviceWorker' in navigator) {
   .cur-switch { display:flex; gap:6px; margin:0 0 8px; }
   .cur-switch button { font:inherit; font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
   .cur-switch button.on { background:#0F52BA; border-color:#0F52BA; color:#fff; }
+  .pk-box { margin:0 0 4px; }
+  .pk-box .cur-switch { flex-wrap:wrap; }
+  .pk-quick { margin:6px 0 0; }
+  .pk-quick button { padding:4px 10px; font-size:12px; }
+  .pk-total { margin:-2px 0 10px; padding:8px 12px; border-radius:12px; background:#EEF4FF; color:#0F52BA; font-size:13.5px; }
   .usd-tag { display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:6px; background:#DBEAFE; color:#1E40AF; margin-left:4px; vertical-align:1px; }
   .dtabs button { font:inherit; font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--hint); cursor:pointer; }
   .dtabs button.on { background:var(--text); border-color:var(--text); color:#fff; }
@@ -3077,7 +3082,7 @@ if ('serviceWorker' in navigator) {
           </div>
           <div class="field" id="wh_new_unit_row" style="display:none;">
             <label>{{ T.wh_unit }}</label>
-            <select id="wh_new_unit">
+            <select id="wh_new_unit" onchange="onWhCategoryChanged()">
               <option value="pc">{{ T.unit_pc }}</option>
               <option value="l">{{ T.unit_l }}</option>
             </select>
@@ -3106,6 +3111,7 @@ if ('serviceWorker' in navigator) {
               <input id="wh_new_purchase_usd" type="number" step="0.01" placeholder="$" oninput="onUsdFieldEdited('wh_new_purchase_usd', 'wh_new_purchase_price')">
             </div>
           </div>
+          <div class="pk-box" id="whnew_pk" style="display:none;"></div>
           <div class="field">
             <label>{{ T.wh_initial_stock }}</label>
             <input id="wh_new_stock" type="number" placeholder="0">
@@ -3372,6 +3378,7 @@ MODAL_AND_SCRIPT = """
 <div class="modal-overlay" id="restockModal">
   <div class="modal" style="text-align:left;">
     <h3 style="text-align:center;" id="restockModalTitle">{{ T.wh_restock_title }}</h3>
+    <div class="pk-box" id="restock_pk" style="display:none;"></div>
     <div class="field">
       <label>{{ T.wh_restock_qty }}</label>
       <input id="restock_qty" type="number">
@@ -4829,6 +4836,107 @@ function whSplitCat(v) {
   return { category: parts[0], dir: parts[1] || '' };
 }
 
+// ---- Тара: «канистра 4 л × 100 шт» → 400 л сразу в поле количества ----
+const PACK_MAIN = [4, 5];               // кнопки «Канистра 4 л», «Канистра 5 л»
+const PACK_QUICK = [1, 20, 200, 208];   // быстрые объёмы для «Своя тара»
+const PACK = {};                         // префикс → { qtyId, mode: '0' | '4' | '5' | 'custom' }
+function packEl(p, s) { return document.getElementById(p + '_pk' + s); }
+function packInit(p, qtyId) {
+  const box = packEl(p, '');
+  if (!box) return;
+  if (!box.dataset.ready) {
+    box.innerHTML = `<label>${T.pk_how}</label>
+      <div class="cur-switch" id="${p}_pk_modes">
+        <button type="button" data-v="0" class="on" onclick="packMode('${p}', '0')">${T.pk_liters}</button>
+        ${PACK_MAIN.map(n => `<button type="button" data-v="${n}" onclick="packMode('${p}', '${n}')">${T.pk_can.replace('{n}', n)}</button>`).join('')}
+        <button type="button" data-v="custom" onclick="packMode('${p}', 'custom')">${T.pk_custom}</button>
+      </div>
+      <div class="row2" id="${p}_pk_row" style="display:none;">
+        <div class="field" id="${p}_pk_size_wrap">
+          <label>${T.pk_size}</label>
+          <input id="${p}_pk_size" type="number" step="0.1" min="0" inputmode="decimal" oninput="packCalc('${p}')">
+          <div class="cur-switch pk-quick">${PACK_QUICK.map(n => `<button type="button" onclick="packQuick('${p}', ${n})">${n} ${T.unit_l}</button>`).join('')}</div>
+        </div>
+        <div class="field">
+          <label>${T.pk_count}</label>
+          <input id="${p}_pk_count" type="number" min="0" inputmode="numeric" oninput="packCalc('${p}')">
+        </div>
+      </div>
+      <div class="pk-total" id="${p}_pk_total" style="display:none;"></div>`;
+    box.dataset.ready = '1';
+  }
+  if (!PACK[p]) PACK[p] = { qtyId, mode: '0' };
+}
+// показать/спрятать выбор тары (нужен только товарам в литрах)
+function packShow(p, show) {
+  const box = packEl(p, '');
+  if (!box || !PACK[p]) return;
+  box.style.display = show ? '' : 'none';
+  if (!show) packMode(p, '0');
+}
+function packMode(p, v, keep) {
+  const st = PACK[p];
+  if (!st) return;
+  st.mode = String(v);
+  document.querySelectorAll(`#${p}_pk_modes button`).forEach(b => b.classList.toggle('on', b.dataset.v === st.mode));
+  const on = st.mode !== '0';
+  packEl(p, '_row').style.display = on ? '' : 'none';
+  packEl(p, '_size_wrap').style.display = st.mode === 'custom' ? '' : 'none';
+  const qty = document.getElementById(st.qtyId);
+  qty.readOnly = on;
+  if (!on) {
+    packEl(p, '_total').style.display = 'none';
+    if (!keep) packEl(p, '_count').value = '';
+    return;
+  }
+  if (!keep) (st.mode === 'custom' && !packEl(p, '_size').value ? packEl(p, '_size') : packEl(p, '_count')).focus();
+  packCalc(p);
+}
+function packQuick(p, n) { packEl(p, '_size').value = n; packCalc(p); packEl(p, '_count').focus(); }
+function packNum(v) { return parseFloat(String(v || '').replace(',', '.')); }
+function packSize(p) {
+  const st = PACK[p];
+  return st.mode === 'custom' ? packNum(packEl(p, '_size').value) : parseFloat(st.mode);
+}
+function packCalc(p) {
+  const st = PACK[p];
+  if (!st || st.mode === '0') return;
+  const size = packSize(p), cnt = packNum(packEl(p, '_count').value);
+  const qty = document.getElementById(st.qtyId), total = packEl(p, '_total');
+  if (size > 0 && cnt > 0) {
+    const l = Math.round(size * cnt * 1000) / 1000;
+    qty.value = l;
+    total.innerHTML = `${T.pk_total}: <b>${whQty(cnt)} × ${whQty(size)} ${T.unit_l} = ${whQty(l)} ${T.unit_l}</b>`;
+    total.style.display = '';
+  } else {
+    qty.value = '';
+    total.style.display = 'none';
+  }
+}
+// перед отправкой: выбрана тара, но объём или число канистр не заполнены
+function packMissing(p) {
+  const st = PACK[p], box = packEl(p, '');
+  if (!st || st.mode === '0' || !box || box.style.display === 'none') return false;
+  return !(parseFloat(document.getElementById(st.qtyId).value) > 0);
+}
+// запоминаем тару товара: в следующий раз «Пополнить» откроется с ней же
+function packRemember(productId, p) {
+  const st = PACK[p], box = packEl(p, '');
+  if (!st || !productId || !box || box.style.display === 'none') return;
+  try {
+    const key = 'oilbook_pack_' + productId;
+    if (st.mode === '0') localStorage.removeItem(key);
+    else localStorage.setItem(key, st.mode === 'custom' ? 'c' + packSize(p) : st.mode);
+  } catch (e) {}
+}
+function packRestore(productId, p) {
+  let v = null;
+  try { v = localStorage.getItem('oilbook_pack_' + productId); } catch (e) {}
+  if (!v) { packMode(p, '0', true); return; }
+  if (v[0] === 'c') { packEl(p, '_size').value = v.slice(1); packMode(p, 'custom', true); }
+  else packMode(p, v, true);
+}
+
 function onWhCategoryChanged() {
   const sel = document.getElementById('wh_new_category');
   const unitRow = document.getElementById('wh_new_unit_row');
@@ -4836,6 +4944,9 @@ function onWhCategoryChanged() {
   if (unitRow) unitRow.style.display = c.category === 'other' ? 'block' : 'none';
   const unit = document.getElementById('wh_new_unit');
   if (unit && c.dir) unit.value = 'pc';
+  packInit('whnew', 'wh_new_stock');
+  const liters = c.category.startsWith('fluid_') || (c.category === 'other' && !!unit && unit.value === 'l');
+  packShow('whnew', liters);
 }
 
 // ---- Склад: одна логика отрисовки для своего склада (ctx 'own', элементы wh*)
@@ -6654,7 +6765,7 @@ async function previewImport() {
           <tr>
             <td style="color:#94A3B8;">${r.row}</td>
             <td><b>${escapeHtml(r.name || '—')}</b><br><span class="hint-text" style="margin:0;">${escapeHtml(r.category ? (r.category === 'other' ? T.wh_category_other : T[r.category]) : r.category_raw || '—')}</span></td>
-            <td style="white-space:nowrap;">${r.quantity ? whQty(r.quantity) + ' ' + whUnit(r.unit) : '—'}</td>
+            <td style="white-space:nowrap;">${r.quantity ? whQty(r.quantity) + ' ' + whUnit(r.unit) : '—'}${r.packs ? `<div class="hint-text" style="margin:0;">${whQty(r.packs)} × ${whQty(r.pack_size)}${r.unit === 'pc' ? '' : ' ' + T.unit_l}</div>` : ''}</td>
             <td style="white-space:nowrap;">${r.sell_price != null ? fmtNum(r.sell_price) : '—'}${!IS_BRANCH && r.purchase_price != null ? `<br><span class="hint-text" style="margin:0;">${T.whs_buy} ${fmtNum(r.purchase_price)}</span>` : ''}</td>
             <td>${r.errors.length ? `<span class="imp-tag err">${errText(r.errors)}</span>` : (r.exists ? `<span class="imp-tag upd">${T.imp_tag_upd}</span>` : `<span class="imp-tag new">${T.imp_tag_new}</span>`)}</td>
           </tr>`).join('')}
@@ -7152,6 +7263,7 @@ async function createProduct() {
   const { category, dir } = whSplitCat(catEl.value);
   const name = nameEl.value.trim();
   if (!category || !name) { showMsg(T.wh_fill_required, false); return; }
+  if (packMissing('whnew')) { showMsg(T.pk_need_size, false); return; }
   const payload = {
     category, dir, name,
     unit: document.getElementById('wh_new_unit').value,
@@ -7172,6 +7284,8 @@ async function createProduct() {
   const data = await res.json();
   if (data.ok) {
     showMsg(T.wh_product_added, true);
+    packRemember(data.product && data.product.id, 'whnew');
+    packMode('whnew', '0');
     ['wh_new_name','wh_new_sell_price','wh_new_purchase_price','wh_new_purchase_usd','wh_new_stock'].forEach(id => document.getElementById(id).value = '');
     if (!IS_BRANCH) curSet('wh_new', 'UZS');
     document.getElementById('wh_new_unit_row').style.display = 'none';
@@ -7205,6 +7319,12 @@ function openRestockModal(id, name, shopId) {
   const restockUsd = document.getElementById('restock_price_usd');
   if (restockUsd) restockUsd.value = '';
   document.getElementById('restock_date').value = fmtDate(new Date());
+  // тара — только для товаров в литрах (масла, жидкости)
+  const prod = (productsCache || []).concat(WHCTX.br.products || []).find(x => x.id === id);
+  const liters = !!prod && prod.unit !== 'pc';
+  packInit('restock', 'restock_qty');
+  packShow('restock', liters);
+  if (liters) { packEl('restock', '_count').value = ''; packRestore(id, 'restock'); }
   document.getElementById('restockModal').classList.add('open');
 }
 
@@ -7213,6 +7333,7 @@ function closeRestockModal() {
 }
 
 async function submitRestock() {
+  if (packMissing('restock')) { showMsg(T.pk_need_size, false); return; }
   const payload = {
     quantity: document.getElementById('restock_qty').value,
     purchase_price: document.getElementById('restock_price').value || null,
@@ -7227,6 +7348,7 @@ async function submitRestock() {
   });
   const data = await res.json();
   if (data.ok) {
+    packRemember(restockingProductId, 'restock');
     closeRestockModal();
     showMsg(T.wh_restocked, true);
     if (restockingShopId) { selectWhBranch(restockingShopId); WH.net = null; loadNetworkStock(); }
