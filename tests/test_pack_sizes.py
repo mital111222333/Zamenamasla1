@@ -144,3 +144,13 @@ def test_filled_template_without_excel_recalc_still_counts(app):
     assert err is None
     rows = db.parse_import_rows(raw, webapp._import_category_names())
     assert len(rows) == 1 and rows[0]["quantity"] == 400 and not rows[0]["errors"]
+
+
+def test_master_picker_hidden_with_single_master():
+    """«Мастер (кто делал)» показываем, только если мастеров больше одного;
+    единственному мастеру замена засчитывается автоматически."""
+    src = _src()
+    assert '<div id="master_row" style="display:none;">' in src
+    js = src[src.index("async function loadTeamMasters"):src.index("loadTeamMasters();")]
+    assert "d.masters.length === 1" in js and "sel.value = String(d.masters[0].id)" in js
+    assert "row.style.display = one ? 'none' : ''" in js
